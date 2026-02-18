@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+env/
+
+# Data (NEVER commit these)
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep      # Keeps the folder structure but ignores files
+!data/processed/.gitkeep
+
+# Large Models (GitHub has a 100MB limit)
+models/*.pt
+models/*.pth
+models/*.onnx
+
+# LaTeX (generated junk)
+*.aux
+*.log
+*.out
+*.toc
+*.pdf
+*.synctex.gz

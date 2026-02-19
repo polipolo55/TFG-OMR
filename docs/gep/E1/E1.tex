@@ -112,36 +112,52 @@ In these situations, paper limits flexibility. Performers may need to transpose 
 \section{Justification of the Chosen Alternative}
 
 \subsection{State of the Art / Existing Alternatives}
-The landscape of Optical Music Recognition (OMR) for full-page transcription can be categorized into three distinct methodological families:
+Current OMR literature distinguishes three broad families of approaches:
 
 \begin{enumerate}
-    \item \textbf{Traditional Modular Pipelines (e.g., Audiveris):} These systems rely on a sequence of handcrafted heuristics: image binarization, staff-line removal, symbol segmentation (Connected Component Analysis), and rule-based syntactic reconstruction. While historically significant, they suffer from error propagation—if the staff removal step fails, the subsequent symbol recognition fails irreversibly.
-    
-    \item \textbf{CRNN-CTC (Convolutional Recurrent Neural Networks):} Adapted from text recognition, this architecture uses a CNN for feature extraction and an RNN trained with Connectionist Temporal Classification (CTC) loss. While highly effective for monophonic melodies, this approach struggles with \textit{polyphony} due to the "Vertical Collapse" problem, where the model cannot naturally distinguish multiple notes occurring at the same horizontal timestamp.
-    
-    \item \textbf{End-to-End Transformers (Seq2Seq):} The current state-of-the-art, exemplified by the \textit{Sheet Music Transformer} (SMT++) and \textit{LEGATO}. These models treat OMR as a sequence-to-sequence translation task, mapping the input image directly to a sequence of musical tokens (e.g., Humdrum \*\*kern or ABC notation) using an Encoder-Decoder architecture with Attention mechanisms.
+    \item \textbf{Traditional modular pipelines (e.g., rule-based systems):} They decompose the task into fixed stages (pre-processing, staff detection/removal, symbol segmentation, symbol classification, and reconstruction). Their main weakness is error propagation between stages.
+    \item \textbf{CRNN-CTC approaches:} They combine convolutional features with recurrent sequence modeling and CTC training, adapting methods from text recognition. They are effective for simple notation lines but can struggle when dense polyphony and complex page structure are present.
+    \item \textbf{End-to-end transformer approaches:} They formulate OMR as image-to-sequence translation with attention-based encoder-decoder architectures. This family is currently the most promising for full-page and structurally complex scores.
 \end{enumerate}
 
 \subsection{Comparison Criteria}
-The following criteria are defined to evaluate the suitability of these alternatives for a TFG aimed at full-score transcription:
+The alternatives are compared using criteria aligned with the scope of this TFG:
 
 \begin{itemize}
-    \item \textbf{Robustness and Accuracy:} The overall precision of the system in correctly classifying symbols and extracting the melody, specifically its resilience against non-standard, handwritten-style, noise, and varying image quality.
-    \item \textbf{Polyphony Handling:} The ability to correctly recognize chords and multiple voices without heuristic ``linearization'' or vertical collapse.
-    \item \textbf{Reading Order Awareness:} The capacity to navigate the complex "zig-zag" reading path of a full page (multiple systems, repeats) rather than just a single line.[2]
-    \item \textbf{Semantic Completeness:} Whether the output captures the full musical logic (pitch, duration, key signature) required for re-engraving.
-    \item \textbf{Local Ecosystem Alignment:} Compatibility with datasets and baselines maintained by the local research community (CVC-UAB / University of Alicante) to facilitate evaluation.
-    \item \textbf{Computational Feasibility:} The hardware requirements for training and inference within the scope of a bachelor's thesis.
+    \item \textbf{Accuracy and robustness:} Resistance to image noise, quality variation, and notation complexity.
+    \item \textbf{Polyphony support:} Ability to represent simultaneous notes and multiple voices correctly.
+    \item \textbf{Layout awareness:} Capacity to process complete pages with multiple systems and non-trivial reading order.
+    \item \textbf{Semantic completeness:} Generation of outputs that preserve musical meaning (pitch, duration, meter, and key context).
+    \item \textbf{Implementation feasibility:} Compatibility with available time, compute resources, and development effort for a Bachelor's thesis.
+    \item \textbf{Evaluation compatibility:} Possibility of benchmarking with public datasets and reproducible metrics.
 \end{itemize}
 
 \subsection{Comparative Analysis}
-\textit{Compare candidate alternatives and justify the analysis with references.}
+\textbf{Traditional pipelines} provide interpretability and low entry cost, but their stage-by-stage structure tends to amplify upstream errors and requires substantial manual tuning for new score conditions.
+
+\textbf{CRNN-CTC models} simplify training and can work well on constrained settings (e.g., single staves or reduced vocabulary). However, they are less suited to rich polyphony and full-page structure when direct sequence alignment becomes ambiguous.
+
+\textbf{Transformer-based models} offer the strongest overall balance for this project. Their attention mechanisms support broader visual context and improve handling of long-range dependencies (for example, symbols whose meaning depends on earlier context). In addition, they integrate naturally with compact tokenized output formats suitable for sequence generation.
 
 \subsection{Selected Alternative and Rationale}
-\textit{Explain which alternative is selected and why it is the most suitable one for this project.}
+The selected alternative is an \textbf{end-to-end transformer architecture}, following the \textbf{Sheet Music Transformer (SMT)-style} formulation with \textbf{Humdrum \texttt{**kern}} tokenization.
+
+\textbf{Rationale:}
+\begin{enumerate}
+    \item \textbf{Better fit for full-page transcription:} Attention-based decoding is more appropriate for non-local dependencies and dense notation than strictly monotonic sequence assumptions.
+    \item \textbf{Good representational efficiency:} The \texttt{**kern} format is compact and expressive enough to encode relevant symbolic information for this stage of the project.
+    \item \textbf{Feasible implementation path:} A medium-scale encoder-decoder model is realistic within TFG constraints, both in training cost and engineering effort.
+    \item \textbf{Strong baseline potential:} The approach can be evaluated with common OMR metrics and compared against prior deep-learning baselines.
+\end{enumerate}
 
 \subsection{Constraints and Decision Boundaries}
-\textit{Describe technical, time, economic, legal, or resource constraints that condition the decision.}
+\begin{itemize}
+    \item \textbf{Data availability:} High-quality ground truth for full pages is limited; therefore, synthetic data and careful validation splits are required.
+    \item \textbf{Sequence length:} Dense pages produce long output sequences, so compact encodings (e.g., \texttt{**kern}) are preferred over verbose alternatives.
+    \item \textbf{Computational resources:} Training must fit available GPU memory and time constraints, which limits model size and batch configuration.
+    \item \textbf{Project scope:} The objective is a solid and reproducible prototype, not a production-ready universal OMR engine.
+    \item \textbf{Too ambitious} approaches (e.g., multi-modal fusion, large-scale pretraining) could be out of scope for this TFG stage but could be future extensions, then a CRNN-CTC for monophonic sheets or a modular pipeline for simple scores could be fallback alternatives if the transformer approach proves infeasible within the project timeline.
+\end{itemize}
 
 \section{Project Scope}
 \subsection{General Objective}

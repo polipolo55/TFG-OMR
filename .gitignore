@@ -16,10 +16,54 @@ models/*.pt
 models/*.pth
 models/*.onnx
 
-# LaTeX (generated junk)
+# LaTeX / TeX (generated artifacts)
 *.aux
+*.fdb_latexmk
+*.fls
+*.fmt
+*.fot
+*.lof
 *.log
+*.lot
 *.out
 *.toc
-*.pdf
 *.synctex.gz
+*.xdv
+
+# Bibliography (BibTeX / Biber)
+*.bbl
+*.bcf
+*.blg
+*.run.xml
+
+# Index / glossary / nomenclature
+*.acn
+*.acr
+*.alg
+*.glg
+*.glo
+*.gls
+*.idx
+*.ilg
+*.ind
+*.ist
+*.loa
+*.lol
+*.nlo
+*.nls
+
+# Beamer / presentations
+*.nav
+*.snm
+
+# Build helpers / temporary files
+*.dvi
+*.ps
+*.backup
+*.sav
+*.tmp
+*~
+
+# Package-specific temp folders
+_minted*/
+pythontex-files-*/

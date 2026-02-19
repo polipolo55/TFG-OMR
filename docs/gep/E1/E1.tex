@@ -1,0 +1,192 @@
+\documentclass[11pt, a4paper]{article}
+
+% --- PACKAGES ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel} % Set to English
+\usepackage[margin=2.5cm]{geometry}
+\setlength{\headheight}{13.6pt}
+\usepackage{graphicx}       % For logos and images
+\usepackage{hyperref}       % For clickable links and TOC
+\usepackage{fancyhdr}       % For headers and footers
+\usepackage{caption}        % For figure/table legends
+\usepackage{csquotes}
+
+% --- BIBLIOGRAPHY SETUP ---
+% The rubric allows [n] format, which IEEE handles perfectly
+\usepackage[style=ieee, sorting=none]{biblatex} 
+\addbibresource{references.bib}
+
+% --- HEADER & FOOTER SETUP ---
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{OMR for full music sheets} % Project short name
+\fancyhead[R]{GEP Deliverable 1}        % Deliverable name
+\fancyfoot[C]{\thepage}                 % Page numbers are mandatory
+
+% --- LINK COLORS ---
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    filecolor=magenta,      
+    urlcolor=blue,
+    citecolor=blue,
+}
+
+\begin{document}
+
+% ==========================================
+% TITLE PAGE
+% ==========================================
+\begin{titlepage}
+    \centering
+    \vspace*{1cm}
+    
+    % TODO: posar el puto logo
+    
+    {\scshape\LARGE Universitat Politècnica de Catalunya \par}
+    {\scshape\Large Facultat d'Informàtica de Barcelona (FIB) \par}
+    \vspace{1.5cm}
+    
+    {\huge\bfseries End-to-End Optical Music Recognition for Full Music Sheets using Deep Learning \par}
+    \vspace{1cm}
+    
+    {\Large\bfseries GEP Deliverable 1: Context and Scope \par}
+    \vspace{2cm}
+    
+    \begin{flushleft} \large
+        \textbf{Author:} Pol Casanovas Puig \\
+        \textbf{Director:} Manel Frigola Bourlon \\
+        \textbf{GEP Tutor:} Xavier Morales Sorolla \\
+        \textbf{Specialty:} Computació \\
+    \end{flushleft}
+    
+    \vfill
+    {\large \today \par}
+\end{titlepage}
+
+% ==========================================
+% TABLE OF CONTENTS
+% ==========================================
+\tableofcontents
+\newpage
+
+% ==========================================
+% DOCUMENT BODY
+% ==========================================
+
+\section{Introduction and Context}
+\subsection{Academic/Professional Framework}
+This project is developed in the academic context of the Bachelor's Thesis (TFG) at FIB--UPC, under modality A, as part of the requirements to complete the Computer Science degree at the Universitat Polit\`ecnica de Catalunya (UPC). The project is supervised by Manel Frigola Bourlon, professor at the Facultat d'Inform\`atica de Barcelona (FIB), and guided by Xavier Morales Sorolla as GEP tutor.
+
+The work is framed within the Computaci\'o specialty. The topic was selected due to my interest in the intersection of music and technology, and because of the potential impact of Optical Music Recognition (OMR) in areas such as music education, digital archiving, and music information retrieval.
+
+\subsection{Domain Concepts and Terminology}
+\begin{description}
+    \item[Optical Music Recognition (OMR):] The process of automatically converting scanned or photographed music sheets into machine-readable symbolic formats (e.g., MusicXML, MIDI).
+    \item[Music Sheet/Score:] A printed or digital document containing musical notation, including notes, staves, time signatures, and other musical symbols.
+    \item[End-to-End System:] A unified approach that maps input directly to output without intermediate manual steps, typically using a single neural network or an integrated pipeline.
+    \item[Music Information Retrieval (MIR):] The interdisciplinary field focused on extracting meaningful information from music data.
+    \item[Symbolic Notation:] A machine-readable representation of music (e.g., MusicXML, MIDI), in contrast to audio waveforms.
+    \item[Digital Archiving:] The process of converting and preserving documents in digital form for long-term accessibility.
+\end{description}
+
+In addition to these core concepts, the project relies on basic music theory (notation, rhythm, and structure) and technical foundations in deep learning, computer vision, and data processing. When required, these notions will be introduced and explained to keep the document accessible to readers with different backgrounds.
+
+
+\subsection{Problem Statement}
+As a musician, I have repeatedly faced the need to digitize paper scores for sharing, archival purposes, and use in composition or analysis software. This is especially relevant in rehearsal and live-performance contexts, where musicians may receive a physical chart and need to perform it immediately.
+
+In these situations, paper limits flexibility. Performers may need to transpose parts for different instruments, generate quick audio playback to understand style and groove, or store the score in a searchable digital library (e.g., on a tablet). Manual transcription is slow and error-prone, which motivates the need for an efficient and accurate method to convert physical music sheets into machine-readable formats.
+
+\subsection{Stakeholders}
+\begin{itemize}
+    \item \textbf{Musicians:} Readers and performers who benefit from digital scores for practice, performance, sharing, and transposition.
+    \item \textbf{Music Educators:} Teachers who use digital sheet music in class and provide interactive learning resources to students.
+    \item \textbf{Music Archivists:} Professionals responsible for preserving and organizing collections, who benefit from improved accessibility and long-term preservation.
+    \item \textbf{Music Software Developers:} Companies and independent developers who can integrate OMR outputs into notation, playback, or learning applications.
+    \item \textbf{MIR Researchers:} Researchers in music information retrieval who can use OMR data for analysis, recommendation systems, and musicology studies.
+    \item \textbf{General Public:} Music enthusiasts interested in accessing and interacting with digital music sheets for personal use and learning.
+\end{itemize}
+
+\section{Justification of the Chosen Alternative}
+
+\subsection{State of the Art / Existing Alternatives}
+The landscape of Optical Music Recognition (OMR) for full-page transcription can be categorized into three distinct methodological families:
+
+\begin{enumerate}
+    \item \textbf{Traditional Modular Pipelines (e.g., Audiveris):} These systems rely on a sequence of handcrafted heuristics: image binarization, staff-line removal, symbol segmentation (Connected Component Analysis), and rule-based syntactic reconstruction. While historically significant, they suffer from error propagation—if the staff removal step fails, the subsequent symbol recognition fails irreversibly.
+    
+    \item \textbf{CRNN-CTC (Convolutional Recurrent Neural Networks):} Adapted from text recognition, this architecture uses a CNN for feature extraction and an RNN trained with Connectionist Temporal Classification (CTC) loss. While highly effective for monophonic melodies, this approach struggles with \textit{polyphony} due to the "Vertical Collapse" problem, where the model cannot naturally distinguish multiple notes occurring at the same horizontal timestamp.
+    
+    \item \textbf{End-to-End Transformers (Seq2Seq):} The current state-of-the-art, exemplified by the \textit{Sheet Music Transformer} (SMT++) and \textit{LEGATO}. These models treat OMR as a sequence-to-sequence translation task, mapping the input image directly to a sequence of musical tokens (e.g., Humdrum \*\*kern or ABC notation) using an Encoder-Decoder architecture with Attention mechanisms.
+\end{enumerate}
+
+\subsection{Comparison Criteria}
+The following criteria are defined to evaluate the suitability of these alternatives for a TFG aimed at full-score transcription:
+
+\begin{itemize}
+    \item \textbf{Robustness and Accuracy:} The overall precision of the system in correctly classifying symbols and extracting the melody, specifically its resilience against non-standard, handwritten-style, noise, and varying image quality.
+    \item \textbf{Polyphony Handling:} The ability to correctly recognize chords and multiple voices without heuristic ``linearization'' or vertical collapse.
+    \item \textbf{Reading Order Awareness:} The capacity to navigate the complex "zig-zag" reading path of a full page (multiple systems, repeats) rather than just a single line.[2]
+    \item \textbf{Semantic Completeness:} Whether the output captures the full musical logic (pitch, duration, key signature) required for re-engraving.
+    \item \textbf{Local Ecosystem Alignment:} Compatibility with datasets and baselines maintained by the local research community (CVC-UAB / University of Alicante) to facilitate evaluation.
+    \item \textbf{Computational Feasibility:} The hardware requirements for training and inference within the scope of a bachelor's thesis.
+\end{itemize}
+
+\subsection{Comparative Analysis}
+\textit{Compare candidate alternatives and justify the analysis with references.}
+
+\subsection{Selected Alternative and Rationale}
+\textit{Explain which alternative is selected and why it is the most suitable one for this project.}
+
+\subsection{Constraints and Decision Boundaries}
+\textit{Describe technical, time, economic, legal, or resource constraints that condition the decision.}
+
+\section{Project Scope}
+\subsection{General Objective}
+\textit{State the main objective of the TFG clearly and concisely.}
+
+\subsection{Specific Objectives}
+\textit{List measurable sub-objectives that decompose the general objective.}
+
+\subsection{Functional Requirements}
+\textit{Describe what the solution must do (features, behaviours, outputs).}
+
+\subsection{Non-Functional Requirements}
+\textit{Describe quality attributes and constraints (e.g., accuracy, speed, usability, robustness, portability).}
+
+\subsection{Scope Boundaries and Exclusions}
+\textit{Specify what is in scope and explicitly what is out of scope for this deliverable/TFG stage.}
+
+\subsection{Risks and Potential Obstacles}
+\textit{Identify potential risks and obstacles (technical, data-related, planning, integration) and their expected impact.}
+
+\section{Methodology and Rigour}
+\subsection{Project Methodology}
+\textit{Describe the chosen methodology (e.g., classical/cascade, agile, hybrid) and justify why it fits the project.}
+
+\subsection{Adaptation to This Project}
+\textit{Explain how the methodology is tailored to your concrete TFG context and constraints.}
+
+\subsection{Execution Approach}
+\textit{Describe the intended phases/iterations at a high level and the expected deliverables/results of each one.}
+
+\subsection{Monitoring and Follow-up Tools}
+\textit{Describe how progress will be monitored (meetings, milestones, indicators, planning board, repositories and logs).}
+
+\section{Document Organisation}
+\textit{Briefly explain the structure of this document and what each section contains.}
+
+\section{Conclusions}
+\textit{Summarize the context, chosen alternative, defined scope, and methodological approach.
+Highlight the expected contribution of the TFG.}
+
+
+% ==========================================
+% REFERENCES
+% ==========================================
+\newpage
+\printbibliography[heading=bibintoc, title={References}]
+
+\end{document}

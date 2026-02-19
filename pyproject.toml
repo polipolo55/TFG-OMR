@@ -6,12 +6,14 @@ authors = [
     {name = "Pol Casanovas"}
 ]
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = "~3.14"
 dependencies = [
     "opencv-python (>=4.13.0.92,<5.0.0.0)",
     "music21 (>=9.9.1,<10.0.0)",
     "matplotlib (>=3.10.8,<4.0.0)",
-    "jupyterlab (>=4.5.4,<5.0.0)"
+    "jupyterlab (>=4.5.4,<5.0.0)",
+    "torch (>=2.10.0,<3.0.0)",
+    "torchvision (>=0.25.0,<0.26.0)"
 ]
 
 

@@ -48,7 +48,7 @@
     {\scshape\Large Facultat d'Informàtica de Barcelona (FIB) \par}
     \vspace{1.5cm}
     
-    {\huge\bfseries End-to-End Optical Music Recognition for Full Music Sheets using Deep Learning \par}
+    {\huge\bfseries Optical Music Recognition for Full Music Sheets: A CRNN-CTC Approach for Monophonic Lines \par}
     \vspace{1cm}
     
     {\Large\bfseries GEP Deliverable 1: Context and Scope \par}
@@ -115,9 +115,9 @@ In these situations, paper limits flexibility. Performers may need to transpose 
 Current OMR literature distinguishes three broad families of approaches:
 
 \begin{enumerate}
-    \item \textbf{Traditional modular pipelines (e.g., rule-based systems):} They decompose the task into fixed stages (pre-processing, staff detection/removal, symbol segmentation, symbol classification, and reconstruction). Their main weakness is error propagation between stages.
-    \item \textbf{CRNN-CTC approaches:} They combine convolutional features with recurrent sequence modeling and CTC training, adapting methods from text recognition. They are effective for simple notation lines but can struggle when dense polyphony and complex page structure are present.
-    \item \textbf{End-to-end transformer approaches:} They formulate OMR as image-to-sequence translation with attention-based encoder-decoder architectures. This family is currently the most promising for full-page and structurally complex scores.
+    \item \textbf{Traditional modular pipelines (e.g., rule-based systems):} They decompose the task into fixed stages (pre-processing, staff detection/removal, symbol segmentation, symbol classification, and reconstruction). Their main weakness is error propagation between stages, and they require significant manual engineering for each new score style or notation condition.
+    \item \textbf{CRNN-CTC approaches:} They combine convolutional feature extraction with recurrent sequence modeling (typically a bidirectional LSTM) trained with Connectionist Temporal Classification (CTC) loss, adapting methods originally developed for handwriting and text recognition. They are well-suited for monophonic staff lines where a left-to-right sequential assumption holds naturally, and they are lighter and faster to train than attention-based counterparts.
+    \item \textbf{End-to-end transformer approaches:} They formulate OMR as image-to-sequence translation with attention-based encoder-decoder architectures. This family handles long-range dependencies and complex page layouts well, making it the most promising direction for polyphonic and full-page scores, at the cost of higher data and compute requirements.
 \end{enumerate}
 
 \subsection{Comparison Criteria}
@@ -133,50 +133,100 @@ The alternatives are compared using criteria aligned with the scope of this TFG:
 \end{itemize}
 
 \subsection{Comparative Analysis}
-\textbf{Traditional pipelines} provide interpretability and low entry cost, but their stage-by-stage structure tends to amplify upstream errors and requires substantial manual tuning for new score conditions.
+\textbf{Traditional pipelines} provide interpretability and low entry cost, but their stage-by-stage structure tends to amplify upstream errors and requires substantial manual tuning for new score conditions. They remain useful as baselines and for understanding the problem structure.
 
-\textbf{CRNN-CTC models} simplify training and can work well on constrained settings (e.g., single staves or reduced vocabulary). However, they are less suited to rich polyphony and full-page structure when direct sequence alignment becomes ambiguous.
+\noindent\textbf{CRNN-CTC models} are a natural fit for the monophonic setting. A CNN encodes local visual features from the staff image, a bidirectional LSTM captures sequential context, and CTC decoding aligns the output sequence without needing explicit segmentation boundaries. This is exactly the problem structure of a single melody line such as those found in lead sheets (e.g., the Real Book), where reading order is strictly left-to-right and polyphony is absent.
 
-\textbf{Transformer-based models} offer the strongest overall balance for this project. Their attention mechanisms support broader visual context and improve handling of long-range dependencies (for example, symbols whose meaning depends on earlier context). In addition, they integrate naturally with compact tokenized output formats suitable for sequence generation.
+\noindent\textbf{Transformer-based models} are the most powerful option for full-page and polyphonic transcription, but they demand substantially more annotated data and compute. They represent a natural extension once the monophonic problem is solved, rather than the primary implementation target for this TFG.
 
 \subsection{Selected Alternative and Rationale}
-The selected alternative is an \textbf{end-to-end transformer architecture}, following the \textbf{Sheet Music Transformer (SMT)-style} formulation with \textbf{Humdrum \texttt{**kern}} tokenization.
+The selected approach is a \textbf{CRNN-CTC model} for \textbf{monophonic music line recognition}, with the primary evaluation target being lead-sheet scores from \textbf{The Real Book (C edition)}.
 
 \textbf{Rationale:}
 \begin{enumerate}
-    \item \textbf{Better fit for full-page transcription:} Attention-based decoding is more appropriate for non-local dependencies and dense notation than strictly monotonic sequence assumptions.
-    \item \textbf{Good representational efficiency:} The \texttt{**kern} format is compact and expressive enough to encode relevant symbolic information for this stage of the project.
-    \item \textbf{Feasible implementation path:} A medium-scale encoder-decoder model is realistic within TFG constraints, both in training cost and engineering effort.
-    \item \textbf{Strong baseline potential:} The approach can be evaluated with common OMR metrics and compared against prior deep-learning baselines.
+    \item \textbf{Well-matched to the monophonic setting:} Real Book melodies consist of single-voice staff lines with a strict left-to-right reading order, which is exactly the regime where CTC-based sequence models excel.
+    \item \textbf{Feasible within TFG constraints:} A CRNN-CTC is significantly lighter to train than a full transformer, requiring less annotated data and less GPU memory, which is important given the limited compute budget of a Bachelor's thesis.
+    \item \textbf{Strong prior art:} CRNN-CTC architectures have been validated for OMR in systems such as the Calvo-Zaragoza monophonic OMR line recognizer and related work, providing reproducible baselines.
+    \item \textbf{Clear evaluation path:} Recognition at the staff-line level can be directly benchmarked with Symbol Error Rate (SER) and sequence-level metrics on standard or custom-annotated Real Book data.
+    \item \textbf{Natural extension to polyphony:} Once monophonic recognition is solid, the architecture can be progressively extended, or complemented with a transformer-based model, to address polyphonic staves and full-page structure.
 \end{enumerate}
+
+Traditional modular pipelines and transformer-based models will be studied and discussed to provide context and comparison, but the main implementation is the CRNN-CTC approach described above.
 
 \subsection{Constraints and Decision Boundaries}
 \begin{itemize}
-    \item \textbf{Data availability:} High-quality ground truth for full pages is limited; therefore, synthetic data and careful validation splits are required.
-    \item \textbf{Sequence length:} Dense pages produce long output sequences, so compact encodings (e.g., \texttt{**kern}) are preferred over verbose alternatives.
-    \item \textbf{Computational resources:} Training must fit available GPU memory and time constraints, which limits model size and batch configuration.
-    \item \textbf{Project scope:} The objective is a solid and reproducible prototype, not a production-ready universal OMR engine.
-    \item \textbf{Too ambitious} approaches (e.g., multi-modal fusion, large-scale pretraining) could be out of scope for this TFG stage but could be future extensions, then a CRNN-CTC for monophonic sheets or a modular pipeline for simple scores could be fallback alternatives if the transformer approach proves infeasible within the project timeline.
+    \item \textbf{Data availability:} Ground truth for Real Book pages is not publicly available in annotated form; the project will require building or adapting a dataset, potentially combining synthetic generation with manual annotation of a subset of pages.
+    \item \textbf{Monophonic-first scope:} The initial system will target single-voice melodic lines only. Polyphony (chords, multiple voices) and full-page layout parsing are considered extensions, not primary deliverables.
+    \item \textbf{Computational resources:} Training must fit available GPU memory and time. A CRNN-CTC is better suited to this constraint than large transformer models.
+    \item \textbf{Sequence representation:} A compact symbolic encoding (e.g., a simplified \texttt{**kern}-like or ABC-like token sequence or even a custom one) will be used for the output, balancing expressiveness and training efficiency.
+    \item \textbf{Project scope:} The objective is a solid and reproducible prototype that correctly transcribes monophonic lead-sheet lines, not a production-ready universal OMR engine.
+    \item \textbf{Polyphony and full-page extension:} These are considered future work if time and resources allow, potentially employing a transformer-based model in a second phase.
 \end{itemize}
 
 \section{Project Scope}
 \subsection{General Objective}
-\textit{State the main objective of the TFG clearly and concisely.}
+To develop a proof-of-concept CRNN-CTC model capable of transcribing monophonic music lines into a symbolic format, with the Real Book as the primary target corpus, and to explore potential extensions toward polyphonic recognition, demonstrating the feasibility of this approach within the constraints of a Bachelor's thesis.
 
 \subsection{Specific Objectives}
-\textit{List measurable sub-objectives that decompose the general objective.}
+\begin{itemize}
+    \item Survey and document the state of the art in OMR, covering traditional modular pipelines, CRNN-CTC models, and transformer-based end-to-end approaches.
+    \item Implement a traditional modular pipeline as a baseline, using classical computer vision techniques for staff detection and symbol segmentation.
+    \item Build or adapt an annotated dataset of monophonic staff lines derived from Real Book pages, including synthetic augmentation to increase sample diversity and quantity.
+    \item Design, implement, and train a CRNN-CTC model for monophonic staff-line recognition, defining a compact symbolic output encoding suitable for melody representation.
+    \item Evaluate the CRNN-CTC model against the baseline using standard OMR metrics (e.g., Symbol Error Rate) and analyse failure modes.
+    \item Investigate and prototype, if feasible within scope and time, an extension of the system to handle limited polyphony or chord symbols commonly found in lead sheets.
+\end{itemize}    
 
 \subsection{Functional Requirements}
-\textit{Describe what the solution must do (features, behaviours, outputs).}
+\begin{itemize}
+    \item The system shall accept as input a scanned or photographed image of a music sheet page and detect the individual staff lines present on it.
+    \item For each detected staff line, the system shall produce a symbolic sequence representing the musical content (pitches, durations, rests, accidentals, time and key signatures) in a compact, machine-readable format.
+    \item The output format shall be sufficient to reconstruct the melody of a monophonic line unambiguously (e.g., reconstruct MIDI or import into notation software).
+    \item The system shall process Real Book lead-sheet pages as the primary evaluation scenario.
+    \item The system shall include a traditional modular pipeline baseline against which the CRNN-CTC model can be compared quantitatively.
+    \item The system shall provide evaluation outputs (metric scores and error analysis) for the trained model on a held-out test set.
+\end{itemize}
 
 \subsection{Non-Functional Requirements}
-\textit{Describe quality attributes and constraints (e.g., accuracy, speed, usability, robustness, portability).}
+\begin{itemize}
+    \item \textbf{Accuracy:} The CRNN-CTC model should achieve a Symbol Error Rate (SER) clearly below that of the modular baseline on the test set, demonstrating a meaningful improvement.
+    \item \textbf{Reproducibility:} All experiments must be reproducible from a public repository with documented dependencies, dataset preparation scripts, and training configuration files.
+    \item \textbf{Computational feasibility:} Training must complete in a reasonable time on a single consumer-grade GPU (e.g., NVIDIA RTX-class). Inference on a single staff line must run in well under one second.
+    \item \textbf{Modularity:} The codebase should be structured so that the staff detection, line cropping, and recognition stages are independently testable and replaceable.
+    \item \textbf{Portability:} The implementation should run on standard Linux environments using open-source libraries (PyTorch, OpenCV, etc.) without proprietary dependencies.
+    \item \textbf{Documentation:} Code and experimental results must be documented clearly enough to allow the project supervisor and evaluators to understand and verify the work.
+\end{itemize}
 
 \subsection{Scope Boundaries and Exclusions}
-\textit{Specify what is in scope and explicitly what is out of scope for this deliverable/TFG stage.}
+\textbf{In scope:}
+\begin{itemize}
+    \item Monophonic melody lines like the ones found on the Real Book pages.
+    \item Staff-line detection and individual line cropping as a preprocessing stage.
+    \item Design, training, and evaluation of a CRNN-CTC model for single-voice line recognition.
+    \item Implementation of a traditional modular pipeline as a comparative baseline.
+    \item Dataset construction, including synthetic data generation and/or manual annotation of a Real Book subset.
+    \item Quantitative evaluation using standard OMR metrics (SER, pitch accuracy, rhythm accuracy).
+    \item A survey and discussion of transformer-based OMR approaches as context and potential future direction.
+\end{itemize}
+\textbf{Out of scope (for this TFG stage):}
+\begin{itemize}
+    \item Full polyphonic transcription (multiple simultaneous voices or complex chords beyond simple chord symbols).
+    \item Full-page layout analysis (reading order recovery across multiple systems, lyrics, annotations).
+    \item Audio synthesis or playback integration beyond basic MIDI export.
+    \item Real-time or mobile deployment.
+    \item Support for handwritten scores or non-Western notation systems.
+    \item Training or fine-tuning large-scale transformer models from scratch.
+\end{itemize}
 
 \subsection{Risks and Potential Obstacles}
-\textit{Identify potential risks and obstacles (technical, data-related, planning, integration) and their expected impact.}
+\begin{itemize}
+    \item \textbf{Limited ground-truth data:} Annotated Real Book data is not freely available. Building a sufficient training set manually is time-consuming. \textit{Mitigation:} Use synthetic score generation (e.g., via LilyPond or MuseScore) to bootstrap training data, and apply data augmentation (noise, blur, rotation) to improve generalisation.
+    \item \textbf{Staff detection errors propagating downstream:} If staff lines are incorrectly detected or cropped, the recogniser receives corrupted input. \textit{Mitigation:} Dedicate early project phases to validating the detection stage independently before coupling it to the recognition model.
+    \item \textbf{Encoding design complexity:} Defining a compact yet expressive symbolic encoding for the CTC output vocabulary may require iteration. \textit{Mitigation:} Start with a minimal vocabulary (pitch class + octave + duration) and extend incrementally.
+    \item \textbf{Model underfitting or CTC misalignment:} CTC training can be sensitive to vocabulary size and sequence length ratios. \textit{Mitigation:} Follow established CRNN-CTC OMR recipes from the literature and monitor CTC loss curves carefully during training.
+    \item \textbf{Scope creep toward polyphony:} Attempting to address polyphony prematurely could divert time from solidifying the monophonic core. \textit{Mitigation:} Treat polyphony as a clearly gated extension, only pursued after the monophonic system meets the defined accuracy targets.
+    \item \textbf{Computational resource constraints:} Limited GPU access could slow training iteration cycles. \textit{Mitigation:} Use lightweight model configurations, mixed-precision training, and cloud compute credits if available.
+\end{itemize}
 
 \section{Methodology and Rigour}
 \subsection{Project Methodology}

@@ -155,25 +155,12 @@ The alternatives are compared using criteria aligned with the scope of this TFG:
 The selected approach is a \textbf{CRNN-CTC model} for \textbf{monophonic music line recognition}, with the primary evaluation target being lead-sheet scores from \textbf{The Real Book (C edition)}.
 
 \textbf{Rationale:}
-\begin{enumerate}
-    \item \textbf{Well-matched to the monophonic setting:} Real Book melodies consist of single-voice staff lines with a strict left-to-right reading order, which is exactly the regime where CTC-based sequence models excel.
-    \item \textbf{Feasible within TFG constraints:} A CRNN-CTC is significantly lighter to train than a full transformer, requiring less annotated data and less GPU memory, which is important given the limited compute budget of a Bachelor's thesis.
-    \item \textbf{Strong prior art:} CRNN-CTC architectures have been validated for OMR in systems such as the Calvo-Zaragoza monophonic OMR line recognizer and related work~\cite{PrIMuSDataset,opticalmusicrecognitionresearchSelfLearningOpticalMusic2019}, providing reproducible baselines.
-    \item \textbf{Clear evaluation path:} Recognition at the staff-line level can be directly benchmarked with Symbol Error Rate (SER)~\cite{SymbolErrorRate} and sequence-level metrics on standard or custom-annotated Real Book data.
-    \item \textbf{Natural extension to polyphony:} Once monophonic recognition is solid, the architecture can be progressively extended, or complemented with a transformer-based model, to address polyphonic staves and full-page structure.
-\end{enumerate}
+This approach is chosen because Real Book melodies are strictly monophonic and read left-to-right, making them an ideal fit for CTC-based sequence models. Furthermore, a CRNN-CTC architecture is computationally lighter than full transformer models, fitting well within the resource constraints of a Bachelor's thesis. It also benefits from strong prior art~\cite{PrIMuSDataset,opticalmusicrecognitionresearchSelfLearningOpticalMusic2019} and a clear evaluation path using standard metrics like Symbol Error Rate (SER)~\cite{SymbolErrorRate}. Finally, it provides a solid foundation that can later be extended to handle polyphony.
 
 Traditional modular pipelines and transformer-based models will be studied and discussed to provide context and comparison, but the main implementation is the CRNN-CTC approach described above.
 
 \subsection{Constraints and Decision Boundaries}
-\begin{itemize}
-    \item \textbf{Data availability:} Ground truth for Real Book pages is not publicly available in annotated form; the project will require building or adapting a dataset, potentially combining synthetic generation with manual annotation of a subset of pages.
-    \item \textbf{Monophonic-first scope:} The initial system will target single-voice melodic lines only. Polyphony (chords, multiple voices) and full-page layout parsing are considered extensions, not primary deliverables.
-    \item \textbf{Computational resources:} Training must fit available GPU memory and time. A CRNN-CTC is better suited to this constraint than large transformer models.
-    \item \textbf{Sequence representation:} A compact symbolic encoding (e.g., a simplified \texttt{**kern}-like~\cite{Humdrum} or ABC-like token sequence or even a custom one) will be used for the output, balancing expressiveness and training efficiency.
-    \item \textbf{Project scope:} The objective is a solid and reproducible prototype that correctly transcribes monophonic lead-sheet lines, not a production-ready universal OMR engine.
-    \item \textbf{Polyphony and full-page extension:} These are considered future work if time and resources allow, potentially employing a transformer-based model in a second phase.
-\end{itemize}
+The project is constrained by the lack of publicly available annotated Real Book data, necessitating the creation of a custom dataset through synthetic generation and manual annotation. The scope is strictly monophonic-first, targeting single-voice melodic lines to ensure computational feasibility within the available GPU resources and time. The output will use a compact symbolic encoding (e.g., a simplified \texttt{**kern}-like~\cite{Humdrum} or ABC-like sequence) to balance expressiveness and training efficiency. The primary goal is a reproducible prototype, with polyphony and full-page layout parsing considered as potential future extensions.
 
 \section{Project Scope}
 \subsection{General Objective}
@@ -243,25 +230,10 @@ To develop a proof-of-concept CRNN-CTC model capable of transcribing monophonic 
 \section{Methodology and Rigour}
 \label{sec:methodology}
 \subsection{Project Methodology}
-This project adopts an \textbf{iterative and incremental methodology}, inspired by agile principles, rather than a classical waterfall (cascade) approach. The rationale is as follows.
-
-A classical cascade model would require all requirements to be fully specified before implementation begins, and would sequence phases strictly (requirements $\rightarrow$ design $\rightarrow$ implementation $\rightarrow$ testing). This is ill-suited to a research-oriented TFG, where:
-\begin{itemize}
-    \item Experimental outcomes (e.g., dataset quality, model accuracy, encoding design) influence subsequent design decisions.
-    \item The scope of certain components (e.g., polyphony extension) depends on results obtained in earlier phases.
-    \item There is no external client with fixed requirements; the supervisor and student co-evolve the direction based on findings.
-\end{itemize}
-
-An \textbf{iterative approach} allows each cycle to produce a working, evaluated artefact (e.g., a baseline model, an initial CRNN-CTC prototype, an improved variant), providing concrete checkpoints for feedback and replanning. This aligns with software engineering practices taught in the degree, particularly those covered in project management and software development methodology courses at FIB.
+This project adopts an iterative and incremental methodology, inspired by agile principles, rather than a classical waterfall approach. A rigid cascade model is ill-suited for a research-oriented TFG, where experimental outcomes influence subsequent design decisions and the scope of certain components depends on earlier results. Instead, an iterative approach allows each cycle to produce a working, evaluated artefact (e.g., a baseline model, an initial CRNN-CTC prototype), providing concrete checkpoints for feedback and replanning. This aligns with software engineering practices taught in the degree.
 
 \subsection{Adaptation to This Project}
-The iterative methodology is adapted to the TFG context as follows:
-\begin{itemize}
-    \item \textbf{Short iterations aligned with supervisor meetings:} Each development iteration is bounded by a supervisor meeting, in which results are reviewed and priorities for the next iteration are agreed upon. This keeps the project on track without requiring a fixed sprint structure.
-    \item \textbf{Research-first iterations:} The first iterations are literature- and data-focused (no code produced), establishing the theoretical foundation and dataset before implementation begins. This hybrid respects the academic nature of a TFG.
-    \item \textbf{Incremental scope:} The monophonic CRNN-CTC system is treated as the primary deliverable. Polyphony and full-page extension are only entered if time and quality thresholds in the monophonic system allow it, avoiding premature complexity.
-    \item \textbf{Continuous evaluation:} Quantitative metrics (SER, pitch/rhythm accuracy) are computed at the end of each model iteration, making progress visible and decisions evidence-based.
-\end{itemize}
+The iterative methodology is adapted to the TFG context by aligning short development iterations with regular supervisor meetings. This keeps the project on track without requiring a rigid sprint structure. The initial iterations focus on literature review and dataset construction to establish a solid foundation before implementation. The scope is kept incremental, treating the monophonic CRNN-CTC system as the primary deliverable, with polyphony considered only if time permits. Progress is continuously evaluated using quantitative metrics like SER at the end of each iteration.
 
 \subsection{Execution Approach}
 The project is divided into five sequential phases, each producing a concrete deliverable:
@@ -289,12 +261,7 @@ The project is divided into five sequential phases, each producing a concrete de
 \end{enumerate}
 
 \subsection{Monitoring and Follow-up Tools}
-Progress is monitored through the following mechanisms:
-\begin{itemize}
-    \item \textbf{Version control (Git/GitHub):} All code, dataset scripts, configuration files, and experiment logs are maintained in a Git repository. Commit history provides a complete record of technical progress and allows rollback to any previous state.
-    \item \textbf{Experiment tracking:} Training runs are logged with metrics (loss curves, SER per epoch) and hyperparameter configurations.
-    \item \textbf{Supervisor meetings:} Regular meetings with the thesis director are held to review results, discuss obstacles, and redefine priorities.
-\end{itemize}
+Progress is monitored using Git/GitHub for version control of code and datasets, ensuring a complete record of technical progress. Experiment tracking is used to log training runs, metrics, and hyperparameter configurations. Additionally, regular meetings with the thesis director are held to review results, discuss obstacles, and redefine priorities.
 
 \section{Document Organisation}
 This document is structured as follows:
@@ -309,13 +276,13 @@ This document is structured as follows:
 \end{description}
 
 \section{Conclusions}
-This deliverable has established the context, scope, and methodological foundations for a TFG on Optical Music Recognition at FIB-UPC. The problem is motivated by a practical and recurring need: converting physical music scores, as a concrete benchmark lead sheets such as those from the Real Book into machine-readable symbolic formats that can be used for transposition, playback, archiving, and analysis.
+This deliverable establishes the context, scope, and methodology for a TFG on Optical Music Recognition at FIB-UPC. The project addresses the practical need to digitize physical music scores, specifically jazz lead sheets from the Real Book, into machine-readable formats for transposition, playback, and analysis.
 
-A systematic review of the OMR literature identified three main families of approaches: traditional modular pipelines~\cite{dalitzComparativeStudyStaff2008,simonettaOpticalMusicRecognition2024}, CRNN-CTC models~\cite{PrIMuSDataset,opticalmusicrecognitionresearchSelfLearningOpticalMusic2019}, and end-to-end transformer architectures~\cite{vilaAntoniorv6SMT2026,UfalOlimpicicdar24Practical}. After comparing them against criteria of accuracy, feasibility, evaluation compatibility, and alignment with the monophonic target, a \textbf{CRNN-CTC model} was selected as the primary implementation approach. This choice is supported by strong prior art, a natural fit for the sequential structure of single-voice staff lines, and feasibility within the resource and time constraints of a Bachelor's thesis. Traditional pipelines will serve as a comparative baseline, and transformer-based approaches will be discussed as context and future direction.
+Following a review of OMR literature, a CRNN-CTC model was selected as the primary approach. This architecture is well-suited for the sequential nature of monophonic staff lines and is feasible within the constraints of a Bachelor's thesis. A traditional modular pipeline will serve as a comparative baseline, while transformer-based models are considered for future extensions.
 
-The scope has been precisely delimited: the system targets monophonic melody lines, with staff detection, CRNN-CTC recognition, and quantitative evaluation as core deliverables. Polyphonic transcription and full-page layout analysis are explicitly excluded from the primary scope and treated as gated extensions. Risks, including limited ground-truth data and potential CTC training instability, have been identified with concrete mitigation strategies.
+The project scope is strictly focused on monophonic melody lines, encompassing staff detection, model training, and quantitative evaluation. Complex tasks like polyphonic transcription and full-page layout analysis are deferred as potential extensions. Key risks, such as the lack of annotated data, will be mitigated through synthetic dataset generation.
 
-The project will follow an iterative and incremental methodology, organised into five sequential phases (literature review, dataset construction, model development, evaluation, and conditional extension), monitored through Git version control, experiment logging, and regular supervisor meetings. The expected contribution is a reproducible proof-of-concept CRNN-CTC model for monophonic OMR, benchmarked against a modular baseline using Symbol Error Rate~\cite{SymbolErrorRate} on Real Book data, and published with full documentation to enable future extension toward polyphonic recognition.
+The development will follow an iterative methodology divided into five phases: literature review, dataset construction, model development, evaluation, and conditional extension. The final outcome will be a reproducible proof-of-concept CRNN-CTC model, benchmarked using standard metrics like Symbol Error Rate~\cite{SymbolErrorRate}, providing a solid foundation for future OMR research.
 
 
 % ==========================================

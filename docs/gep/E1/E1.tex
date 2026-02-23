@@ -142,9 +142,9 @@ In these situations, paper limits flexibility. Performers may need to transpose 
 Current OMR literature distinguishes three broad families of approaches~\cite{shatriOPTICALMUSICRECOGNITION}:
 
 \begin{enumerate}
-    \item \textbf{Traditional modular pipelines (e.g., rule-based systems):} They decompose the task into fixed stages (pre-processing, staff detection/removal, symbol segmentation, symbol classification, and reconstruction). Their main weakness is error propagation between stages, and they require significant manual engineering for each new score style or notation condition~\cite{dalitzComparativeStudyStaff2008,simonettaOpticalMusicRecognition2024}.
-    \item \textbf{CRNN-CTC approaches:} They combine convolutional feature extraction with recurrent sequence modeling (typically a bidirectional LSTM) trained with Connectionist Temporal Classification (CTC) loss, adapting methods originally developed for handwriting and text recognition. They are well-suited for monophonic staff lines where a left-to-right sequential assumption holds naturally, and they are lighter and faster to train than attention-based counterparts~\cite{PrIMuSDataset,opticalmusicrecognitionresearchSelfLearningOpticalMusic2019}.
-    \item \textbf{End-to-end transformer approaches:} They formulate OMR as image-to-sequence translation with attention-based encoder-decoder architectures. This family handles long-range dependencies and complex page layouts well, making it the most promising direction for polyphonic and full-page scores, at the cost of higher data and compute requirements~\cite{vilaAntoniorv6SMT2026,UfalOlimpicicdar24Practical}.
+    \item \textbf{Traditional modular pipelines (e.g., rule-based systems):} They decompose the task into fixed stages (pre-processing, staff detection/removal, symbol segmentation, symbol classification, and reconstruction). Their main weakness is error propagation between stages, and they require significant manual engineering for each new score style or notation condition~\cite{dalitzComparativeStudyStaff2008}.
+    \item \textbf{CRNN-CTC approaches:} They combine convolutional feature extraction with recurrent sequence modeling (typically a bidirectional LSTM) trained with Connectionist Temporal Classification (CTC) loss, adapting methods originally developed for handwriting and text recognition. They are well-suited for monophonic staff lines where a left-to-right sequential assumption holds naturally, and they are lighter and faster to train than attention-based counterparts~\cite{PrIMuSDataset,opticalmusicrecognitionresearchSelfLearningOpticalMusic2019,simonettaOpticalMusicRecognition2024}.
+    \item \textbf{End-to-end transformer approaches:} They formulate OMR as image-to-sequence translation with attention-based encoder-decoder architectures. This family handles long-range dependencies and complex page layouts well, making it the most promising direction for polyphonic and full-page scores, at the cost of higher data and compute requirements~\cite{vilaAntoniorv6SMT2026,UfalOlimpicicdar24Practical,simonettaOpticalMusicRecognition2024}.
 \end{enumerate}
 
 \subsection{Comparison Criteria}
@@ -162,17 +162,14 @@ The alternatives are compared using criteria aligned with the scope of this TFG:
 \subsection{Comparative Analysis}
 \textbf{Traditional pipelines}~\cite{dalitzComparativeStudyStaff2008} provide interpretability and low entry cost, but their stage-by-stage structure tends to amplify upstream errors and requires substantial manual tuning for new score conditions. They remain useful as baselines and for understanding the problem structure.
 
-\noindent\textbf{CRNN-CTC models}~\cite{PrIMuSDataset,opticalmusicrecognitionresearchSelfLearningOpticalMusic2019} are a natural fit for the monophonic setting. A CNN encodes local visual features from the staff image, a bidirectional LSTM captures sequential context, and CTC decoding aligns the output sequence without needing explicit segmentation boundaries. This is exactly the problem structure of a single melody line such as those found in lead sheets (e.g., the Real Book), where reading order is strictly left-to-right and polyphony is absent.
+\noindent\textbf{CRNN-CTC models}~\cite{PrIMuSDataset,opticalmusicrecognitionresearchSelfLearningOpticalMusic2019} Have been the most common approach for some years and are well-fitted to monophonic lines. A CNN encodes local visual features from the staff image, a bidirectional LSTM captures sequential context, and CTC decoding aligns the output sequence without needing explicit segmentation boundaries. 
 
 \noindent\textbf{Transformer-based models}~\cite{vilaAntoniorv6SMT2026,UfalOlimpicicdar24Practical} are the most powerful option for full-page and polyphonic transcription, but they demand substantially more annotated data and compute. They represent a natural extension once the monophonic problem is solved, rather than the primary implementation target for this TFG.
 
 \subsection{Selected Alternative and Rationale}
 The selected approach is a \textbf{CRNN-CTC model} for \textbf{monophonic music line recognition}, with the primary evaluation target being lead-sheet scores from \textbf{The Real Book in C}.
 
-\textbf{Rationale:}
-This approach is chosen because Real Book melodies are strictly monophonic and read left-to-right, making them an ideal fit for CTC-based sequence models. Furthermore, a CRNN-CTC architecture is computationally lighter than full transformer models, fitting well within the resource constraints of a Bachelor's thesis. It also benefits from strong prior art~\cite{PrIMuSDataset,opticalmusicrecognitionresearchSelfLearningOpticalMusic2019} and a clear evaluation path using standard metrics like Symbol Error Rate (SER)~\cite{SymbolErrorRate}. Finally, it provides a solid foundation that can later be extended to handle polyphony.
-
-Traditional modular pipelines and transformer-based models will be studied and discussed to provide context and comparison, but the main implementation is the CRNN-CTC approach described above.
+I've chosen this approach because Real Book melodies are mostly monophonic and read left-to-right, making them an ideal fit for CTC-based sequence models. Furthermore, a CRNN-CTC architecture is computationally lighter than full transformer models, fitting well within the resource constraints. It also benefits from strong prior art~\cite{PrIMuSDataset,opticalmusicrecognitionresearchSelfLearningOpticalMusic2019} and a clear evaluation path using standard metrics like Symbol Error Rate (SER)~\cite{SymbolErrorRate}. Finally, it provides a solid foundation that can later be extended to handle polyphony if needed.
 
 \subsection{Constraints and Decision Boundaries}
 The project is constrained by the lack of publicly available annotated Real Book data, necessitating the creation of a custom dataset through synthetic generation and manual annotation. The scope is strictly monophonic-first, targeting single-voice melodic lines to ensure computational feasibility within the available GPU resources and time. The output will use a compact symbolic encoding (e.g., a simplified \texttt{**kern}-like~\cite{Humdrum} or \texttt{LMX}~\cite{OMRResearchLmx2025}) to balance expressiveness and training efficiency. The primary goal is a reproducible prototype, with polyphony and full-page layout parsing considered as potential future extensions.
@@ -195,8 +192,8 @@ To develop a proof-of-concept CRNN-CTC model capable of transcribing monophonic 
 \begin{itemize}
     \item The system shall accept as input a scanned or photographed image of a music sheet page and detect the individual staff lines present on it.
     \item For each detected staff line, the system shall produce a symbolic sequence representing the musical content (pitches, durations, rests, accidentals, time and key signatures) in a compact, machine-readable format.
-    \item The output format shall be sufficient to reconstruct the melody of a monophonic line unambiguously (e.g., reconstruct MIDI or import into notation software).
-    \item The system shall process Real Book lead-sheet pages as the primary evaluation scenario.
+    \item The output format shall be sufficient to reconstruct the melody of a monophonic line unambiguously (e.g., reconstruct MIDI or be able to be translated into a standard notation format like MusicXML).
+    \item The system shall process Real Book lead-sheet pages as a self-imposed bechmark.
     \item The system shall include a traditional modular pipeline baseline against which the CRNN-CTC model can be compared quantitatively.
     \item The system shall provide evaluation outputs (metric scores and error analysis) for the trained model on a held-out test set.
 \end{itemize}

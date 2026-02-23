@@ -6,10 +6,8 @@ __pycache__/
 env/
 
 # Data (NEVER commit these)
-data/raw/*
-data/processed/*
-!data/raw/.gitkeep      # Keeps the folder structure but ignores files
-!data/processed/.gitkeep
+data/
+!data/.gitkeep
 
 # Large Models (GitHub has a 100MB limit)
 models/*.pt

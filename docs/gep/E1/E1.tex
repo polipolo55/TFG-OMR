@@ -21,7 +21,7 @@
 % --- HEADER & FOOTER SETUP ---
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{OMR for jazz lead lines} % Project short name
+\fancyhead[L]{Optical Music Recognition for monophonic lines}       % Project short name
 \fancyhead[R]{GEP Deliverable 1}        % Deliverable name
 \fancyfoot[C]{\thepage}                 % Page numbers are mandatory
 
@@ -41,35 +41,50 @@
 % ==========================================
 \begin{titlepage}
     \centering
-    \vspace*{1cm}
     
-    
-    {\scshape\LARGE Universitat Politècnica de Catalunya \par}
-    {\scshape\Large Facultat d'Informàtica de Barcelona (FIB) \par}
-    \vspace{1.5cm}
-    
-    {\huge\bfseries Optical Music Recognition for Jazz Lead Sheets: A CRNN-CTC Approach for Monophonic Lines \par}
-    \vspace{1cm}
-
-    %%logo
+    % Logo at the top
+    \vspace*{-1.5cm}
     \begin{figure}[h!]
         \centering
-        \includegraphics[width=0.8\textwidth]{figures/logo-upc.png}
+        \includegraphics[width=\textwidth]{figures/portada_logo.png}
     \end{figure}
-
     
-    {\Large\bfseries GEP Deliverable 1: Context and Scope \par}
-    \vspace{2cm}
+    \vspace{3cm}
     
-    \begin{flushleft} \large
-        \textbf{Author:} Pol Casanovas Puig \\
-        \textbf{Director:} Manel Frigola Bourlon \\
-        \textbf{GEP Tutor:} Xavier Morales Sorolla \\
-        \textbf{Specialty:} Computació \\
-    \end{flushleft}
+    {\LARGE\bfseries OPTICAL MUSIC RECOGNITION FOR JAZZ LEAD SHEETS:\\ A CRNN-CTC APPROACH FOR MONOPHONIC LINES \par}
+    
+    \vspace{3cm}
+    
+    {\large\bfseries POL CASANOVAS PUIG \par}
+    
+    \vspace{3cm}
+    
+    {\small Thesis supervisor \par}
+    {\small MANEL FRIGOLA BOURLON (Department of Automatic Control) \par}
+    
+    \vspace{0.5cm}
+    
+    {\small GEP tutor \par}
+    {\small XAVIER MORALES SOROLLA \par}
+    
+    \vspace{0.5cm}
+    
+    {\small Degree \par}
+    {\small Bachelor's Degree in Informatics Engineering (Computing) \par}
+    
+    \vspace{1cm}
+    
+    {\small\bfseries GEP Deliverable 1: Context and Scope \par}
     
     \vfill
-    {\large \today \par}
+    
+    {\small\bfseries Facultat d'Informàtica de Barcelona (FIB) \par}
+    
+    \vspace{0.2cm}
+    
+    {\small\bfseries Universitat Politècnica de Catalunya (UPC) - BarcelonaTech \par}
+    
+    \vspace{1cm}
 \end{titlepage}
 
 % ==========================================
@@ -100,7 +115,7 @@ The work is framed within the Computaci\'o specialty. The topic was selected due
     \item[CTC (Connectionist Temporal Classification):] A loss function and decoding algorithm used to train sequence models on unsegmented data, allowing the network to align input features with output sequences automatically.
     \item[Monophonic / Polyphonic:] Monophonic refers to music consisting of a single melodic line without simultaneous notes, whereas polyphonic involves multiple independent voices or simultaneous notes (chords).
     \item[Lead Sheet:] A form of musical score commonly used in jazz and popular music that specifies the essential elements of a song: the melody, lyrics, and harmony (chord symbols).
-    \item[The Real Book:] A widely used compilation of jazz lead sheets, serving as a standard reference for jazz musicians.
+    \item[The Real Book:] A widely used compilation of jazz lead sheets.
 \end{description}
 
 In addition to these core concepts, the project relies on basic music theory (notation, rhythm, and structure) and technical foundations in deep learning, computer vision, and data processing. When required, these notions will be introduced and explained to keep the document accessible to readers with different backgrounds.
@@ -152,7 +167,7 @@ The alternatives are compared using criteria aligned with the scope of this TFG:
 \noindent\textbf{Transformer-based models}~\cite{vilaAntoniorv6SMT2026,UfalOlimpicicdar24Practical} are the most powerful option for full-page and polyphonic transcription, but they demand substantially more annotated data and compute. They represent a natural extension once the monophonic problem is solved, rather than the primary implementation target for this TFG.
 
 \subsection{Selected Alternative and Rationale}
-The selected approach is a \textbf{CRNN-CTC model} for \textbf{monophonic music line recognition}, with the primary evaluation target being lead-sheet scores from \textbf{The Real Book (C edition)}.
+The selected approach is a \textbf{CRNN-CTC model} for \textbf{monophonic music line recognition}, with the primary evaluation target being lead-sheet scores from \textbf{The Real Book in C}.
 
 \textbf{Rationale:}
 This approach is chosen because Real Book melodies are strictly monophonic and read left-to-right, making them an ideal fit for CTC-based sequence models. Furthermore, a CRNN-CTC architecture is computationally lighter than full transformer models, fitting well within the resource constraints of a Bachelor's thesis. It also benefits from strong prior art~\cite{PrIMuSDataset,opticalmusicrecognitionresearchSelfLearningOpticalMusic2019} and a clear evaluation path using standard metrics like Symbol Error Rate (SER)~\cite{SymbolErrorRate}. Finally, it provides a solid foundation that can later be extended to handle polyphony.
@@ -160,7 +175,7 @@ This approach is chosen because Real Book melodies are strictly monophonic and r
 Traditional modular pipelines and transformer-based models will be studied and discussed to provide context and comparison, but the main implementation is the CRNN-CTC approach described above.
 
 \subsection{Constraints and Decision Boundaries}
-The project is constrained by the lack of publicly available annotated Real Book data, necessitating the creation of a custom dataset through synthetic generation and manual annotation. The scope is strictly monophonic-first, targeting single-voice melodic lines to ensure computational feasibility within the available GPU resources and time. The output will use a compact symbolic encoding (e.g., a simplified \texttt{**kern}-like~\cite{Humdrum} or ABC-like sequence) to balance expressiveness and training efficiency. The primary goal is a reproducible prototype, with polyphony and full-page layout parsing considered as potential future extensions.
+The project is constrained by the lack of publicly available annotated Real Book data, necessitating the creation of a custom dataset through synthetic generation and manual annotation. The scope is strictly monophonic-first, targeting single-voice melodic lines to ensure computational feasibility within the available GPU resources and time. The output will use a compact symbolic encoding (e.g., a simplified \texttt{**kern}-like~\cite{Humdrum} or \texttt{LMX}~\cite{OMRResearchLmx2025}) to balance expressiveness and training efficiency. The primary goal is a reproducible prototype, with polyphony and full-page layout parsing considered as potential future extensions.
 
 \section{Project Scope}
 \subsection{General Objective}

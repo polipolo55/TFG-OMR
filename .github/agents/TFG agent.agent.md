@@ -26,6 +26,7 @@ The project is an end-to-end Optical Music Recognition (OMR) system specifically
 # Repository Layout
 ```
 src/
+  style.py           # PROJECT-WIDE styling: palette, rcParams, apply() — import in every notebook/script
   simple_baseline/   # empty — CV pipeline code goes here
   CRNN-CTC/          # empty — model code goes here
 notebooks/
@@ -41,6 +42,7 @@ data/
 docs/
   gep/E1/            # GEP Deliverable 1 (complete): context, scope, methodology
   main/main.tex      # Main thesis document (currently empty — not yet started)
+  main/tfg.sty       # PROJECT-WIDE LaTeX style: palette colours, hyperref, captions, macros — \usepackage{tfg}
 models/              # empty — trained artifacts go here
 ```
 
@@ -70,8 +72,16 @@ models/              # empty — trained artifacts go here
 3. **Iterative/Agile Mindset:** When asked to plan tasks or write code, prefer small, testable scripts (e.g., "Let's first write a script to crop a single staff line") over massive, complex architectures all at once. Always align suggestions with the current project phase.
 4. **Memory Constraints:** Assume the training will happen on a local consumer NVIDIA GPU (e.g., RTX 3060). Suggest memory-efficient architectures (like ResNet18/MobileNet backbones) and mixed-precision training (`torch.cuda.amp`).
 5. **Data generation tools:** Use **LilyPond** or **MuseScore** for synthetic score rendering. Do not suggest Verovio as a generation tool.
+6. **Self-update obligation:** Whenever a project-wide resource is added or changed (global style files, new shared utilities, major architectural decisions, new datasets integrated, phase status changes), **update this agent file** to reflect the new state before finishing the task. Never leave this file stale after a structural change to the repository.
 
 # Standard Operating Procedures
+* **Project-wide styling — Python:** Every notebook and script **must** begin with:
+  ```python
+  import sys; sys.path.insert(0, "../src")  # adjust depth as needed
+  import style; style.apply()
+  ```
+  Use `style.C["<role>"]` (e.g. `style.C["primary"]`, `style.C["secondary"]`) for all explicit bar/line colours. Never hardcode hex colour literals. The full palette and `COLOR_CYCLE` are defined in `src/style.py`.
+* **Project-wide styling — LaTeX:** Every `.tex` file under `docs/` **must** include `\usepackage{tfg}` (points to `docs/main/tfg.sty`). Use `\code{}`, `\term{}`, `\important{}` macros and `\tfgheadrule` for tables. Colour names follow the pattern `tfgPrimary`, `tfgSecondary`, `tfgTertiary`, `tfgHighlight`, `tfgNeutralDark/Mid/Light`.
 * **When asked for CV code:** Provide OpenCV Python code. Assume grayscale images are the default starting point. Follow the patterns in `notebooks/simple_baseline.ipynb` for image loading and display.
 * **When asked for PyTorch code:** Ensure the model takes a tensor of shape `(Batch, Channels, Height, Width)` where Height is a fixed size (e.g., 64) and Width is variable, outputting a sequence suitable for `torch.nn.CTCLoss`. Use a **bidirectional LSTM** as the recurrent component.
 * **When asked for LaTeX:** Use `biblatex` with IEEE style (`[style=ieee, sorting=none]`). Use `\section`, `\subsection`, `\cite{}`. Citation keys must follow the Better BibLaTeX camelCase pattern. The main thesis is `docs/main/main.tex`; GEP deliverables are under `docs/gep/`.

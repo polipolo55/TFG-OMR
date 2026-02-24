@@ -231,7 +231,7 @@ To develop a proof-of-concept CRNN-CTC model capable of transcribing monophonic 
 
 \subsection{Risks and Potential Obstacles}
 \begin{itemize}
-    \item \textbf{Limited ground-truth data:} Annotated Real Book data is not freely available. Building a sufficient training set manually is time-consuming. \textit{Mitigation:} Use synthetic score generation (e.g., via LilyPond or MuseScore) to bootstrap training data, and apply data augmentation (noise, blur, rotation) to improve generalisation.
+    \item \textbf{Limited ground-truth data:} Annotated Real Book data is not freely available. Building a sufficient training set manually is time-consuming. \textit{Mitigation:} Use synthetic score generation (e.g., via LilyPond or MuseScore) to bootstrap training data in the style of the Real Book, and apply data augmentation (noise, blur, rotation) to improve generalisation.
     \item \textbf{Staff detection errors propagating downstream:} If staff lines are incorrectly detected or cropped, the recogniser receives corrupted input. \textit{Mitigation:} Dedicate early project phases to validating the detection stage independently before coupling it to the recognition model.
     \item \textbf{Encoding design complexity:} Defining a compact yet expressive symbolic encoding for the CTC output vocabulary may require iteration. \textit{Mitigation:} Start with a minimal vocabulary (pitch class + octave + duration) and extend incrementally.
     \item \textbf{Model underfitting or CTC misalignment:} CTC training can be sensitive to vocabulary size and sequence length ratios. \textit{Mitigation:} Follow established CRNN-CTC OMR recipes from the literature~\cite{PrIMuSDataset,opticalmusicrecognitionresearchSelfLearningOpticalMusic2019} and monitor CTC loss curves carefully during training.
@@ -274,27 +274,6 @@ The project is divided into five sequential phases, each producing a concrete de
 
 \subsection{Monitoring and Follow-up Tools}
 Progress is monitored using Git/GitHub for version control of code and datasets, ensuring a complete record of technical progress. Experiment tracking is used to log training runs, metrics, and hyperparameter configurations. Additionally, regular meetings with the thesis director are held to review results, discuss obstacles, and redefine priorities.
-
-\section{Document Organisation}
-This document is structured as follows:
-
-\begin{description}
-    \item[Section 1: Introduction and Context:] Establishes the academic framework of the project, introduces the key domain concepts and terminology, describes the problem that motivates the work, and identifies the stakeholders who stand to benefit from its results.
-    \item[Section 2: Justification of the Chosen Alternative:] Reviews the three main families of OMR approaches (traditional modular pipelines, CRNN-CTC models, and transformer-based end-to-end systems), defines the comparison criteria, and justifies the selection of a CRNN-CTC model targeting monophonic lines from the Real Book as the primary implementation strategy.
-    \item[Section 3: Project Scope:] Defines the general and specific objectives, states the functional and non-functional requirements, delimits what is in and out of scope, and identifies the main risks and obstacles together with their mitigation strategies.
-    \item[Section 4: Methodology and Rigour:] Describes the iterative and incremental methodology adopted, explains how it is adapted to the TFG context, outlines the five execution phases and their deliverables, and specifies the monitoring and follow-up tools used to track progress.
-    \item[Section 5: Document Organisation:] The present section; provides a brief overview of the structure of the document.
-    \item[Section 6: Conclusions:] Summarises the main decisions taken in this deliverable and outlines the expected contribution of the TFG.
-\end{description}
-
-\section{Conclusions}
-This deliverable establishes the context, scope, and methodology for a TFG on Optical Music Recognition at FIB-UPC. The project addresses the practical need to digitize physical music scores, specifically jazz lead sheets from the Real Book, into machine-readable formats for transposition, playback, and analysis.
-
-Following a review of OMR literature, a CRNN-CTC model was selected as the primary approach. This architecture is well-suited for the sequential nature of monophonic staff lines and is feasible within the constraints of a Bachelor's thesis. A traditional modular pipeline will serve as a comparative baseline, while transformer-based models are considered for future extensions.
-
-The project scope is strictly focused on monophonic melody lines, encompassing staff detection, model training, and quantitative evaluation. Complex tasks like polyphonic transcription and full-page layout analysis are deferred as potential extensions. Key risks, such as the lack of annotated data, will be mitigated through synthetic dataset generation.
-
-The development will follow an iterative methodology divided into five phases: literature review, dataset construction, model development, evaluation, and conditional extension. The final outcome will be a reproducible proof-of-concept CRNN-CTC model, benchmarked using standard metrics like Symbol Error Rate~\cite{SymbolErrorRate}, providing a solid foundation for future OMR research.
 
 
 % ==========================================

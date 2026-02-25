@@ -11,6 +11,9 @@
 \usepackage{hyperref}       % For clickable links and TOC
 \usepackage{fancyhdr}       % For headers and footers
 \usepackage{caption}        % For figure/table legends
+\usepackage{booktabs}       % For professional table rules
+\usepackage{array}          % For extended column types
+\usepackage{tabularx}       % For auto-stretching table columns
 \usepackage{csquotes}
 
 % --- BIBLIOGRAPHY SETUP ---
@@ -148,6 +151,7 @@ Current OMR literature distinguishes three broad families of approaches~\cite{sh
 \end{enumerate}
 
 \subsection{Comparison Criteria}
+\label{sec:criteria}
 The alternatives are compared using criteria aligned with the scope of this TFG:
 
 \begin{itemize}
@@ -160,11 +164,52 @@ The alternatives are compared using criteria aligned with the scope of this TFG:
 \end{itemize}
 
 \subsection{Comparative Analysis}
-\textbf{Traditional pipelines}~\cite{dalitzComparativeStudyStaff2008} provide interpretability and low entry cost, but their stage-by-stage structure tends to amplify upstream errors and requires substantial manual tuning for new score conditions. They remain useful as baselines and for understanding the problem structure.
 
-\noindent\textbf{CRNN-CTC models}~\cite{PrIMuSDataset,opticalmusicrecognitionresearchSelfLearningOpticalMusic2019} Have been the most common approach for some years and are well-fitted to monophonic lines. A CNN encodes local visual features from the staff image, a bidirectional LSTM captures sequential context, and CTC decoding aligns the output sequence without needing explicit segmentation boundaries. 
-
-\noindent\textbf{Transformer-based models}~\cite{vilaAntoniorv6SMT2026,UfalOlimpicicdar24Practical} are the most powerful option for full-page and polyphonic transcription, but they demand substantially more annotated data and compute. They represent a natural extension once the monophonic problem is solved, rather than the primary implementation target for this TFG.
+\begin{table}[h!]
+    \centering
+    \caption{Comparison of OMR approach families across evaluation criteria
+    (\textbf{+}~good, \textbf{$\sim$}~moderate, \textbf{--}~poor).}
+    \label{tab:approach-comparison}
+    \renewcommand{\arraystretch}{1.4}
+    \begin{tabularx}{\linewidth}{>{}p{3.8cm} X X X}
+        \toprule
+        \textbf{Criteria}
+            & \textbf{Traditional Pipeline}~\cite{dalitzComparativeStudyStaff2008}
+            & \textbf{CRNN-CTC}~\cite{PrIMuSDataset,opticalmusicrecognitionresearchSelfLearningOpticalMusic2019}
+            & \textbf{Transformer}~\cite{vilaAntoniorv6SMT2026,UfalOlimpicicdar24Practical} \\
+        \midrule
+        Accuracy \& robustness
+            & -- Errors amplified stage-by-stage
+            & $\sim$ Good on typeset; degrades on distorted images
+            & + Attention handles high visual variance \\
+        \addlinespace
+        Polyphony support
+            & -- Requires explicit per-symbol segmentation
+            & -- Monophonic only
+            & + Full polyphony capable \\
+        \addlinespace
+        Layout awareness
+            & -- Assumes pre-cropped lines
+            & -- Assumes pre-cropped lines
+            & $\sim$ Page-level models exist \\
+        \addlinespace
+        Semantic completeness
+            & $\sim$ Symbol detection without sequence context
+            & + Sequential context via bidirectional LSTM
+            & + Encoder-decoder captures full musical context \\
+        \addlinespace
+        Implementation feasibility
+            & + Interpretable; low data requirements
+            & + Well-documented; lightweight training
+            & -- Requires large annotated corpus and compute \\
+        \addlinespace
+        Evaluation compatibility
+            & + Classic baselines readily available
+            & + PrIMuS benchmarks and SER well-defined
+            & $\sim$ Fewer standardised public benchmarks \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
 
 \subsection{Selected Alternative and Rationale}
 The selected approach is a \textbf{CRNN-CTC model} for \textbf{monophonic music line recognition}, with the primary evaluation target being lead-sheet scores from \textbf{The Real Book in C}.
@@ -181,7 +226,7 @@ To develop a proof-of-concept CRNN-CTC model capable of transcribing monophonic 
 \subsection{Specific Objectives}
 \begin{itemize}
     \item Survey and document the state of the art in OMR, covering traditional modular pipelines, CRNN-CTC models, and transformer-based end-to-end approaches.
-    \item Implement a traditional modular pipeline as a baseline, using classical computer vision techniques for staff detection and symbol segmentation.
+    \item Implement a traditional modular pipeline as a baseline, using classical computer vision techniques (morphological operations, horizontal projection) for explicit staff line detection, removal, and symbol segmentation.
     \item Build or adapt an annotated dataset of monophonic staff lines derived from Real Book pages, including synthetic augmentation to increase sample diversity and quantity.
     \item Design, implement, and train a CRNN-CTC model for monophonic staff-line recognition, defining a compact symbolic output encoding suitable for melody representation.
     \item Evaluate the CRNN-CTC model against the baseline using standard OMR metrics (e.g., Symbol Error Rate) and analyse failure modes.
@@ -190,7 +235,7 @@ To develop a proof-of-concept CRNN-CTC model capable of transcribing monophonic 
 
 \subsection{Functional Requirements}
 \begin{itemize}
-    \item The system shall accept as input a scanned or photographed image of a music sheet page and detect the individual staff lines present on it.
+    \item The system shall accept as input a scanned or photographed image of a music sheet page; a page segmentation stage shall detect and crop each staff region to produce individual staff line images.
     \item For each detected staff line, the system shall produce a symbolic sequence representing the musical content (pitches, durations, rests, accidentals, time and key signatures) in a compact, machine-readable format.
     \item The output format shall be sufficient to reconstruct the melody of a monophonic line unambiguously (e.g., reconstruct MIDI or be able to be translated into a standard notation format like MusicXML).
     \item The system shall process Real Book lead-sheet pages as a self-imposed bechmark.
@@ -203,7 +248,7 @@ To develop a proof-of-concept CRNN-CTC model capable of transcribing monophonic 
     \item \textbf{Accuracy:} The CRNN-CTC model should achieve a Symbol Error Rate (SER)~\cite{SymbolErrorRate} clearly below that of the modular baseline on the test set, demonstrating a meaningful improvement.
     \item \textbf{Reproducibility:} All experiments must be reproducible from a public repository with documented dependencies, dataset preparation scripts, and training configuration files.
     \item \textbf{Computational feasibility:} Training must complete in a reasonable time on a single consumer-grade GPU (e.g., NVIDIA RTX-class). Inference on a single staff line must run in well under one second.
-    \item \textbf{Modularity:} The codebase should be structured so that the staff detection, line cropping, and recognition stages are independently testable and replaceable.
+    \item \textbf{Modularity:} The codebase should be structured so that the page segmentation (staff region cropping), CRNN-CTC recognition, and evaluation stages are independently testable and replaceable.
     \item \textbf{Portability:} The implementation should run on standard Linux environments using open-source libraries (PyTorch, OpenCV, etc.) without proprietary dependencies.
     \item \textbf{Documentation:} Code and experimental results must be documented clearly enough to allow the project supervisor and evaluators to understand and verify the work.
 \end{itemize}
@@ -212,7 +257,7 @@ To develop a proof-of-concept CRNN-CTC model capable of transcribing monophonic 
 \textbf{In scope:}
 \begin{itemize}
     \item Monophonic melody lines like the ones found on the Real Book pages.
-    \item Staff-line detection and individual line cropping as a preprocessing stage.
+    \item Staff region detection and individual line cropping as a page segmentation preprocessing stage.
     \item Design, training, and evaluation of a CRNN-CTC model for single-voice line recognition.
     \item Implementation of a traditional modular pipeline as a comparative baseline.
     \item Dataset construction, including synthetic data generation and/or manual annotation of a Real Book subset.

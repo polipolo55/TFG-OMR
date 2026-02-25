@@ -18,7 +18,7 @@ The project is an end-to-end Optical Music Recognition (OMR) system specifically
 # Current Project State (as of Feb 2026)
 * **Phase 1 — Literature Review & Baseline: COMPLETE.** GEP Deliverable 1 (`docs/gep/E1/E1.tex`) is written and submitted. The morphological baseline notebook is fully implemented and evaluated.
 * **Phase 2 — Dataset Construction: COMPLETE.** data/realbook_primus_aa contains 10k synthetic staff line images (PNG) with paired annotations (JPG) in PrIMuS format, generated via a custom script using LilyPond. Basic augmentations (Gaussian noise, blur, perspective warp) are applied to simulate real-world conditions and can be found in realbook_primus_aa_scanned
-* **Phase 3 — CRNN-CTC Development: NOT STARTED.**
+* **Phase 3 — CRNN-CTC Development: IN PROGRESS (infrastructure only).** Pipeline scaffolding is in place: `Vocabulary` class with 93-token LMX vocabulary (`src/CRNN_CTC/vocab.py`, `vocabulary.txt`), `Config` dataclass (`src/CRNN_CTC/config.py`), PrIMuS→LMX conversion script (`src/data_processing/semantic_to_lmx.py`), and unified CLI (`src/cli.py` — `convert`, `vocab`, `train`, `evaluate` subcommands). **Not yet implemented:** CNN backbone, bidirectional LSTM, dataset/dataloader, training loop, evaluation loop.
 * **Phase 4 — Evaluation & Analysis: NOT STARTED.**
 * **Phase 5 — Extension (conditional): NOT STARTED.** Polyphony/chord symbols only if time allows after Phase 4.
 * **Thesis document:** `docs/main/main.tex` exists but is currently **empty** — writing has not begun.
@@ -26,11 +26,22 @@ The project is an end-to-end Optical Music Recognition (OMR) system specifically
 # Repository Layout
 ```
 src/
-  style.py           # PROJECT-WIDE styling: palette, rcParams, apply() — import in every notebook/script
-  simple_baseline/   # empty — CV pipeline code goes here
-  CRNN-CTC/          # empty — model code goes here
+  style.py                    # PROJECT-WIDE styling: palette, rcParams, apply() — import in every notebook/script
+  cli.py                      # Unified CLI: convert | vocab | train | evaluate subcommands
+  simple_baseline/            # empty — CV pipeline code goes here
+  data_processing/
+    generate_realbook.py      # LilyPond + LilyJAZZ rendering of PrIMuS → realbook_primus_aa
+    augment_scanned.py        # Gaussian noise, blur, perspective warp → realbook_primus_aa_scanned
+    semantic_to_lmx.py        # PrIMuS .semantic → monophonic LMX (.lmx) via music21
+    test1.py                  # scratch / smoke-test script
+  CRNN_CTC/
+    __init__.py
+    config.py                 # Config dataclass: paths, seed
+    vocab.py                  # Vocabulary class: token↔index, CTC blank at 0
+    vocabulary.txt            # 93-token LMX vocabulary built from realbook_primus_aa
 notebooks/
-  simple_baseline.ipynb   # morphological baseline, fully implemented
+  simple_baseline.ipynb       # morphological baseline, fully implemented
+  simple_baseline.pdf         # exported PDF of the baseline notebook
 data/
   camera_primus/     # CameraPrimus: typeset PNGs + distorted JPGs (paired)
   primus/            # PrIMuS: agnostic/semantic annotated monophonic staff lines
@@ -69,8 +80,8 @@ models/              # empty — trained artifacts go here
 # Encoding
 internally and for the models **kern or LMX-like encoding** (pitch + octave + duration + rests + accidentals) is used, inspired by PrIMuS. This is a compact, symbolic representation that abstracts away from visual details and focuses on the musical content. The exact vocabulary is defined incrementally as needed, starting with a minimal set of symbols for the initial CRNN training.
 
-This has to be evaluated still but LMX looks good https://github.com/OMR-Research/lmx
-
+This has to be evaluated still but LMX looks good https://github.com/OMR-Research/lmx and is fairly modern
+ 
 # Strict Operational Rules
 1. **Language Policy:** Write all code, comments, variables, and LaTeX document contents in **English**. If asked to prepare a presentation or speaking notes for the defense, write in **Catalan**.
 2. **FIB Academic Rigor:** When generating LaTeX text, maintain a highly professional, objective engineering tone. Always prioritize justifying engineering decisions (e.g., "Why CRNN over Transformers?") based on constraints like compute limits and dataset size.

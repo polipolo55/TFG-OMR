@@ -11,14 +11,14 @@ The project is an end-to-end Optical Music Recognition (OMR) system specifically
 * **The Architecture:** The core model is a Convolutional Recurrent Neural Network (CRNN) — CNN feature extractor followed by a **bidirectional LSTM** — trained with Connectionist Temporal Classification (CTC) loss.
 * **The Output Encoding:** A compact symbolic vocabulary (pitch + octave + duration + rests + accidentals), inspired by the PrIMuS agnostic/semantic notation or a simplified LMX format. The vocabulary is kept minimal and extended incrementally.
 * **Primary Evaluation Metric:** Symbol Error Rate (SER) — edit distance at the symbol level divided by total ground-truth symbols (analogous to CER in OCR).
-* **The Baseline:** A "Strawman" classical Computer Vision pipeline (OpenCV horizontal erosion/dilation) that intentionally highlights the difficulty of heuristic staff removal. Implemented in `notebooks/simple_baseline.ipynb`, evaluated on CameraPrimus. Key finding: ~100% staff-line recall on clean typeset images drops to ~50% on distorted camera images — a structural failure, not a tuning problem.
+* **The Baseline:** A "Strawman" classical Computer Vision pipeline (OpenCV horizontal erosion/dilation) that intentionally highlights the difficulty of heuristic staff removal. Implemented in `notebooks/simple_baseline.ipynb`, evaluated on CameraPrimus. Key finding: ~100% staff-line recall on clean typeset images drops to ~50% on distorted camera images, and fails completely (0% recall, >100% noise artifacts) on actual handwritten Real Book scans.
 * **The Data:** A synthetic dataset of monophonic music lines generated programmatically via **LilyPond** or **MuseScore**, with data augmentation (noise, blur, perspective warp) to mimic physical scans.
 * **Polyphony:** The system strictly handles monophonic lines (1D sequences). Full polyphony and full-page layout analysis are explicitly OUT OF SCOPE for this TFG stage.
 
 # Current Project State (as of Feb 2026)
 * **Phase 1 — Literature Review & Baseline: COMPLETE.** GEP Deliverable 1 (`docs/gep/E1/E1.tex`) is written and submitted. The morphological baseline notebook is fully implemented and evaluated.
-* **Phase 2 — Dataset Construction: COMPLETE.** data/realbook_primus_aa contains 10k synthetic staff line images (PNG) with paired annotations (JPG) in PrIMuS format, generated via a custom script using LilyPond. Basic augmentations (Gaussian noise, blur, perspective warp) are applied to simulate real-world conditions and can be found in realbook_primus_aa_scanned
-* **Phase 3 — CRNN-CTC Development: IN PROGRESS (infrastructure only).** Pipeline scaffolding is in place: `Vocabulary` class with 93-token LMX vocabulary (`src/CRNN_CTC/vocab.py`, `vocabulary.txt`), `Config` dataclass (`src/CRNN_CTC/config.py`), PrIMuS→LMX conversion script (`src/data_processing/semantic_to_lmx.py`), and unified CLI (`src/cli.py` — `convert`, `vocab`, `train`, `evaluate` subcommands). **Not yet implemented:** CNN backbone, bidirectional LSTM, dataset/dataloader, training loop, evaluation loop.
+* **Phase 2 — Dataset Construction: COMPLETE.** data/realbook_primus_aa contains 10k synthetic staff line images (PNG) with paired annotations in PrIMuS format, generated via a custom script using LilyPond. Basic augmentations (Gaussian noise, blur, perspective warp) are applied to simulate real-world conditions and can be found in realbook_primus_aa_scanned
+* **Phase 3 — CRNN-CTC Development: IN PROGRESS (pipeline complete, model ready to train).** Full end-to-end pipeline scaffolding is in place: `Vocabulary` (93 LMX tokens + blank + pad = 95), `Config` dataclass with all hyperparameters, `OMRDataset` + `collate_fn` loading PNG+LMX pairs (43,553 valid samples, images resized to 128px height), `CRNN` model (VGG-style CNN → BiLSTM → FC, ~4.2M params), training loop with CTC loss + AMP + OneCycleLR + gradient clipping + best-model checkpointing, evaluation loop with greedy CTC decoding + SER metric, and a fully-featured CLI (`convert`, `vocab`, `train`, `evaluate` with per-flag control of every hyperparameter). **Not yet done:** actual training runs, architecture tuning, ablation experiments.
 * **Phase 4 — Evaluation & Analysis: NOT STARTED.**
 * **Phase 5 — Extension (conditional): NOT STARTED.** Polyphony/chord symbols only if time allows after Phase 4.
 * **Thesis document:** `docs/main/main.tex` exists but is currently **empty** — writing has not begun.
@@ -36,9 +36,13 @@ src/
     test1.py                  # scratch / smoke-test script
   CRNN_CTC/
     __init__.py
-    config.py                 # Config dataclass: paths, seed
+    config.py                 # Config dataclass: paths, data, model arch, training hyperparams
     vocab.py                  # Vocabulary class: token↔index, CTC blank at 0
     vocabulary.txt            # 93-token LMX vocabulary built from realbook_primus_aa
+    dataset.py                # OMRDataset (PNG+LMX pairs), collate_fn, train/val/test split
+    model.py                  # CRNN: CNN backbone + BiLSTM + FC head (~4.2M params)
+    train.py                  # Training loop: CTC loss, AMP, OneCycleLR, checkpointing
+    evaluate.py               # Greedy CTC decode, SER metric, full evaluation loop
 notebooks/
   simple_baseline.ipynb       # morphological baseline, fully implemented
   simple_baseline.pdf         # exported PDF of the baseline notebook

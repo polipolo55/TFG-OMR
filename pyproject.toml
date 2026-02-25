@@ -1,6 +1,6 @@
 [project]
 name = "tfg-omr"
-version = "0.2.0"
+version = "0.2.1"
 description = ""
 authors = [
     {name = "Pol Casanovas"}
@@ -16,7 +16,9 @@ dependencies = [
     "torchvision (>=0.25.0,<0.26.0)",
     "numpy (>=2.4.2,<3.0.0)",
     "pymupdf (>=1.27.1,<2.0.0)",
-    "lxml (>=6.0.2,<7.0.0)"
+    "lxml (>=6.0.2,<7.0.0)",
+    "albumentations (>=2.0.8,<3.0.0)",
+    "linearized-musicxml (>=1.0.0,<2.0.0)"
 ]
 
 

@@ -9,7 +9,7 @@ You are an expert Computer Vision and Deep Learning engineer, as well as an acad
 # Project Context: The "Real Book" OMR System
 The project is an end-to-end Optical Music Recognition (OMR) system specifically targeting monophonic jazz lead sheets (like "The Real Book").
 * **The Architecture:** The core model is a Convolutional Recurrent Neural Network (CRNN) — CNN feature extractor followed by a **bidirectional LSTM** — trained with Connectionist Temporal Classification (CTC) loss.
-* **The Output Encoding:** A compact symbolic vocabulary (pitch + octave + duration + rests + accidentals), inspired by the PrIMuS agnostic/semantic notation or a simplified `**kern`/LMX format. The vocabulary is kept minimal and extended incrementally.
+* **The Output Encoding:** A compact symbolic vocabulary (pitch + octave + duration + rests + accidentals), inspired by the PrIMuS agnostic/semantic notation or a simplified LMX format. The vocabulary is kept minimal and extended incrementally.
 * **Primary Evaluation Metric:** Symbol Error Rate (SER) — edit distance at the symbol level divided by total ground-truth symbols (analogous to CER in OCR).
 * **The Baseline:** A "Strawman" classical Computer Vision pipeline (OpenCV horizontal erosion/dilation) that intentionally highlights the difficulty of heuristic staff removal. Implemented in `notebooks/simple_baseline.ipynb`, evaluated on CameraPrimus. Key finding: ~100% staff-line recall on clean typeset images drops to ~50% on distorted camera images — a structural failure, not a tuning problem.
 * **The Data:** A synthetic dataset of monophonic music lines generated programmatically via **LilyPond** or **MuseScore**, with data augmentation (noise, blur, perspective warp) to mimic physical scans.
@@ -17,8 +17,8 @@ The project is an end-to-end Optical Music Recognition (OMR) system specifically
 
 # Current Project State (as of Feb 2026)
 * **Phase 1 — Literature Review & Baseline: COMPLETE.** GEP Deliverable 1 (`docs/gep/E1/E1.tex`) is written and submitted. The morphological baseline notebook is fully implemented and evaluated.
-* **Phase 2 — Dataset Construction: NOT STARTED.** `src/` directories are empty. The synthetic data generation pipeline and annotation scripts still need to be built.
-* **Phase 3 — CRNN-CTC Development: NOT STARTED.** No model code exists yet.
+* **Phase 2 — Dataset Construction: COMPLETE.** data/realbook_primus_aa contains 10k synthetic staff line images (PNG) with paired annotations (JPG) in PrIMuS format, generated via a custom script using LilyPond. Basic augmentations (Gaussian noise, blur, perspective warp) are applied to simulate real-world conditions and can be found in realbook_primus_aa_scanned
+* **Phase 3 — CRNN-CTC Development: NOT STARTED.**
 * **Phase 4 — Evaluation & Analysis: NOT STARTED.**
 * **Phase 5 — Extension (conditional): NOT STARTED.** Polyphony/chord symbols only if time allows after Phase 4.
 * **Thesis document:** `docs/main/main.tex` exists but is currently **empty** — writing has not begun.
@@ -65,6 +65,11 @@ models/              # empty — trained artifacts go here
 * **Music Processing:** `music21` for symbolic music manipulation and export (MIDI, MusicXML).
 * **Academic Writing:** Local LaTeX (TeX Live) via VS Code LaTeX Workshop extension.
 * **Reference Management:** Zotero with Better BibLaTeX plugin. Citation keys use Better BibLaTeX camelCase format, e.g., `\cite{dalitzComparativeStudyStaff2008}`, `\cite{PrIMuSDataset}`, `\cite{shatriOPTICALMUSICRECOGNITION}`. **Never use `{author2024}` style keys.**
+
+# Encoding
+internally and for the models **kern or LMX-like encoding** (pitch + octave + duration + rests + accidentals) is used, inspired by PrIMuS. This is a compact, symbolic representation that abstracts away from visual details and focuses on the musical content. The exact vocabulary is defined incrementally as needed, starting with a minimal set of symbols for the initial CRNN training.
+
+This has to be evaluated still but LMX looks good https://github.com/OMR-Research/lmx
 
 # Strict Operational Rules
 1. **Language Policy:** Write all code, comments, variables, and LaTeX document contents in **English**. If asked to prepare a presentation or speaking notes for the defense, write in **Catalan**.

@@ -1,0 +1,264 @@
+"""Simple realbook scan simulation.
+
+Read clean lilyjazz PNGs and write distorted copies. Metadata files
+(.semantic, .agnostic, .mid) are propagated unchanged.
+
+CLI options mirror generate_realbook.py; see --help for details.
+"""
+
+import argparse
+import logging
+import multiprocessing
+import os
+import random
+import shutil
+import sys
+from pathlib import Path
+
+import albumentations as A
+import cv2
+import numpy as np
+from PIL import Image
+
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%H:%M:%S",
+)
+log = logging.getLogger(__name__)
+
+PAPER_BRIGHT  = 242
+PAPER_DARK    = 22
+INK_DILATE_ITERATIONS = 2
+INK_DILATE_KERNEL     = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+VIGNETTE_STRENGTH = 0.22
+
+
+# Albumentations pipeline (scan-like distortions)
+
+def build_pipeline(seed: int | None = None) -> A.Compose:
+    """Return an albumentations Compose pipeline for scan simulation."""
+    return A.Compose(
+        [
+            A.ElasticTransform(alpha=28, sigma=5, p=0.90),
+            A.GridDistortion(num_steps=5, distort_limit=(-0.10, 0.10), p=0.80),
+            A.Affine(
+                translate_percent={"x": (-0.01, 0.01), "y": (-0.01, 0.01)},
+                scale=(0.98, 1.02),
+                rotate=(-3.0, 3.0),
+                shear=(-1.5, 1.5),
+                border_mode=cv2.BORDER_CONSTANT,
+                fill=255,
+                p=0.9,
+            ),
+            A.GaussianBlur(blur_limit=0, sigma_limit=(0.3, 0.8), p=0.70),
+            A.Sharpen(alpha=(0.2, 0.5), lightness=(0.85, 1.0), p=0.55),
+            A.RandomToneCurve(scale=0.15, p=0.80),
+            A.GaussNoise(std_range=(0.02, 0.06), mean_range=(0.0, 0.0),
+                         per_channel=False, p=0.85),
+            A.RandomBrightnessContrast(brightness_limit=(-0.10, 0.05),
+                                       contrast_limit=(0.05, 0.20),
+                                       p=0.90),
+        ],
+        seed=seed,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Individual augmentation steps applied outside albumentations
+# ---------------------------------------------------------------------------
+
+def dilate_ink(img_gray: np.ndarray, iterations: int = INK_DILATE_ITERATIONS) -> np.ndarray:
+    """Erode to simulate ink bleed."""
+    if iterations == 0:
+        return img_gray
+    return cv2.erode(img_gray, INK_DILATE_KERNEL, iterations=iterations)
+
+
+def remap_tones(img_gray: np.ndarray) -> np.ndarray:
+    """Linear map white/black to PAPER_BRIGHT/DARK."""
+    f = img_gray.astype(np.float32) / 255.0
+    out = PAPER_DARK + f * (PAPER_BRIGHT - PAPER_DARK)
+    return np.clip(out, 0, 255).astype(np.uint8)
+
+
+def add_vignette(img_gray: np.ndarray, strength: float = VIGNETTE_STRENGTH) -> np.ndarray:
+    """Darken corners by a radial mask."""
+    h, w = img_gray.shape
+    Y, X = np.ogrid[:h, :w]
+    cx, cy = w / 2.0, h / 2.0
+    xn = (X - cx) / cx
+    yn = (Y - cy) / cy
+    dist = np.sqrt(xn ** 2 + yn ** 2)
+    dist_norm = np.clip(dist / 1.414, 0.0, 1.0)
+    mask = 1.0 - strength * dist_norm ** 2
+    out = np.clip(img_gray.astype(np.float32) * mask, 0, 255).astype(np.uint8)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Per-sample augmentation
+# ---------------------------------------------------------------------------
+
+def augment_sample(
+    src_png: Path,
+    dst_png: Path,
+    pipeline: A.Compose,
+    rng: random.Random,
+) -> None:
+    """Augment a single grayscale PNG and write result."""
+    img = np.array(Image.open(src_png).convert("L"))
+    img = dilate_ink(img)
+    img3 = np.stack([img, img, img], axis=-1)
+    result = pipeline(image=img3)["image"]
+    img = result[:, :, 0]
+    img = remap_tones(img)
+    img = add_vignette(img)
+
+    dst_png.parent.mkdir(parents=True, exist_ok=True)
+    Image.fromarray(img).save(dst_png)
+
+
+# ---------------------------------------------------------------------------
+# Top-level worker (must be module-level for multiprocessing pickling)
+# ---------------------------------------------------------------------------
+
+def _worker(args_tuple):
+    src_dir, output_dir, copies, seed_base = args_tuple
+    sample_id = src_dir.name
+    src_png = src_dir / f"{sample_id}.png"
+    results = []
+    for copy_idx in range(copies):
+        copy_seed = seed_base + copy_idx
+        out_id = sample_id if copies == 1 else f"{sample_id}_aug{copy_idx:02d}"
+        out_dir = output_dir / out_id
+        out_png = out_dir / f"{out_id}.png"
+        if out_png.exists():
+            results.append(True)
+            continue
+        try:
+            pipeline = build_pipeline(seed=copy_seed)
+            augment_sample(src_png, out_png, pipeline, random.Random(copy_seed))
+            out_dir.mkdir(parents=True, exist_ok=True)
+            for ext in (".semantic", ".agnostic", ".mid"):
+                src_ann = src_dir / f"{sample_id}{ext}"
+                if src_ann.exists():
+                    shutil.copy(src_ann, out_dir / f"{out_id}{ext}")
+            results.append(True)
+        except Exception as exc:
+            log.warning("Augment failed for %s: %s", sample_id, exc)
+            results.append(False)
+    return results
+
+
+def _init_worker(nice_val: int) -> None:
+    """Lower the OS scheduling priority of each worker process."""
+    try:
+        os.nice(nice_val)
+    except OSError:
+        pass
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Apply scan-simulation augmentations to the clean realbook_primus dataset."
+    )
+    parser.add_argument(
+        "--source",
+        type=Path,
+        default=Path("data/realbook_primus"),
+        help="Clean dataset root (default: data/realbook_primus)",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("data/realbook_primus_scanned"),
+        help="Output dataset root (default: data/realbook_primus_scanned)",
+    )
+    parser.add_argument(
+        "--copies",
+        type=int,
+        default=1,
+        help="Number of augmented versions to create per sample (default: 1)",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Global random seed (default: 42)",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=max(1, (os.cpu_count() or 4) // 2),
+        help="Parallel workers (default: half of CPU count)",
+    )
+    parser.add_argument(
+        "--maxtasks",
+        type=int,
+        default=32,
+        help="Tasks per worker before it is recycled to free memory (default: 32)",
+    )
+    parser.add_argument(
+        "--nice",
+        type=int,
+        default=10,
+        help="OS nice value for worker processes, 0–19 (default: 10)",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Process at most N samples (for testing)",
+    )
+    args = parser.parse_args()
+
+    sample_dirs = sorted(
+        d for d in args.source.iterdir()
+        if d.is_dir() and not d.name.startswith(".")
+        and (d / f"{d.name}.png").exists()
+    )
+
+    if not sample_dirs:
+        log.error("No samples found in %s", args.source)
+        sys.exit(1)
+
+    if args.limit:
+        sample_dirs = sample_dirs[: args.limit]
+
+    args.output.mkdir(parents=True, exist_ok=True)
+    log.info("Augmenting %d samples × %d cop%s → %s (workers: %d, nice: %d)",
+             len(sample_dirs), args.copies,
+             "y" if args.copies == 1 else "ies",
+             args.output, args.workers, args.nice)
+
+    work_items = [
+        (d, args.output, args.copies, args.seed + i * 1000)
+        for i, d in enumerate(sample_dirs)
+    ]
+
+    ok = fail = 0
+    with multiprocessing.Pool(
+        processes=args.workers,
+        maxtasksperchild=args.maxtasks,
+        initializer=_init_worker,
+        initargs=(args.nice,),
+    ) as pool:
+        for i, results in enumerate(pool.imap_unordered(_worker, work_items), 1):
+            ok   += sum(results)
+            fail += results.count(False)
+            if i % 200 == 0 or i == len(sample_dirs):
+                log.info("Progress %d/%d  ✓ %d  ✗ %d", i, len(sample_dirs), ok, fail)
+
+    log.info("Done. Success: %d  Failed: %d", ok, fail)
+
+
+if __name__ == "__main__":
+    main()

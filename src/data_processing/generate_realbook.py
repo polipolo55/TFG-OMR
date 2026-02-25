@@ -17,11 +17,14 @@ Usage:
 
 import argparse
 import logging
+import multiprocessing
+import os
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
+from functools import partial
 from pathlib import Path
 
 import numpy as np
@@ -398,6 +401,12 @@ def main() -> None:
         help="Rendering resolution (default: 200)",
     )
     parser.add_argument(
+        "--workers",
+        type=int,
+        default=os.cpu_count(),
+        help="Parallel workers (default: CPU count)",
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Show DEBUG messages",
@@ -421,19 +430,19 @@ def main() -> None:
     if args.limit:
         sample_dirs = sample_dirs[: args.limit]
 
-    log.info("Found %d samples → output: %s", len(sample_dirs), args.output)
+    log.info("Found %d samples → output: %s (workers: %d)", len(sample_dirs), args.output, args.workers)
     args.output.mkdir(parents=True, exist_ok=True)
 
     ok = fail = 0
-    for i, sample_dir in enumerate(sample_dirs, 1):
-        success = process_sample(sample_dir, args.output, dpi=args.dpi)
-        if success:
-            ok += 1
-        else:
-            fail += 1
-
-        if i % 50 == 0 or i == len(sample_dirs):
-            log.info("Progress %d/%d  ✓ %d  ✗ %d", i, len(sample_dirs), ok, fail)
+    _worker = partial(process_sample, output_dir=args.output, dpi=args.dpi)
+    with multiprocessing.Pool(processes=args.workers) as pool:
+        for i, success in enumerate(pool.imap_unordered(_worker, sample_dirs), 1):
+            if success:
+                ok += 1
+            else:
+                fail += 1
+            if i % 100 == 0 or i == len(sample_dirs):
+                log.info("Progress %d/%d  ✓ %d  ✗ %d", i, len(sample_dirs), ok, fail)
 
     log.info("Done. Success: %d  Failed: %d", ok, fail)
 

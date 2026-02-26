@@ -31,7 +31,7 @@ import torch
 from torch import Tensor
 from torch.utils.data import Dataset
 
-from src.CRNN_CTC.vocab import Vocabulary
+from .vocab import Vocabulary
 
 log = logging.getLogger(__name__)
 

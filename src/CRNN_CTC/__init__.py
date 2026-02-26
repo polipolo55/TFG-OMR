@@ -15,7 +15,7 @@ train       Training loop with AMP, OneCycleLR, CTC loss, checkpointing.
 evaluate    Greedy CTC decoding, SER metric, full evaluation loop.
 """
 
-from src.CRNN_CTC.config import Config
-from src.CRNN_CTC.vocab import Vocabulary
+from .config import Config
+from .vocab import Vocabulary
 
 __all__ = ["Config", "Vocabulary"]

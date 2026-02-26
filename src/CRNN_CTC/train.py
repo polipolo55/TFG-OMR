@@ -19,8 +19,8 @@ Usage — called from ``cli.py``::
 
 Or programmatically::
 
-    from src.CRNN_CTC.train import train
-    from src.CRNN_CTC.config import Config
+    from CRNN_CTC.train import train
+    from CRNN_CTC.config import Config
     train(Config())
 """
 
@@ -41,11 +41,11 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader
 
-from src.CRNN_CTC.config import Config
-from src.CRNN_CTC.dataset import OMRDataset, collate_fn, make_splits
-from src.CRNN_CTC.evaluate import compute_ser_batch, greedy_decode
-from src.CRNN_CTC.model import CRNN
-from src.CRNN_CTC.vocab import Vocabulary
+from .config import Config
+from .dataset import OMRDataset, collate_fn, make_splits
+from .evaluate import compute_ser_batch, greedy_decode
+from .model import CRNN
+from .vocab import Vocabulary
 
 log = logging.getLogger(__name__)
 

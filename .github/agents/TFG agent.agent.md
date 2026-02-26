@@ -44,8 +44,9 @@ src/
     train.py                  # Training loop: CTC loss, AMP, OneCycleLR, checkpointing
     evaluate.py               # Greedy CTC decode, SER metric, full evaluation loop
 notebooks/
-  simple_baseline.ipynb       # morphological baseline, fully implemented
+  01_simple_baseline.ipynb    # morphological baseline, fully implemented
   simple_baseline.pdf         # exported PDF of the baseline notebook
+  02_evaluate_model.ipynb     # CRNN evaluation code goes here
 data/
   camera_primus/     # CameraPrimus: typeset PNGs + distorted JPGs (paired)
   primus/            # PrIMuS: agnostic/semantic annotated monophonic staff lines

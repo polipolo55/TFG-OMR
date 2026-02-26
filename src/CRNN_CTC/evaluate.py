@@ -26,10 +26,10 @@ from torch import Tensor
 from torch.amp import autocast
 from torch.utils.data import DataLoader
 
-from src.CRNN_CTC.config import Config
-from src.CRNN_CTC.dataset import OMRDataset, collate_fn, make_splits
-from src.CRNN_CTC.model import CRNN
-from src.CRNN_CTC.vocab import Vocabulary
+from .config import Config
+from .dataset import OMRDataset, collate_fn, make_splits
+from .model import CRNN
+from .vocab import Vocabulary
 
 log = logging.getLogger(__name__)
 

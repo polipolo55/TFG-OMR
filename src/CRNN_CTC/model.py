@@ -58,33 +58,38 @@ class CNNBackbone(nn.Module):
     the remaining pools only shrink height).
     """
 
-    def __init__(self, cnn_out_channels: int = 256) -> None:
+    def __init__(self, cnn_out_channels: int = 256, cnn_dropout: float = 0.0) -> None:
         super().__init__()
-        # Each block: Conv → BN → ReLU → Pool
+        # Each block: Conv → BN → ReLU → Dropout2d → Pool
         # Pool kernel is (h, w) — we pool height aggressively, width gently.
+        drop = cnn_dropout  # shorthand
         self.features = nn.Sequential(
             # Block 1 — (1, 128, W) → (64, 64, W/2)
             nn.Conv2d(1, 64, kernel_size=3, padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
+            nn.Dropout2d(drop),
             nn.MaxPool2d(kernel_size=(2, 2)),  # h/2, w/2
 
             # Block 2 — (64, 64, W/2) → (128, 32, W/4)
             nn.Conv2d(64, 128, kernel_size=3, padding=1),
             nn.BatchNorm2d(128),
             nn.ReLU(inplace=True),
+            nn.Dropout2d(drop),
             nn.MaxPool2d(kernel_size=(2, 2)),  # h/2, w/2
 
             # Block 3 — (128, 32, W/4) → (256, 16, W/4)
             nn.Conv2d(128, 256, kernel_size=3, padding=1),
             nn.BatchNorm2d(256),
             nn.ReLU(inplace=True),
+            nn.Dropout2d(drop),
             nn.MaxPool2d(kernel_size=(2, 1)),  # h/2, w stays
 
             # Block 4 — (256, 16, W/4) → (256, 8, W/4)
             nn.Conv2d(256, 256, kernel_size=3, padding=1),
             nn.BatchNorm2d(256),
             nn.ReLU(inplace=True),
+            nn.Dropout2d(drop),
             nn.MaxPool2d(kernel_size=(2, 1)),  # h/2, w stays
 
             # Block 5 — (256, 8, W/4) → (cnn_out, 1, W/4)
@@ -127,12 +132,13 @@ class CRNN(nn.Module):
         rnn_hidden: int = 256,
         rnn_layers: int = 2,
         dropout: float = 0.3,
+        cnn_dropout: float = 0.0,
     ) -> None:
         super().__init__()
         self.vocab_size = vocab_size
 
         # ── CNN ───────────────────────────────────────────────────────────
-        self.cnn = CNNBackbone(cnn_out_channels)
+        self.cnn = CNNBackbone(cnn_out_channels, cnn_dropout=cnn_dropout)
 
         # ── RNN ───────────────────────────────────────────────────────────
         self.rnn = nn.LSTM(
@@ -210,7 +216,7 @@ def _smoke_test() -> None:
     """Run a forward pass with dummy data to verify shapes."""
     B, H, W = 4, 128, 800
     vocab_size = 95  # 93 tokens + blank + pad
-    model = CRNN(vocab_size=vocab_size)
+    model = CRNN(vocab_size=vocab_size, cnn_dropout=0.2)
 
     x = torch.randn(B, 1, H, W)
     widths = torch.tensor([800, 700, 600, 500])

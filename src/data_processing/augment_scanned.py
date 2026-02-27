@@ -143,7 +143,7 @@ def _worker(args_tuple):
             pipeline = build_pipeline(seed=copy_seed)
             augment_sample(src_png, out_png, pipeline, random.Random(copy_seed))
             out_dir.mkdir(parents=True, exist_ok=True)
-            for ext in (".semantic", ".agnostic", ".mid"):
+            for ext in (".semantic", ".agnostic", ".mid", ".lmx"):
                 src_ann = src_dir / f"{sample_id}{ext}"
                 if src_ann.exists():
                     shutil.copy(src_ann, out_dir / f"{out_id}{ext}")

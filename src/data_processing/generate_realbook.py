@@ -21,7 +21,6 @@ import multiprocessing
 import os
 import re
 import shutil
-import subprocess
 import sys
 import tempfile
 from functools import partial
@@ -29,6 +28,15 @@ from pathlib import Path
 
 import numpy as np
 from PIL import Image
+
+# Shared rendering back-end (single source of truth for clef maps, template,
+# LilyPond invocation, and image cropping).
+from CRNN_CTC.lilypond_render import (
+    CLEF_LY,
+    LY_TEMPLATE,
+    crop_content,
+    run_lilypond,
+)
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -55,8 +63,6 @@ _STEP_LILY   = {"C": "c", "D": "d", "E": "e", "F": "f",
 _ACC_LILY    = {"b": "es", "bb": "eses", "#": "is", "x": "isis", "": ""}
 _DUR_LILY    = {"breve": r"\breve", "whole": "1", "half": "2", "quarter": "4",
                 "eighth": "8", "sixteenth": "16", "32nd": "32", "64th": "64"}
-_CLEF_LILY   = {"G2": "treble", "G2/8": "treble_8",
-                "F4": "bass",   "C3": "alto", "C4": "tenor"}
 
 
 def _parse_pitch(pitch_str: str) -> str:
@@ -143,7 +149,12 @@ def semantic_to_lily_music(semantic_path: Path) -> str:
         try:
             if tok.startswith("clef-"):
                 clef_id  = tok[len("clef-"):]
-                lily_clef = _CLEF_LILY.get(clef_id, "treble")
+                if clef_id not in CLEF_LY:
+                    raise ValueError(
+                        f"Unknown clef token: {tok!r}. "
+                        f"Add it to CLEF_LY in CRNN_CTC/lilypond_render.py."
+                    )
+                lily_clef = CLEF_LY[clef_id]
                 lily_tokens.append(rf"\clef {lily_clef}")
 
             elif tok.startswith("keySignature-"):
@@ -199,113 +210,22 @@ def semantic_to_lily_music(semantic_path: Path) -> str:
     return " ".join(lily_tokens)
 
 
-# ---------------------------------------------------------------------------
-# LilyPond template
-# ---------------------------------------------------------------------------
-
-LILY_TEMPLATE = r"""
-\version "2.24.0"
-\include "lilyjazz.ily"
-
-\header {{
-  tagline = ##f
-}}
-
-\paper {{
-  indent = 0
-  ragged-right = ##t
-  top-margin    = 6\mm
-  bottom-margin = 6\mm
-  left-margin   = 8\mm
-  right-margin  = 8\mm
-  paper-height  = 55\mm
-}}
-
-\score {{
-  \new Staff {{
-    {music}
-  }}
-  \layout {{
-    \context {{
-      \Score
-      \omit BarNumber
-    }}
-  }}
-}}
-""".strip()
-
-
 def make_lily_source(music_body: str) -> str:
-    return LILY_TEMPLATE.format(music=music_body)
-
-
-# ---------------------------------------------------------------------------
-# Render & crop
-# ---------------------------------------------------------------------------
-
-def render_lily(ly_source: str, work_dir: Path, basename: str, dpi: int = 200) -> Path | None:
-    """
-    Write `ly_source` to `work_dir/{basename}.ly`, run LilyPond, and return
-    the path to the generated PNG.  Returns None on failure.
-    """
-    ly_path  = work_dir / f"{basename}.ly"
-    png_path = work_dir / f"{basename}.png"
-
-    ly_path.write_text(ly_source, encoding="utf-8")
-
-    result = subprocess.run(
-        ["lilypond", f"-dresolution={dpi}", "--png", "-o", str(work_dir / basename), str(ly_path)],
-        capture_output=True,
-        text=True,
-        cwd=str(work_dir),
-    )
-
-    if result.returncode != 0:
-        log.debug("LilyPond stderr: %s", result.stderr[-500:])
-        return None
-
-    if not png_path.exists():
-        # LilyPond sometimes appends -1.png for multi-page output
-        candidates = sorted(work_dir.glob(f"{basename}*.png"))
-        if candidates:
-            return candidates[0]
-        return None
-
-    return png_path
-
-
-def crop_content(png_path: Path, padding: int = 6) -> np.ndarray:
-    """
-    Load a white-background PNG rendered by LilyPond and crop to the
-    non-white bounding box, adding `padding` pixels on each side.
-    Returns the cropped image as a NumPy array (H×W, uint8 grayscale).
-    """
-    img = np.array(Image.open(png_path).convert("L"))  # grayscale
-
-    # Mask of ink pixels (not white)
-    ink = img < 250
-    rows = np.any(ink, axis=1)
-    cols = np.any(ink, axis=0)
-
-    if not rows.any():
-        return img  # blank page — return as-is
-
-    r0, r1 = np.where(rows)[0][[0, -1]]
-    c0, c1 = np.where(cols)[0][[0, -1]]
-
-    r0 = max(0, r0 - padding)
-    r1 = min(img.shape[0] - 1, r1 + padding)
-    c0 = max(0, c0 - padding)
-    c1 = min(img.shape[1] - 1, c1 + padding)
-
-    return img[r0 : r1 + 1, c0 : c1 + 1]
+    """Fill the shared LY_TEMPLATE with a music body string."""
+    return LY_TEMPLATE.format(music=music_body)
 
 
 # ---------------------------------------------------------------------------
 # Per-sample processing
 # ---------------------------------------------------------------------------
 
-def process_sample(sample_dir: Path, output_dir: Path, dpi: int = 200) -> bool:
+def process_sample(
+    sample_dir: Path,
+    output_dir: Path,
+    dpi: int = 200,
+    force: bool = False,
+    with_lmx: bool = True,
+) -> bool:
     """
     Process one PrIMuS sample directory.
     Returns True on success, False on failure.
@@ -320,7 +240,7 @@ def process_sample(sample_dir: Path, output_dir: Path, dpi: int = 200) -> bool:
     out_sample = output_dir / sample_id
     out_png    = out_sample / f"{sample_id}.png"
 
-    if out_png.exists():
+    if out_png.exists() and not force:
         return True  # already processed
 
     # Parse semantic → LilyPond music body
@@ -339,14 +259,15 @@ def process_sample(sample_dir: Path, output_dir: Path, dpi: int = 200) -> bool:
     # Render in a temp directory, then move outputs
     with tempfile.TemporaryDirectory(prefix="realbook_") as tmp:
         tmp_dir = Path(tmp)
-        png_path = render_lily(ly_source, tmp_dir, sample_id, dpi=dpi)
+        png_path = run_lilypond(ly_source, sample_id, tmp_dir, dpi=dpi)
         if png_path is None:
             log.warning("LilyPond render failed for %s", sample_id)
             return False
 
         # Crop to staff content
         try:
-            cropped = crop_content(png_path)
+            raw = np.array(Image.open(png_path).convert("L"))
+            cropped = crop_content(raw)
         except Exception as exc:
             log.warning("Crop failed for %s: %s", sample_id, exc)
             return False
@@ -364,6 +285,14 @@ def process_sample(sample_dir: Path, output_dir: Path, dpi: int = 200) -> bool:
         src = sample_dir / f"{sample_id}{ext}"
         if src.exists():
             shutil.copy(src, out_sample / f"{sample_id}{ext}")
+
+    # Optionally generate LMX from the copied .semantic file
+    if with_lmx:
+        try:
+            from data_processing.semantic_to_lmx import convert_sample
+            convert_sample(out_sample, strip_visual=True)
+        except Exception as exc:
+            log.debug("LMX generation failed for %s: %s", sample_id, exc)
 
     return True
 
@@ -407,6 +336,16 @@ def main() -> None:
         help="Parallel workers (default: CPU count)",
     )
     parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-render even if output PNG already exists",
+    )
+    parser.add_argument(
+        "--no-lmx",
+        action="store_true",
+        help="Skip inline LMX generation (use if running semantic_to_lmx.py separately)",
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Show DEBUG messages",
@@ -434,7 +373,8 @@ def main() -> None:
     args.output.mkdir(parents=True, exist_ok=True)
 
     ok = fail = 0
-    _worker = partial(process_sample, output_dir=args.output, dpi=args.dpi)
+    _worker = partial(process_sample, output_dir=args.output, dpi=args.dpi,
+                      force=args.force, with_lmx=not args.no_lmx)
     with multiprocessing.Pool(processes=args.workers) as pool:
         for i, success in enumerate(pool.imap_unordered(_worker, sample_dirs), 1):
             if success:

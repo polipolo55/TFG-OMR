@@ -36,6 +36,56 @@ from .vocab import Vocabulary
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
+# Sample-quality filter
+# ---------------------------------------------------------------------------
+
+# Structural tokens that carry no pitched content
+_REST_STRUCTURAL = frozenset({"rest", "rest:measure", "measure"})
+
+# C-clef variants that are not used in jazz lead sheets and cause
+# systematic pitch-cascade errors due to visual similarity with tenor clef.
+_CLEF_UNWANTED = frozenset({"clef:C1", "clef:C2"})
+
+
+def _is_degenerate(
+    tokens: list[str],
+    *,
+    filter_rest_heavy: bool = True,
+    filter_unwanted_clefs: bool = True,
+) -> bool:
+    """Return *True* if a sample should be excluded from training/evaluation.
+
+    Two independent criteria:
+
+    rest-heavy
+        More than 80 % of tokens are structural (``rest``, ``rest:measure``,
+        ``measure``) *and* the sequence is longer than 50 tokens.  These are
+        multi-bar tacet passages whose image shows an uninformative long rest
+        — the CTC edit distance explodes and they contribute no signal.
+
+    unwanted-clefs
+        The sample contains a soprano (``clef:C1``) or mezzo-soprano
+        (``clef:C2``) clef.  These C-clef variants look visually like tenor
+        clef but sit on a different staff line; the model confuses them and
+        every subsequent pitch prediction is shifted by a fixed interval,
+        creating a large cascade of substitution errors.  Neither clef appears
+        in jazz lead sheets.
+    """
+    if not tokens:
+        return True
+
+    if filter_unwanted_clefs and any(t in _CLEF_UNWANTED for t in tokens):
+        return True
+
+    if filter_rest_heavy and len(tokens) > 50:
+        n_structural = sum(1 for t in tokens if t in _REST_STRUCTURAL)
+        if n_structural / len(tokens) > 0.80:
+            return True
+
+    return False
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -114,6 +164,8 @@ class OMRDataset(Dataset):
         vocab: Vocabulary,
         img_height: int = 128,
         scanned_dir: Path | str | None = None,
+        filter_rest_heavy: bool = True,
+        filter_unwanted_clefs: bool = True,
     ) -> None:
         self.data_dir = Path(data_dir)
         self.vocab = vocab
@@ -121,9 +173,34 @@ class OMRDataset(Dataset):
         self.scanned_dir = Path(scanned_dir) if scanned_dir else None
 
         # Discover all valid (png + lmx) samples
-        self._samples = _discover_samples(self.data_dir, require_lmx=True)
-        if not self._samples:
+        raw_samples = _discover_samples(self.data_dir, require_lmx=True)
+        if not raw_samples:
             raise RuntimeError(f"No valid samples found in {self.data_dir}")
+
+        # Apply quality filters — read the tiny .lmx files once at init time
+        if filter_rest_heavy or filter_unwanted_clefs:
+            self._samples = [
+                (sid, png, lmx)
+                for sid, png, lmx in raw_samples
+                if not _is_degenerate(
+                    _load_lmx_tokens(lmx),
+                    filter_rest_heavy=filter_rest_heavy,
+                    filter_unwanted_clefs=filter_unwanted_clefs,
+                )
+            ]
+            n_removed = len(raw_samples) - len(self._samples)
+            if n_removed:
+                log.info(
+                    "Filtered %d degenerate/unwanted samples (%d remain)",
+                    n_removed, len(self._samples),
+                )
+        else:
+            self._samples = raw_samples
+
+        if not self._samples:
+            raise RuntimeError(
+                f"No samples remain in {self.data_dir} after filtering."
+            )
         log.info(
             "OMRDataset: %d samples from %s%s",
             len(self._samples),
@@ -225,6 +302,8 @@ def make_splits(
     val_frac: float = 0.1,
     test_frac: float = 0.1,
     seed: int = 42,
+    filter_rest_heavy: bool = True,
+    filter_unwanted_clefs: bool = True,
 ) -> tuple[Dataset, Dataset, Dataset]:
     """Create train / val / test splits from a single data directory.
 
@@ -239,6 +318,8 @@ def make_splits(
 
     full_ds = OMRDataset(
         data_dir, vocab, img_height=img_height, scanned_dir=scanned_dir,
+        filter_rest_heavy=filter_rest_heavy,
+        filter_unwanted_clefs=filter_unwanted_clefs,
     )
     n = len(full_ds)
     indices = list(range(n))

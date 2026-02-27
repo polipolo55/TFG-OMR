@@ -203,6 +203,8 @@ def train(cfg: Config) -> Path:
         val_frac=cfg.val_frac,
         test_frac=cfg.test_frac,
         seed=cfg.seed,
+        filter_rest_heavy=cfg.filter_rest_heavy,
+        filter_unwanted_clefs=cfg.filter_unwanted_clefs,
     )
 
     train_loader = DataLoader(
@@ -231,6 +233,7 @@ def train(cfg: Config) -> Path:
         rnn_hidden=cfg.rnn_hidden,
         rnn_layers=cfg.rnn_layers,
         dropout=cfg.dropout,
+        cnn_dropout=cfg.cnn_dropout,
     ).to(device)
 
     n_params = sum(p.numel() for p in model.parameters())
@@ -262,6 +265,7 @@ def train(cfg: Config) -> Path:
     # ── Training loop ──────────────────────────────────────────────────────
     best_ser = float("inf")
     best_ckpt = cfg.model_dir / "best_model.pt"
+    patience_counter = 0
     t0 = time.time()
 
     for epoch in range(1, cfg.epochs + 1):
@@ -292,6 +296,7 @@ def train(cfg: Config) -> Path:
         # Checkpoint best model
         if val_ser < best_ser:
             best_ser = val_ser
+            patience_counter = 0
             torch.save(
                 {
                     "epoch": epoch,
@@ -305,6 +310,8 @@ def train(cfg: Config) -> Path:
                 best_ckpt,
             )
             log.info("  ✓ New best SER=%.4f — saved %s", val_ser, best_ckpt)
+        else:
+            patience_counter += 1
 
         # Also save latest (for resuming)
         torch.save(
@@ -319,6 +326,14 @@ def train(cfg: Config) -> Path:
             },
             cfg.model_dir / "latest_checkpoint.pt",
         )
+
+        # Early stopping
+        if cfg.early_stopping_patience > 0 and patience_counter >= cfg.early_stopping_patience:
+            log.info(
+                "Early stopping — val SER did not improve for %d epochs (best=%.4f)",
+                cfg.early_stopping_patience, best_ser,
+            )
+            break
 
     total_time = time.time() - t0
     log.info(

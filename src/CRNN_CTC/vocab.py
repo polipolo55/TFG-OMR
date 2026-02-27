@@ -16,7 +16,10 @@ Usage::
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 
 class Vocabulary:
@@ -53,8 +56,18 @@ class Vocabulary:
     # -- Encode / Decode ----------------------------------------------------
 
     def encode(self, tokens: list[str]) -> list[int]:
-        """Convert a list of LMX token strings to integer indices."""
-        return [self._tok2idx[t] for t in tokens if t in self._tok2idx]
+        """Convert a list of LMX token strings to integer indices.
+
+        Unknown tokens are dropped with a warning so that data-quality
+        issues surface in the logs instead of being silently hidden.
+        """
+        indices: list[int] = []
+        for t in tokens:
+            if t in self._tok2idx:
+                indices.append(self._tok2idx[t])
+            else:
+                log.warning("OOV token dropped during encode: %r", t)
+        return indices
 
     def decode(self, indices: list[int]) -> list[str]:
         """Convert integer indices back to token strings, skipping blank/pad."""

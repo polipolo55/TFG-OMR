@@ -191,6 +191,8 @@ def evaluate(
         val_frac=cfg.val_frac,
         test_frac=cfg.test_frac,
         seed=cfg.seed,
+        filter_rest_heavy=cfg.filter_rest_heavy,
+        filter_unwanted_clefs=cfg.filter_unwanted_clefs,
     )
     ds_map = {"train": train_ds, "val": val_ds, "test": test_ds}
     ds = ds_map[split]

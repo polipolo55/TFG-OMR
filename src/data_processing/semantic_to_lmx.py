@@ -148,8 +148,12 @@ def semantic_to_score(tokens: list[str]) -> music21.stream.Score:
     for tok in tokens:
         try:
             if tok.startswith("clef-"):
-                clef_cls = _CLEF_MAP.get(tok[5:], music21.clef.TrebleClef)
-                current_measure.append(clef_cls())
+                clef_id = tok[5:]
+                if clef_id not in _CLEF_MAP:
+                    raise ValueError(
+                        f"Unknown clef token: {tok!r}. Add it to _CLEF_MAP."
+                    )
+                current_measure.append(_CLEF_MAP[clef_id]())
 
             elif tok.startswith("keySignature-"):
                 current_measure.append(_parse_key_m21(tok[13:]))
@@ -201,14 +205,18 @@ def semantic_to_score(tokens: list[str]) -> music21.stream.Score:
                 current_measure.append(gn)
 
             elif tok.startswith("multirest-"):
-                count = int(tok[10:])
-                for _ in range(count):
-                    # insert full-measure rests  (approximation: 4/4)
-                    r = music21.note.Rest(quarterLength=4.0)
-                    current_measure.append(r)
-                    part.append(current_measure)
-                    measure_num += 1
-                    current_measure = music21.stream.Measure(number=measure_num)
+                # A multi-bar rest is a single compact visual symbol in the
+                # image (a thick horizontal bar with a count above it).
+                # Expanding it into N individual measures produces an
+                # image–label mismatch: the model sees one glyph but would
+                # need to predict N×(measure+rest) tokens.
+                # Fix: emit exactly ONE full-measure rest representing the
+                # whole multi-bar rest, then close that measure.
+                r = music21.note.Rest(quarterLength=4.0)
+                current_measure.append(r)
+                part.append(current_measure)
+                measure_num += 1
+                current_measure = music21.stream.Measure(number=measure_num)
 
         except Exception as exc:
             log.debug("Skipping token %r: %s", tok, exc)

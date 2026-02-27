@@ -33,8 +33,23 @@ class Config:
     val_frac: float = 0.10         # fraction held out for validation
     test_frac: float = 0.10        # fraction held out for final test
 
+    # ── Data filtering ────────────────────────────────────────────────────
+    # filter_rest_heavy: drop samples where >80% of tokens are structural
+    # rest/measure tokens and the total length exceeds 50.  These are
+    # multi-bar tacet passages from orchestral PrIMuS pieces — the image
+    # shows a long string of whole-measure rests, a rare pattern that is
+    # irrelevant for jazz lead sheets and inflates CTC edit distance.
+    filter_rest_heavy: bool = True
+    # filter_unwanted_clefs: drop samples containing C1 or C2 clef tokens
+    # (soprano / mezzo-soprano clefs).  These clefs are visually similar to
+    # tenor clef (C4) but shifted on the staff; the model confuses them and
+    # the resulting pitch cascade accounts for ~9 000 substitution errors.
+    # Soprano/mezzo clefs are absent from jazz lead sheets.
+    filter_unwanted_clefs: bool = True
+
     # ── Model — CNN ────────────────────────────────────────────────────────
     cnn_out_channels: int = 256    # feature maps at the CNN output
+    cnn_dropout: float = 0.2       # Dropout2d after each CNN block (0 = off)
 
     # ── Model — RNN ────────────────────────────────────────────────────────
     rnn_hidden: int = 256          # hidden size per LSTM direction
@@ -48,6 +63,7 @@ class Config:
     weight_decay: float = 1e-4
     warmup_frac: float = 0.05      # fraction of total steps for LR warm-up
     num_workers: int = 4           # DataLoader workers
+    early_stopping_patience: int = 10  # stop if val SER stalls N epochs (0 = off)
 
     def __post_init__(self) -> None:
         self.model_dir.mkdir(parents=True, exist_ok=True)

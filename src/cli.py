@@ -5,19 +5,21 @@ cli.py — Unified command-line interface for the TFG-OMR pipeline.
 
 Subcommands
 -----------
-convert     Convert PrIMuS .semantic → LMX.
+render      Render PrIMuS samples → LilyJAZZ PNGs + LMX annotations.
+convert     Convert PrIMuS .semantic → monophonic LMX (standalone).
+augment     Apply scan-simulation augmentations to clean images.
 vocab       Build LMX vocabulary from converted data.
 train       Train the CRNN-CTC model.
 evaluate    Evaluate a trained model checkpoint.
 
 Usage examples::
 
+    poetry run python src/cli.py render  --source data/primus/package_aa --output data/realbook_primus_aa
     poetry run python src/cli.py convert --source data/realbook_primus_aa --workers 8
-    poetry run python src/cli.py vocab --data-dir data/realbook_primus_aa
-    poetry run python src/cli.py train --epochs 50 --batch-size 16 --lr 1e-3
-    poetry run python src/cli.py train --use-scanned --epochs 80
+    poetry run python src/cli.py augment --source data/realbook_primus_aa --output data/realbook_primus_aa_scanned
+    poetry run python src/cli.py vocab   --data-dir data/realbook_primus_aa
+    poetry run python src/cli.py train   --epochs 50 --batch-size 16 --lr 1e-3
     poetry run python src/cli.py evaluate --checkpoint models/best_model.pt --split test
-    poetry run python src/cli.py evaluate --checkpoint models/best_model.pt --per-sample
 """
 
 from __future__ import annotations
@@ -28,12 +30,13 @@ import sys
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# Ensure the project root is on sys.path so imports work when the script is
-# invoked directly (``python src/cli.py …``).
+# Ensure src/ is on sys.path so imports work when the script is invoked
+# directly (``python src/cli.py …``).
 # ---------------------------------------------------------------------------
-_ROOT = Path(__file__).resolve().parent.parent  # …/TFG-OMR
-if str(_ROOT) not in sys.path:
-    sys.path.insert(0, str(_ROOT))
+_SRC = Path(__file__).resolve().parent            # …/TFG-OMR/src
+for _p in (str(_SRC), str(_SRC.parent)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 log = logging.getLogger("omr.cli")
 
@@ -42,11 +45,41 @@ log = logging.getLogger("omr.cli")
 # Subcommand handlers
 # ═══════════════════════════════════════════════════════════════════════════
 
+# ── render ────────────────────────────────────────────────────────────────
+
+def cmd_render(args: argparse.Namespace) -> None:
+    """Render PrIMuS samples with LilyJAZZ and optionally generate LMX."""
+    from data_processing.generate_realbook import main as _render_main
+
+    argv: list[str] = [
+        "--source", str(args.source),
+        "--output", str(args.output),
+        "--dpi", str(args.dpi),
+    ]
+    if args.limit is not None:
+        argv += ["--limit", str(args.limit)]
+    if args.workers is not None:
+        argv += ["--workers", str(args.workers)]
+    if args.force:
+        argv.append("--force")
+    if args.no_lmx:
+        argv.append("--no-lmx")
+    if args.verbose:
+        argv.append("--verbose")
+
+    old_argv = sys.argv
+    sys.argv = ["generate_realbook"] + argv
+    try:
+        _render_main()
+    finally:
+        sys.argv = old_argv
+
+
 # ── convert ───────────────────────────────────────────────────────────────
 
 def cmd_convert(args: argparse.Namespace) -> None:
     """Convert PrIMuS .semantic annotations → monophonic LMX via music21."""
-    from src.data_processing.semantic_to_lmx import main as _convert_main
+    from data_processing.semantic_to_lmx import main as _convert_main
 
     # Build argv for the converter's own argparse
     argv: list[str] = ["--source", str(args.source)]
@@ -71,7 +104,7 @@ def cmd_convert(args: argparse.Namespace) -> None:
 
 def cmd_vocab(args: argparse.Namespace) -> None:
     """Build the LMX vocabulary file from a directory of .lmx files."""
-    from src.CRNN_CTC.vocab import Vocabulary
+    from CRNN_CTC.vocab import Vocabulary
 
     data_dir = Path(args.data_dir)
     out_path = Path(args.output)
@@ -86,7 +119,7 @@ def cmd_vocab(args: argparse.Namespace) -> None:
 
 def _build_config_from_args(args: argparse.Namespace):
     """Construct a Config from CLI flags, overriding only what was set."""
-    from src.CRNN_CTC.config import Config
+    from CRNN_CTC.config import Config
 
     overrides: dict = {}
     # Map CLI flag names → Config field names
@@ -101,6 +134,7 @@ def _build_config_from_args(args: argparse.Namespace):
         "val_frac": "val_frac",
         "test_frac": "test_frac",
         "cnn_out_channels": "cnn_out_channels",
+        "cnn_dropout": "cnn_dropout",
         "rnn_hidden": "rnn_hidden",
         "rnn_layers": "rnn_layers",
         "dropout": "dropout",
@@ -110,7 +144,14 @@ def _build_config_from_args(args: argparse.Namespace):
         "weight_decay": "weight_decay",
         "warmup_frac": "warmup_frac",
         "num_workers": "num_workers",
+        "early_stopping_patience": "early_stopping_patience",
     }
+    # Boolean filter flags use store_false with default=None (only
+    # override when the user explicitly passes the --no-... flag)
+    for bflag in ("filter_rest_heavy", "filter_unwanted_clefs"):
+        val = getattr(args, bflag, None)
+        if val is not None:
+            overrides[bflag] = val
     for flag, field in flag_map.items():
         val = getattr(args, flag, None)
         if val is not None:
@@ -126,7 +167,7 @@ def _build_config_from_args(args: argparse.Namespace):
 
 def cmd_train(args: argparse.Namespace) -> None:
     """Launch CRNN-CTC training."""
-    from src.CRNN_CTC.train import train
+    from CRNN_CTC.train import train
 
     cfg = _build_config_from_args(args)
     log.info("Config: %s", cfg)
@@ -138,7 +179,7 @@ def cmd_train(args: argparse.Namespace) -> None:
 
 def cmd_evaluate(args: argparse.Namespace) -> None:
     """Evaluate a trained model checkpoint."""
-    from src.CRNN_CTC.evaluate import evaluate
+    from CRNN_CTC.evaluate import evaluate
 
     cfg = _build_config_from_args(args)
     checkpoint = Path(args.checkpoint)
@@ -153,6 +194,33 @@ def cmd_evaluate(args: argparse.Namespace) -> None:
         per_sample=args.per_sample,
     )
     print(f"SER ({args.split}): {ser:.4f}")
+
+
+# ── augment ───────────────────────────────────────────────────────────────
+
+def cmd_augment(args: argparse.Namespace) -> None:
+    """Apply scan-simulation augmentations to clean dataset images."""
+    from data_processing.augment_scanned import main as _augment_main
+
+    argv: list[str] = [
+        "--source", str(args.source),
+        "--output", str(args.output),
+    ]
+    if args.copies is not None:
+        argv += ["--copies", str(args.copies)]
+    if args.seed is not None:
+        argv += ["--seed", str(args.seed)]
+    if args.workers is not None:
+        argv += ["--workers", str(args.workers)]
+    if args.limit is not None:
+        argv += ["--limit", str(args.limit)]
+
+    old_argv = sys.argv
+    sys.argv = ["augment_scanned"] + argv
+    try:
+        _augment_main()
+    finally:
+        sys.argv = old_argv
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -180,6 +248,12 @@ def _add_common_data_args(parser: argparse.ArgumentParser) -> None:
                    help="DataLoader workers (default: 4)")
     g.add_argument("--seed", type=int, default=None,
                    help="Random seed (default: 42)")
+    g.add_argument("--no-filter-rest-heavy", dest="filter_rest_heavy",
+                   action="store_false", default=None,
+                   help="Disable filtering of rest-heavy samples")
+    g.add_argument("--no-filter-unwanted-clefs", dest="filter_unwanted_clefs",
+                   action="store_false", default=None,
+                   help="Disable filtering of C1/C2 clef samples")
 
 
 def _add_model_args(parser: argparse.ArgumentParser) -> None:
@@ -187,6 +261,8 @@ def _add_model_args(parser: argparse.ArgumentParser) -> None:
     g = parser.add_argument_group("model")
     g.add_argument("--cnn-out-channels", type=int, default=None,
                    help="CNN output feature maps (default: 256)")
+    g.add_argument("--cnn-dropout", type=float, default=None,
+                   help="Dropout2d after each CNN block (default: 0.2)")
     g.add_argument("--rnn-hidden", type=int, default=None,
                    help="LSTM hidden size per direction (default: 256)")
     g.add_argument("--rnn-layers", type=int, default=None,
@@ -204,6 +280,31 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("-v", "--verbose", action="store_true",
                         help="Enable DEBUG-level logging")
     sub = parser.add_subparsers(dest="command", required=True)
+
+    # ── render ────────────────────────────────────────────────────────
+    p_rend = sub.add_parser(
+        "render",
+        help="Render PrIMuS → LilyJAZZ PNGs (+ LMX annotations)",
+        description="Re-render PrIMuS samples with LilyJAZZ styling and "
+                    "optionally generate LMX labels inline.",
+    )
+    p_rend.add_argument("--source", type=Path,
+                        default=Path("data/primus/package_aa"),
+                        help="PrIMuS source directory (default: data/primus/package_aa)")
+    p_rend.add_argument("--output", type=Path,
+                        default=Path("data/realbook_primus_aa"),
+                        help="Output dataset directory (default: data/realbook_primus_aa)")
+    p_rend.add_argument("--dpi", type=int, default=200,
+                        help="Rendering resolution (default: 200)")
+    p_rend.add_argument("--limit", type=int, default=None,
+                        help="Process at most N samples (for testing)")
+    p_rend.add_argument("--workers", type=int, default=None,
+                        help="Parallel workers (default: CPU count)")
+    p_rend.add_argument("--force", action="store_true",
+                        help="Re-render even if output PNG already exists")
+    p_rend.add_argument("--no-lmx", action="store_true",
+                        help="Skip inline LMX generation")
+    p_rend.set_defaults(func=cmd_render)
 
     # ── convert ───────────────────────────────────────────────────────
     p_conv = sub.add_parser(
@@ -223,6 +324,28 @@ def build_parser() -> argparse.ArgumentParser:
     p_conv.add_argument("--keep-visual", action="store_true",
                         help="Retain visual tokens (beam, stem, staff)")
     p_conv.set_defaults(func=cmd_convert)
+
+    # ── augment ───────────────────────────────────────────────────────
+    p_aug = sub.add_parser(
+        "augment",
+        help="Apply scan-simulation augmentations to clean images",
+        description="Distort clean LilyJAZZ PNGs to simulate physical scans.",
+    )
+    p_aug.add_argument("--source", type=Path,
+                       default=Path("data/realbook_primus_aa"),
+                       help="Clean dataset root (default: data/realbook_primus_aa)")
+    p_aug.add_argument("--output", type=Path,
+                       default=Path("data/realbook_primus_aa_scanned"),
+                       help="Output root (default: data/realbook_primus_aa_scanned)")
+    p_aug.add_argument("--copies", type=int, default=None,
+                       help="Augmented copies per sample (default: 1)")
+    p_aug.add_argument("--seed", type=int, default=None,
+                       help="Global random seed (default: 42)")
+    p_aug.add_argument("--workers", type=int, default=None,
+                       help="Parallel workers (default: half CPU count)")
+    p_aug.add_argument("--limit", type=int, default=None,
+                       help="Process at most N samples (for testing)")
+    p_aug.set_defaults(func=cmd_augment)
 
     # ── vocab ─────────────────────────────────────────────────────────
     p_vocab = sub.add_parser(
@@ -257,6 +380,8 @@ def build_parser() -> argparse.ArgumentParser:
                          help="AdamW weight decay (default: 1e-4)")
     g_train.add_argument("--warmup-frac", type=float, default=None,
                          help="LR warm-up fraction (default: 0.05)")
+    g_train.add_argument("--early-stopping-patience", type=int, default=None,
+                         help="Stop after N epochs without val SER improvement (0=off, default: 10)")
     g_train.add_argument("--model-dir", type=str, default=None,
                          help="Directory for checkpoints (default: models/)")
     p_train.set_defaults(func=cmd_train)

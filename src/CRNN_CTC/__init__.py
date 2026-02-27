@@ -7,12 +7,13 @@ staff-line images, using LMX (Linearized MusicXML) as the target encoding.
 
 Modules
 -------
-config      Centralised hyperparameters and paths.
-vocab       LMX token ↔ integer mapping (CTC blank at index 0).
-dataset     PyTorch Dataset / DataLoader / collation for PNG + LMX pairs.
-model       CRNN architecture: CNN backbone + bidirectional LSTM + FC head.
-train       Training loop with AMP, OneCycleLR, CTC loss, checkpointing.
-evaluate    Greedy CTC decoding, SER metric, full evaluation loop.
+config           Centralised hyperparameters and paths.
+vocab            LMX token ↔ integer mapping (CTC blank at index 0).
+dataset          PyTorch Dataset / DataLoader / collation for PNG + LMX pairs.
+model            CRNN architecture: CNN backbone + bidirectional LSTM + FC head.
+train            Training loop with AMP, OneCycleLR, CTC loss, checkpointing.
+evaluate         Greedy CTC decoding, SER metric, full evaluation loop.
+lilypond_render  LMX → LilyPond → PNG rendering (shared back-end).
 """
 
 from .config import Config

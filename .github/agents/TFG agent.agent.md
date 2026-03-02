@@ -15,12 +15,17 @@ The project is an end-to-end Optical Music Recognition (OMR) system specifically
 * **The Data:** A synthetic dataset of monophonic music lines generated programmatically via **LilyPond** or **MuseScore**, with data augmentation (noise, blur, perspective warp) to mimic physical scans.
 * **Polyphony:** The system strictly handles monophonic lines (1D sequences). Full polyphony and full-page layout analysis are explicitly OUT OF SCOPE for this TFG stage.
 
-# Current Project State (as of Feb 2026)
+# Current Project State (as of Mar 2026)
 * **Phase 1 — Literature Review & Baseline: COMPLETE.** GEP Deliverable 1 (`docs/gep/E1/E1.tex`) is written and submitted. The morphological baseline notebook is fully implemented and evaluated.
-* **Phase 2 — Dataset Construction: COMPLETE.** data/realbook_primus_aa contains 10k synthetic staff line images (PNG) with paired annotations in PrIMuS format, generated via a custom script using LilyPond. Basic augmentations (Gaussian noise, blur, perspective warp) are applied to simulate real-world conditions and can be found in realbook_primus_aa_scanned
-* **Phase 3 — CRNN-CTC Development: IN PROGRESS (pipeline complete, model ready to train).** Full end-to-end pipeline scaffolding is in place: `Vocabulary` (93 LMX tokens + blank + pad = 95), `Config` dataclass with all hyperparameters, `OMRDataset` + `collate_fn` loading PNG+LMX pairs (43,553 valid samples, images resized to 128px height), `CRNN` model (VGG-style CNN → BiLSTM → FC, ~4.2M params), training loop with CTC loss + AMP + OneCycleLR + gradient clipping + best-model checkpointing, evaluation loop with greedy CTC decoding + SER metric, and a fully-featured CLI (`convert`, `vocab`, `train`, `evaluate` with per-flag control of every hyperparameter). **Not yet done:** actual training runs, architecture tuning, ablation experiments.
-* **Phase 4 — Evaluation & Analysis: NOT STARTED.**
-* **Phase 5 — Extension (conditional): NOT STARTED.** Polyphony/chord symbols only if time allows after Phase 4.
+* **Phase 2 — Dataset Construction: COMPLETE.** data/realbook_primus_aa contains 43,563 synthetic staff line images (PNG) with paired annotations in LMX format, generated via LilyPond + LilyJAZZ. Data augmentation (Gaussian noise, blur, perspective warp) applied to `realbook_primus_aa_scanned` for robustness training. Fixed pipeline bug: `semantic_to_lmx.py` now correctly skips `multirest-N` tokens (matching `generate_realbook.py` behavior), eliminating 24.3% ghost-token corruption.
+* **Phase 3 — CRNN-CTC Development: COMPLETE.** Full pipeline operational and iteratively improved through three training runs:
+  - **Run 1** (baseline): Aggregate test SER 0.2698
+  - **Run 2** (reduced dropout + early stopping): Best val SER 0.1367, aggregate test SER 0.1451
+  - **Run 3** (after multirest fix + label sync): Best val SER **0.0712**, aggregate test SER **0.0744**, 45% perfect predictions (SER=0), 75.1% SER ≤10%
+  - **Latest:** Added `filter_multi_staff` + `max_source_height=180` to remove 1,132 multi-staff renders (2.6% of data), cleanly separated from normal population by a hard pixel-height gap (normal ≤152px, multi-staff ≥200px)
+  - Training dataset after all filters: 30,113 samples (train=24,091 / val=3,011 / test=3,011)
+* **Phase 4 — Evaluation & Analysis: IN PROGRESS.** Currently cycling Phase 3↔4 for iterative improvement. Run 3 error analysis complete: deletions 53.9% (primarily `measure` ×1746, `rest` ×906, `32nd` ×565), substitutions 23.0% (duration confusion: eighth↔quarter), insertions 23.1%. Worst 8 predictions analyzed — 3 were false-positive multi-staff renders (now filtered); 5 are genuinely hard (dense 32nds, bar-boundary precision). Run 4 queued to validate height filter.
+* **Phase 5 — Extension (conditional): NOT STARTED.** Polyphony/chord symbols only if time allows after Phase 4 stabilizes.
 * **Thesis document:** `docs/main/main.tex` exists but is currently **empty** — writing has not begun.
 
 # Repository Layout
@@ -36,13 +41,13 @@ src/
     test1.py                  # scratch / smoke-test script
   CRNN_CTC/
     __init__.py
-    config.py                 # Config dataclass: paths, data, model arch, training hyperparams
+    config.py                 # Config dataclass: paths, data (with filter_multi_staff, max_source_height), model arch, training hyperparams
     vocab.py                  # Vocabulary class: token↔index, CTC blank at 0
-    vocabulary.txt            # 93-token LMX vocabulary built from realbook_primus_aa
-    dataset.py                # OMRDataset (PNG+LMX pairs), collate_fn, train/val/test split
+    vocabulary.txt            # 94-token LMX vocabulary (93 music tokens + blank + pad)
+    dataset.py                # OMRDataset with multi-stage filtering: tokens (rest-heavy, C1/C2 clefs), image height (multi-staff); collate_fn, make_splits()
     model.py                  # CRNN: CNN backbone + BiLSTM + FC head (~4.2M params)
-    train.py                  # Training loop: CTC loss, AMP, OneCycleLR, checkpointing
-    evaluate.py               # Greedy CTC decode, SER metric, full evaluation loop
+    train.py                  # Training loop: CTC loss, AMP, OneCycleLR, gradient clipping, early stopping, best-model checkpointing
+    evaluate.py               # Greedy CTC decode, SER metric, per-sample error breakdown, worst-prediction visualization
 notebooks/
   01_simple_baseline.ipynb    # morphological baseline, fully implemented
   simple_baseline.pdf         # exported PDF of the baseline notebook
@@ -90,10 +95,28 @@ This has to be evaluated still but LMX looks good https://github.com/OMR-Researc
 # Strict Operational Rules
 1. **Language Policy:** Write all code, comments, variables, and LaTeX document contents in **English**. If asked to prepare a presentation or speaking notes for the defense, write in **Catalan**.
 2. **FIB Academic Rigor:** When generating LaTeX text, maintain a highly professional, objective engineering tone. Always prioritize justifying engineering decisions (e.g., "Why CRNN over Transformers?") based on constraints like compute limits and dataset size.
-3. **Iterative/Agile Mindset:** When asked to plan tasks or write code, prefer small, testable scripts (e.g., "Let's first write a script to crop a single staff line") over massive, complex architectures all at once. Always align suggestions with the current project phase.
+3. **Iterative/Agile Mindset:** Currently cycling Phase 3 (model training/refinement) ↔ Phase 4 (error analysis/data improvements) until convergence. When debugging, always: (a) analyze failure modes quantitatively (worst predictions, error breakdown by token), (b) identify root causes (data corruption, architecture mismatch, filtering issues), (c) implement clean fixes in the pipeline, (d) retrain and validate. Never apply band-aid patches.
 4. **Memory Constraints:** Assume the training will happen on a local consumer NVIDIA GPU (e.g., RTX 3060). Suggest memory-efficient architectures (like ResNet18/MobileNet backbones) and mixed-precision training (`torch.cuda.amp`).
 5. **Data generation tools:** Use **LilyPond** or **MuseScore** for synthetic score rendering. Do not suggest Verovio as a generation tool.
 6. **Self-update obligation:** Whenever a project-wide resource is added or changed (global style files, new shared utilities, major architectural decisions, new datasets integrated, phase status changes), **update this agent file** to reflect the new state before finishing the task. Never leave this file stale after a structural change to the repository.
+
+# Current Training State & Best Model
+* **Latest Checkpoint:** `models/best_model.pt` (Run 3, epoch 36)
+* **Best Metrics:**
+  - Validation SER: 0.0712 (best epoch during training)
+  - Aggregate test SER: 0.0744
+  - Perfect predictions (SER=0): 45.0%
+  - SER ≤ 5%: 60.6%
+  - SER ≤ 10%: 75.1%
+* **Training Config (Run 3):**
+  - Dataset: 30,963 samples (after C1/C2 clef + rest-heavy filters; run before height filter was added)
+  - Batch size: 16, Learning rate: 1e-3 (OneCycleLR), Epochs: 50 (stopped at 36)
+  - CNN dropout: 0.2, Early stopping patience: 10
+* **Dominant Remaining Errors (quantified from 3,096 test samples):**
+  - **Deletions (53.9%):** `measure` ×1,746 (bar boundaries), `rest` ×906, `32nd` ×565 (rare symbols)
+  - **Substitutions (23.0%):** Duration confusion (`eighth↔quarter` ×66, `eighth↔16th` ×60)
+  - **Insertions (23.1%):** Spurious `measure` ×1,037, `rest` ×444
+* **Next Focus:** Run 4 will validate `filter_multi_staff=True` with 30,113 samples (850 multi-staff renders removed). Followed by architecture/decoder experiments if SER stalls.
 
 # Standard Operating Procedures
 * **Project-wide styling — Python:** Every notebook and script **must** begin with:

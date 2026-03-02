@@ -119,13 +119,24 @@ def _discover_samples(
     return samples
 
 
-def _load_image(path: Path, img_height: int) -> np.ndarray:
-    """Load a grayscale image, resize to ``img_height``, return float32 [0, 1]."""
+def _load_image(
+    path: Path,
+    img_height: int,
+    max_width: int = 0,
+) -> np.ndarray:
+    """Load a grayscale image, resize to ``img_height``, return float32 [0, 1].
+
+    If *max_width* > 0 and the proportionally-scaled width exceeds it, the
+    image is clamped to ``(img_height, max_width)`` — a safety valve against
+    OOM from outlier-wide samples.
+    """
     img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
     if img is None:
         raise FileNotFoundError(f"Cannot read image: {path}")
     h, w = img.shape
     new_w = max(1, round(w * img_height / h))
+    if max_width > 0 and new_w > max_width:
+        new_w = max_width
     img = cv2.resize(img, (new_w, img_height), interpolation=cv2.INTER_AREA)
     return img.astype(np.float32) / 255.0
 
@@ -163,6 +174,7 @@ class OMRDataset(Dataset):
         data_dir: Path | str,
         vocab: Vocabulary,
         img_height: int = 128,
+        max_image_width: int = 0,
         scanned_dir: Path | str | None = None,
         filter_rest_heavy: bool = True,
         filter_unwanted_clefs: bool = True,
@@ -170,6 +182,7 @@ class OMRDataset(Dataset):
         self.data_dir = Path(data_dir)
         self.vocab = vocab
         self.img_height = img_height
+        self.max_image_width = max_image_width
         self.scanned_dir = Path(scanned_dir) if scanned_dir else None
 
         # Discover all valid (png + lmx) samples
@@ -223,7 +236,7 @@ class OMRDataset(Dataset):
                 png_path = alt_png
 
         # Image → (1, H, W) float32 tensor, normalised
-        img = _load_image(png_path, self.img_height)  # (H, W) float32 [0,1]
+        img = _load_image(png_path, self.img_height, self.max_image_width)  # (H, W) float32 [0,1]
         img = (img - img.mean()) / (img.std() + 1e-6)  # zero-mean, unit-var
         img_t = torch.from_numpy(img).unsqueeze(0)      # (1, H, W)
 
@@ -298,6 +311,7 @@ def make_splits(
     data_dir: Path | str,
     vocab: Vocabulary,
     img_height: int = 128,
+    max_image_width: int = 0,
     scanned_dir: Path | str | None = None,
     val_frac: float = 0.1,
     test_frac: float = 0.1,
@@ -317,7 +331,9 @@ def make_splits(
     from torch.utils.data import Subset
 
     full_ds = OMRDataset(
-        data_dir, vocab, img_height=img_height, scanned_dir=scanned_dir,
+        data_dir, vocab, img_height=img_height,
+        max_image_width=max_image_width,
+        scanned_dir=scanned_dir,
         filter_rest_heavy=filter_rest_heavy,
         filter_unwanted_clefs=filter_unwanted_clefs,
     )

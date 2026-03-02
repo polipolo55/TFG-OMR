@@ -29,6 +29,7 @@ class Config:
 
     # ── Data ───────────────────────────────────────────────────────────────
     img_height: int = 128          # resize all images to this height
+    max_image_width: int = 2048    # clamp width after height-resize (OOM guard)
     use_scanned: bool = False      # train on augmented scanned images
     val_frac: float = 0.10         # fraction held out for validation
     test_frac: float = 0.10        # fraction held out for final test

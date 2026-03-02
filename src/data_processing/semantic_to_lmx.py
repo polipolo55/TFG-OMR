@@ -205,18 +205,13 @@ def semantic_to_score(tokens: list[str]) -> music21.stream.Score:
                 current_measure.append(gn)
 
             elif tok.startswith("multirest-"):
-                # A multi-bar rest is a single compact visual symbol in the
-                # image (a thick horizontal bar with a count above it).
-                # Expanding it into N individual measures produces an
-                # image–label mismatch: the model sees one glyph but would
-                # need to predict N×(measure+rest) tokens.
-                # Fix: emit exactly ONE full-measure rest representing the
-                # whole multi-bar rest, then close that measure.
-                r = music21.note.Rest(quarterLength=4.0)
-                current_measure.append(r)
-                part.append(current_measure)
-                measure_num += 1
-                current_measure = music21.stream.Measure(number=measure_num)
+                # generate_realbook.py skips multirest entirely — the
+                # LilyPond/PNG pipeline does NOT render these bars.  We
+                # must do the same here so the LMX label matches the image.
+                # Emitting any rest would create ghost bars that have no
+                # visual counterpart.
+                log.debug("Skipping %s (multirest not rendered in image)", tok)
+                continue
 
         except Exception as exc:
             log.debug("Skipping token %r: %s", tok, exc)

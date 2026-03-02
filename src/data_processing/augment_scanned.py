@@ -126,6 +126,17 @@ def augment_sample(
 # Top-level worker (must be module-level for multiprocessing pickling)
 # ---------------------------------------------------------------------------
 
+_LABEL_EXTS = (".semantic", ".agnostic", ".mid", ".lmx")
+
+
+def _copy_labels(src_dir: Path, out_dir: Path, sample_id: str, out_id: str) -> None:
+    """Copy annotation files from source to output, unconditionally."""
+    for ext in _LABEL_EXTS:
+        src_ann = src_dir / f"{sample_id}{ext}"
+        if src_ann.exists():
+            shutil.copy2(src_ann, out_dir / f"{out_id}{ext}")
+
+
 def _worker(args_tuple):
     src_dir, output_dir, copies, seed_base = args_tuple
     sample_id = src_dir.name
@@ -136,22 +147,51 @@ def _worker(args_tuple):
         out_id = sample_id if copies == 1 else f"{sample_id}_aug{copy_idx:02d}"
         out_dir = output_dir / out_id
         out_png = out_dir / f"{out_id}.png"
+
         if out_png.exists():
+            # Image already augmented — just re-sync labels (they may
+            # have been regenerated since the last augmentation run).
+            _copy_labels(src_dir, out_dir, sample_id, out_id)
             results.append(True)
             continue
         try:
             pipeline = build_pipeline(seed=copy_seed)
             augment_sample(src_png, out_png, pipeline, random.Random(copy_seed))
             out_dir.mkdir(parents=True, exist_ok=True)
-            for ext in (".semantic", ".agnostic", ".mid", ".lmx"):
-                src_ann = src_dir / f"{sample_id}{ext}"
-                if src_ann.exists():
-                    shutil.copy(src_ann, out_dir / f"{out_id}{ext}")
+            _copy_labels(src_dir, out_dir, sample_id, out_id)
             results.append(True)
         except Exception as exc:
             log.warning("Augment failed for %s: %s", sample_id, exc)
             results.append(False)
     return results
+
+
+# ---------------------------------------------------------------------------
+# Standalone label-sync (no image re-augmentation)
+# ---------------------------------------------------------------------------
+
+def sync_labels(
+    source: Path,
+    output: Path,
+) -> tuple[int, int]:
+    """Copy label files from *source* to every matching sample in *output*.
+
+    Returns ``(synced, skipped)`` counts.
+    """
+    synced = skipped = 0
+    for out_sub in sorted(output.iterdir()):
+        if not out_sub.is_dir():
+            continue
+        out_id = out_sub.name
+        # strip _augNN suffix to find the original sample
+        base_id = out_id.rsplit("_aug", 1)[0]
+        src_sub = source / base_id
+        if not src_sub.is_dir():
+            skipped += 1
+            continue
+        _copy_labels(src_sub, out_sub, base_id, out_id)
+        synced += 1
+    return synced, skipped
 
 
 def _init_worker(nice_val: int) -> None:
@@ -218,7 +258,21 @@ def main() -> None:
         default=None,
         help="Process at most N samples (for testing)",
     )
+    parser.add_argument(
+        "--sync-labels",
+        action="store_true",
+        help="Only copy/sync label files (.lmx, .semantic, .agnostic, .mid) "
+             "from source to output without re-augmenting images.  Use after "
+             "regenerating .lmx files in the source directory.",
+    )
     args = parser.parse_args()
+
+    # --- Label-only sync mode (fast, no images) ---
+    if args.sync_labels:
+        log.info("Syncing labels from %s → %s ...", args.source, args.output)
+        synced, skipped = sync_labels(args.source, args.output)
+        log.info("Done. Synced: %d  Skipped: %d", synced, skipped)
+        return
 
     sample_dirs = sorted(
         d for d in args.source.iterdir()

@@ -199,6 +199,7 @@ def train(cfg: Config) -> Path:
         data_dir=cfg.data_dir,
         vocab=vocab,
         img_height=cfg.img_height,
+        max_image_width=cfg.max_image_width,
         scanned_dir=cfg.scanned_dir if cfg.use_scanned else None,
         val_frac=cfg.val_frac,
         test_frac=cfg.test_frac,

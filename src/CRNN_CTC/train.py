@@ -206,6 +206,8 @@ def train(cfg: Config) -> Path:
         seed=cfg.seed,
         filter_rest_heavy=cfg.filter_rest_heavy,
         filter_unwanted_clefs=cfg.filter_unwanted_clefs,
+        filter_multi_staff=cfg.filter_multi_staff,
+        max_source_height=cfg.max_source_height,
     )
 
     train_loader = DataLoader(

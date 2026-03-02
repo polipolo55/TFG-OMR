@@ -145,10 +145,11 @@ def _build_config_from_args(args: argparse.Namespace):
         "warmup_frac": "warmup_frac",
         "num_workers": "num_workers",
         "early_stopping_patience": "early_stopping_patience",
+        "max_source_height": "max_source_height",
     }
     # Boolean filter flags use store_false with default=None (only
     # override when the user explicitly passes the --no-... flag)
-    for bflag in ("filter_rest_heavy", "filter_unwanted_clefs"):
+    for bflag in ("filter_rest_heavy", "filter_unwanted_clefs", "filter_multi_staff"):
         val = getattr(args, bflag, None)
         if val is not None:
             overrides[bflag] = val
@@ -254,6 +255,11 @@ def _add_common_data_args(parser: argparse.ArgumentParser) -> None:
     g.add_argument("--no-filter-unwanted-clefs", dest="filter_unwanted_clefs",
                    action="store_false", default=None,
                    help="Disable filtering of C1/C2 clef samples")
+    g.add_argument("--no-filter-multi-staff", dest="filter_multi_staff",
+                   action="store_false", default=None,
+                   help="Disable filtering of multi-staff (tall) images")
+    g.add_argument("--max-source-height", type=int, default=None,
+                   help="Max original image height for single-staff filter (default: 180 px)")
 
 
 def _add_model_args(parser: argparse.ArgumentParser) -> None:

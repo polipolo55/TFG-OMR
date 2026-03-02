@@ -47,6 +47,16 @@ class Config:
     # the resulting pitch cascade accounts for ~9 000 substitution errors.
     # Soprano/mezzo clefs are absent from jazz lead sheets.
     filter_unwanted_clefs: bool = True
+    # filter_multi_staff: drop images whose original height exceeds
+    # max_source_height.  LilyPond occasionally wraps a long excerpt onto two
+    # staff lines in a single PNG — the resulting image is ~2-3× taller than
+    # a normal single staff.  Height distribution for realbook_primus_aa:
+    #   normal range  84–152 px (p5–p95), median 133 px
+    #   multi-staff   ≥200 px (hard gap, no values 153–199 px)
+    # A threshold of 180 px removes all 1 132 / 43 563 multi-staff images
+    # (2.6 %) while retaining every legitimate single-staff sample.
+    filter_multi_staff: bool = True
+    max_source_height: int = 180   # px — upper bound for single-staff check
 
     # ── Model — CNN ────────────────────────────────────────────────────────
     cnn_out_channels: int = 256    # feature maps at the CNN output

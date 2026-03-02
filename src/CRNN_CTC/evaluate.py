@@ -194,6 +194,8 @@ def evaluate(
         seed=cfg.seed,
         filter_rest_heavy=cfg.filter_rest_heavy,
         filter_unwanted_clefs=cfg.filter_unwanted_clefs,
+        filter_multi_staff=cfg.filter_multi_staff,
+        max_source_height=cfg.max_source_height,
     )
     ds_map = {"train": train_ds, "val": val_ds, "test": test_ds}
     ds = ds_map[split]

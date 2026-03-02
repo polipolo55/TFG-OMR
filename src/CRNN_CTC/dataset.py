@@ -119,6 +119,18 @@ def _discover_samples(
     return samples
 
 
+def _image_source_height(path: Path) -> int:
+    """Return the original pixel height of a PNG without full decode.
+
+    Uses ``cv2.imread`` in grayscale mode; faster than a full decode when
+    all we need is ``img.shape[0]``.
+    """
+    img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
+    if img is None:
+        return 0
+    return img.shape[0]
+
+
 def _load_image(
     path: Path,
     img_height: int,
@@ -167,6 +179,15 @@ class OMRDataset(Dataset):
     scanned_dir : Path | str | None
         If given, load *images* from this directory instead of *data_dir*.
         Labels are always read from *data_dir*.
+    filter_multi_staff : bool
+        If *True*, discard images whose source height exceeds
+        ``max_source_height``.  Multi-staff renders (LilyPond wrapping onto
+        two lines) are ~2-3× taller than single staves (normal range
+        84–152 px, gap, then ≥200 px for double staves).
+    max_source_height : int
+        Upper bound on original image height used by the multi-staff filter.
+        A value of 180 px cleanly separates the entire normal population
+        (p95 = 152 px) from all multi-staff images (≥200 px).
     """
 
     def __init__(
@@ -178,6 +199,8 @@ class OMRDataset(Dataset):
         scanned_dir: Path | str | None = None,
         filter_rest_heavy: bool = True,
         filter_unwanted_clefs: bool = True,
+        filter_multi_staff: bool = True,
+        max_source_height: int = 180,
     ) -> None:
         self.data_dir = Path(data_dir)
         self.vocab = vocab
@@ -190,9 +213,9 @@ class OMRDataset(Dataset):
         if not raw_samples:
             raise RuntimeError(f"No valid samples found in {self.data_dir}")
 
-        # Apply quality filters — read the tiny .lmx files once at init time
+        # 1) Token-level quality filters (fast — reads tiny .lmx files)
         if filter_rest_heavy or filter_unwanted_clefs:
-            self._samples = [
+            after_token_filter = [
                 (sid, png, lmx)
                 for sid, png, lmx in raw_samples
                 if not _is_degenerate(
@@ -201,25 +224,42 @@ class OMRDataset(Dataset):
                     filter_unwanted_clefs=filter_unwanted_clefs,
                 )
             ]
-            n_removed = len(raw_samples) - len(self._samples)
+            n_removed = len(raw_samples) - len(after_token_filter)
             if n_removed:
                 log.info(
-                    "Filtered %d degenerate/unwanted samples (%d remain)",
-                    n_removed, len(self._samples),
+                    "Token filter removed %d degenerate/unwanted samples",
+                    n_removed,
                 )
         else:
-            self._samples = raw_samples
+            after_token_filter = raw_samples
+
+        # 2) Image-height filter — rejects multi-staff renders
+        if filter_multi_staff:
+            self._samples = [
+                (sid, png, lmx)
+                for sid, png, lmx in after_token_filter
+                if _image_source_height(png) <= max_source_height
+            ]
+            n_tall = len(after_token_filter) - len(self._samples)
+            if n_tall:
+                log.info(
+                    "Height filter (max %dpx) removed %d multi-staff images",
+                    max_source_height, n_tall,
+                )
+        else:
+            self._samples = after_token_filter
+
+        if self._samples:
+            log.info(
+                "OMRDataset: %d samples retained from %s%s",
+                len(self._samples), self.data_dir,
+                f" (images from {self.scanned_dir})" if self.scanned_dir else "",
+            )
 
         if not self._samples:
             raise RuntimeError(
                 f"No samples remain in {self.data_dir} after filtering."
             )
-        log.info(
-            "OMRDataset: %d samples from %s%s",
-            len(self._samples),
-            self.data_dir,
-            f" (images from {self.scanned_dir})" if self.scanned_dir else "",
-        )
 
     # -- Dataset protocol ---------------------------------------------------
 
@@ -318,6 +358,8 @@ def make_splits(
     seed: int = 42,
     filter_rest_heavy: bool = True,
     filter_unwanted_clefs: bool = True,
+    filter_multi_staff: bool = True,
+    max_source_height: int = 180,
 ) -> tuple[Dataset, Dataset, Dataset]:
     """Create train / val / test splits from a single data directory.
 
@@ -336,6 +378,8 @@ def make_splits(
         scanned_dir=scanned_dir,
         filter_rest_heavy=filter_rest_heavy,
         filter_unwanted_clefs=filter_unwanted_clefs,
+        filter_multi_staff=filter_multi_staff,
+        max_source_height=max_source_height,
     )
     n = len(full_ds)
     indices = list(range(n))

@@ -201,15 +201,24 @@ class OMRDataset(Dataset):
         filter_unwanted_clefs: bool = True,
         filter_multi_staff: bool = True,
         max_source_height: int = 180,
+        extra_data_dirs: list[Path] | None = None,
+        extra_scanned_dirs: list[Path] | None = None,
     ) -> None:
         self.data_dir = Path(data_dir)
         self.vocab = vocab
         self.img_height = img_height
         self.max_image_width = max_image_width
         self.scanned_dir = Path(scanned_dir) if scanned_dir else None
+        self.extra_scanned_dirs = [Path(p) for p in (extra_scanned_dirs or [])]
 
-        # Discover all valid (png + lmx) samples
+        # Discover all valid (png + lmx) samples from primary + extra dirs
         raw_samples = _discover_samples(self.data_dir, require_lmx=True)
+        for extra in (extra_data_dirs or []):
+            extra_path = Path(extra)
+            if extra_path.is_dir():
+                extra_samples = _discover_samples(extra_path, require_lmx=True)
+                log.info("Extra data dir %s: %d samples", extra_path, len(extra_samples))
+                raw_samples.extend(extra_samples)
         if not raw_samples:
             raise RuntimeError(f"No valid samples found in {self.data_dir}")
 
@@ -274,6 +283,13 @@ class OMRDataset(Dataset):
             alt_png = self.scanned_dir / sid / f"{sid}.png"
             if alt_png.exists():
                 png_path = alt_png
+            else:
+                # Try extra scanned dirs
+                for sd in self.extra_scanned_dirs:
+                    alt2 = sd / sid / f"{sid}.png"
+                    if alt2.exists():
+                        png_path = alt2
+                        break
 
         # Image → (1, H, W) float32 tensor, normalised
         img = _load_image(png_path, self.img_height, self.max_image_width)  # (H, W) float32 [0,1]
@@ -360,6 +376,8 @@ def make_splits(
     filter_unwanted_clefs: bool = True,
     filter_multi_staff: bool = True,
     max_source_height: int = 180,
+    extra_data_dirs: list[Path] | None = None,
+    extra_scanned_dirs: list[Path] | None = None,
 ) -> tuple[Dataset, Dataset, Dataset]:
     """Create train / val / test splits from a single data directory.
 
@@ -380,6 +398,8 @@ def make_splits(
         filter_unwanted_clefs=filter_unwanted_clefs,
         filter_multi_staff=filter_multi_staff,
         max_source_height=max_source_height,
+        extra_data_dirs=extra_data_dirs,
+        extra_scanned_dirs=extra_scanned_dirs,
     )
     n = len(full_ds)
     indices = list(range(n))

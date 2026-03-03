@@ -21,6 +21,8 @@ class Config:
     # ── Paths ──────────────────────────────────────────────────────────────
     data_dir: Path = Path("data/realbook_primus_aa")
     scanned_dir: Path = Path("data/realbook_primus_aa_scanned")
+    extra_data_dirs: list[Path] = field(default_factory=list)
+    extra_scanned_dirs: list[Path] = field(default_factory=list)
     model_dir: Path = Path("models")
     vocab_path: Path = Path("src/CRNN_CTC/vocabulary.txt")
 
@@ -30,7 +32,7 @@ class Config:
     # ── Data ───────────────────────────────────────────────────────────────
     img_height: int = 128          # resize all images to this height
     max_image_width: int = 2048    # clamp width after height-resize (OOM guard)
-    use_scanned: bool = False      # train on augmented scanned images
+    use_scanned: bool = True           # train on augmented scanned images
     val_frac: float = 0.10         # fraction held out for validation
     test_frac: float = 0.10        # fraction held out for final test
 
@@ -58,9 +60,12 @@ class Config:
     filter_multi_staff: bool = True
     max_source_height: int = 180   # px — upper bound for single-staff check
 
+    # ── Model — backbone ───────────────────────────────────────────────────
+    backbone: str = "resnet18"         # CNN backbone: "resnet18" or "vgg"
+
     # ── Model — CNN ────────────────────────────────────────────────────────
-    cnn_out_channels: int = 256    # feature maps at the CNN output
-    cnn_dropout: float = 0.2       # Dropout2d after each CNN block (0 = off)
+    cnn_out_channels: int = 256    # feature maps at the CNN output (VGG only)
+    cnn_dropout: float = 0.25      # Dropout2d after CNN blocks
 
     # ── Model — RNN ────────────────────────────────────────────────────────
     rnn_hidden: int = 256          # hidden size per LSTM direction
@@ -70,10 +75,10 @@ class Config:
     # ── Training ───────────────────────────────────────────────────────────
     epochs: int = 50
     batch_size: int = 16
-    lr: float = 1e-3               # peak learning rate (OneCycleLR)
+    lr: float = 5e-4               # peak learning rate (OneCycleLR)
     weight_decay: float = 1e-4
     warmup_frac: float = 0.05      # fraction of total steps for LR warm-up
-    num_workers: int = 4           # DataLoader workers
+    num_workers: int = 10          # DataLoader workers
     early_stopping_patience: int = 10  # stop if val SER stalls N epochs (0 = off)
 
     def __post_init__(self) -> None:

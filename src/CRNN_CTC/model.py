@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import torch
 import torch.nn as nn
+import torchvision.models as tv_models
 from torch import Tensor
 
 
@@ -60,6 +61,7 @@ class CNNBackbone(nn.Module):
 
     def __init__(self, cnn_out_channels: int = 256, cnn_dropout: float = 0.0) -> None:
         super().__init__()
+        self.out_channels = cnn_out_channels
         # Each block: Conv → BN → ReLU → Dropout2d → Pool
         # Pool kernel is (h, w) — we pool height aggressively, width gently.
         drop = cnn_dropout  # shorthand
@@ -105,6 +107,75 @@ class CNNBackbone(nn.Module):
 
 
 # ---------------------------------------------------------------------------
+# ResNet18 backbone
+# ---------------------------------------------------------------------------
+
+class ResNetBackbone(nn.Module):
+    """ResNet18-based feature extractor: (B, 1, H=128, W) → (B, 512, 1, W').
+
+    Uses the standard torchvision ResNet18 with:
+    * First convolution replaced to accept 1-channel (grayscale) input.
+    * Global average pool and FC head removed.
+    * ``AdaptiveAvgPool2d((1, None))`` collapses height to 1 while retaining
+      the (down-sampled) width axis for the CTC sequence.
+
+    Width reduction factor:  W' ≈ W / 32  (initial stride-2 conv + maxpool
+    + three stride-2 residual stages).
+    """
+
+    def __init__(self, cnn_dropout: float = 0.0) -> None:
+        super().__init__()
+        base = tv_models.resnet18(weights=None)
+        # Swap first conv: 3-channel RGB → 1-channel grayscale
+        base.conv1 = nn.Conv2d(
+            1, 64, kernel_size=7, stride=2, padding=3, bias=False,
+        )
+        self.features = nn.Sequential(
+            base.conv1, base.bn1, base.relu, base.maxpool,
+            base.layer1,   # 64  channels, stride 1
+            base.layer2,   # 128 channels, stride 2
+            base.layer3,   # 256 channels, stride 2
+            base.layer4,   # 512 channels, stride 2
+            nn.Dropout2d(cnn_dropout) if cnn_dropout > 0 else nn.Identity(),
+            nn.AdaptiveAvgPool2d((1, None)),  # collapse h → 1, keep w
+        )
+        self.out_channels = 512
+
+    def forward(self, x: Tensor) -> Tensor:
+        """(B, 1, H, W) → (B, 512, 1, W')."""
+        return self.features(x)
+
+
+# ---------------------------------------------------------------------------
+# Backbone factory
+# ---------------------------------------------------------------------------
+
+_BACKBONES = {
+    "vgg": lambda out_ch, drop: CNNBackbone(out_ch, cnn_dropout=drop),
+    "resnet18": lambda _out_ch, drop: ResNetBackbone(cnn_dropout=drop),
+}
+
+
+def build_backbone(name: str, cnn_out_channels: int = 256, cnn_dropout: float = 0.0) -> nn.Module:
+    """Create a CNN backbone by name.
+
+    Parameters
+    ----------
+    name : str
+        ``"vgg"`` or ``"resnet18"``.
+    cnn_out_channels : int
+        Feature maps at the output (only used by the VGG backbone).
+    cnn_dropout : float
+        Spatial dropout probability.
+    """
+    if name not in _BACKBONES:
+        raise ValueError(
+            f"Unknown backbone {name!r}. Choose from {sorted(_BACKBONES)}"
+        )
+    return _BACKBONES[name](cnn_out_channels, cnn_dropout)
+
+
+# ---------------------------------------------------------------------------
 # Full CRNN
 # ---------------------------------------------------------------------------
 
@@ -133,16 +204,18 @@ class CRNN(nn.Module):
         rnn_layers: int = 2,
         dropout: float = 0.3,
         cnn_dropout: float = 0.0,
+        backbone: str = "resnet18",
     ) -> None:
         super().__init__()
         self.vocab_size = vocab_size
 
         # ── CNN ───────────────────────────────────────────────────────────
-        self.cnn = CNNBackbone(cnn_out_channels, cnn_dropout=cnn_dropout)
+        self.cnn = build_backbone(backbone, cnn_out_channels, cnn_dropout)
+        rnn_input = self.cnn.out_channels  # dynamic: 256 (VGG) or 512 (ResNet)
 
         # ── RNN ───────────────────────────────────────────────────────────
         self.rnn = nn.LSTM(
-            input_size=cnn_out_channels,
+            input_size=rnn_input,
             hidden_size=rnn_hidden,
             num_layers=rnn_layers,
             batch_first=True,
@@ -216,16 +289,21 @@ def _smoke_test() -> None:
     """Run a forward pass with dummy data to verify shapes."""
     B, H, W = 4, 128, 800
     vocab_size = 95  # 93 tokens + blank + pad
-    model = CRNN(vocab_size=vocab_size, cnn_dropout=0.2)
 
-    x = torch.randn(B, 1, H, W)
-    widths = torch.tensor([800, 700, 600, 500])
+    for backbone in ("resnet18", "vgg"):
+        print(f"\n{'='*60}")
+        print(f"Testing backbone: {backbone}")
+        print(f"{'='*60}")
+        model = CRNN(vocab_size=vocab_size, cnn_dropout=0.2, backbone=backbone)
 
-    log_probs, out_lens = model(x, widths)
-    print(f"Input:        ({B}, 1, {H}, {W})")
-    print(f"log_probs:    {log_probs.shape}")   # (T, B, vocab_size)
-    print(f"output_lens:  {out_lens}")
-    print(f"Total params: {sum(p.numel() for p in model.parameters()):,}")
+        x = torch.randn(B, 1, H, W)
+        widths = torch.tensor([800, 700, 600, 500])
+
+        log_probs, out_lens = model(x, widths)
+        print(f"Input:        ({B}, 1, {H}, {W})")
+        print(f"log_probs:    {log_probs.shape}")   # (T, B, vocab_size)
+        print(f"output_lens:  {out_lens}")
+        print(f"Total params: {sum(p.numel() for p in model.parameters()):,}")
 
 
 if __name__ == "__main__":

@@ -80,6 +80,118 @@ def greedy_decode(
     return decoded
 
 
+def beam_search_decode(
+    log_probs: Tensor,
+    output_lengths: Tensor,
+    vocab: Vocabulary,
+    beam_width: int = 10,
+) -> list[list[str]]:
+    """Prefix beam search CTC decoding.
+
+    Parameters
+    ----------
+    log_probs : Tensor
+        (T, B, vocab_size) — log-softmax output from the model.
+    output_lengths : Tensor
+        (B,) — valid time-steps per sample.
+    vocab : Vocabulary
+        Mapping to convert indices back to token strings.
+    beam_width : int
+        Number of beams to keep at each time-step.
+
+    Returns
+    -------
+    list[list[str]]
+        Decoded token sequences, one per sample in the batch.
+    """
+    B = log_probs.shape[1]
+    blank = vocab.blank_idx
+    decoded: list[list[str]] = []
+
+    for i in range(B):
+        T_i = output_lengths[i].item()
+        lp = log_probs[:T_i, i, :]  # (T_i, V)
+
+        # Each beam: (prefix_tuple, (log_prob_blank_end, log_prob_non_blank_end))
+        NEG_INF = float("-inf")
+        beams: dict[tuple[int, ...], list[float]] = {
+            (): [0.0, NEG_INF],  # empty prefix: blank-end prob=1, non-blank=0
+        }
+
+        for t in range(T_i):
+            new_beams: dict[tuple[int, ...], list[float]] = {}
+            scores_t = lp[t].tolist()  # vocab_size floats (log-probs)
+
+            # Prune to top beam_width prefixes by total log-prob
+            scored = [
+                (prefix, _log_add(pb, pnb))
+                for prefix, (pb, pnb) in beams.items()
+            ]
+            scored.sort(key=lambda x: x[1], reverse=True)
+            scored = scored[:beam_width]
+
+            for prefix, _total in scored:
+                pb, pnb = beams[prefix]
+
+                # --- extend with blank ---
+                new_pb = _log_add(pb + scores_t[blank], pnb + scores_t[blank])
+                if prefix not in new_beams:
+                    new_beams[prefix] = [NEG_INF, NEG_INF]
+                new_beams[prefix][0] = _log_add(new_beams[prefix][0], new_pb)
+
+                # --- extend with non-blank tokens ---
+                for c in range(len(scores_t)):
+                    if c == blank:
+                        continue
+                    sc = scores_t[c]
+                    # If last char of prefix == c, only blank-ended paths can extend
+                    if prefix and prefix[-1] == c:
+                        new_pnb = pb + sc  # repeat only from blank-ended
+                        # Also continue the prefix without extension
+                        if prefix not in new_beams:
+                            new_beams[prefix] = [NEG_INF, NEG_INF]
+                        new_beams[prefix][1] = _log_add(
+                            new_beams[prefix][1], pnb + sc
+                        )
+                    else:
+                        new_pnb = _log_add(pb + sc, pnb + sc)
+
+                    ext = prefix + (c,)
+                    if ext not in new_beams:
+                        new_beams[ext] = [NEG_INF, NEG_INF]
+                    new_beams[ext][1] = _log_add(new_beams[ext][1], new_pnb)
+
+            beams = new_beams
+
+        # Select best beam
+        best_prefix = max(
+            beams, key=lambda p: _log_add(beams[p][0], beams[p][1])
+        )
+        tokens = vocab.decode(list(best_prefix))
+        decoded.append(tokens)
+
+    return decoded
+
+
+def _log_add(a: float, b: float) -> float:
+    """Numerically stable log(exp(a) + exp(b))."""
+    if a == float("-inf"):
+        return b
+    if b == float("-inf"):
+        return a
+    if a > b:
+        return a + _log_stable(b - a)
+    return b + _log_stable(a - b)
+
+
+def _log_stable(x: float) -> float:
+    """log(1 + exp(x)) for small x."""
+    import math
+    if x < -50:
+        return 0.0
+    return math.log1p(math.exp(x))
+
+
 # ---------------------------------------------------------------------------
 # Edit distance (Levenshtein)
 # ---------------------------------------------------------------------------
@@ -142,6 +254,7 @@ def evaluate(
     *,
     split: str = "test",
     per_sample: bool = False,
+    beam_width: int = 1,
 ) -> float:
     """Load a checkpoint, run inference on the requested split, report SER.
 
@@ -161,6 +274,13 @@ def evaluate(
     float
         Aggregate SER on the requested split.
     """
+    decode_fn = (
+        lambda lp, ol, v: beam_search_decode(lp, ol, v, beam_width)
+        if beam_width > 1
+        else greedy_decode(lp, ol, v)
+    )
+    if beam_width > 1:
+        log.info("Using beam search decoding (beam_width=%d)", beam_width)
     checkpoint_path = Path(checkpoint_path)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     use_amp = device.type == "cuda"
@@ -176,6 +296,7 @@ def evaluate(
         rnn_hidden=cfg.rnn_hidden,
         rnn_layers=cfg.rnn_layers,
         dropout=0.0,  # no dropout at inference
+        backbone=cfg.backbone,
     ).to(device)
     model.load_state_dict(ckpt["model_state_dict"])
     model.eval()
@@ -196,6 +317,10 @@ def evaluate(
         filter_unwanted_clefs=cfg.filter_unwanted_clefs,
         filter_multi_staff=cfg.filter_multi_staff,
         max_source_height=cfg.max_source_height,
+        extra_data_dirs=cfg.extra_data_dirs or None,
+        extra_scanned_dirs=(
+            cfg.extra_scanned_dirs if cfg.use_scanned else None
+        ) or None,
     )
     ds_map = {"train": train_ds, "val": val_ds, "test": test_ds}
     ds = ds_map[split]
@@ -220,7 +345,7 @@ def evaluate(
         with autocast("cuda", enabled=use_amp):
             log_probs, output_lens = model(images, image_widths)
 
-        preds = greedy_decode(log_probs, output_lens, vocab)
+        preds = decode_fn(log_probs, output_lens, vocab)
 
         # Reconstruct per-sample ground truth
         offset = 0

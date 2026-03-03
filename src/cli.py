@@ -133,6 +133,7 @@ def _build_config_from_args(args: argparse.Namespace):
         "use_scanned": "use_scanned",
         "val_frac": "val_frac",
         "test_frac": "test_frac",
+        "backbone": "backbone",
         "cnn_out_channels": "cnn_out_channels",
         "cnn_dropout": "cnn_dropout",
         "rnn_hidden": "rnn_hidden",
@@ -157,6 +158,14 @@ def _build_config_from_args(args: argparse.Namespace):
         val = getattr(args, flag, None)
         if val is not None:
             overrides[field] = val
+
+    # Repeatable list flags
+    extra_data = getattr(args, "extra_data_dir", None)
+    if extra_data:
+        overrides["extra_data_dirs"] = [Path(p) for p in extra_data]
+    extra_scanned = getattr(args, "extra_scanned_dir", None)
+    if extra_scanned:
+        overrides["extra_scanned_dirs"] = [Path(p) for p in extra_scanned]
 
     # Convert string paths to Path objects
     for key in ("data_dir", "scanned_dir", "model_dir", "vocab_path"):
@@ -193,6 +202,7 @@ def cmd_evaluate(args: argparse.Namespace) -> None:
         checkpoint,
         split=args.split,
         per_sample=args.per_sample,
+        beam_width=getattr(args, "beam_width", 1) or 1,
     )
     print(f"SER ({args.split}): {ser:.4f}")
 
@@ -246,7 +256,7 @@ def _add_common_data_args(parser: argparse.ArgumentParser) -> None:
     g.add_argument("--test-frac", type=float, default=None,
                    help="Test split fraction (default: 0.10)")
     g.add_argument("--num-workers", type=int, default=None,
-                   help="DataLoader workers (default: 4)")
+                   help="DataLoader workers (default: 10)")
     g.add_argument("--seed", type=int, default=None,
                    help="Random seed (default: 42)")
     g.add_argument("--no-filter-rest-heavy", dest="filter_rest_heavy",
@@ -260,15 +270,22 @@ def _add_common_data_args(parser: argparse.ArgumentParser) -> None:
                    help="Disable filtering of multi-staff (tall) images")
     g.add_argument("--max-source-height", type=int, default=None,
                    help="Max original image height for single-staff filter (default: 180 px)")
+    g.add_argument("--extra-data-dir", type=str, action="append", default=None,
+                   help="Additional data directory (repeatable, for package_ab etc.)")
+    g.add_argument("--extra-scanned-dir", type=str, action="append", default=None,
+                   help="Additional scanned-image directory (repeatable)")
 
 
 def _add_model_args(parser: argparse.ArgumentParser) -> None:
     """Add model-architecture flags shared by train / evaluate."""
     g = parser.add_argument_group("model")
+    g.add_argument("--backbone", type=str, default=None,
+                   choices=["resnet18", "vgg"],
+                   help="CNN backbone (default: resnet18)")
     g.add_argument("--cnn-out-channels", type=int, default=None,
-                   help="CNN output feature maps (default: 256)")
+                   help="CNN output feature maps — VGG only (default: 256)")
     g.add_argument("--cnn-dropout", type=float, default=None,
-                   help="Dropout2d after each CNN block (default: 0.2)")
+                   help="Dropout2d after CNN blocks (default: 0.25)")
     g.add_argument("--rnn-hidden", type=int, default=None,
                    help="LSTM hidden size per direction (default: 256)")
     g.add_argument("--rnn-layers", type=int, default=None,
@@ -304,8 +321,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Rendering resolution (default: 200)")
     p_rend.add_argument("--limit", type=int, default=None,
                         help="Process at most N samples (for testing)")
-    p_rend.add_argument("--workers", type=int, default=None,
-                        help="Parallel workers (default: CPU count)")
+    p_rend.add_argument("--workers", type=int, default=10,
+                        help="Parallel workers (default: 10)")
     p_rend.add_argument("--force", action="store_true",
                         help="Re-render even if output PNG already exists")
     p_rend.add_argument("--no-lmx", action="store_true",
@@ -323,8 +340,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Root directory of PrIMuS samples")
     p_conv.add_argument("--limit", type=int, default=None,
                         help="Process only N samples (for smoke tests)")
-    p_conv.add_argument("--workers", type=int, default=None,
-                        help="Parallel workers for conversion")
+    p_conv.add_argument("--workers", type=int, default=10,
+                        help="Parallel workers for conversion (default: 10)")
     p_conv.add_argument("--verbose", action="store_true",
                         help="Per-sample conversion logging")
     p_conv.add_argument("--keep-visual", action="store_true",
@@ -347,8 +364,8 @@ def build_parser() -> argparse.ArgumentParser:
                        help="Augmented copies per sample (default: 1)")
     p_aug.add_argument("--seed", type=int, default=None,
                        help="Global random seed (default: 42)")
-    p_aug.add_argument("--workers", type=int, default=None,
-                       help="Parallel workers (default: half CPU count)")
+    p_aug.add_argument("--workers", type=int, default=10,
+                       help="Parallel workers (default: 10)")
     p_aug.add_argument("--limit", type=int, default=None,
                        help="Process at most N samples (for testing)")
     p_aug.set_defaults(func=cmd_augment)
@@ -404,6 +421,8 @@ def build_parser() -> argparse.ArgumentParser:
                         default="test", help="Split to evaluate (default: test)")
     p_eval.add_argument("--per-sample", action="store_true",
                         help="Log per-sample SER (worst first)")
+    p_eval.add_argument("--beam-width", type=int, default=1,
+                        help="Beam search width (1=greedy, default: 1)")
     _add_common_data_args(p_eval)
     _add_model_args(p_eval)
     p_eval.set_defaults(func=cmd_evaluate)

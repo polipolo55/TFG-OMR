@@ -208,6 +208,10 @@ def train(cfg: Config) -> Path:
         filter_unwanted_clefs=cfg.filter_unwanted_clefs,
         filter_multi_staff=cfg.filter_multi_staff,
         max_source_height=cfg.max_source_height,
+        extra_data_dirs=cfg.extra_data_dirs or None,
+        extra_scanned_dirs=(
+            cfg.extra_scanned_dirs if cfg.use_scanned else None
+        ) or None,
     )
 
     train_loader = DataLoader(
@@ -237,6 +241,7 @@ def train(cfg: Config) -> Path:
         rnn_layers=cfg.rnn_layers,
         dropout=cfg.dropout,
         cnn_dropout=cfg.cnn_dropout,
+        backbone=cfg.backbone,
     ).to(device)
 
     n_params = sum(p.numel() for p in model.parameters())

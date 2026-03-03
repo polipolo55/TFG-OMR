@@ -106,11 +106,16 @@ def cmd_vocab(args: argparse.Namespace) -> None:
     """Build the LMX vocabulary file from a directory of .lmx files."""
     from CRNN_CTC.vocab import Vocabulary
 
-    data_dir = Path(args.data_dir)
+    data_dirs = [Path(args.data_dir)]
+    if getattr(args, "extra_data_dir", None):
+        data_dirs.extend(Path(p) for p in args.extra_data_dir)
+
     out_path = Path(args.output)
 
-    log.info("Building vocabulary from %s …", data_dir)
-    vocab = Vocabulary.build_from_lmx_dir(data_dir)
+    log.info("Building vocabulary from %d directories …", len(data_dirs))
+    for d in data_dirs:
+        log.info("  - %s", d)
+    vocab = Vocabulary.build_from_lmx_dirs(data_dirs)
     vocab.save(out_path)
     log.info("Saved vocabulary (%d tokens incl. blank+pad) → %s", len(vocab), out_path)
 
@@ -250,7 +255,7 @@ def _add_common_data_args(parser: argparse.ArgumentParser) -> None:
     g.add_argument("--img-height", type=int, default=None,
                    help="Resize images to this height (default: 128)")
     g.add_argument("--use-scanned", action="store_true", default=None,
-                   help="Use augmented scanned images instead of clean originals")
+                   help="Use augmented scanned images instead of clean originals (default: True)")
     g.add_argument("--val-frac", type=float, default=None,
                    help="Validation split fraction (default: 0.10)")
     g.add_argument("--test-frac", type=float, default=None,
@@ -261,13 +266,13 @@ def _add_common_data_args(parser: argparse.ArgumentParser) -> None:
                    help="Random seed (default: 42)")
     g.add_argument("--no-filter-rest-heavy", dest="filter_rest_heavy",
                    action="store_false", default=None,
-                   help="Disable filtering of rest-heavy samples")
+                   help="Disable filtering of rest-heavy samples (default: enabled)")
     g.add_argument("--no-filter-unwanted-clefs", dest="filter_unwanted_clefs",
                    action="store_false", default=None,
-                   help="Disable filtering of C1/C2 clef samples")
+                   help="Disable filtering of C1/C2 clef samples (default: enabled)")
     g.add_argument("--no-filter-multi-staff", dest="filter_multi_staff",
                    action="store_false", default=None,
-                   help="Disable filtering of multi-staff (tall) images")
+                   help="Disable filtering of multi-staff (tall) images (default: enabled)")
     g.add_argument("--max-source-height", type=int, default=None,
                    help="Max original image height for single-staff filter (default: 180 px)")
     g.add_argument("--extra-data-dir", type=str, action="append", default=None,
@@ -379,6 +384,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_vocab.add_argument("--data-dir", type=str,
                          default="data/realbook_primus_aa",
                          help="Directory with .lmx files (searched recursively)")
+    p_vocab.add_argument("--extra-data-dir", type=str, action="append", default=None,
+                         help="Additional data directory (repeatable, for package_ab etc.)")
     p_vocab.add_argument("--output", type=str,
                          default="src/CRNN_CTC/vocabulary.txt",
                          help="Output vocabulary file path")
@@ -394,17 +401,17 @@ def build_parser() -> argparse.ArgumentParser:
     _add_model_args(p_train)
     g_train = p_train.add_argument_group("training")
     g_train.add_argument("--epochs", type=int, default=None,
-                         help="Training epochs (default: 50)")
+                   help="Number of training epochs (default: 50)")
     g_train.add_argument("--batch-size", type=int, default=None,
-                         help="Mini-batch size (default: 16)")
+                   help="Training batch size (default: 16)")
     g_train.add_argument("--lr", type=float, default=None,
-                         help="Peak learning rate (default: 1e-3)")
+                   help="Peak learning rate — OneCycleLR (default: 5e-4)")
     g_train.add_argument("--weight-decay", type=float, default=None,
-                         help="AdamW weight decay (default: 1e-4)")
+                   help="AdamW weight decay (default: 1e-4)")
     g_train.add_argument("--warmup-frac", type=float, default=None,
-                         help="LR warm-up fraction (default: 0.05)")
+                   help="Fraction of steps for LR warm-up (default: 0.05)")
     g_train.add_argument("--early-stopping-patience", type=int, default=None,
-                         help="Stop after N epochs without val SER improvement (0=off, default: 10)")
+                   help="Epochs without val SER improvement to wait before stopping (default: 10)")
     g_train.add_argument("--model-dir", type=str, default=None,
                          help="Directory for checkpoints (default: models/)")
     p_train.set_defaults(func=cmd_train)

@@ -97,16 +97,17 @@ class Vocabulary:
         path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     @classmethod
-    def build_from_lmx_dir(cls, data_dir: str | Path) -> "Vocabulary":
+    def build_from_lmx_dirs(cls, data_dirs: list[str | Path]) -> "Vocabulary":
         """
-        Scan all ``.lmx`` files under *data_dir* and build a vocabulary from
-        the union of all observed tokens, sorted alphabetically.
+        Scan all ``.lmx`` files under the given *data_dirs* and build a
+        vocabulary from the union of all observed tokens, sorted alphabetically.
         """
-        data_dir = Path(data_dir)
         token_set: set[str] = set()
-        for lmx_file in data_dir.rglob("*.lmx"):
-            text = lmx_file.read_text(encoding="utf-8").strip()
-            if text:
-                token_set.update(text.split())
+        for data_dir in data_dirs:
+            data_dir = Path(data_dir)
+            for lmx_file in data_dir.rglob("*.lmx"):
+                text = lmx_file.read_text(encoding="utf-8").strip()
+                if text:
+                    token_set.update(text.split())
         tokens = sorted(token_set)
         return cls(tokens)

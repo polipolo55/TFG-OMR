@@ -186,7 +186,21 @@ def cmd_train(args: argparse.Namespace) -> None:
 
     cfg = _build_config_from_args(args)
     log.info("Config: %s", cfg)
-    best_ckpt = train(cfg)
+
+    resume_from: Path | None = None
+    resume_arg = getattr(args, "resume", None)
+    if resume_arg is not None:
+        # --resume without a value → auto-detect latest_checkpoint.pt
+        if resume_arg == "":
+            auto = cfg.model_dir / "latest_checkpoint.pt"
+            if not auto.exists():
+                log.error("No checkpoint found at %s. Start a fresh run first.", auto)
+                sys.exit(1)
+            resume_from = auto
+        else:
+            resume_from = Path(resume_arg)
+
+    best_ckpt = train(cfg, resume_from=resume_from)
     log.info("Best checkpoint saved to %s", best_ckpt)
 
 
@@ -414,6 +428,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Epochs without val SER improvement to wait before stopping (default: 10)")
     g_train.add_argument("--model-dir", type=str, default=None,
                          help="Directory for checkpoints (default: models/)")
+    g_train.add_argument("--resume", nargs="?", const="", default=None, metavar="CHECKPOINT",
+                         help="Resume from a checkpoint. Omit a path to auto-use "
+                              "models/latest_checkpoint.pt, or supply an explicit .pt path.")
     p_train.set_defaults(func=cmd_train)
 
     # ── evaluate ──────────────────────────────────────────────────────

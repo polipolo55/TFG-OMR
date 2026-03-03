@@ -176,7 +176,7 @@ def _validate(
 # Main entry point
 # ---------------------------------------------------------------------------
 
-def train(cfg: Config) -> Path:
+def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
     """Full training run. Returns path to the best checkpoint.
 
     Parameters
@@ -251,6 +251,31 @@ def train(cfg: Config) -> Path:
     criterion = nn.CTCLoss(blank=vocab.blank_idx, zero_infinity=True)
     optimiser = AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
 
+    # ── Resume from checkpoint (if requested) ──────────────────────────────
+    start_epoch = 1
+    best_ser = float("inf")
+    patience_counter = 0
+
+    if resume_from is not None:
+        ckpt_path = Path(resume_from)
+        if not ckpt_path.exists():
+            raise FileNotFoundError(f"Resume checkpoint not found: {ckpt_path}")
+        log.info("Resuming from checkpoint: %s", ckpt_path)
+        ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
+        model.load_state_dict(ckpt["model_state_dict"])
+        optimiser.load_state_dict(ckpt["optimiser_state_dict"])
+        start_epoch = ckpt["epoch"] + 1
+        best_ser = ckpt.get("val_ser", float("inf"))
+        log.info("  Resumed at epoch %d  (best val_SER so far: %.4f)", start_epoch, best_ser)
+
+    remaining_epochs = cfg.epochs - (start_epoch - 1)
+    if remaining_epochs <= 0:
+        log.warning(
+            "Checkpoint already reached epoch %d / %d — nothing left to train.",
+            start_epoch - 1, cfg.epochs,
+        )
+        return cfg.model_dir / "best_model.pt"
+
     total_steps = cfg.epochs * len(train_loader)
     scheduler = OneCycleLR(
         optimiser,
@@ -258,25 +283,34 @@ def train(cfg: Config) -> Path:
         total_steps=total_steps,
         pct_start=cfg.warmup_frac,
         anneal_strategy="cos",
+        last_epoch=-1,
     )
 
+    if resume_from is not None and "scheduler_state_dict" in ckpt:
+        scheduler.load_state_dict(ckpt["scheduler_state_dict"])
+        log.info("  Scheduler state restored.")
+
     scaler = GradScaler("cuda", enabled=use_amp)
+    if resume_from is not None and "scaler_state_dict" in ckpt:
+        scaler.load_state_dict(ckpt["scaler_state_dict"])
+        log.info("  GradScaler state restored.")
 
     # ── Training log ───────────────────────────────────────────────────────
     log_path = cfg.model_dir / "training_log.csv"
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with open(log_path, "w", newline="") as f:
+    # Append to existing log when resuming, otherwise start fresh
+    log_mode = "a" if resume_from is not None and log_path.exists() else "w"
+    with open(log_path, log_mode, newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["epoch", "train_loss", "val_loss", "val_ser", "lr", "elapsed_s"])
+        if log_mode == "w":
+            writer.writerow(["epoch", "train_loss", "val_loss", "val_ser", "lr", "elapsed_s"])
 
     # ── Training loop ──────────────────────────────────────────────────────
-    best_ser = float("inf")
     best_ckpt = cfg.model_dir / "best_model.pt"
-    patience_counter = 0
     t0 = time.time()
 
-    for epoch in range(1, cfg.epochs + 1):
+    for epoch in range(start_epoch, cfg.epochs + 1):
         t_epoch = time.time()
 
         train_loss = _train_one_epoch(

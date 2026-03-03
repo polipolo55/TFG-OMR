@@ -113,33 +113,67 @@ class CNNBackbone(nn.Module):
 class ResNetBackbone(nn.Module):
     """ResNet18-based feature extractor: (B, 1, H=128, W) → (B, 512, 1, W').
 
-    Uses the standard torchvision ResNet18 with:
-    * First convolution replaced to accept 1-channel (grayscale) input.
-    * Global average pool and FC head removed.
-    * ``AdaptiveAvgPool2d((1, None))`` collapses height to 1 while retaining
-      the (down-sampled) width axis for the CTC sequence.
+    Uses the standard torchvision ResNet18 with **asymmetric strides** so that
+    height is reduced aggressively (collapsed by ``AdaptiveAvgPool2d``) while
+    width is only reduced by ~4× — matching the VGG backbone and preserving
+    enough CTC timesteps for typical label lengths.
 
-    Width reduction factor:  W' ≈ W / 32  (initial stride-2 conv + maxpool
-    + three stride-2 residual stages).
+    Stride plan (height × width):
+        conv1      (2, 1)   →  h/2,  w
+        maxpool    (2, 2)   →  h/4,  w/2
+        layer1     (1, 1)   →  h/4,  w/2
+        layer2     (2, 2)   →  h/8,  w/4
+        layer3     (2, 1)   →  h/16, w/4
+        layer4     (2, 1)   →  h/32, w/4
+        AdaptiveAvgPool2d   →  1,    w/4
+
+    Width reduction factor:  W' ≈ W / 4.
     """
 
     def __init__(self, cnn_dropout: float = 0.0) -> None:
         super().__init__()
         base = tv_models.resnet18(weights=None)
-        # Swap first conv: 3-channel RGB → 1-channel grayscale
+
+        # 1. conv1: stride (2,1) — reduce height, keep width
         base.conv1 = nn.Conv2d(
-            1, 64, kernel_size=7, stride=2, padding=3, bias=False,
+            1, 64, kernel_size=7, stride=(2, 1), padding=3, bias=False,
         )
+        # 2. maxpool: keep (2,2) — gives w/2
+        base.maxpool = nn.MaxPool2d(kernel_size=3, stride=(2, 2), padding=1)
+
+        # 3. layer3 & layer4: change stride to (2,1) — height only
+        self._patch_layer_stride(base.layer3, stride=(2, 1))
+        self._patch_layer_stride(base.layer4, stride=(2, 1))
+
         self.features = nn.Sequential(
             base.conv1, base.bn1, base.relu, base.maxpool,
-            base.layer1,   # 64  channels, stride 1
-            base.layer2,   # 128 channels, stride 2
-            base.layer3,   # 256 channels, stride 2
-            base.layer4,   # 512 channels, stride 2
+            base.layer1,   # 64  ch, stride (1,1)
+            base.layer2,   # 128 ch, stride (2,2) → w/4
+            base.layer3,   # 256 ch, stride (2,1) → w/4 still
+            base.layer4,   # 512 ch, stride (2,1) → w/4 still
             nn.Dropout2d(cnn_dropout) if cnn_dropout > 0 else nn.Identity(),
             nn.AdaptiveAvgPool2d((1, None)),  # collapse h → 1, keep w
         )
         self.out_channels = 512
+
+    @staticmethod
+    def _patch_layer_stride(layer: nn.Sequential, stride: tuple[int, int]) -> None:
+        """Change the down-sampling stride of the first BasicBlock in *layer*."""
+        block0 = layer[0]  # type: ignore[index]
+        # Patch conv1 (the 3×3 that carries the stride)
+        old = block0.conv1
+        block0.conv1 = nn.Conv2d(
+            old.in_channels, old.out_channels,
+            kernel_size=old.kernel_size, stride=stride,
+            padding=old.padding, bias=False,
+        )
+        # Patch the downsample shortcut (1×1 conv + BN)
+        if block0.downsample is not None:
+            old_ds = block0.downsample[0]
+            block0.downsample[0] = nn.Conv2d(
+                old_ds.in_channels, old_ds.out_channels,
+                kernel_size=1, stride=stride, bias=False,
+            )
 
     def forward(self, x: Tensor) -> Tensor:
         """(B, 1, H, W) → (B, 512, 1, W')."""

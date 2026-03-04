@@ -29,6 +29,7 @@ from __future__ import annotations
 import csv
 import logging
 import time
+from datetime import datetime
 from pathlib import Path
 
 from tqdm import tqdm
@@ -176,6 +177,62 @@ def _validate(
 # Main entry point
 # ---------------------------------------------------------------------------
 
+def _create_run_dir(base_dir: Path) -> Path:
+    """Create a timestamped run directory and update the ``latest`` symlink.
+
+    Directory structure::
+
+        models/
+        ├── run_20260304_123956/      ← this run
+        │   ├── best_model.pt
+        │   ├── latest_checkpoint.pt
+        │   └── training_log.csv
+        ├── run_20260303_091022/      ← previous run (preserved)
+        │   └── ...
+        └── latest -> run_20260304_123956   ← convenience symlink
+    """
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_dir = base_dir / f"run_{stamp}"
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    # Atomic symlink update: create temp link, then rename over old one
+    link = base_dir / "latest"
+    tmp_link = base_dir / f"_latest_tmp_{stamp}"
+    try:
+        tmp_link.symlink_to(run_dir.name)  # relative symlink
+        tmp_link.rename(link)
+    except OSError:
+        # Fallback: remove + recreate (non-atomic but works on all FS)
+        link.unlink(missing_ok=True)
+        try:
+            link.symlink_to(run_dir.name)
+        except OSError:
+            pass  # symlinks unsupported — not critical
+
+    return run_dir
+
+
+def _resolve_run_dir(
+    cfg: Config, resume_from: Path | str | None
+) -> Path:
+    """Decide which run directory to use.
+
+    * **Fresh run:** create a new timestamped directory.
+    * **Resumed run:** reuse the directory containing the checkpoint.
+    """
+    if resume_from is not None:
+        ckpt_path = Path(resume_from).resolve()
+        # If the checkpoint lives inside a run_* subdirectory, reuse it.
+        parent = ckpt_path.parent
+        if parent.name.startswith("run_"):
+            return parent
+        # Legacy layout: checkpoint directly in model_dir — create new run
+        # and copy the checkpoint there so the old file stays untouched.
+        return _create_run_dir(cfg.model_dir)
+
+    return _create_run_dir(cfg.model_dir)
+
+
 def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
     """Full training run. Returns path to the best checkpoint.
 
@@ -189,6 +246,10 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     use_amp = device.type == "cuda"
     log.info("Device: %s | AMP: %s", device, use_amp)
+
+    # ── Run directory (unique per training run) ────────────────────────────
+    run_dir = _resolve_run_dir(cfg, resume_from)
+    log.info("Run directory: %s", run_dir)
 
     # ── Vocabulary ─────────────────────────────────────────────────────────
     vocab = Vocabulary.from_file(cfg.vocab_path)
@@ -274,7 +335,7 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
             "Checkpoint already reached epoch %d / %d — nothing left to train.",
             start_epoch - 1, cfg.epochs,
         )
-        return cfg.model_dir / "best_model.pt"
+        return run_dir / "best_model.pt"
 
     total_steps = cfg.epochs * len(train_loader)
     scheduler = OneCycleLR(
@@ -296,8 +357,7 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
         log.info("  GradScaler state restored.")
 
     # ── Training log ───────────────────────────────────────────────────────
-    log_path = cfg.model_dir / "training_log.csv"
-    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path = run_dir / "training_log.csv"
 
     # Append to existing log when resuming, otherwise start fresh
     log_mode = "a" if resume_from is not None and log_path.exists() else "w"
@@ -307,7 +367,7 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
             writer.writerow(["epoch", "train_loss", "val_loss", "val_ser", "lr", "elapsed_s"])
 
     # ── Training loop ──────────────────────────────────────────────────────
-    best_ckpt = cfg.model_dir / "best_model.pt"
+    best_ckpt = run_dir / "best_model.pt"
     t0 = time.time()
 
     for epoch in range(start_epoch, cfg.epochs + 1):
@@ -366,7 +426,7 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
                 "val_ser": val_ser,
                 "config": cfg,
             },
-            cfg.model_dir / "latest_checkpoint.pt",
+            run_dir / "latest_checkpoint.pt",
         )
 
         # Early stopping

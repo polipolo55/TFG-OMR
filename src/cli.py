@@ -19,7 +19,7 @@ Usage examples::
     poetry run python src/cli.py augment --source data/realbook_primus_aa --output data/realbook_primus_aa_scanned
     poetry run python src/cli.py vocab   --data-dir data/realbook_primus_aa
     poetry run python src/cli.py train   --epochs 50 --batch-size 16 --lr 1e-3
-    poetry run python src/cli.py evaluate --checkpoint models/best_model.pt --split test
+    poetry run python src/cli.py evaluate --checkpoint models/latest/best_model.pt --split test
 """
 
 from __future__ import annotations
@@ -190,13 +190,20 @@ def cmd_train(args: argparse.Namespace) -> None:
     resume_from: Path | None = None
     resume_arg = getattr(args, "resume", None)
     if resume_arg is not None:
-        # --resume without a value → auto-detect latest_checkpoint.pt
+        # --resume without a value → auto-detect from latest run
         if resume_arg == "":
-            auto = cfg.model_dir / "latest_checkpoint.pt"
+            # Try new layout: models/latest/latest_checkpoint.pt
+            auto = cfg.model_dir / "latest" / "latest_checkpoint.pt"
             if not auto.exists():
-                log.error("No checkpoint found at %s. Start a fresh run first.", auto)
+                # Fallback: legacy flat layout
+                auto = cfg.model_dir / "latest_checkpoint.pt"
+            if not auto.exists():
+                log.error(
+                    "No checkpoint found in %s. Start a fresh run first.",
+                    cfg.model_dir,
+                )
                 sys.exit(1)
-            resume_from = auto
+            resume_from = auto.resolve()  # resolve symlinks
         else:
             resume_from = Path(resume_arg)
 
@@ -430,7 +437,7 @@ def build_parser() -> argparse.ArgumentParser:
                          help="Directory for checkpoints (default: models/)")
     g_train.add_argument("--resume", nargs="?", const="", default=None, metavar="CHECKPOINT",
                          help="Resume from a checkpoint. Omit a path to auto-use "
-                              "models/latest_checkpoint.pt, or supply an explicit .pt path.")
+                              "the latest run's checkpoint, or supply an explicit .pt path.")
     p_train.set_defaults(func=cmd_train)
 
     # ── evaluate ──────────────────────────────────────────────────────

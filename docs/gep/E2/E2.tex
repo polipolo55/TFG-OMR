@@ -1,6 +1,6 @@
 \documentclass[11pt, a4paper]{article}
 
-% --- PACKAGES ---
+%~-~PACKAGES ---
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage[english]{babel}
@@ -22,18 +22,18 @@
 \usepackage{xcolor}           % Colours for Gantt bars
 \usepackage{eurosym}          % Euro symbol
 
-% --- BIBLIOGRAPHY SETUP ---
+%~-~BIBLIOGRAPHY SETUP ---
 \usepackage[style=ieee, sorting=none]{biblatex}
 \addbibresource{../E1/references.bib}
 
-% --- HEADER & FOOTER SETUP ---
+%~-~HEADER & FOOTER SETUP ---
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{Optical Music Recognition for monophonic lines}
 \fancyhead[R]{GEP Deliverable 2}
 \fancyfoot[C]{\thepage}
 
-% --- LINK COLORS ---
+%~-~LINK COLORS ---
 \hypersetup{
     colorlinks=true,
     linkcolor=black,
@@ -42,7 +42,7 @@
     citecolor=blue,
 }
 
-% --- GANTT COLOURS ---
+%~-~GANTT COLOURS ---
 \definecolor{gpMgmt}{HTML}{1565C0}
 \definecolor{gpSprint1}{HTML}{2E7D32}
 \definecolor{gpSprint2}{HTML}{E65100}
@@ -132,18 +132,17 @@ Table~\ref{tab:global-data} summarises the global planning parameters.
         \toprule
         \textbf{Parameter} & \textbf{Value} \\
         \midrule
-        Project start date       & February 3, 2026 \\
-        Project end date         & June 27, 2026 \\
-        Planned defence date     & Week of June 29 -- July 3, 2026 \\
-        Total duration           & 21 weeks (105 working days) \\
+        Project start date       & February, 2026 \\
+        Project end date         & June, 2026 \\
+        Total duration           & 21 weeks \\
         Average daily effort     & 4--5 hours \\
-        Total estimated effort   & \textbf{504 hours} \\
+        Total estimated effort   & \textbf{509 hours} \\
         Number of team members   & 1 (student) + 1 (supervisor, advisory) \\
         \bottomrule
     \end{tabularx}
 \end{table}
 
-The project is carried out by a single developer (the student), with periodic advisory input from the thesis supervisor. Being a solo project, all roles --- researcher, developer, tester, and technical writer --- are fulfilled by the same person. The supervisor contributes approximately 1--2 hours per meeting, roughly biweekly.
+The project is carried out by a single developer (the student), with periodic advisory input from the thesis supervisor. Being a solo project, all roles researcher, developer, tester, and technical writer are fulfilled by the same person. The supervisor contributes approximately 1--2 hours per meeting, roughly biweekly.
 
 \subsection{Methodology Recap}
 
@@ -163,8 +162,8 @@ This section describes each task at individual task level, grouped by work packa
 \textbf{Resources} are common to all tasks unless otherwise noted:
 \begin{itemize}[nosep]
     \item \textbf{Human:} Student (Pol Casanovas Puig). Supervisor (Manel Frigola Bourlon) participates in review meetings (T0.5).
-    \item \textbf{Hardware:} Personal workstation with NVIDIA RTX 3060 (12\,GB VRAM), used for all GPU training.
-    \item \textbf{Software:} Python 3.14, PyTorch, OpenCV, music21, LilyPond, \LaTeX{} (TeX Live), Git/GitHub.
+    \item \textbf{Hardware:} Personal computer used for all coding, training, and documentation.
+    \item \textbf{Software:} Python 3.14, PyTorch, OpenCV, music21, LilyPond, \LaTeX, Git/GitHub, among others.
 \end{itemize}
 
 
@@ -175,28 +174,28 @@ This section describes each task at individual task level, grouped by work packa
 This work package runs \textbf{concurrently} with all sprints, from project start to end. It encompasses all management, documentation, and coordination activities.
 
 \begin{description}[style=nextline, leftmargin=1.2cm]
-    \item[T0.1 --- Context and scope definition (20\,h)]
+    \item[T0.1~-~Context and scope definition (20\,h)]
     Research and write the project context, state-of-the-art review, alternative justification, scope definition, requirements, risks, and methodology. Corresponds to GEP Deliverable~1 content. \\
     \textit{Dependencies:} None (project start). \\
     \textit{Resources:} Standard + Zotero reference manager.
 
-    \item[T0.2 --- Temporal planning (12\,h)]
+    \item[T0.2~-~Temporal planning (12\,h)]
     Define the work breakdown structure, estimate task durations, establish dependencies, and produce the Gantt chart. Corresponds to this document (GEP Deliverable~2). \\
     \textit{Dependencies:} T0.1.
 
-    \item[T0.3 --- Budget and sustainability report (15\,h)]
+    \item[T0.3~-~Budget and sustainability report (15\,h)]
     Prepare the economic budget (human resources, hardware amortisation, software licences, indirect costs) and the sustainability analysis (environmental, economic, and social dimensions). Corresponds to GEP Deliverable~3. \\
     \textit{Dependencies:} T0.2.
 
-    \item[T0.4 --- Final GEP document integration (8\,h)]
+    \item[T0.4~-~Final GEP document integration (8\,h)]
     Compile, revise, and integrate GEP deliverables 1--3 into a coherent final management document. \\
     \textit{Dependencies:} T0.3.
 
-    \item[T0.5 --- Supervisor meetings and follow-up (25\,h)]
+    \item[T0.5~-~Supervisor meetings and follow-up (25\,h)]
     Biweekly meetings with the thesis supervisor ($\sim$1.5\,h each, including preparation and minutes), plus ad-hoc consultations. Approximately 15 meetings over 21 weeks. This task is \textbf{intermittent} throughout the entire project. \\
     \textit{Dependencies:} Concurrent with all tasks.
 
-    \item[T0.6 --- Thesis writing and documentation (50\,h)]
+    \item[T0.6~-~Thesis writing and documentation (50\,h)]
     Continuous writing of the final thesis document (\texttt{main.tex}), including the introduction, methodology, experimental chapters, and conclusions. This task is \textbf{concurrent} with all sprints, intensifying during Sprint~5. \\
     \textit{Dependencies:} Concurrent with all tasks; intensifies after T4.5.
 \end{description}
@@ -204,31 +203,31 @@ This work package runs \textbf{concurrently} with all sprints, from project star
 \textbf{WP0 subtotal: 130\,h}
 
 % ------------------------------------------
-\subsection{WP1 --- Sprint 1: Literature Review and Baseline}
+\subsection{WP1~-~Sprint 1: Literature Review and Baseline}
 \label{sec:wp1}
 
-\textit{Duration: Weeks 1--4 (February 3 -- March 2, 2026).} \\
+\textit{Duration: Weeks 1--4 (February -- March 2026).} \\
 \textit{Sprint goal:} Establish the theoretical foundation and implement a classical computer vision baseline to quantify the difficulty of the task.
 
 \begin{description}[style=nextline, leftmargin=1.2cm]
-    \item[T1.1 --- OMR literature survey (25\,h)]
+    \item[T1.1~-~OMR literature survey (25\,h)]
     Systematic review of OMR approaches: traditional pipelines~\cite{dalitzComparativeStudyStaff2008}, CRNN-CTC methods~\cite{PrIMuSDataset}, and transformer-based systems~\cite{vilaAntoniorv6SMT2026,UfalOlimpicicdar24Practical}. Document findings and annotated bibliography. \\
     \textit{Dependencies:} None (sprint start). \\
     \textit{Resources:} Standard + access to IEEE, ACM, and arXiv repositories.
 
-    \item[T1.2 --- Dataset exploration and analysis (15\,h)]
+    \item[T1.2~-~Dataset exploration and analysis (15\,h)]
     Download, inspect, and document publicly available OMR datasets (PrIMuS, CameraPrimus, MUSCIMA++, DeepScoresV2, OLiMPiC, GrandStaff). Analyse encoding formats, annotation quality, and suitability for monophonic training. \\
     \textit{Dependencies:} T1.1 (partial; may overlap).
 
-    \item[T1.3 --- Classical CV baseline implementation (25\,h)]
-    Implement a morphological staff-line detection and removal pipeline using OpenCV (horizontal erosion/dilation). Evaluate staff-line recall on clean typeset images (PrIMuS) versus distorted camera images (CameraPrimus) versus handwritten Real Book scans. \\
+    \item[T1.3~-~Classical CV baseline implementation (25\,h)]
+    Implement a morphological staff-line detection and removal pipeline using OpenCV. Evaluate staff-line recall on clean typeset images (PrIMuS), distorted camera images (CameraPrimus), and handwritten Real Book scans. \\
     \textit{Dependencies:} T1.2.
 
-    \item[T1.4 --- Baseline evaluation and report (10\,h)]
+    \item[T1.4~-~Baseline evaluation and report (10\,h)]
     Quantitative evaluation of the morphological baseline: staff-line recall, precision, noise artefact rate. Document findings and failure modes that motivate the deep learning approach. \\
     \textit{Dependencies:} T1.3.
 
-    \item[T1.5 --- Sprint 1 review (3\,h)]
+    \item[T1.5~-~Sprint 1 review (3\,h)]
     Present results to supervisor, discuss lessons learned, and confirm Sprint~2 scope. \\
     \textit{Dependencies:} T1.4.
 \end{description}
@@ -237,33 +236,33 @@ This work package runs \textbf{concurrently} with all sprints, from project star
 
 
 % ------------------------------------------
-\subsection{WP2 --- Sprint 2: Dataset Construction}
+\subsection{WP2~-~Sprint 2: Dataset Construction}
 \label{sec:wp2}
 
-\textit{Duration: Weeks 5--8 (March 3 -- March 30, 2026).} \\
+\textit{Duration: Weeks 5--8 (March 2026).} \\
 \textit{Sprint goal:} Build a synthetic monophonic dataset in Real Book style with paired image--annotation data suitable for CRNN-CTC training.
 
 \begin{description}[style=nextline, leftmargin=1.2cm]
-    \item[T2.1 --- Output encoding design (12\,h)]
+    \item[T2.1~-~Output encoding design (12\,h)]
     Define the LMX-based symbolic vocabulary: token set (pitch + octave + duration + rests + accidentals + barlines), special tokens (clef, time/key signatures), and the CTC blank token. Write the conversion script from PrIMuS \texttt{.semantic} format to LMX. \\
     \textit{Dependencies:} T1.5. \\
     \textit{Resources:} Standard + music21 library.
 
-    \item[T2.2 --- Synthetic rendering pipeline (35\,h)]
+    \item[T2.2~-~Synthetic rendering pipeline (35\,h)]
     Develop a LilyPond-based pipeline to render PrIMuS-derived monophonic scores in Real Book jazz style using the LilyJAZZ font. Generate $\sim$43{,}000 staff-line images (PNG) with paired LMX annotations. Handle edge cases: multi-rest tokens, clef filtering, degenerate sequences. \\
     \textit{Dependencies:} T2.1. \\
     \textit{Resources:} Standard + LilyPond with LilyJAZZ package.
 
-    \item[T2.3 --- Data augmentation pipeline (15\,h)]
+    \item[T2.3~-~Data augmentation pipeline (15\,h)]
     Implement augmentation transforms (Gaussian noise, Gaussian blur, perspective warp) to produce a ``scanned'' variant of the dataset that simulates real-world degradation. Calibrate distortion parameters against actual Real Book scan characteristics. \\
     \textit{Dependencies:} T2.2. \\
     \textit{Resources:} Standard + OpenCV.
 
-    \item[T2.4 --- Dataset validation and split preparation (8\,h)]
-    Validate image--label alignment, filter corrupted samples (ghost tokens from multi-rest, multi-staff renders), and prepare reproducible train/validation/test splits (80/10/10). Produce dataset statistics summary. \\
+    \item[T2.4~-~Dataset validation and split preparation (8\,h)]
+    Validate image--label alignment, filter corrupted or degenerate samples, and prepare reproducible train/validation/test splits (80/10/10). Produce dataset statistics summary. \\
     \textit{Dependencies:} T2.3.
 
-    \item[T2.5 --- Sprint 2 review (3\,h)]
+    \item[T2.5~-~Sprint 2 review (3\,h)]
     Present the dataset to the supervisor, review quality metrics, and confirm readiness for model training. \\
     \textit{Dependencies:} T2.4.
 \end{description}
@@ -272,32 +271,32 @@ This work package runs \textbf{concurrently} with all sprints, from project star
 
 
 % ------------------------------------------
-\subsection{WP3 --- Sprint 3: CRNN-CTC Model Development}
+\subsection{WP3~-~Sprint 3: CRNN-CTC Model Development}
 \label{sec:wp3}
 
-\textit{Duration: Weeks 9--12 (March 31 -- April 27, 2026).} \\
+\textit{Duration: Weeks 9--12 (April 2026).} \\
 \textit{Sprint goal:} Design, implement, and perform an initial training run of the CRNN-CTC model, establishing the evaluation framework.
 
 \begin{description}[style=nextline, leftmargin=1.2cm]
-    \item[T3.1 --- CRNN architecture design and implementation (25\,h)]
-    Design the CNN backbone (convolutional feature extractor with batch normalisation and dropout), the bidirectional LSTM sequence module, and the fully connected CTC head. Implement in PyTorch with configurable hyperparameters. Target $\sim$4\,M parameters for GPU memory efficiency. \\
+    \item[T3.1~-~CRNN architecture design and implementation (25\,h)]
+    Design the CNN backbone (convolutional feature extractor), the bidirectional LSTM sequence module, and the fully connected CTC head. Implement in PyTorch with configurable hyperparameters, keeping the model lightweight enough for training on a consumer GPU. \\
     \textit{Dependencies:} T2.5. \\
-    \textit{Resources:} Standard + NVIDIA RTX 3060 GPU.
+    \textit{Resources:} Standard + consumer GPU.
 
-    \item[T3.2 --- Training pipeline implementation (20\,h)]
-    Implement the training loop: CTC loss, automatic mixed precision (AMP), OneCycleLR scheduler, gradient clipping, early stopping, and best-model checkpointing. Implement the dataset loader with dynamic padding and collation. \\
+    \item[T3.2~-~Training pipeline implementation (20\,h)]
+    Implement the training loop with CTC loss, a learning rate scheduler, gradient clipping, early stopping, and best-model checkpointing. Implement the dataset loader with dynamic padding and collation. \\
     \textit{Dependencies:} T3.1.
 
-    \item[T3.3 --- Initial training and debugging --- Run 1 (15\,h)]
-    Execute the first full training run. Monitor loss curves, diagnose CTC alignment issues, and verify that the model converges. Document Run~1 baseline metrics. \\
+    \item[T3.3~-~Initial training run (15\,h)]
+    Execute the first full training run. Monitor loss curves, diagnose convergence issues, and document initial baseline metrics. \\
     \textit{Dependencies:} T3.2.
 
-    \item[T3.4 --- Evaluation framework (12\,h)]
+    \item[T3.4~-~Evaluation framework (12\,h)]
     Implement greedy CTC decoding, Symbol Error Rate (SER) computation, per-sample error breakdown (substitutions, insertions, deletions), and worst-prediction visualisation. This task runs in partial overlap with T3.3. \\
     \textit{Dependencies:} T3.2 (may overlap with T3.3).
 
-    \item[T3.5 --- Sprint 3 review (3\,h)]
-    Analyse Run~1 results with the supervisor, identify dominant error modes, and plan the Sprint~4 refinement strategy. \\
+    \item[T3.5~-~Sprint 3 review (3\,h)]
+    Analyse initial training results with the supervisor, identify dominant error modes, and plan the Sprint~4 refinement strategy. \\
     \textit{Dependencies:} T3.3, T3.4.
 \end{description}
 
@@ -305,33 +304,34 @@ This work package runs \textbf{concurrently} with all sprints, from project star
 
 
 % ------------------------------------------
-\subsection{WP4 --- Sprint 4: Iterative Refinement}
+\subsection{WP4~-~Sprint 4: Iterative Refinement}
 \label{sec:wp4}
 
-\textit{Duration: Weeks 13--16 (April 28 -- May 25, 2026).} \\
+\textit{Duration: Weeks 13--16 (April--May 2026).} \\
 \textit{Sprint goal:} Close the train--evaluate--improve loop. Quantitatively analyse errors, fix data pipeline issues, refine the model, and retrain until SER stabilises.
 
 This sprint implements the \textbf{iterative refinement cycle} at the core of the agile methodology: after each training run, errors are analysed, root causes identified (data corruption, architecture limitations, filtering gaps), and targeted fixes applied before retraining. This cycle may execute multiple times within the sprint.
 
 \begin{description}[style=nextline, leftmargin=1.2cm]
-    \item[T4.1 --- Error analysis of initial runs (10\,h)]
-    Detailed breakdown of Run~1 errors by type (deletion, substitution, insertion) and by token. Identify systematic patterns: which symbols are most confused, which image characteristics correlate with high SER. Inspect worst predictions manually. \\
+    \item[T4.1~-~Error analysis of initial run (10\,h)]
+    Detailed breakdown of errors by type (deletion, substitution, insertion) and by token. Identify systematic patterns: which symbols are most confused and which image characteristics correlate with high SER. \\
     \textit{Dependencies:} T3.5.
 
-    \item[T4.2 --- Data pipeline improvements (15\,h)]
-    Fix issues discovered during error analysis: label synchronisation bugs (e.g., multi-rest ghost tokens), sample filtering (multi-staff renders identified by pixel height), vocabulary adjustments. Re-generate or re-filter the dataset as needed. \\
+    \item[T4.2~-~Data pipeline improvements (15\,h)]
+    Fix data quality issues discovered during error analysis: annotation errors, problematic sample filtering, and vocabulary adjustments. Re-generate or re-filter the dataset as needed. \\
     \textit{Dependencies:} T4.1.
 
-    \item[T4.3 --- Model refinement and retraining --- Runs 2--4 (25\,h)]
-    Adjust hyperparameters based on error analysis (dropout rates, learning rate schedule, early stopping patience). Retrain on the cleaned dataset. Execute 2--3 additional training runs, each informed by the previous run's error profile. \\
+    \item[T4.3~-~Model refinement and retraining (25\,h)]
+    Adjust hyperparameters based on error analysis and retrain on the improved dataset. Execute several training runs, each informed by the previous run's error profile, until SER stabilises. \\
     \textit{Dependencies:} T4.2. \\
-    \textit{Resources:} Standard + extended GPU time ($\sim$2--4\,h per run).
+    \textit{Resources:} Standard + consumer GPU.
 
-    \item[T4.4 --- Ablation studies (15\,h)]
-    Conduct controlled experiments to isolate the effect of key design choices: augmentation type and intensity, CNN depth, LSTM hidden size, dropout rate, and vocabulary encoding. Document results in a structured ablation table. \\
-    \textit{Dependencies:} T4.3.
+    \item[T4.4~-~Ablation studies (15\,h)]
+    Conduct controlled experiments to isolate the effect of key design choices in the data pipeline, model architecture, and training configuration. Document results in a structured ablation table. \\
+    \textit{Dependencies:} T4.3. \\
+    \textit{Resources:} Standard + consumer GPU.
 
-    \item[T4.5 --- Sprint 4 review (3\,h)]
+    \item[T4.5~-~Sprint 4 review (3\,h)]
     Present the refined model metrics and ablation results to the supervisor. Decide whether further iteration is needed or whether to proceed to final evaluation. \\
     \textit{Dependencies:} T4.4.
 \end{description}
@@ -340,31 +340,33 @@ This sprint implements the \textbf{iterative refinement cycle} at the core of th
 
 
 % ------------------------------------------
-\subsection{WP5 --- Sprint 5: Final Evaluation, Extension, and Defence}
+\subsection{WP5~-~Sprint 5: Final Evaluation, Extension, and Defence}
 \label{sec:wp5}
 
-\textit{Duration: Weeks 17--21 (May 26 -- June 27, 2026).} \\
+\textit{Duration: Weeks 17--21 (May -- June 2026).} \\
 \textit{Sprint goal:} Produce the definitive evaluation, explore conditional extensions, complete the thesis document, and prepare the defence.
 
 \begin{description}[style=nextline, leftmargin=1.2cm]
-    \item[T5.1 --- Comprehensive evaluation and benchmarking (15\,h)]
+    \item[T5.1~-~Comprehensive evaluation and benchmarking (15\,h)]
     Evaluate the best model on the held-out test set. Compute aggregate and per-category SER. Compare quantitatively against the classical CV baseline from Sprint~1. Produce publication-quality tables and figures. \\
-    \textit{Dependencies:} T4.5.
+    \textit{Dependencies:} T4.5. \\
+    \textit{Resources:} Standard + consumer GPU.
 
-    \item[T5.2 --- Qualitative error analysis and case studies (10\,h)]
+    \item[T5.2~-~Qualitative error analysis and case studies (10\,h)]
     Select representative correct and incorrect predictions for qualitative discussion. Analyse failure modes by image difficulty (dense passages, unusual symbols, heavily augmented images). Produce annotated visualisations. \\
     \textit{Dependencies:} T5.1.
 
-    \item[T5.3 --- Extension exploration --- conditional (20\,h)]
+    \item[T5.3~-~Extension exploration~-~conditional (20\,h)]
     If the monophonic model achieves satisfactory SER ($<$10\%) and time permits: prototype a limited extension, such as chord symbol recognition or page-level staff detection. This task is \textbf{scope-contingent} and may be reduced or skipped without affecting the core deliverables. \\
-    \textit{Dependencies:} T5.1.
+    \textit{Dependencies:} T5.1. \\
+    \textit{Resources:} Standard + consumer GPU.
 
-    \item[T5.4 --- Final thesis writing and revision (30\,h)]
+    \item[T5.4~-~Final thesis writing and revision (30\,h)]
     Complete all thesis chapters: introduction, state of the art, methodology, dataset description, model architecture, experiments and results, conclusions, and future work. Integrate all figures, tables, and references. Perform full proofreading and formatting pass. \\
     \textit{Dependencies:} T5.2 (and T5.3 if completed). \\
     \textit{Resources:} Standard + \LaTeX{} (TeX Live), Zotero.
 
-    \item[T5.5 --- Defence preparation (10\,h)]
+    \item[T5.5~-~Defence preparation (10\,h)]
     Prepare the presentation slides, rehearse the defence talk, and prepare answers for anticipated questions from the evaluation committee. \\
     \textit{Dependencies:} T5.4.
 \end{description}
@@ -386,54 +388,54 @@ The total estimated effort is \textbf{509 hours}, distributed as shown in Table~
         \toprule
         \textbf{Code} & \textbf{Task} & \textbf{Hours} & \textbf{Dependencies} & \textbf{Specific Resources} \\
         \midrule
-        \multicolumn{5}{l}{\textbf{WP0 --- Project Management (130\,h)}} \\
+        \multicolumn{5}{l}{\textbf{WP0~-~Project Management (130\,h)}} \\
         \midrule
-        T0.1 & Context and scope definition         & 20  & ---            & Zotero \\
-        T0.2 & Temporal planning                    & 12  & T0.1           & --- \\
-        T0.3 & Budget and sustainability             & 15  & T0.2           & --- \\
-        T0.4 & Final GEP integration                & 8   & T0.3           & --- \\
-        T0.5 & Supervisor meetings                  & 25  & Concurrent     & --- \\
+        T0.1 & Context and scope definition         & 20  &~-~           & Zotero \\
+        T0.2 & Temporal planning                    & 12  & T0.1           &~-~\\
+        T0.3 & Budget and sustainability             & 15  & T0.2           &~-~\\
+        T0.4 & Final GEP integration                & 8   & T0.3           &~-~\\
+        T0.5 & Supervisor meetings                  & 25  & Concurrent     &~-~\\
         T0.6 & Thesis writing                       & 50  & Concurrent     & \LaTeX{} \\
         \midrule
-        \multicolumn{5}{l}{\textbf{WP1 --- Sprint 1: Literature Review \& Baseline (78\,h)}} \\
+        \multicolumn{5}{l}{\textbf{WP1~-~Sprint 1: Literature Review \& Baseline (78\,h)}} \\
         \midrule
-        T1.1 & OMR literature survey                & 25  & ---            & Library access \\
-        T1.2 & Dataset exploration                  & 15  & T1.1$^\dagger$ & --- \\
+        T1.1 & OMR literature survey                & 25  &~-~           & Library access \\
+        T1.2 & Dataset exploration                  & 15  & T1.1$^\dagger$ &~-~\\
         T1.3 & Classical CV baseline impl.          & 25  & T1.2           & OpenCV \\
-        T1.4 & Baseline evaluation and report       & 10  & T1.3           & --- \\
-        T1.5 & Sprint 1 review                      & 3   & T1.4           & --- \\
+        T1.4 & Baseline evaluation and report       & 10  & T1.3           &~-~\\
+        T1.5 & Sprint 1 review                      & 3   & T1.4           &~-~\\
         \midrule
-        \multicolumn{5}{l}{\textbf{WP2 --- Sprint 2: Dataset Construction (73\,h)}} \\
+        \multicolumn{5}{l}{\textbf{WP2~-~Sprint 2: Dataset Construction (73\,h)}} \\
         \midrule
         T2.1 & Output encoding design               & 12  & T1.5           & music21 \\
         T2.2 & Synthetic rendering pipeline         & 35  & T2.1           & LilyPond \\
         T2.3 & Data augmentation pipeline           & 15  & T2.2           & OpenCV \\
-        T2.4 & Dataset validation and splits        & 8   & T2.3           & --- \\
-        T2.5 & Sprint 2 review                      & 3   & T2.4           & --- \\
+        T2.4 & Dataset validation and splits        & 8   & T2.3           &~-~\\
+        T2.5 & Sprint 2 review                      & 3   & T2.4           &~-~\\
         \midrule
-        \multicolumn{5}{l}{\textbf{WP3 --- Sprint 3: CRNN-CTC Development (75\,h)}} \\
+        \multicolumn{5}{l}{\textbf{WP3~-~Sprint 3: CRNN-CTC Development (75\,h)}} \\
         \midrule
-        T3.1 & CRNN architecture design             & 25  & T2.5           & RTX 3060 \\
-        T3.2 & Training pipeline impl.              & 20  & T3.1           & PyTorch / AMP \\
-        T3.3 & Initial training (Run 1)             & 15  & T3.2           & GPU \\
-        T3.4 & Evaluation framework                 & 12  & T3.2$^\dagger$ & --- \\
-        T3.5 & Sprint 3 review                      & 3   & T3.3, T3.4     & --- \\
+        T3.1 & CRNN architecture design             & 25  & T2.5           & Consumer GPU \\
+        T3.2 & Training pipeline impl.              & 20  & T3.1           &~-~\\
+        T3.3 & Initial training run                 & 15  & T3.2           & GPU \\
+        T3.4 & Evaluation framework                 & 12  & T3.2$^\dagger$ &~-~\\
+        T3.5 & Sprint 3 review                      & 3   & T3.3, T3.4     &~-~\\
         \midrule
-        \multicolumn{5}{l}{\textbf{WP4 --- Sprint 4: Iterative Refinement (68\,h)}} \\
+        \multicolumn{5}{l}{\textbf{WP4~-~Sprint 4: Iterative Refinement (68\,h)}} \\
         \midrule
-        T4.1 & Error analysis of initial runs       & 10  & T3.5           & --- \\
-        T4.2 & Data pipeline improvements           & 15  & T4.1           & --- \\
-        T4.3 & Model refinement (Runs 2--4)         & 25  & T4.2           & GPU \\
+        T4.1 & Error analysis of initial run        & 10  & T3.5           &~-~\\
+        T4.2 & Data pipeline improvements           & 15  & T4.1           &~-~\\
+        T4.3 & Model refinement runs                & 25  & T4.2           & GPU \\
         T4.4 & Ablation studies                     & 15  & T4.3           & GPU \\
-        T4.5 & Sprint 4 review                      & 3   & T4.4           & --- \\
+        T4.5 & Sprint 4 review                      & 3   & T4.4           &~-~\\
         \midrule
-        \multicolumn{5}{l}{\textbf{WP5 --- Sprint 5: Final Evaluation \& Defence (85\,h)}} \\
+        \multicolumn{5}{l}{\textbf{WP5~-~Sprint 5: Final Evaluation \& Defence (85\,h)}} \\
         \midrule
         T5.1 & Comprehensive evaluation             & 15  & T4.5           & GPU \\
-        T5.2 & Qualitative error analysis           & 10  & T5.1           & --- \\
+        T5.2 & Qualitative error analysis           & 10  & T5.1           &~-~\\
         T5.3 & Extension exploration (cond.)        & 20  & T5.1           & GPU \\
         T5.4 & Final thesis writing                 & 30  & T5.2           & \LaTeX{} \\
-        T5.5 & Defence preparation                  & 10  & T5.4           & --- \\
+        T5.5 & Defence preparation                  & 10  & T5.4           &~-~\\
         \midrule
         & \textbf{TOTAL}                            & \textbf{509} & & \\
         \bottomrule
@@ -492,7 +494,7 @@ The Gantt chart in Figure~\ref{fig:gantt} provides a visual representation of th
         \ganttbar[bar/.append style={fill=gpMgmt!40}]{T0.6 Thesis Writing}{5}{21} \\
 
         % ---- WP1: Sprint 1 ----
-        \ganttgroup[group/.append style={fill=gpSprint1!30}]{WP1: Sprint 1 --- Lit.\ Review \& Baseline}{1}{4} \\
+        \ganttgroup[group/.append style={fill=gpSprint1!30}]{WP1: Sprint 1~-~Lit.\ Review \& Baseline}{1}{4} \\
         \ganttbar[bar/.append style={fill=gpSprint1!60}]{T1.1 Literature survey}{1}{2} \\
         \ganttbar[bar/.append style={fill=gpSprint1!60}]{T1.2 Dataset exploration}{2}{3} \\
         \ganttbar[bar/.append style={fill=gpSprint1!60}]{T1.3 CV baseline impl.}{2}{4} \\
@@ -500,7 +502,7 @@ The Gantt chart in Figure~\ref{fig:gantt} provides a visual representation of th
         \ganttmilestone[milestone/.append style={fill=gpMilestone}]{M1: Sprint 1 Review}{4} \\
 
         % ---- WP2: Sprint 2 ----
-        \ganttgroup[group/.append style={fill=gpSprint2!30}]{WP2: Sprint 2 --- Dataset Construction}{5}{8} \\
+        \ganttgroup[group/.append style={fill=gpSprint2!30}]{WP2: Sprint 2~-~Dataset Construction}{5}{8} \\
         \ganttbar[bar/.append style={fill=gpSprint2!60}]{T2.1 Encoding design}{5}{5} \\
         \ganttbar[bar/.append style={fill=gpSprint2!60}]{T2.2 Rendering pipeline}{5}{7} \\
         \ganttbar[bar/.append style={fill=gpSprint2!60}]{T2.3 Augmentation}{7}{7} \\
@@ -508,23 +510,23 @@ The Gantt chart in Figure~\ref{fig:gantt} provides a visual representation of th
         \ganttmilestone[milestone/.append style={fill=gpMilestone}]{M2: Sprint 2 Review}{8} \\
 
         % ---- WP3: Sprint 3 ----
-        \ganttgroup[group/.append style={fill=gpSprint3!30}]{WP3: Sprint 3 --- CRNN-CTC Development}{9}{12} \\
+        \ganttgroup[group/.append style={fill=gpSprint3!30}]{WP3: Sprint 3~-~CRNN-CTC Development}{9}{12} \\
         \ganttbar[bar/.append style={fill=gpSprint3!60}]{T3.1 Architecture design}{9}{10} \\
         \ganttbar[bar/.append style={fill=gpSprint3!60}]{T3.2 Training pipeline}{10}{11} \\
-        \ganttbar[bar/.append style={fill=gpSprint3!60}]{T3.3 Run 1 training}{11}{12} \\
+        \ganttbar[bar/.append style={fill=gpSprint3!60}]{T3.3 Initial training}{11}{12} \\
         \ganttbar[bar/.append style={fill=gpSprint3!60}]{T3.4 Eval.\ framework}{11}{12} \\
         \ganttmilestone[milestone/.append style={fill=gpMilestone}]{M3: Sprint 3 Review}{12} \\
 
         % ---- WP4: Sprint 4 ----
-        \ganttgroup[group/.append style={fill=gpSprint4!30}]{WP4: Sprint 4 --- Iterative Refinement}{13}{16} \\
+        \ganttgroup[group/.append style={fill=gpSprint4!30}]{WP4: Sprint 4~-~Iterative Refinement}{13}{16} \\
         \ganttbar[bar/.append style={fill=gpSprint4!60}]{T4.1 Error analysis}{13}{13} \\
         \ganttbar[bar/.append style={fill=gpSprint4!60}]{T4.2 Data fixes}{13}{14} \\
-        \ganttbar[bar/.append style={fill=gpSprint4!60}]{T4.3 Runs 2--4}{14}{15} \\
+        \ganttbar[bar/.append style={fill=gpSprint4!60}]{T4.3 Refinement runs}{14}{15} \\
         \ganttbar[bar/.append style={fill=gpSprint4!60}]{T4.4 Ablation studies}{15}{16} \\
         \ganttmilestone[milestone/.append style={fill=gpMilestone}]{M4: Sprint 4 Review}{16} \\
 
         % ---- WP5: Sprint 5 ----
-        \ganttgroup[group/.append style={fill=gpSprint5!30}]{WP5: Sprint 5 --- Final Eval.\ \& Defence}{17}{21} \\
+        \ganttgroup[group/.append style={fill=gpSprint5!30}]{WP5: Sprint 5~-~Final Eval.\ \& Defence}{17}{21} \\
         \ganttbar[bar/.append style={fill=gpSprint5!60}]{T5.1 Final evaluation}{17}{17} \\
         \ganttbar[bar/.append style={fill=gpSprint5!60}]{T5.2 Error case studies}{17}{18} \\
         \ganttbar[bar/.append style={fill=gpSprint5!60}]{T5.3 Extension (cond.)}{17}{19} \\
@@ -545,7 +547,7 @@ The Gantt chart in Figure~\ref{fig:gantt} provides a visual representation of th
 
 This section coordinates with the risks identified in Deliverable~1 (Section~3.6) and defines concrete contingency actions, their impact on the schedule, and the additional resources required.
 
-\subsection{R1 --- Limited Ground-Truth Data}
+\subsection{R1~-~Limited Ground-Truth Data}
 
 \textbf{Risk:} Annotated Real Book data is not publicly available. The synthetic dataset may contain errors or lack diversity. \\
 \textbf{Likelihood:} High. \quad \textbf{Impact:} High (degraded model accuracy). \\
@@ -556,7 +558,7 @@ This section coordinates with the risks identified in Deliverable~1 (Section~3.6
     \item \textit{Resources:} No additional resources; PrIMuS data is already downloaded.
 \end{itemize}
 
-\subsection{R2 --- Staff Detection Errors Propagating Downstream}
+\subsection{R2~-~Staff Detection Errors Propagating Downstream}
 
 \textbf{Risk:} Incorrectly cropped staff lines feed corrupted input to the CRNN, increasing SER. \\
 \textbf{Likelihood:} Medium. \quad \textbf{Impact:} Medium. \\
@@ -567,7 +569,7 @@ This section coordinates with the risks identified in Deliverable~1 (Section~3.6
     \item \textit{Resources:} None additional.
 \end{itemize}
 
-\subsection{R3 --- Model Underfitting or CTC Misalignment}
+\subsection{R3~-~Model Underfitting or CTC Misalignment}
 
 \textbf{Risk:} The CRNN does not converge, or CTC loss plateaus at an unacceptably high SER ($>$30\%). \\
 \textbf{Likelihood:} Medium. \quad \textbf{Impact:} High (could compromise the project's central contribution). \\
@@ -578,18 +580,18 @@ This section coordinates with the risks identified in Deliverable~1 (Section~3.6
     \item \textit{Resources:} Same hardware; longer GPU time per run.
 \end{itemize}
 
-\subsection{R4 --- Computational Resource Constraints}
+\subsection{R4~-~Computational Resource Constraints}
 
-\textbf{Risk:} Training runs take too long on the RTX 3060, slowing the iteration cycle and delaying Sprint~4. \\
+\textbf{Risk:} Training runs take too long on the available hardware, slowing the iteration cycle and delaying Sprint~4. \\
 \textbf{Likelihood:} Low--Medium. \quad \textbf{Impact:} Medium (schedule delays). \\
-\textbf{Mitigation (built into plan):} The model is designed to be lightweight ($\sim$4\,M parameters). Mixed-precision training (AMP) is used by default, halving memory usage and accelerating training by $\sim$30\%. Each run takes approximately 2--4 hours. \\
-\textbf{Contingency (Plan B):} If a single run exceeds 6 hours, reduce the dataset size (e.g., train on $\sim$15{,}000 samples instead of $\sim$30{,}000) or use a shallower CNN backbone. Alternatively, request temporary access to UPC or cloud GPU resources.
+\textbf{Mitigation (built into plan):} The model is designed to be lightweight and uses mixed-precision training to reduce memory usage and training time. \\
+\textbf{Contingency (Plan B):} If training time becomes a bottleneck, reduce dataset size, simplify the model architecture, or request temporary access to UPC or cloud GPU resources.
 \begin{itemize}[nosep]
     \item \textit{Schedule impact:} Minimal if mitigated early; up to 5\,h overhead for cloud setup.
     \item \textit{Resources:} Potential cloud GPU cost ($\sim$\EUR{}20--50 for short-term rental).
 \end{itemize}
 
-\subsection{R5 --- Scope Creep Toward Polyphony}
+\subsection{R5~-~Scope Creep Toward Polyphony}
 
 \textbf{Risk:} Attempting polyphonic extensions prematurely diverts effort from the monophonic core. \\
 \textbf{Likelihood:} Medium. \quad \textbf{Impact:} High (incomplete core system). \\
@@ -609,16 +611,6 @@ The plan includes the following built-in margins to absorb deviations:
     \item \textbf{Thesis writing throughout:} T0.6 runs concurrently, preventing a documentation bottleneck at the end.
     \item \textbf{Total slack:} Approximately 25--30\,h can be redistributed without exceeding the project end date.
 \end{itemize}
-
-
-% ==========================================
-\section{Conclusions}
-
-This document defines a temporal plan of \textbf{509 estimated hours} over \textbf{21 weeks}, structured into five agile sprints plus a concurrent project management work package. The planning reflects the iterative methodology introduced in Deliverable~1: Sprints 3 and 4 form an explicit refinement loop, documentation runs throughout, and supervisor meetings provide periodic checkpoints.
-
-Each task has been described at individual task level with hour estimates, explicit dependencies, and resource assignments. The Gantt chart demonstrates meaningful concurrency (WP0 runs in parallel with all sprints; several tasks within each sprint overlap) and avoids a purely sequential layout. Risk management builds directly on the obstacles identified in Deliverable~1, with concrete contingency plans specifying alternative tasks, schedule impact, and resource implications.
-
-The plan is designed so that the project can deliver its core contribution --- a trained and evaluated CRNN-CTC model for monophonic music recognition --- even if one or more risks materialise, by leveraging the conditional extension (T5.3) as a schedule buffer and the built-in overestimations in the most uncertain tasks.
 
 
 % ==========================================

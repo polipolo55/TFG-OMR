@@ -37,6 +37,7 @@ CLEF_LY: dict[str, str] = {
     "C2": "mezzosoprano",
     "C3": "alto",
     "C4": "tenor",
+    "C5": "baritone",    # rare PrIMuS token; LilyPond has no exact C5 clef
 }
 """Map PrIMuS / LMX clef identifiers to LilyPond clef names."""
 

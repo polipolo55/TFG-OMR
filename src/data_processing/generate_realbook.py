@@ -62,7 +62,11 @@ _STEP_LILY   = {"C": "c", "D": "d", "E": "e", "F": "f",
                 "G": "g", "A": "a", "B": "b"}
 _ACC_LILY    = {"b": "es", "bb": "eses", "#": "is", "x": "isis", "": ""}
 _DUR_LILY    = {"breve": r"\breve", "whole": "1", "half": "2", "quarter": "4",
-                "eighth": "8", "sixteenth": "16", "32nd": "32", "64th": "64"}
+                "eighth": "8", "sixteenth": "16", "32nd": "32", "64th": "64",
+                # PrIMuS aliases — some samples spell these out
+                "thirty_second": "32", "sixty_fourth": "64",
+                # longa (4 whole notes); LilyPond calls it \longa
+                "quadruple_whole": r"\longa"}
 
 
 def _parse_pitch(pitch_str: str) -> str:
@@ -171,12 +175,18 @@ def semantic_to_lily_music(semantic_path: Path) -> str:
                     lily_tokens.append(rf"\time {ts_str}")
 
             elif tok.startswith("note-"):
-                # format: note-{Pitch}_{duration}
+                # format: note-{Pitch}_{duration}  or  note-{Pitch}_{duration}_fermata
                 inner      = tok[len("note-"):]
                 pitch_str, dur_str = inner.split("_", 1)
+                # Handle fermata suffix (e.g. "eighth_fermata" → "eighth")
+                has_fermata = dur_str.endswith("_fermata")
+                if has_fermata:
+                    dur_str = dur_str[: -len("_fermata")]
                 lily_pitch = _parse_pitch(pitch_str)
                 lily_dur   = _parse_duration(dur_str)
                 note_tok   = lily_pitch + lily_dur
+                if has_fermata:
+                    note_tok += r"\fermata"
                 if pending_tie:
                     lily_tokens[-1] += "~"
                     pending_tie = False
@@ -184,8 +194,15 @@ def semantic_to_lily_music(semantic_path: Path) -> str:
 
             elif tok.startswith("rest-"):
                 dur_str  = tok[len("rest-"):]
+                # Handle fermata suffix on rests too
+                has_fermata = dur_str.endswith("_fermata")
+                if has_fermata:
+                    dur_str = dur_str[: -len("_fermata")]
                 lily_dur = _parse_duration(dur_str)
-                lily_tokens.append("r" + lily_dur)
+                rest_tok = "r" + lily_dur
+                if has_fermata:
+                    rest_tok += r"\fermata"
+                lily_tokens.append(rest_tok)
 
             elif tok == "barline":
                 lily_tokens.append("|")

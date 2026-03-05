@@ -80,6 +80,9 @@ _DUR_QL: dict[str, float] = {
     "64th":     0.0625,
     # aliases used in some PrIMuS samples
     "thirty_second": 0.125,
+    "sixty_fourth":  0.0625,
+    # longa (4 whole notes)
+    "quadruple_whole": 16.0,
 }
 
 
@@ -129,10 +132,12 @@ _CLEF_MAP = {
     "G2": music21.clef.TrebleClef,
     "G1": music21.clef.FrenchViolinClef,
     "F4": music21.clef.BassClef,
+    "F3": music21.clef.BaritoneClef,
     "C1": music21.clef.SopranoClef,
     "C2": music21.clef.MezzoSopranoClef,
     "C3": music21.clef.AltoClef,
     "C4": music21.clef.TenorClef,
+    "C5": music21.clef.AltoClef,   # rare; no exact music21 equiv, use alto
 }
 
 
@@ -169,9 +174,15 @@ def semantic_to_score(tokens: list[str]) -> music21.stream.Score:
             elif tok.startswith("note-"):
                 inner = tok[5:]
                 pitch_str, dur_str = inner.split("_", 1)
+                # Handle fermata suffix (e.g. "eighth_fermata" → "eighth")
+                has_fermata = dur_str.endswith("_fermata")
+                if has_fermata:
+                    dur_str = dur_str[: -len("_fermata")]
                 m21_pitch = _parse_pitch_m21(pitch_str)
                 ql = _parse_duration_ql(dur_str)
                 n = music21.note.Note(m21_pitch, quarterLength=ql)
+                if has_fermata:
+                    n.expressions.append(music21.expressions.Fermata())
                 if pending_tie:
                     n.tie = music21.tie.Tie("stop")
                     pending_tie = False
@@ -179,8 +190,14 @@ def semantic_to_score(tokens: list[str]) -> music21.stream.Score:
 
             elif tok.startswith("rest-"):
                 dur_str = tok[5:]
+                # Handle fermata suffix on rests too
+                has_fermata = dur_str.endswith("_fermata")
+                if has_fermata:
+                    dur_str = dur_str[: -len("_fermata")]
                 ql = _parse_duration_ql(dur_str)
                 r = music21.note.Rest(quarterLength=ql)
+                if has_fermata:
+                    r.expressions.append(music21.expressions.Fermata())
                 current_measure.append(r)
 
             elif tok == "barline":

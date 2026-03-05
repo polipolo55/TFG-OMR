@@ -1,4 +1,5 @@
 1024th
+128th
 16th
 256th
 32nd
@@ -63,6 +64,7 @@ clef:G1
 clef:G2
 dot
 eighth
+fermata
 flat
 forward
 half

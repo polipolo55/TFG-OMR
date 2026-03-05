@@ -23,7 +23,7 @@ class Config:
     scanned_dir: Path = Path("data/realbook_primus_aa_scanned")
     extra_data_dirs: list[Path] = field(default_factory=list)
     extra_scanned_dirs: list[Path] = field(default_factory=list)
-    model_dir: Path = Path("models")
+    model_dir: Path = Path("models/latest")
     vocab_path: Path = Path("src/CRNN_CTC/vocabulary.txt")
 
     # ── Reproducibility ────────────────────────────────────────────────────

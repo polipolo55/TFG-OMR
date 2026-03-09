@@ -22,13 +22,14 @@ The project is an end-to-end Optical Music Recognition (OMR) system specifically
 
 * **Phase 1 — Literature Review & Baseline: COMPLETE.** GEP Deliverable 1 (`docs/gep/E1/E1.tex`) is written and submitted. The morphological baseline notebook is fully implemented and evaluated.
 * **Phase 2 — Dataset Construction: COMPLETE.** data/realbook_primus_aa contains 43,563 synthetic staff line images (PNG) with paired annotations in LMX format, generated via LilyPond + LilyJAZZ. Data augmentation (Gaussian noise, blur, perspective warp) applied to `realbook_primus_aa_scanned` for robustness training. Fixed pipeline bug: `semantic_to_lmx.py` now correctly skips `multirest-N` tokens (matching `generate_realbook.py` behavior), eliminating 24.3% ghost-token corruption.
-* **Phase 3 — CRNN-CTC Development: COMPLETE.** Full pipeline operational and iteratively improved through four training runs:
+* **Phase 3 — CRNN-CTC Development: COMPLETE.** Full pipeline operational and iteratively improved through five training runs:
   - **Run 1** (baseline): Aggregate test SER 0.2698
   - **Run 2** (reduced dropout + early stopping): Best val SER 0.1367, aggregate test SER 0.1451
   - **Run 3** (after multirest fix + label sync): Best val SER 0.0712, aggregate test SER 0.0744, 45% perfect predictions (SER=0), 75.1% SER ≤10%
   - **Run 4** (`run_20260305_131855`, ResNet18 backbone + expanded dataset aa+ab + height filter validated): Best val SER **0.0389** (epoch 30/40), aggregate test SER **0.0407**, **57.5%** perfect predictions, 71.7% SER ≤5%, 85.9% SER ≤10%
+  - **Run 5** (`run_20260309_070331`, same config fresh init, STARTED 2026-03-09): Best val SER **0.0213** (epoch 16/50, IN PROGRESS) — already beats Run 4 best
   - Training dataset after all filters: ~57,710 samples across aa+ab (train≈46,168 / val≈5,771 / test=5,771)
-* **Phase 4 — Evaluation & Analysis: IN PROGRESS.** Currently cycling Phase 3↔4 for iterative improvement. Run 4 error analysis complete: deletions 58.6% (×6,378), insertions 31.9% (×3,469), substitutions 9.5% (×1,029 — mainly quarter↔half, half↔quarter, eighth↔quarter). Real-world inference tested on `AutumLeaves_actual.pdf` (first staff line) — model produces plausible LMX output; full-page layout pipeline still out of scope. Further runs / architecture experiments queued.
+* **Phase 4 — Evaluation & Analysis: IN PROGRESS.** Currently cycling Phase 3↔4 for iterative improvement. Run 4 error analysis complete: deletions 58.6% (×6,378), insertions 31.9% (×3,469), substitutions 9.5% (×1,029 — mainly quarter↔half, half↔quarter, eighth↔quarter). Real-world inference tested on `AutumLeaves_actual.pdf` (first staff line) — model produces plausible LMX output; full-page layout pipeline still out of scope. Run 5 training in progress.
 * **Phase 5 — Extension (conditional): NOT STARTED.** Polyphony/chord symbols only if time allows after Phase 4 stabilizes.
 * **Thesis document:** `docs/main/main.tex` exists but is currently **empty** — writing has not begun. A `docs/main/figures/` directory exists for thesis figures (currently contains `Untitled.png` from a first test export).
 
@@ -48,7 +49,7 @@ src/
     __init__.py
     config.py                 # Config dataclass: paths, data (filter_multi_staff, max_source_height, extra_data_dirs), model arch (backbone selector), training hyperparams
     vocab.py                  # Vocabulary class: token↔index, CTC blank at 0
-    vocabulary.txt            # 98-token LMX vocabulary (96 music tokens + blank + pad)
+    vocabulary.txt            # 100-token vocabulary (98 music tokens + blank at idx 0 + pad at idx 1)
     dataset.py                # OMRDataset with multi-stage filtering: tokens (rest-heavy, C1/C2 clefs), image height (multi-staff); extra_data_dirs support; collate_fn, make_splits()
     model.py                  # CRNN: VGG CNN or ResNet18 backbone + BiLSTM + FC head; ResNet18 = ~14.4M params
     train.py                  # Training loop: CTC loss, AMP, OneCycleLR, gradient clipping, early stopping, best-model checkpointing
@@ -61,6 +62,7 @@ notebooks/
   02_evaluate_model.pdf       # exported PDF
   03_evaluate_phase2.ipynb    # current CRNN evaluation notebook: Run 4 results, error analysis, real-world PDF test
   03_evaluate_phase2.pdf      # exported PDF of Run 4 evaluation
+  04_pipeline_walkthrough.ipynb  # full pipeline walkthrough for thesis director meeting (2026-03-09)
 data/
   camera_primus/     # CameraPrimus: typeset PNGs + distorted JPGs (paired)
   primus/            # PrIMuS: agnostic/semantic annotated monophonic staff lines
@@ -120,25 +122,28 @@ This has to be evaluated still but LMX looks good https://github.com/OMR-Researc
 
 # Current Training State & Best Model
 
-* **Latest Checkpoint:** `models/latest/best_model.pt` → `models/run_20260305_131855/best_model.pt` (Run 4, epoch 30)
-* **Best Metrics:**
+* **Latest Checkpoint:** `models/latest/latest/best_model.pt` → `models/latest/run_20260309_070331/best_model.pt` (Run 5, epoch 16, IN PROGRESS)
+* **Run 5 (current, in progress):**
+  - Best val SER so far: **0.0213** (epoch 16/50) — already beats Run 4 best
+  - Training started: 2026-03-09 07:03
+  - Config: same as Run 4 (ResNet18, aa+ab, all filters)
+* **Run 4 (best completed):**
   - Validation SER: 0.0389 (epoch 30 of 40)
   - Aggregate test SER: 0.0407
   - Perfect predictions (SER=0): 57.5% (3,318 / 5,771)
-  - SER ≤ 5%: 71.7%
-  - SER ≤ 10%: 85.9%
-  - Model parameters: 14,374,434 (ResNet18 backbone)
-* **Training Config (Run 4):**
-  - Backbone: ResNet18
+  - SER ≤ 5%: 71.7%  |  SER ≤ 10%: 85.9%
+  - Model parameters: 14,375,460 (ResNet18 backbone)
+* **Training Config (Runs 4 & 5):**
+  - Backbone: ResNet18 (asymmetric strides, H-collapsing)
   - Dataset: ~57,710 samples (aa + ab, after all filters); test split = 5,771
-  - Batch size: 16, Learning rate: 5e-4 (OneCycleLR), Epochs: 50 (stopped at 40)
+  - Batch size: 16, Learning rate: 5e-4 (OneCycleLR), Epochs: 50
   - CNN dropout: 0.25, LSTM dropout: 0.3, Early stopping patience: 10
-* **Dominant Remaining Errors (quantified from 5,771 test samples, 10,876 total errors):**
+* **Dominant Remaining Errors (quantified from Run 4, 5,771 test samples, 10,876 total errors):**
   - **Deletions (58.6%):** ×6,378 (bar boundaries, rests, rare durations)
   - **Insertions (31.9%):** ×3,469 (spurious measure/rest tokens)
   - **Substitutions (9.5%):** ×1,029 — duration confusion (`quarter↔half` ×63/47, `eighth↔quarter` ×35)
 * **Real-world test:** Model ran inference on `AutumLeaves_actual.pdf` (first staff line crop); produced plausible LMX sequence — domain gap from scans is observable but manageable.
-* **Next Focus:** Continue Phase 3↔4 iteration — analyse Run 4 error breakdown (deletion-heavy pattern, duration substitutions), implement fixes (data balancing, loss weighting, beam search decoder, or architecture tweaks), then retrain and validate. Thesis writing (`docs/main/main.tex`) and Phase 5 start only after Phase 4 converges.
+* **Next Focus:** Let Run 5 finish; if val SER < 0.020 checkpoint as new best. Then error mitigation (CTC blank weight, beam search, curriculum), thesis writing after Phase 4 converges.
 
 # Standard Operating Procedures
 

@@ -43,11 +43,13 @@ class Config:
     # shows a long string of whole-measure rests, a rare pattern that is
     # irrelevant for jazz lead sheets and inflates CTC edit distance.
     filter_rest_heavy: bool = True
-    # filter_unwanted_clefs: drop samples containing C1 or C2 clef tokens
-    # (soprano / mezzo-soprano clefs).  These clefs are visually similar to
-    # tenor clef (C4) but shifted on the staff; the model confuses them and
-    # the resulting pitch cascade accounts for ~9 000 substitution errors.
-    # Soprano/mezzo clefs are absent from jazz lead sheets.
+    # filter_unwanted_clefs: drop samples containing C1, C2, or F3 clef tokens.
+    # C1/C2 (soprano / mezzo-soprano) are visually similar to tenor (C4) but
+    # shifted by one staff line — the model confuses them and the resulting
+    # pitch cascade accounts for ~9 000 substitution errors in Run 4.
+    # F3 (baritone) looks like the standard bass clef (F4) shifted one line up,
+    # causing the same cascade issue for bass-register samples.
+    # None of these clefs appear in jazz lead sheets.
     filter_unwanted_clefs: bool = True
     # filter_multi_staff: drop images whose original height exceeds
     # max_source_height.  LilyPond occasionally wraps a long excerpt onto two

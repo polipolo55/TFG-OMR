@@ -59,6 +59,7 @@ clef:C1
 clef:C2
 clef:C3
 clef:C4
+clef:F3
 clef:F4
 clef:G1
 clef:G2
@@ -82,6 +83,7 @@ key:fifths:4
 key:fifths:5
 key:fifths:6
 key:fifths:7
+long
 measure
 natural
 quarter

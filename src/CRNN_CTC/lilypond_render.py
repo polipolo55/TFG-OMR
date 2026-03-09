@@ -53,7 +53,7 @@ KEY_LY: dict[int, str] = {
 DUR_LY: dict[str, str] = {
     "whole": "1", "half": "2", "quarter": "4", "eighth": "8",
     "16th": "16", "32nd": "32", "64th": "64", "128th": "128",
-    "256th": "256", "1024th": "1024", "breve": r"\breve",
+    "256th": "256", "1024th": "1024", "breve": r"\breve", "long": r"\longa",
 }
 """Map LMX duration token names to LilyPond duration strings."""
 

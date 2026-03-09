@@ -2,23 +2,29 @@
 semantic_to_lmx.py
 ==================
 Convert PrIMuS .semantic annotations → monophonic LMX (.lmx) via music21
-and the ``linearized-musicxml`` package (Route A).
+and the ``linearized-musicxml`` package.
 
 Pipeline per sample:
-    .semantic  ──parse──▶  music21 Score  ──export──▶  .musicxml  ──lmx──▶  .lmx
+    .semantic  ──parse──▶  music21 Score  ──export──▶  MusicXML  ──lmx──▶  .lmx
 
-The monophonic LMX output is then post-filtered to strip purely visual tokens
-(beam, stem, staff, voice) that carry no musical semantics for a monophonic
-CRNN-CTC model.
+The monophonic LMX output strips purely visual tokens (beam, stem, staff,
+voice) that carry no musical semantics for a CRNN-CTC model.
+
+The music21 intermediate representation is kept because it correctly computes
+written accidentals (natural signs, cautionary flats/sharps) from the key
+signature and intra-measure pitch history — logic that would be complex and
+error-prone to reimplement.  The sole responsibility of this module is to
+build a structurally correct Score so that music21's MusicXML exporter does
+not inject phantom fill rests that have no counterpart in the LilyPond-rendered
+image.
 
 Usage:
     poetry run python src/data_processing/semantic_to_lmx.py \\
-        --source data/realbook_primus_aa \\
-        --limit 10 --verbose
-
-    # Or process all samples:
-    poetry run python src/data_processing/semantic_to_lmx.py \\
         --source data/realbook_primus_aa --workers 8
+
+    # Test on a small subset:
+    poetry run python src/data_processing/semantic_to_lmx.py \\
+        --source data/realbook_primus_aa --limit 10 --verbose
 """
 
 from __future__ import annotations
@@ -33,6 +39,7 @@ import tempfile
 import xml.etree.ElementTree as ET
 from functools import partial
 from pathlib import Path
+from typing import Optional
 
 import music21
 
@@ -51,9 +58,6 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Tokens to strip for monophonic output
 # ---------------------------------------------------------------------------
-# These tokens encode visual layout information that is irrelevant for a
-# monophonic sequence model.  Keeping them would bloat the vocabulary and
-# the output sequence length with no musical benefit.
 _STRIP_PREFIXES = (
     "voice:",
     "staff:",
@@ -63,28 +67,49 @@ _STRIP_PREFIXES = (
 )
 
 # ---------------------------------------------------------------------------
-# PrIMuS semantic → music21 Score
+# Conversion tables
 # ---------------------------------------------------------------------------
 
-# music21 pitch names use "-" for flat and "#" for sharp
-_ACC_M21 = {"b": "-", "bb": "--", "#": "#", "x": "##", "": ""}
-
-_DUR_QL: dict[str, float] = {
-    "breve":    8.0,
-    "whole":    4.0,
-    "half":     2.0,
-    "quarter":  1.0,
-    "eighth":   0.5,
-    "sixteenth": 0.25,
-    "32nd":     0.125,
-    "64th":     0.0625,
-    # aliases used in some PrIMuS samples
-    "thirty_second": 0.125,
-    "sixty_fourth":  0.0625,
-    # longa (4 whole notes)
-    "quadruple_whole": 16.0,
+# music21 pitch names: flat = "-", double-flat = "--", sharp = "#", double-sharp = "##"
+_ACC_M21: dict[str, str] = {
+    "":   "",
+    "b":  "-",
+    "bb": "--",
+    "#":  "#",
+    "x":  "##",   # double-sharp (×)
 }
 
+_DUR_QL: dict[str, float] = {
+    "breve":            8.0,
+    "whole":            4.0,
+    "half":             2.0,
+    "quarter":          1.0,
+    "eighth":           0.5,
+    "sixteenth":        0.25,
+    "32nd":             0.125,
+    "64th":             0.0625,
+    # legacy PrIMuS aliases
+    "thirty_second":    0.125,
+    "sixty_fourth":     0.0625,
+    # longa (4 whole notes)
+    "quadruple_whole":  16.0,
+}
+
+_CLEF_MAP: dict[str, type] = {
+    "G2": music21.clef.TrebleClef,
+    "G1": music21.clef.FrenchViolinClef,
+    "F4": music21.clef.BassClef,
+    "F3": music21.clef.FBaritoneClef,
+    "C1": music21.clef.SopranoClef,
+    "C2": music21.clef.MezzoSopranoClef,
+    "C3": music21.clef.AltoClef,
+    "C4": music21.clef.TenorClef,
+    "C5": music21.clef.AltoClef,   # no exact music21 equivalent; alto is closest
+}
+
+# ---------------------------------------------------------------------------
+# Parsing helpers
+# ---------------------------------------------------------------------------
 
 def _parse_pitch_m21(pitch_str: str) -> str:
     """Convert PrIMuS pitch ``'Bb5'`` → music21 pitch string ``'B-5'``."""
@@ -92,57 +117,67 @@ def _parse_pitch_m21(pitch_str: str) -> str:
     if not m:
         raise ValueError(f"Cannot parse pitch: {pitch_str!r}")
     step, acc, octave = m.group(1), m.group(2), m.group(3)
-    if acc == "##":
-        acc = "x"
-    return step + _ACC_M21.get(acc, "") + octave
+    return step + _ACC_M21.get(acc, acc) + octave
 
 
 def _parse_duration_ql(dur_str: str) -> float:
-    """Convert PrIMuS duration ``'quarter.'`` → music21 quarterLength ``1.5``."""
+    """Convert PrIMuS duration string ``'quarter.'`` → quarterLength ``1.5``."""
     stripped = dur_str.rstrip(".")
     dots = len(dur_str) - len(stripped)
     base = _DUR_QL.get(stripped)
     if base is None:
         raise ValueError(f"Unknown duration: {dur_str!r}")
-    # each dot adds half the previous value
-    ql = base
-    add = base
+    ql, add = base, base
     for _ in range(dots):
         add /= 2.0
         ql += add
     return ql
 
 
-# Key-signature name → music21 Key constructor arg
-# PrIMuS uses e.g. "EbM" for Eb Major, "Am" for A minor, "CM" for C major.
 def _parse_key_m21(ks_str: str) -> music21.key.Key:
+    """Convert PrIMuS key-signature string (e.g. ``'EbM'``) → music21 Key."""
     if ks_str.endswith("M"):
         mode, root = "major", ks_str[:-1]
     elif ks_str.endswith("m"):
         mode, root = "minor", ks_str[:-1]
     else:
         mode, root = "major", ks_str
-
-    # Translate PrIMuS accidental style to music21 style
-    root_m21 = root[0] + root[1:].replace("b", "-").replace("#", "#")
+    root_m21 = root[0] + root[1:].replace("b", "-")
     return music21.key.Key(root_m21, mode)
 
 
-_CLEF_MAP = {
-    "G2": music21.clef.TrebleClef,
-    "G1": music21.clef.FrenchViolinClef,
-    "F4": music21.clef.BassClef,
-    "F3": music21.clef.BaritoneClef,
-    "C1": music21.clef.SopranoClef,
-    "C2": music21.clef.MezzoSopranoClef,
-    "C3": music21.clef.AltoClef,
-    "C4": music21.clef.TenorClef,
-    "C5": music21.clef.AltoClef,   # rare; no exact music21 equiv, use alto
-}
+def _parse_time_m21(ts_str: str) -> music21.meter.TimeSignature:
+    """Convert PrIMuS time-signature string (e.g. ``'C'``) → music21 TimeSignature."""
+    if ts_str == "C":
+        ts_str = "4/4"
+    elif ts_str in ("C/", "C|"):
+        ts_str = "2/2"
+    return music21.meter.TimeSignature(ts_str)
 
+
+# ---------------------------------------------------------------------------
+# PrIMuS semantic → music21 Score
+# ---------------------------------------------------------------------------
 
 def semantic_to_score(tokens: list[str]) -> music21.stream.Score:
-    """Build a ``music21.stream.Score`` from PrIMuS semantic tokens."""
+    """
+    Build a ``music21.stream.Score`` from PrIMuS semantic tokens.
+
+    Design invariants
+    -----------------
+    * ``multirest-N`` tokens are skipped entirely, matching ``generate_realbook.py``
+      which also does not render these bars in the LilyPond image.
+    * A barline that would flush a measure with no notes/rests is also skipped
+      (phantom measure produced after a skipped multirest).  The header tokens
+      (clef, key, time) stay in ``current_measure`` and are carried forward to
+      the first real content.
+    * Every incomplete measure is padded before being appended to the Part:
+      ``paddingLeft`` for measures flushed at an interior barline (anacrusis /
+      pickup bar), ``paddingRight`` for the final measure.  Both flags tell
+      music21's MusicXML exporter that the measure is intentionally incomplete,
+      preventing it from injecting phantom fill rests that have no counterpart
+      in the rendered image.
+    """
     score = music21.stream.Score()
     part = music21.stream.Part()
 
@@ -150,37 +185,58 @@ def semantic_to_score(tokens: list[str]) -> music21.stream.Score:
     measure_num = 1
     pending_tie = False
 
+    # Tracks the most-recently-seen TimeSignature across measure boundaries so
+    # we can compute bar_ql for any measure, not just the first.
+    current_ts: Optional[music21.meter.TimeSignature] = None
+
+    def _flush_measure(m: music21.stream.Measure, is_last: bool) -> None:
+        """Apply incomplete-measure padding to *m* then append it to *part*."""
+        nonlocal current_ts
+        # Update the running TimeSignature from any new TS inside this measure.
+        ts_in_measure = list(m.getElementsByClass(music21.meter.TimeSignature))
+        if ts_in_measure:
+            current_ts = ts_in_measure[-1]
+
+        if current_ts is not None:
+            bar_ql = current_ts.barDuration.quarterLength
+            notes_ql = sum(n.duration.quarterLength for n in m.notesAndRests)
+            remainder = bar_ql - notes_ql
+            if 0 < remainder < bar_ql:
+                # paddingLeft  → anacrusis / pickup bar (notes at END of bar)
+                # paddingRight → final partial bar   (notes at START of bar)
+                if is_last:
+                    m.paddingRight = remainder
+                else:
+                    m.paddingLeft = remainder
+
+        part.append(m)
+
     for tok in tokens:
         try:
+            # ── Clef / key / time-signature ───────────────────────────────────
             if tok.startswith("clef-"):
                 clef_id = tok[5:]
                 if clef_id not in _CLEF_MAP:
-                    raise ValueError(
-                        f"Unknown clef token: {tok!r}. Add it to _CLEF_MAP."
-                    )
+                    raise ValueError(f"Unknown clef: {clef_id!r}. Add it to _CLEF_MAP.")
                 current_measure.append(_CLEF_MAP[clef_id]())
 
             elif tok.startswith("keySignature-"):
                 current_measure.append(_parse_key_m21(tok[13:]))
 
             elif tok.startswith("timeSignature-"):
-                ts_str = tok[14:]
-                if ts_str == "C":
-                    ts_str = "4/4"
-                elif ts_str in ("C/", "C|"):
-                    ts_str = "2/2"
-                current_measure.append(music21.meter.TimeSignature(ts_str))
+                current_measure.append(_parse_time_m21(tok[14:]))
 
+            # ── Notes ─────────────────────────────────────────────────────────
             elif tok.startswith("note-"):
                 inner = tok[5:]
                 pitch_str, dur_str = inner.split("_", 1)
-                # Handle fermata suffix (e.g. "eighth_fermata" → "eighth")
                 has_fermata = dur_str.endswith("_fermata")
                 if has_fermata:
                     dur_str = dur_str[: -len("_fermata")]
-                m21_pitch = _parse_pitch_m21(pitch_str)
-                ql = _parse_duration_ql(dur_str)
-                n = music21.note.Note(m21_pitch, quarterLength=ql)
+                n = music21.note.Note(
+                    _parse_pitch_m21(pitch_str),
+                    quarterLength=_parse_duration_ql(dur_str),
+                )
                 if has_fermata:
                     n.expressions.append(music21.expressions.Fermata())
                 if pending_tie:
@@ -188,56 +244,67 @@ def semantic_to_score(tokens: list[str]) -> music21.stream.Score:
                     pending_tie = False
                 current_measure.append(n)
 
+            # ── Rests ─────────────────────────────────────────────────────────
             elif tok.startswith("rest-"):
                 dur_str = tok[5:]
-                # Handle fermata suffix on rests too
                 has_fermata = dur_str.endswith("_fermata")
                 if has_fermata:
                     dur_str = dur_str[: -len("_fermata")]
-                ql = _parse_duration_ql(dur_str)
-                r = music21.note.Rest(quarterLength=ql)
+                r = music21.note.Rest(quarterLength=_parse_duration_ql(dur_str))
                 if has_fermata:
                     r.expressions.append(music21.expressions.Fermata())
                 current_measure.append(r)
 
-            elif tok == "barline":
-                part.append(current_measure)
-                measure_num += 1
-                current_measure = music21.stream.Measure(number=measure_num)
+            # ── Grace notes ───────────────────────────────────────────────────
+            elif tok.startswith("gracenote-"):
+                inner = tok[10:]
+                pitch_str, dur_str = inner.split("_", 1)
+                gn = music21.note.Note(
+                    _parse_pitch_m21(pitch_str),
+                    quarterLength=_parse_duration_ql(dur_str),
+                )
+                gn.duration.isGrace = True
+                current_measure.append(gn)
 
+            # ── Ties ──────────────────────────────────────────────────────────
             elif tok == "tie":
-                # Mark the previous note as tie-start
                 elements = list(current_measure.notesAndRests)
                 if elements and isinstance(elements[-1], music21.note.Note):
                     elements[-1].tie = music21.tie.Tie("start")
                 pending_tie = True
 
-            elif tok.startswith("gracenote-"):
-                inner = tok[10:]
-                pitch_str, dur_str = inner.split("_", 1)
-                m21_pitch = _parse_pitch_m21(pitch_str)
-                ql = _parse_duration_ql(dur_str)
-                gn = music21.note.Note(m21_pitch, quarterLength=ql)
-                gn.duration.isGrace = True
-                current_measure.append(gn)
+            # ── Barlines ──────────────────────────────────────────────────────
+            elif tok == "barline":
+                if not list(current_measure.notesAndRests):
+                    # Empty measure — produced when multirest-N is followed
+                    # immediately by a barline.  Skip the flush; header tokens
+                    # (clef/key/time) that are already in current_measure will
+                    # be carried forward to the first real content token.
+                    continue
+                _flush_measure(current_measure, is_last=False)
+                measure_num += 1
+                current_measure = music21.stream.Measure(number=measure_num)
 
+            # ── Multirest ─────────────────────────────────────────────────────
             elif tok.startswith("multirest-"):
-                # generate_realbook.py skips multirest entirely — the
-                # LilyPond/PNG pipeline does NOT render these bars.  We
-                # must do the same here so the LMX label matches the image.
-                # Emitting any rest would create ghost bars that have no
-                # visual counterpart.
-                log.debug("Skipping %s (multirest not rendered in image)", tok)
-                continue
+                # generate_realbook.py renders the image WITHOUT multirest bars.
+                # Skip these tokens so the LMX label matches the image.
+                log.debug("Skipping %s (not rendered in image)", tok)
+
+            # ── Unknown tokens (silently ignore) ──────────────────────────────
+            else:
+                log.debug("Unhandled token %r — skipping", tok)
 
         except Exception as exc:
-            log.debug("Skipping token %r: %s", tok, exc)
-            continue
+            log.debug("Error processing token %r: %s", tok, exc)
 
-    # Flush last measure if it has content
-    if current_measure.notesAndRests or list(current_measure.getElementsByClass(
-            (music21.clef.Clef, music21.key.Key, music21.meter.TimeSignature))):
-        part.append(current_measure)
+    # Flush the final measure if it contains notes/rests or header tokens.
+    has_notes = bool(list(current_measure.notesAndRests))
+    has_headers = bool(list(current_measure.getElementsByClass(
+        (music21.clef.Clef, music21.key.Key, music21.meter.TimeSignature)
+    )))
+    if has_notes or has_headers:
+        _flush_measure(current_measure, is_last=True)
 
     score.append(part)
     return score

@@ -42,9 +42,10 @@ log = logging.getLogger(__name__)
 # Structural tokens that carry no pitched content
 _REST_STRUCTURAL = frozenset({"rest", "rest:measure", "measure"})
 
-# C-clef variants that are not used in jazz lead sheets and cause
-# systematic pitch-cascade errors due to visual similarity with tenor clef.
-_CLEF_UNWANTED = frozenset({"clef:C1", "clef:C2"})
+# C-clef and F3-clef variants that are not used in jazz lead sheets and cause
+# systematic pitch-cascade errors due to visual similarity with a neighbouring
+# clef (C1/C2 ≈ C4 tenor; F3 baritone ≈ F4 bass, one line off).
+_CLEF_UNWANTED = frozenset({"clef:C1", "clef:C2", "clef:F3"})
 
 
 def _is_degenerate(

@@ -9,10 +9,9 @@ env/
 data/
 !data/.gitkeep
 
-# Large Models (GitHub has a 100MB limit)
-models/*.pt
-models/*.pth
-models/*.onnx
+# Models (checkpoints can be hundreds of MB)
+models/
+!models/.gitkeep
 
 # LaTeX / TeX (generated artifacts)
 *.aux

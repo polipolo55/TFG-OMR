@@ -139,68 +139,25 @@ The project is executed by a single developer who assumes all professional roles
 
 \medskip
 
-Table~\ref{tab:hr-budget} details the human resources cost for every task in the Gantt chart (Deliverable~2). Each task is assigned to its primary role; the cost is computed as $\text{hours} \times \text{rate}$.
+Table~\ref{tab:hr-budget} shows the aggregated human resources cost per work package; the per-task breakdown is consistent with the Gantt chart in Deliverable~2.
 
 \begin{table}[h!]
     \centering
-    \caption{Human resources budget by Gantt task.}
+    \caption{Human resources budget by work package.}
     \label{tab:hr-budget}
     \renewcommand{\arraystretch}{1.05}
-    \scriptsize
-    \begin{tabularx}{\linewidth}{c >{\raggedright}p{3.8cm} l r r r}
+    \begin{tabularx}{\linewidth}{c >{\raggedright\arraybackslash}X r r}
         \toprule
-        \textbf{Code} & \textbf{Task} & \textbf{Role} & \textbf{h} & \textbf{\EUR{}/h} & \textbf{Cost (\EUR{})} \\
+        \textbf{WP} & \textbf{Work Package} & \textbf{Hours} & \textbf{Cost (\EUR{})} \\
         \midrule
-        \multicolumn{6}{l}{\textbf{WP0 -- Project Management (130\,h)}} \\
+        WP0 & Project Management (planning, meetings, thesis writing) & 130 & 3\,482.50 \\
+        WP1 & Sprint 1 -- Literature Review \& Baseline               &  78 & 2\,066.20 \\
+        WP2 & Sprint 2 -- Dataset Construction                        &  73 & 1\,992.55 \\
+        WP3 & Sprint 3 -- CRNN-CTC Development                        &  75 & 2\,075.37 \\
+        WP4 & Sprint 4 -- Iterative Refinement                        &  68 & 1\,859.10 \\
+        WP5 & Sprint 5 -- Final Evaluation \& Defence                 &  85 & 2\,139.85 \\
         \midrule
-        T0.1 & Context and scope definition      & Project Mgr.   & 20  & 29.15 & 583.00 \\
-        T0.2 & Temporal planning                  & Project Mgr.   & 12  & 29.15 & 349.80 \\
-        T0.3 & Budget and sustainability           & Project Mgr.   & 15  & 29.15 & 437.25 \\
-        T0.4 & Final GEP integration              & Project Mgr.   & 8   & 29.15 & 233.20 \\
-        T0.5 & Supervisor meetings                & Project Mgr.   & 25  & 29.15 & 728.75 \\
-        T0.6 & Thesis writing                     & Tech.\ Writer  & 50  & 23.01 & 1\,150.50 \\
-        \midrule
-        \multicolumn{6}{l}{\textbf{WP1 -- Sprint 1: Literature Review \& Baseline (78\,h)}} \\
-        \midrule
-        T1.1 & OMR literature survey              & Research Analyst & 25  & 25.31 & 632.75 \\
-        T1.2 & Dataset exploration                & Research Analyst & 15  & 25.31 & 379.65 \\
-        T1.3 & Classical CV baseline impl.        & ML Engineer      & 25  & 27.61 & 690.25 \\
-        T1.4 & Baseline evaluation                & ML Engineer      & 10  & 27.61 & 276.10 \\
-        T1.5 & Sprint 1 review                    & Project Mgr.    & 3   & 29.15 & 87.45 \\
-        \midrule
-        \multicolumn{6}{l}{\textbf{WP2 -- Sprint 2: Dataset Construction (73\,h)}} \\
-        \midrule
-        T2.1 & Output encoding design             & Research Analyst & 12  & 25.31 & 303.72 \\
-        T2.2 & Synthetic rendering pipeline       & ML Engineer      & 35  & 27.61 & 966.35 \\
-        T2.3 & Data augmentation                  & ML Engineer      & 15  & 27.61 & 414.15 \\
-        T2.4 & Validation and splits              & ML Engineer      & 8   & 27.61 & 220.88 \\
-        T2.5 & Sprint 2 review                    & Project Mgr.    & 3   & 29.15 & 87.45 \\
-        \midrule
-        \multicolumn{6}{l}{\textbf{WP3 -- Sprint 3: CRNN-CTC Development (75\,h)}} \\
-        \midrule
-        T3.1 & CRNN architecture design           & ML Engineer      & 25  & 27.61 & 690.25 \\
-        T3.2 & Training pipeline impl.            & ML Engineer      & 20  & 27.61 & 552.20 \\
-        T3.3 & Initial training run               & ML Engineer      & 15  & 27.61 & 414.15 \\
-        T3.4 & Evaluation framework               & ML Engineer      & 12  & 27.61 & 331.32 \\
-        T3.5 & Sprint 3 review                    & Project Mgr.    & 3   & 29.15 & 87.45 \\
-        \midrule
-        \multicolumn{6}{l}{\textbf{WP4 -- Sprint 4: Iterative Refinement (68\,h)}} \\
-        \midrule
-        T4.1 & Error analysis                     & Research Analyst & 10  & 25.31 & 253.10 \\
-        T4.2 & Data pipeline improvements         & ML Engineer      & 15  & 27.61 & 414.15 \\
-        T4.3 & Model refinement runs              & ML Engineer      & 25  & 27.61 & 690.25 \\
-        T4.4 & Ablation studies                   & ML Engineer      & 15  & 27.61 & 414.15 \\
-        T4.5 & Sprint 4 review                    & Project Mgr.    & 3   & 29.15 & 87.45 \\
-        \midrule
-        \multicolumn{6}{l}{\textbf{WP5 -- Sprint 5: Final Evaluation \& Defence (85\,h)}} \\
-        \midrule
-        T5.1 & Final evaluation                   & ML Engineer      & 15  & 27.61 & 414.15 \\
-        T5.2 & Qualitative error analysis         & Research Analyst & 10  & 25.31 & 253.10 \\
-        T5.3 & Extension exploration (cond.)      & ML Engineer      & 20  & 27.61 & 552.20 \\
-        T5.4 & Final thesis writing               & Tech.\ Writer   & 30  & 23.01 & 690.30 \\
-        T5.5 & Defence preparation                & Tech.\ Writer   & 10  & 23.01 & 230.10 \\
-        \midrule
-        & \textbf{TOTAL HUMAN RESOURCES}          &                  & \textbf{509} & & \textbf{13\,640.77} \\
+        & \textbf{TOTAL HUMAN RESOURCES} & \textbf{509} & \textbf{13\,615.57} \\
         \bottomrule
     \end{tabularx}
 \end{table}
@@ -222,12 +179,11 @@ General costs cover hardware, software, and infrastructure expenses that are sha
         \toprule
         \textbf{Item} & \textbf{Price (\EUR{})} & \textbf{Life (yr)} & \textbf{Use (mo)} & \textbf{Amort.\ (\EUR{})} \\
         \midrule
-        Laptop (development)        & 1\,200 & 5 & 5 & 100.00 \\
-        GPU -- NVIDIA RTX 3060 12\,GB & 350   & 4 & 5 & 36.46 \\
+        Desktop PC (with RTX 3060 12\,GB) & 1\,200 & 5 & 5 & 100.00 \\
         Monitor (external)          & 250    & 6 & 5 & 17.36 \\
         Peripherals (keyboard, mouse) & 80   & 4 & 5 & 8.33 \\
         \midrule
-        \multicolumn{4}{l}{\textbf{Total hardware amortisation}} & \textbf{162.15} \\
+        \multicolumn{4}{l}{\textbf{Total hardware amortisation}} & \textbf{125.69} \\
         \bottomrule
     \end{tabularx}
 \end{table}
@@ -280,26 +236,6 @@ All software used in this project is free/open-source or available through unive
     \end{tabularx}
 \end{table}
 
-\subsubsection{General Costs Summary}
-
-\begin{table}[h!]
-    \centering
-    \caption{Summary of general costs.}
-    \label{tab:general-summary}
-    \renewcommand{\arraystretch}{1.1}
-    \begin{tabularx}{\linewidth}{X r}
-        \toprule
-        \textbf{Category} & \textbf{Cost (\EUR{})} \\
-        \midrule
-        Hardware amortisation  & 162.15 \\
-        Software               & 0.00 \\
-        Overheads              & 125.00 \\
-        \midrule
-        \textbf{Total general costs} & \textbf{287.15} \\
-        \bottomrule
-    \end{tabularx}
-\end{table}
-
 % ------------------------------------------
 \subsection{Contingency}
 \label{sec:contingency}
@@ -307,7 +243,7 @@ All software used in this project is free/open-source or available through unive
 A contingency reserve of \textbf{15\%} is applied to the sum of human resources and general costs. This percentage is within the 10--20\% range recommended for IT projects and reflects the moderate level of detail in this budget (task-level granularity, but single-person execution with inherent estimation uncertainty).
 
 \[
-    \text{Contingency} = 0.15 \times (13\,640.77 + 287.15) = 0.15 \times 13\,927.92 = \textbf{\EUR{}2\,089.19}
+    \text{Contingency} = 0.15 \times (13\,615.57 + 250.69) = 0.15 \times 13\,866.26 = \textbf{\EUR{}2\,079.94}
 \]
 
 % ------------------------------------------
@@ -347,12 +283,6 @@ Incidental costs are derived from the risks identified in Deliverables~1 and~2 (
     \end{tabularx}
 \end{table}
 
-\noindent
-\textbf{Note on R2 (Staff detection errors):} This risk affects only the optional extension task T5.3 and does not generate additional costs beyond re-allocation of time already budgeted.
-
-\noindent
-\textbf{Note on R5 (Scope creep):} Although likely, the contingency action consists of re-scoping rather than spending additional resources, so its monetary impact is zero.
-
 % ------------------------------------------
 \subsection{Total Budget}
 \label{sec:total-budget}
@@ -366,54 +296,18 @@ Incidental costs are derived from the risks identified in Deliverables~1 and~2 (
         \toprule
         \textbf{Budget item} & \textbf{Cost (\EUR{})} \\
         \midrule
-        Human resources (Table~\ref{tab:hr-budget})  & 13\,640.77 \\
-        General costs (Table~\ref{tab:general-summary}) & 287.15 \\
-        Contingency -- 15\% (\S\ref{sec:contingency})  & 2\,089.19 \\
+        Human resources (Table~\ref{tab:hr-budget})  & 13\,615.57 \\
+        General costs (hardware, software, overheads) & 250.69 \\
+        Contingency -- 15\% (\S\ref{sec:contingency})  & 2\,079.94 \\
         Incidentals (Table~\ref{tab:incidentals})    & 150.96 \\
         \midrule
-        \textbf{TOTAL PROJECT BUDGET} & \textbf{16\,168.07} \\
+        \textbf{TOTAL PROJECT BUDGET} & \textbf{16\,097.16} \\
         \bottomrule
     \end{tabularx}
 \end{table}
 
-The total estimated project cost is \textbf{\EUR{16\,168.07}}. Human resources represent 84.4\% of the total, which is expected for a research-intensive software project with minimal hardware requirements. The contingency and incidentals together account for \EUR{2\,240.15} (13.9\%), providing a reasonable safety margin.
+The total estimated project cost is \textbf{\EUR{16\,097.16}}. Human resources represent 84.6\% of the total, which is expected for a research-intensive software project with minimal hardware requirements. The contingency and incidentals together account for \EUR{2\,230.90} (13.9\%), providing a reasonable safety margin.
 
-
-% ==========================================
-\section{Budget Management Control}
-\label{sec:control}
-
-Effective budget control requires both procedures and quantitative indicators to detect and correct deviations during project execution.
-
-\subsection{Control Procedures}
-
-\begin{enumerate}
-    \item \textbf{Biweekly time tracking:} Actual hours spent on each task are logged in a spreadsheet at the end of each biweekly cycle, coinciding with supervisor meetings. This provides the raw data for deviation analysis.
-    \item \textbf{Sprint-end cost review:} At the end of each sprint (every $\sim$4 weeks), the accumulated cost for the completed work package is compared against the planned budget. Deviations are documented and, if significant, trigger a re-forecast for remaining sprints.
-    \item \textbf{Risk register update:} At each sprint review, the risk register (Deliverable~2, Table~4) is revisited. If a risk materialises, the corresponding incidental budget is activated; if a risk is retired, its budget allocation is released to the contingency pool.
-    \item \textbf{Scope change protocol:} Any addition or removal of tasks requires explicit documentation and a budget impact assessment before approval.
-\end{enumerate}
-
-\subsection{Deviation Indicators}
-
-Three key performance indicators (KPIs) are tracked:
-
-\begin{description}[style=nextline, leftmargin=1.5cm]
-    \item[Cost Variance (CV)]
-    $\text{CV} = \text{Budgeted Cost of Work Performed (BCWP)} - \text{Actual Cost of Work Performed (ACWP)}$.
-    A positive CV indicates under-budget execution; a negative CV signals overspending. Action threshold: $|\text{CV}| > 10\%$ of the sprint budget triggers a corrective plan.
-
-    \item[Schedule Variance (SV)]
-    $\text{SV} = \text{BCWP} - \text{Budgeted Cost of Work Scheduled (BCWS)}$.
-    Negative SV indicates schedule delay, which often leads to cost overruns. Action threshold: SV $< -5\%$ of sprint budget.
-
-    \item[Cost Performance Index (CPI)]
-    $\text{CPI} = \text{BCWP} / \text{ACWP}$.
-    A CPI $< 0.90$ at any sprint boundary triggers a detailed root-cause analysis and a revision of the estimate at completion (EAC).
-\end{description}
-
-\noindent
-These indicators follow Earned Value Management (EVM) principles~\cite{pmiBOKGuide2021} and are computed at each sprint review. If the CPI drops below 0.90 for two consecutive sprints, the contingency reserve (\S\ref{sec:contingency}) is partially allocated to cover the overrun, and the scope of T5.3 (conditional extension) is reduced or eliminated to compensate.
 
 % ==========================================
 % PART II: SUSTAINABILITY REPORT
@@ -428,28 +322,21 @@ This section addresses the initial-milestone sustainability questions (row ``I''
 \subsection{Self-Assessment of Sustainability Competency}
 \label{sec:self-assessment}
 
-After completing the sustainability self-assessment survey, the following conclusions emerge:
-
-\begin{itemize}
-    \item \textbf{Strengths:} I have a solid awareness of the economic dimension of projects, having studied project management and cost estimation during the degree. I understand the importance of quantifying resource consumption and can identify direct and indirect costs with reasonable confidence. My computing background also gives me an understanding of energy consumption in computational workloads.
-    \item \textbf{Weaknesses:} My knowledge of environmental impact measurement beyond energy consumption (e.g., supply chain, e-waste, carbon offset mechanisms) is limited. On the social dimension, I tend to focus on the direct user benefits and underestimate the broader societal implications, both positive and negative. This project has prompted me to consider these aspects more carefully.
-    \item \textbf{Growth areas:} I aim to improve my ability to reason about the full lifecycle impact of software systems, including deployment, maintenance, and eventual decommissioning. The sustainability matrix framework is a useful tool that I intend to apply beyond this thesis.
-\end{itemize}
+After completing the sustainability self-assessment survey, my main strengths are in economic dimension awareness and understanding energy consumption in computational workloads. Areas for growth include full lifecycle impact analysis (supply chain, e-waste) and reasoning about broader societal implications beyond direct user benefits -- aspects this project has prompted me to consider more carefully.
 
 % ------------------------------------------
 \subsection{Economic Dimension}
 \label{sec:econ-sustainability}
 
 \paragraph{PPP -- Project cost estimation.}
-The total estimated cost of the project is \EUR{16\,168.07} (see \S\ref{sec:total-budget}). Human resources dominate the budget (84.4\%), reflecting the research and development nature of the work. Material costs are low thanks to the exclusive use of open-source software and existing consumer hardware. The budget includes a 15\% contingency reserve and risk-weighted incidentals, providing a realistic safety margin.
+The total estimated cost of the project is \EUR{16\,097.16} (see \S\ref{sec:total-budget}). Human resources dominate the budget (84.4\%), reflecting the research and development nature of the work. Material costs are low thanks to the exclusive use of open-source software and existing consumer hardware. The budget includes a 15\% contingency reserve and risk-weighted incidentals, providing a realistic safety margin.
 
 \paragraph{Useful life -- Comparison with the state of the art.}
 Currently, musicians and archivists who need to digitise jazz lead sheets must either transcribe scores manually (slow and expensive, typically \EUR{}15--30 per page for a professional copyist) or use commercial OMR tools such as Audiveris, SmartScore, or PhotoScore, which range from free (with limited accuracy) to \EUR{}100--250 for a licence. However, none of these tools are specifically tuned for the jazz lead-sheet idiom (handwritten-style fonts, chord symbols, specific clefs), resulting in high error rates that still require significant manual correction.
 
 This project aims to produce an open-source, specialised model that, once trained, can be run at negligible marginal cost: inference on a single score image takes under one second on consumer hardware. If the model achieves a low SER, it would substantially reduce the cost of digitising lead-sheet collections compared to both manual transcription and generic commercial tools. The model weights, code, and training pipeline will be released publicly, eliminating licence costs for downstream users.
 
-\paragraph{Useful life -- Economic viability.}
-The project itself is an academic exercise and does not generate direct revenue. However, its outputs (trained model, dataset, code) have potential economic value if integrated into open-source music tools (e.g., MuseScore, OpenScore) or adopted by music libraries and archives. The low operational cost (CPU-only inference, no cloud dependency) makes deployment economically viable even for small organisations with limited IT budgets.
+
 
 % ------------------------------------------
 \subsection{Environmental Dimension}
@@ -459,8 +346,8 @@ The project itself is an academic exercise and does not generate direct revenue.
 The main environmental impact of the project is electrical energy consumption for computation and personal work. We estimate:
 
 \begin{itemize}
-    \item \textbf{Development workstation:} The laptop and monitor consume approximately 80\,W during regular development (coding, writing, literature review). Over 509 project hours, this amounts to $509 \times 0.08\,\text{kW} = 40.7\,\text{kWh}$.
-    \item \textbf{GPU training:} The NVIDIA RTX 3060 draws $\sim$170\,W under training load. Estimated GPU-active time across all training tasks (T3.3, T4.3, T4.4, T5.1, T5.3): $\sim$95\,h, yielding $95 \times 0.17\,\text{kW} = 16.2\,\text{kWh}$.
+    \item \textbf{Development workstation:} The desktop PC (excluding GPU) and monitor consume approximately 80\,W during regular development (coding, writing, literature review). Over 509 project hours, this amounts to $509 \times 0.08\,\text{kW} = 40.7\,\text{kWh}$.
+    \item \textbf{GPU training:} The NVIDIA RTX 3060 (integrated in the same desktop) draws $\sim$170\,W under training load. Estimated GPU-active time across all training tasks (T3.3, T4.3, T4.4, T5.1, T5.3): $\sim$95\,h, yielding $95 \times 0.17\,\text{kW} = 16.2\,\text{kWh}$.
     \item \textbf{Dataset generation:} LilyPond rendering of $\sim$43\,000 images is CPU-bound; estimated at $\sim$10\,h of sustained CPU ($\sim$65\,W), contributing $0.65\,\text{kWh}$.
     \item \textbf{Total:} $\sim$57.5\,kWh over five months, equivalent to approximately 13.2\,kg CO\textsubscript{2} at the 2023 Spanish grid emission factor of 0.23\,kg CO\textsubscript{2}/kWh~\cite{reeInformeSistemaElectrico2024,mitecoFactorEmision2025}.
 \end{itemize}
@@ -484,28 +371,10 @@ Manual transcription has negligible direct energy cost but consumes significant 
 \label{sec:social-sustainability}
 
 \paragraph{PPP -- Personal impact.}
-Undertaking this project has been personally enriching in several ways:
-\begin{itemize}
-    \item It has deepened my expertise in deep learning, computer vision, and music information retrieval -- areas I am passionate about and intend to pursue professionally.
-    \item It has strengthened my ability to plan and execute a medium-scale research project independently, including literature review, experimental design, and scientific writing.
-    \item As a musician, working on OMR has made me more aware of the accessibility challenges faced by visually impaired musicians and the importance of machine-readable music formats for assistive technologies.
-\end{itemize}
+This project has deepened my expertise in deep learning, computer vision, and music information retrieval, and strengthened my ability to plan and execute a medium-scale research project independently. As a musician, it has also sharpened my awareness of accessibility challenges faced by visually impaired musicians and the importance of machine-readable music formats for assistive technologies.
 
 \paragraph{Useful life -- Comparison with the state of the art and real need.}
-Jazz lead sheets -- particularly those from The Real Book -- are among the most widely used musical documents in jazz education and performance worldwide. Despite their ubiquity, they remain largely in paper or scanned-image form, limiting searchability, transposability, and integration with digital music tools.
-
-There is a genuine need for an accurate, open, and accessible OMR solution tailored to this repertoire:
-\begin{itemize}
-    \item \textbf{Musicians} benefit from digital scores that can be transposed instantly for different instruments, annotated electronically, and shared via tablets during rehearsals and gigs.
-    \item \textbf{Music educators} can use digitised lead sheets to create interactive learning materials, extract melodic fragments for exercises, and build searchable repertoire databases.
-    \item \textbf{Music archivists and libraries} gain the ability to preserve and index large collections of jazz scores in machine-readable formats, improving long-term accessibility.
-    \item \textbf{MIR researchers} obtain structured symbolic data for computational musicology, jazz analysis, and recommendation systems.
-\end{itemize}
-
-No group is expected to be adversely affected by the project. The system processes publicly available or user-owned scores and does not collect personal data. The open-source licence ensures that no vendor lock-in or dependency is created.
-
-\paragraph{Useful life -- Is there a real need?}
-Yes. Existing OMR tools achieve reasonable results on typeset classical scores but perform poorly on the specific visual style of jazz lead sheets (handwritten-style fonts, chord symbols above the staff, informal layout). Musicians currently resort to manual transcription or accept low-quality automatic results. A specialised, accurate, and free tool directly addresses this unmet need.
+Jazz lead sheets from The Real Book are among the most widely used musical documents in jazz education worldwide, yet remain largely in paper or scanned-image form. Existing OMR tools perform poorly on the jazz lead-sheet idiom (handwritten-style fonts, chord symbols, informal layout), forcing musicians and archivists to fall back on manual transcription. The direct beneficiaries are musicians (transposition, digital annotation), educators (interactive materials), archivists (searchable collections), and MIR researchers (symbolic data for computational musicology). No group is adversely affected: the system processes user-owned scores, collects no personal data, and is released open-source.
 
 
 % ==========================================

@@ -114,11 +114,6 @@ This section presents the full economic budget for the project, following the st
 \label{sec:hr-costs}
 
 The project is executed by a single developer who assumes all professional roles. To estimate labour costs realistically, each task is assigned to the role that best describes the work performed, with an hourly rate derived from average gross salaries in Spain for the IT sector. Rates are grounded in the 2023 INE \textit{Encuesta Anual de Estructura Salarial} (EAES)~\cite{ineEncuestaEstructuraSalarial2023}, the official Spanish salary survey published by the Instituto Nacional de Estad\'istica. The national mean gross salary was \EUR{}28{,}049.94 in 2023; workers in the ICT sector (Section~J of NACE rev.~2) earn substantially above the national average, making the \EUR{}30{,}000--38{,}000 gross range assumed here consistent with EAES data for junior-to-mid level ICT roles. These figures are adjusted by a $\times$1.35 multiplier to convert gross salary to total employer cost, which accounts for employer social security contributions~\cite{segSocialCotizacion2025}, as prescribed in the GEP economic management module~\cite{gepModule24EconomicManagement}.
-
-\medskip
-
-\noindent The four roles and their fully loaded hourly rates are:
-
 \begin{table}[h!]
     \centering
     \caption{Role definitions and hourly rates (gross salary $\times$ 1.35 social security~\cite{segSocialCotizacion2025}).}
@@ -137,9 +132,7 @@ The project is executed by a single developer who assumes all professional roles
 \end{table}
 \footnotetext{Based on 1\,760 effective working hours per year (220 days $\times$ 8\,h/day).}
 
-\medskip
-
-Table~\ref{tab:hr-budget} shows the aggregated human resources cost per work package; the per-task breakdown is consistent with the Gantt chart in Deliverable~2.
+Table~\ref{tab:hr-budget} shows the aggregated cost per work package.
 
 \begin{table}[h!]
     \centering
@@ -308,15 +301,33 @@ Incidental costs are derived from the risks identified in Deliverables~1 and~2 (
 
 The total estimated project cost is \textbf{\EUR{16\,097.16}}. Human resources represent 84.6\% of the total, which is expected for a research-intensive software project with minimal hardware requirements. The contingency and incidentals together account for \EUR{2\,230.90} (13.9\%), providing a reasonable safety margin.
 
+% ------------------------------------------
+\subsection{Budget Management Control}
+\label{sec:control}
+
+Actual hours are logged per task at the end of each biweekly cycle (coinciding with supervisor meetings). At each sprint boundary the accumulated cost is compared against the plan; if a risk materialises, the corresponding incidental budget is activated, and if it is retired the allocation returns to the contingency pool.
+
+Three numerical indicators are tracked at every sprint review:
+
+\begin{description}[style=nextline, leftmargin=1.5cm]
+    \item[Cost Variance (CV)]
+    $\text{CV} = \text{BCWP} - \text{ACWP}$.
+    A negative value means overspend. Action threshold: $|\text{CV}| > 10\%$ of the sprint budget.
+
+    \item[Schedule Variance (SV)]
+    $\text{SV} = \text{BCWP} - \text{BCWS}$.
+    Negative SV signals delay. Action threshold: SV $< -5\%$ of the sprint budget.
+
+    \item[Cost Performance Index (CPI)]
+    $\text{CPI} = \text{BCWP} / \text{ACWP}$.
+    A CPI $< 0.90$ for two consecutive sprints triggers a root-cause analysis and a revised estimate at completion (EAC); the scope of the conditional extension task (T5.3) is reduced or eliminated to compensate.
+\end{description}
 
 % ==========================================
 % PART II: SUSTAINABILITY REPORT
 % ==========================================
-\newpage
 \section{Sustainability Report -- Initial Milestone}
 \label{sec:sustainability}
-
-This section addresses the initial-milestone sustainability questions (row ``I'' of the sustainability matrix defined in the GEP sustainability guide~\cite{gepSustainabilityReport2018}; see also the economic management module~\cite{gepModule24EconomicManagement}). The analysis covers the three mandatory dimensions: economic, environmental, and social.
 
 % ------------------------------------------
 \subsection{Self-Assessment of Sustainability Competency}
@@ -343,28 +354,13 @@ This project aims to produce an open-source, specialised model that, once traine
 \label{sec:env-sustainability}
 
 \paragraph{PPP -- Environmental impact estimation.}
-The main environmental impact of the project is electrical energy consumption for computation and personal work. We estimate:
-
-\begin{itemize}
-    \item \textbf{Development workstation:} The desktop PC (excluding GPU) and monitor consume approximately 80\,W during regular development (coding, writing, literature review). Over 509 project hours, this amounts to $509 \times 0.08\,\text{kW} = 40.7\,\text{kWh}$.
-    \item \textbf{GPU training:} The NVIDIA RTX 3060 (integrated in the same desktop) draws $\sim$170\,W under training load. Estimated GPU-active time across all training tasks (T3.3, T4.3, T4.4, T5.1, T5.3): $\sim$95\,h, yielding $95 \times 0.17\,\text{kW} = 16.2\,\text{kWh}$.
-    \item \textbf{Dataset generation:} LilyPond rendering of $\sim$43\,000 images is CPU-bound; estimated at $\sim$10\,h of sustained CPU ($\sim$65\,W), contributing $0.65\,\text{kWh}$.
-    \item \textbf{Total:} $\sim$57.5\,kWh over five months, equivalent to approximately 13.2\,kg CO\textsubscript{2} at the 2023 Spanish grid emission factor of 0.23\,kg CO\textsubscript{2}/kWh~\cite{reeInformeSistemaElectrico2024,mitecoFactorEmision2025}.
-\end{itemize}
-
-To put this in context, 57.5\,kWh is roughly equivalent to running a household refrigerator for 4--5 days or driving a petrol car for approximately 55\,km. The environmental footprint is modest.
+The main environmental impact is electrical energy consumption. The desktop PC and monitor draw $\sim$80\,W during development ($509 \times 0.08 = 40.7$\,kWh); the RTX~3060 draws $\sim$170\,W during training ($\sim$95\,h of GPU-active time: 16.2\,kWh); LilyPond rendering adds $\sim$0.6\,kWh. Total: $\sim$57.5\,kWh over five months, equivalent to approximately 13.2\,kg CO\textsubscript{2} at the 2023 Spanish grid factor of 0.23\,kg/kWh~\cite{reeInformeSistemaElectrico2024,mitecoFactorEmision2025} -- roughly the footprint of driving a petrol car 55\,km.
 
 \paragraph{PPP -- Minimisation measures.}
-Several measures are taken to reduce the environmental impact:
-\begin{itemize}
-    \item \textbf{Efficient hardware:} The RTX 3060 was chosen for its strong performance-per-watt ratio, and the ResNet18 backbone is deliberately lightweight (vs.\ larger architectures like ResNet50 or Vision Transformers).
-    \item \textbf{Mixed-precision training:} PyTorch AMP (Automatic Mixed Precision) reduces GPU memory usage and speeds up training, lowering total energy consumption per training run.
-    \item \textbf{Early stopping:} Training halts automatically when validation loss plateaus, avoiding unnecessary computation.
-    \item \textbf{Re-use of resources:} No new hardware was purchased for this project; all equipment was already owned and in use.
-\end{itemize}
+The ResNet18 backbone is deliberately lightweight; PyTorch AMP halves GPU memory use and speeds up each run; early stopping avoids unnecessary iterations; no new hardware was purchased -- all equipment was already owned.
 
 \paragraph{Useful life -- Comparison with the state of the art.}
-Manual transcription has negligible direct energy cost but consumes significant human time. Commercial OMR tools run on standard PCs with similar energy profiles. Cloud-based OMR services (e.g., Google Cloud Vision for document OCR) involve data-centre energy consumption that is typically higher per query than local inference. This project's model runs locally on consumer hardware, avoiding data-centre overhead. Furthermore, by releasing a trained model, the environmental cost of training is incurred \emph{once} and amortised across all users, rather than each institution training its own model.
+Cloud-based OMR services incur data-centre energy overhead that is typically higher per query than local inference. By releasing trained weights, the training cost is incurred once and amortised across all users.
 
 % ------------------------------------------
 \subsection{Social Dimension}

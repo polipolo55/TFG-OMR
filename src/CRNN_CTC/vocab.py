@@ -17,7 +17,11 @@ Usage::
 from __future__ import annotations
 
 import logging
+import multiprocessing
+from itertools import chain
 from pathlib import Path
+
+from tqdm import tqdm
 
 log = logging.getLogger(__name__)
 
@@ -96,18 +100,48 @@ class Vocabulary:
         lines = self._idx2tok[2:]
         path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
+    @staticmethod
+    def _read_tokens(lmx_file: Path) -> set[str]:
+        text = lmx_file.read_text(encoding="utf-8").strip()
+        if text:
+            return set(text.split())
+        return set()
+
     @classmethod
-    def build_from_lmx_dirs(cls, data_dirs: list[str | Path]) -> "Vocabulary":
+    def build_from_lmx_dirs(cls, data_dirs: list[str | Path], workers: int | None = None) -> "Vocabulary":
         """
         Scan all ``.lmx`` files under the given *data_dirs* and build a
-        vocabulary from the union of all observed tokens, sorted alphabetically.
+        vocabulary from the union of all observed tokens, sorted alphabetically,
+        using multiprocessing for speed.
         """
-        token_set: set[str] = set()
+        import os
+        if workers is None:
+            workers = max(1, (os.cpu_count() or 4) // 2)
+
+        all_lmx_files = []
         for data_dir in data_dirs:
             data_dir = Path(data_dir)
-            for lmx_file in data_dir.rglob("*.lmx"):
-                text = lmx_file.read_text(encoding="utf-8").strip()
-                if text:
-                    token_set.update(text.split())
+            all_lmx_files.extend(list(data_dir.rglob("*.lmx")))
+
+        token_set: set[str] = set()
+
+        if not all_lmx_files:
+            log.warning("No .lmx files found in provided directories.")
+            return cls([])
+
+        log.info("Scanning %d .lmx files using %d workers...", len(all_lmx_files), workers)
+
+        if workers <= 1:
+            with tqdm(total=len(all_lmx_files), desc="Building Vocab") as pbar:
+                for lmx_file in all_lmx_files:
+                    token_set.update(cls._read_tokens(lmx_file))
+                    pbar.update(1)
+        else:
+            with multiprocessing.Pool(processes=workers) as pool:
+                with tqdm(total=len(all_lmx_files), desc="Building Vocab") as pbar:
+                    for batch_tokens in pool.imap_unordered(cls._read_tokens, all_lmx_files, chunksize=100):
+                        token_set.update(batch_tokens)
+                        pbar.update(1)
+
         tokens = sorted(token_set)
         return cls(tokens)

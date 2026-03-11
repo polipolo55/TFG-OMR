@@ -28,6 +28,7 @@ from pathlib import Path
 
 import numpy as np
 from PIL import Image
+from tqdm import tqdm
 
 # Shared rendering back-end (single source of truth for clef maps, template,
 # LilyPond invocation, and image cropping).
@@ -251,8 +252,8 @@ def process_sample(
     sem_path     = sample_dir / f"{sample_id}.semantic"
 
     if not sem_path.exists():
-        log.warning("No .semantic file in %s — skipping", sample_dir)
-        return False
+        # Using returning a string instead of False to pass an error message to the parent
+        return f"No .semantic file in {sample_dir.name}"
 
     out_sample = output_dir / sample_id
     out_png    = out_sample / f"{sample_id}.png"
@@ -264,30 +265,29 @@ def process_sample(
     try:
         music_body = semantic_to_lily_music(sem_path)
     except Exception as exc:
-        log.warning("Semantic parse failed for %s: %s", sample_id, exc)
-        return False
+        return f"Semantic parse failed for {sample_id}: {exc}"
 
     if not music_body.strip():
-        log.warning("Empty music body for %s — skipping", sample_id)
-        return False
+        return f"Empty music body for {sample_id}"
 
     ly_source = make_lily_source(music_body)
 
     # Render in a temp directory, then move outputs
     with tempfile.TemporaryDirectory(prefix="realbook_") as tmp:
         tmp_dir = Path(tmp)
-        png_path = run_lilypond(ly_source, sample_id, tmp_dir, dpi=dpi)
+        # Timeout is 15 seconds by default in run_lilypond, we can bump it to 30 for safety
+        png_path = run_lilypond(ly_source, sample_id, tmp_dir, dpi=dpi, timeout=30)
         if png_path is None:
-            log.warning("LilyPond render failed for %s", sample_id)
-            return False
+            return f"LilyPond render failed or timed out for {sample_id}"
 
         # Crop to staff content
         try:
             raw = np.array(Image.open(png_path).convert("L"))
             cropped = crop_content(raw)
+            if cropped.size == 0 or np.all(cropped == 255):
+                return f"LilyPond output was empty/blank for {sample_id}"
         except Exception as exc:
-            log.warning("Crop failed for %s: %s", sample_id, exc)
-            return False
+            return f"Crop failed for {sample_id}: {exc}"
 
         out_sample.mkdir(parents=True, exist_ok=True)
 
@@ -307,9 +307,11 @@ def process_sample(
     if with_lmx:
         try:
             from data_processing.semantic_to_lmx import convert_sample
-            convert_sample(out_sample, strip_visual=True)
+            result = convert_sample(out_sample, strip_visual=True)
+            if not result:
+                return f"LMX generation failed to produce output for {sample_id}"
         except Exception as exc:
-            log.debug("LMX generation failed for %s: %s", sample_id, exc)
+            return f"LMX generation exception for {sample_id}: {exc}"
 
     return True
 
@@ -389,19 +391,29 @@ def main() -> None:
     log.info("Found %d samples → output: %s (workers: %d)", len(sample_dirs), args.output, args.workers)
     args.output.mkdir(parents=True, exist_ok=True)
 
+    error_log = args.output / "errors_render.log"
+    if error_log.exists():
+        error_log.unlink()
+
     ok = fail = 0
     _worker = partial(process_sample, output_dir=args.output, dpi=args.dpi,
                       force=args.force, with_lmx=not args.no_lmx)
+    
     with multiprocessing.Pool(processes=args.workers) as pool:
-        for i, success in enumerate(pool.imap_unordered(_worker, sample_dirs), 1):
-            if success:
-                ok += 1
-            else:
-                fail += 1
-            if i % 100 == 0 or i == len(sample_dirs):
-                log.info("Progress %d/%d  ✓ %d  ✗ %d", i, len(sample_dirs), ok, fail)
+        with tqdm(total=len(sample_dirs), desc="Rendering") as pbar:
+            # imap returns results in order, imap_unordered is faster
+            for sd, result in zip(sample_dirs, pool.imap(_worker, sample_dirs)):
+                if result is True:
+                    ok += 1
+                else:
+                    fail += 1
+                    with open(error_log, "a") as err_f:
+                        err_f.write(f"FAILED: {sd.name} - {result}\n")
+                pbar.update(1)
 
     log.info("Done. Success: %d  Failed: %d", ok, fail)
+    if fail > 0:
+        log.warning(f"See {error_log} for list of failed samples.")
 
 
 if __name__ == "__main__":

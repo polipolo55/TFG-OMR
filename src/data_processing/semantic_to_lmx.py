@@ -41,9 +41,8 @@ from functools import partial
 from pathlib import Path
 from typing import Optional
 
+from tqdm import tqdm
 import music21
-
-from lmx.linearization.Linearizer import Linearizer
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -316,24 +315,122 @@ def semantic_to_score(tokens: list[str]) -> music21.stream.Score:
 
 def score_to_lmx(score: music21.stream.Score) -> list[str]:
     """
-    Export a music21 Score to MusicXML in a temp file, then linearize with
-    the ``lmx`` package and return the token list.
+    Directly linearize a music21 Score into LMX tokens, bypassing the brittle
+    external `linearized-musicxml` package and avoiding intermediate XML export.
     """
-    with tempfile.NamedTemporaryFile(suffix=".musicxml", delete=False) as f:
-        tmp = Path(f.name)
+    tokens = []
 
-    try:
-        score.write("musicxml", fp=str(tmp))
-        tree = ET.parse(str(tmp))
-        root = tree.getroot()
+    # Map music21 clefs back to LMX clef tokens
+    _CLEF_REVERSE_MAP = {
+        music21.clef.TrebleClef: "G2",
+        music21.clef.FrenchViolinClef: "G1",
+        music21.clef.BassClef: "F4",
+        music21.clef.FBaritoneClef: "F3",
+        music21.clef.SopranoClef: "C1",
+        music21.clef.MezzoSopranoClef: "C2",
+        music21.clef.AltoClef: "C3",
+        music21.clef.TenorClef: "C4",
+    }
 
-        linearizer = Linearizer(fail_on_unknown_tokens=False)
-        for part in root.iter("part"):
-            linearizer.process_part(part)
+    # Ensure accidentals are computed based on key signature
+    score.makeAccidentals(inPlace=True, overrideStatus=True)
 
-        return linearizer.output_tokens
-    finally:
-        tmp.unlink(missing_ok=True)
+    for part in score.parts:
+        for m in part.getElementsByClass(music21.stream.Measure):
+            tokens.append("measure")
+
+            for el in m.elements:
+                if isinstance(el, music21.clef.Clef):
+                    clef_t = _CLEF_REVERSE_MAP.get(type(el), "G2")
+                    tokens.append(f"clef:{clef_t}")
+
+                elif isinstance(el, music21.key.Key):
+                    # Key signature is represented by number of fifths (sharps>0, flats<0)
+                    tokens.append(f"key:fifths:{el.sharps}")
+
+                elif isinstance(el, music21.meter.TimeSignature):
+                    tokens.append("time")
+                    tokens.append(f"beats:{el.numerator}")
+                    tokens.append(f"beat-type:{el.denominator}")
+
+                elif isinstance(el, music21.note.GeneralNote):
+                    # Pitch or Rest
+                    if isinstance(el, music21.note.Note):
+                        tokens.append(f"{el.pitch.step}{el.pitch.octave}")
+                    elif isinstance(el, music21.note.Rest):
+                        tokens.append("rest")
+                    else:
+                        continue
+
+                    # Base duration
+                    tok_type = el.duration.type
+                    # Handle specific overrides/aliases
+                    if tok_type == "complex":
+                        # Fallback for weird tuplets or non-standard durations
+                        # We try to represent it with the closest single note type
+                        if el.duration.quarterLength >= 4:
+                            tok_type = "whole"
+                        elif el.duration.quarterLength >= 2:
+                            tok_type = "half"
+                        elif el.duration.quarterLength >= 1:
+                            tok_type = "quarter"
+                        elif el.duration.quarterLength >= 0.5:
+                            tok_type = "eighth"
+                        else:
+                            tok_type = "sixteenth"
+                            
+                    tokens.append(tok_type)
+
+                    # Tuplets (Time-modification)
+                    for tuplet in el.duration.tuplets:
+                        tokens.append(f"{tuplet.numberNotesActual}in{tuplet.numberNotesNormal}")
+
+                    # Dots
+                    for _ in range(el.duration.dots):
+                        tokens.append("dot")
+
+                    # Accidentals
+                    if isinstance(el, music21.note.Note) and el.pitch.accidental and el.pitch.accidental.displayStatus:
+                        acc = el.pitch.accidental.name
+                        # LMX names: flat, sharp, natural, double-sharp, flat-flat (not natively in music21 usually but similar)
+                        if acc == "double-sharp":
+                            tokens.append("double-sharp")
+                        elif acc == "double-flat":
+                            tokens.append("flat-flat")
+                        else:
+                            tokens.append(acc)  # flat, sharp, natural
+
+                    # Beams
+                    if getattr(el, "beams", None):
+                        for b in el.beams:
+                            if b.type == "start":
+                                tokens.append("beam:begin")
+                            elif b.type == "stop":
+                                tokens.append("beam:end")
+                            elif b.type == "continue":
+                                tokens.append("beam:continue")
+                            elif "partial" in b.type:
+                                # We treat forward/backward hooks implicitly or skip them,
+                                # semantic dataset doesn't generate them complexly
+                                pass
+
+                    # Ties
+                    if getattr(el, "tie", None):
+                        if el.tie.type == "start":
+                            tokens.append("tied:start")
+                        elif el.tie.type == "stop":
+                            tokens.append("tied:stop")
+                        elif el.tie.type == "continue":
+                            tokens.append("tied:stop")
+                            tokens.append("tied:start")
+
+                    # Articulations & Expressions (Fermata, Staccato, etc.)
+                    if getattr(el, "expressions", None):
+                        has_fermata = any(isinstance(e, music21.expressions.Fermata) for e in el.expressions)
+                        if has_fermata:
+                            tokens.append("fermata")
+
+    return tokens
 
 
 def filter_monophonic(tokens: list[str]) -> list[str]:
@@ -468,29 +565,40 @@ def main() -> None:
         len(sample_dirs), strip, args.workers,
     )
 
+    error_log = args.source / "errors_convert.log"
+    # wipe previous
+    if error_log.exists():
+        error_log.unlink()
+
     ok = fail = 0
 
     if args.workers <= 1:
         # Single-process (easier to debug)
-        for i, sd in enumerate(sample_dirs, 1):
-            if _convert_worker(sd, strip_visual=strip):
-                ok += 1
-            else:
-                fail += 1
-            if i % 100 == 0 or i == len(sample_dirs):
-                log.info("Progress %d/%d  ✓ %d  ✗ %d", i, len(sample_dirs), ok, fail)
-    else:
-        worker = partial(_convert_worker, strip_visual=strip)
-        with multiprocessing.Pool(processes=args.workers) as pool:
-            for i, success in enumerate(pool.imap_unordered(worker, sample_dirs), 1):
-                if success:
+        with tqdm(total=len(sample_dirs), desc="Converting") as pbar:
+            for sd in sample_dirs:
+                if _convert_worker(sd, strip_visual=strip):
                     ok += 1
                 else:
                     fail += 1
-                if i % 200 == 0 or i == len(sample_dirs):
-                    log.info("Progress %d/%d  ✓ %d  ✗ %d", i, len(sample_dirs), ok, fail)
+                    with open(error_log, "a") as err_f:
+                        err_f.write(f"FAILED: {sd.name}\n")
+                pbar.update(1)
+    else:
+        worker = partial(_convert_worker, strip_visual=strip)
+        with multiprocessing.Pool(processes=args.workers) as pool:
+            with tqdm(total=len(sample_dirs), desc="Converting") as pbar:
+                for sd, success in zip(sample_dirs, pool.imap(worker, sample_dirs)):
+                    if success:
+                        ok += 1
+                    else:
+                        fail += 1
+                        with open(error_log, "a") as err_f:
+                            err_f.write(f"FAILED: {sd.name}\n")
+                    pbar.update(1)
 
     log.info("Done. Converted: %d  Failed: %d", ok, fail)
+    if fail > 0:
+        log.warning(f"See {error_log} for list of failed samples.")
 
 
 if __name__ == "__main__":

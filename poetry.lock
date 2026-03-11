@@ -1575,18 +1575,6 @@ nearley = ["js2py"]
 regex = ["regex"]
 
 [[package]]
-name = "linearized-musicxml"
-version = "1.0.0"
-description = "MusicXML linearization for img2seq model training"
-optional = false
-python-versions = ">=3.8"
-groups = ["main"]
-files = [
-    {file = "linearized_musicxml-1.0.0-py3-none-any.whl", hash = "sha256:4ce82b4d1721c1d6c9b93009f13e6a6b6868620252723a58b002280f0af966c8"},
-    {file = "linearized_musicxml-1.0.0.tar.gz", hash = "sha256:1248881382d068960f637c3c7e2314633da5a1196a9a46fd7e5ce015911f25e6"},
-]
-
-[[package]]
 name = "lxml"
 version = "6.0.2"
 description = "Powerful and Pythonic XML processing library combining libxml2/libxslt with the ElementTree API."
@@ -4247,4 +4235,4 @@ test = ["pytest", "websockets"]
 [metadata]
 lock-version = "2.1"
 python-versions = "~3.14"
-content-hash = "c71eaeae7c7a2158f0a50904510aa1e39637e583dc092e1aaccca63e090c4f67"
+content-hash = "1d16d82cf06754cfeec1e9a2cbd881fcff93a8df8d7be332d0e7c0325b8ccb76"

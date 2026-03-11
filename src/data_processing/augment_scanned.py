@@ -19,6 +19,7 @@ import albumentations as A
 import cv2
 import numpy as np
 from PIL import Image
+from tqdm import tqdm
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -137,8 +138,13 @@ def _copy_labels(src_dir: Path, out_dir: Path, sample_id: str, out_id: str) -> N
             shutil.copy2(src_ann, out_dir / f"{out_id}{ext}")
 
 
-def _worker(args_tuple):
-    src_dir, output_dir, copies, seed_base = args_tuple
+def _worker(args: tuple[Path, Path, int, int]) -> list[str | bool]:
+    """
+    Multiprocessing worker function.
+    Given (sample_dir, root_out_dir, num_copies, base_seed), generates
+    all augmented copies for that sample.
+    """
+    src_dir, output_dir, copies, seed_base = args
     sample_id = src_dir.name
     src_png = src_dir / f"{sample_id}.png"
     results = []
@@ -298,6 +304,10 @@ def main() -> None:
         for i, d in enumerate(sample_dirs)
     ]
 
+    error_log = args.output / "errors_augment.log"
+    if error_log.exists():
+        error_log.unlink()
+
     ok = fail = 0
     with multiprocessing.Pool(
         processes=args.workers,
@@ -305,13 +315,20 @@ def main() -> None:
         initializer=_init_worker,
         initargs=(args.nice,),
     ) as pool:
-        for i, results in enumerate(pool.imap_unordered(_worker, work_items), 1):
-            ok   += sum(results)
-            fail += results.count(False)
-            if i % 200 == 0 or i == len(sample_dirs):
-                log.info("Progress %d/%d  ✓ %d  ✗ %d", i, len(sample_dirs), ok, fail)
+        with tqdm(total=len(work_items), desc="Augmenting") as pbar:
+            for i, results in enumerate(pool.imap(_worker, work_items)):
+                for r in results:
+                    if r is True:
+                        ok += 1
+                    else:
+                        fail += 1
+                        with open(error_log, "a") as err_f:
+                            err_f.write(f"FAILED: {r}\n")
+                pbar.update(1)
 
     log.info("Done. Success: %d  Failed: %d", ok, fail)
+    if fail > 0:
+        log.warning(f"See {error_log} for list of failed samples.")
 
 
 if __name__ == "__main__":

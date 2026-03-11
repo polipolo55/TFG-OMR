@@ -113,7 +113,7 @@ This section presents the full economic budget for the project, following the st
 \subsection{Human Resources Costs}
 \label{sec:hr-costs}
 
-The project is executed by a single developer who assumes all professional roles. To estimate labour costs realistically, each task is assigned to the role that best describes the work performed, with an hourly rate derived from average gross salaries in Spain for the IT sector. Rates are based on the 2025 Robert Half Salary Guide for technology professionals~\cite{robertHalfSalaryGuideTechnology2025}, adapted to Spanish market conditions. The figures reflect typical gross salaries for junior-to-mid IT roles in Spain, consistent with data from the Spanish edition of the guide. They are adjusted with a $\times$1.35 multiplier to account for employer social security contributions~\cite{segSocialCotizacion2025}, as recommended in the GEP economic management module~\cite{gepModule24EconomicManagement}.
+The project is executed by a single developer who assumes all professional roles. To estimate labour costs realistically, each task is assigned to the role that best describes the work performed, with an hourly rate derived from average gross salaries in Spain for the IT sector. Rates are grounded in the 2023 INE \textit{Encuesta Anual de Estructura Salarial} (EAES)~\cite{ineEncuestaEstructuraSalarial2023}, the official Spanish salary survey published by the Instituto Nacional de Estad\'istica. The national mean gross salary was \EUR{}28{,}049.94 in 2023; workers in the ICT sector (Section~J of NACE rev.~2) earn substantially above the national average, making the \EUR{}30{,}000--38{,}000 gross range assumed here consistent with EAES data for junior-to-mid level ICT roles. These figures are adjusted by a $\times$1.35 multiplier to convert gross salary to total employer cost, which accounts for employer social security contributions~\cite{segSocialCotizacion2025}, as prescribed in the GEP economic management module~\cite{gepModule24EconomicManagement}.
 
 \medskip
 
@@ -218,9 +218,9 @@ General costs cover hardware, software, and infrastructure expenses that are sha
     \caption{Hardware costs with amortisation.}
     \label{tab:hw}
     \renewcommand{\arraystretch}{1.1}
-    \begin{tabularx}{\linewidth}{l r r r r}
+    \begin{tabularx}{\linewidth}{X r r r r}
         \toprule
-        \textbf{Item} & \textbf{Price (\EUR{})} & \textbf{Useful life (years)} & \textbf{Project use (months)} & \textbf{Amort.\ cost (\EUR{})} \\
+        \textbf{Item} & \textbf{Price (\EUR{})} & \textbf{Life (yr)} & \textbf{Use (mo)} & \textbf{Amort.\ (\EUR{})} \\
         \midrule
         Laptop (development)        & 1\,200 & 5 & 5 & 100.00 \\
         GPU -- NVIDIA RTX 3060 12\,GB & 350   & 4 & 5 & 36.46 \\
@@ -462,7 +462,7 @@ The main environmental impact of the project is electrical energy consumption fo
     \item \textbf{Development workstation:} The laptop and monitor consume approximately 80\,W during regular development (coding, writing, literature review). Over 509 project hours, this amounts to $509 \times 0.08\,\text{kW} = 40.7\,\text{kWh}$.
     \item \textbf{GPU training:} The NVIDIA RTX 3060 draws $\sim$170\,W under training load. Estimated GPU-active time across all training tasks (T3.3, T4.3, T4.4, T5.1, T5.3): $\sim$95\,h, yielding $95 \times 0.17\,\text{kW} = 16.2\,\text{kWh}$.
     \item \textbf{Dataset generation:} LilyPond rendering of $\sim$43\,000 images is CPU-bound; estimated at $\sim$10\,h of sustained CPU ($\sim$65\,W), contributing $0.65\,\text{kWh}$.
-    \item \textbf{Total:} $\sim$57.5\,kWh over five months, equivalent to approximately 13.2\,kg CO\textsubscript{2} at the 2023 Spanish grid emission factor of 0.23\,kg CO\textsubscript{2}/kWh~\cite{reeInformeSistemaElectrico2024,mitecoFactorEmision2024}.
+    \item \textbf{Total:} $\sim$57.5\,kWh over five months, equivalent to approximately 13.2\,kg CO\textsubscript{2} at the 2023 Spanish grid emission factor of 0.23\,kg CO\textsubscript{2}/kWh~\cite{reeInformeSistemaElectrico2024,mitecoFactorEmision2025}.
 \end{itemize}
 
 To put this in context, 57.5\,kWh is roughly equivalent to running a household refrigerator for 4--5 days or driving a petrol car for approximately 55\,km. The environmental footprint is modest.

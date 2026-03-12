@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -41,6 +42,13 @@ for _p in (str(_SRC), str(_SRC.parent)):
         sys.path.insert(0, _p)
 
 log = logging.getLogger("omr.cli")
+
+
+def _get_default_workers() -> int:
+    """Compute default number of workers based on CPU core count."""
+    cpu_count = os.cpu_count() or 4  # Default to 4 if cpu_count() returns None
+    # Leave at least 2 cores for the OS and other processes
+    return max(1, cpu_count - 2)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -410,8 +418,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Rendering resolution (default: 200)")
     p_rend.add_argument("--limit", type=int, default=None,
                         help="Process at most N samples (for testing)")
-    p_rend.add_argument("--workers", type=int, default=10,
-                        help="Parallel workers (default: 10)")
+    p_rend.add_argument("--workers", type=int, default=_get_default_workers(),
+                        help="Parallel workers (default: cpu_count - 2)")
     p_rend.add_argument("--force", action="store_true",
                         help="Re-render even if output PNG already exists")
     p_rend.add_argument("--no-lmx", action="store_true",
@@ -429,8 +437,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Root directory of PrIMuS samples")
     p_conv.add_argument("--limit", type=int, default=None,
                         help="Process only N samples (for smoke tests)")
-    p_conv.add_argument("--workers", type=int, default=10,
-                        help="Parallel workers for conversion (default: 10)")
+    p_conv.add_argument("--workers", type=int, default=_get_default_workers(),
+                        help="Parallel workers for conversion (default: cpu_count - 2)")
     p_conv.add_argument("--verbose", action="store_true",
                         help="Per-sample conversion logging")
     p_conv.set_defaults(func=cmd_convert)
@@ -451,8 +459,8 @@ def build_parser() -> argparse.ArgumentParser:
                        help="Augmented copies per sample (default: 1)")
     p_aug.add_argument("--seed", type=int, default=None,
                        help="Global random seed (default: 42)")
-    p_aug.add_argument("--workers", type=int, default=10,
-                       help="Parallel workers (default: 10)")
+    p_aug.add_argument("--workers", type=int, default=_get_default_workers(),
+                       help="Parallel workers (default: cpu_count - 2)")
     p_aug.add_argument("--limit", type=int, default=None,
                        help="Process at most N samples (for testing)")
     p_aug.set_defaults(func=cmd_augment)
@@ -536,8 +544,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Output vocabulary path")
     p_pipe.add_argument("--limit", type=int, default=None,
                         help="Limit samples per package (for testing)")
-    p_pipe.add_argument("--workers", type=int, default=10,
-                        help="Parallel workers (default: 10)")
+    p_pipe.add_argument("--workers", type=int, default=_get_default_workers(),
+                        help="Parallel workers (default: cpu_count - 2)")
     p_pipe.add_argument("--verbose", action="store_true",
                         help="Enable verbose output")
     p_pipe.set_defaults(func=cmd_pipeline)

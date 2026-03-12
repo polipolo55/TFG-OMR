@@ -111,7 +111,7 @@ def _discover_samples(
         sid = sub.name
         png = sub / f"{sid}.png"
         lmx = sub / f"{sid}.lmx"
-        if not png.exists():
+        if not png.exists() or png.stat().st_size == 0:
             continue
         if require_lmx and not lmx.exists():
             log.debug("Skipping %s — no .lmx file", sid)

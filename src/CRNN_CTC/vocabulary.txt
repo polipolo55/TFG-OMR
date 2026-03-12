@@ -44,6 +44,7 @@ beat-type:4
 beat-type:48
 beat-type:6
 beat-type:8
+beats:1
 beats:11
 beats:12
 beats:2
@@ -52,6 +53,7 @@ beats:3
 beats:4
 beats:5
 beats:6
+beats:7
 beats:8
 beats:9
 breve
@@ -62,6 +64,7 @@ clef:C4
 clef:C5
 clef:F3
 clef:F4
+clef:F5
 clef:G1
 clef:G2
 dot

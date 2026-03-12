@@ -14,11 +14,11 @@ is based on the semantic pitch spelling plus the current key signature
 
 Usage:
     poetry run python src/data_processing/semantic_to_lmx.py \\
-        --source data/realbook_primus_aa --workers 8
+        --source data/realbook_primus/package_aa --workers 8
 
     # Test on a small subset:
     poetry run python src/data_processing/semantic_to_lmx.py \\
-        --source data/realbook_primus_aa --limit 10 --verbose
+        --source data/realbook_primus/package_aa --limit 10 --verbose
 """
 
 from __future__ import annotations
@@ -383,8 +383,8 @@ def main() -> None:
     parser.add_argument(
         "--source",
         type=Path,
-        default=Path("data/realbook_primus_aa"),
-        help="Dataset root containing sample subdirectories (default: data/realbook_primus_aa)",
+        default=Path("data/realbook_primus/package_aa"),
+        help="Dataset root containing sample subdirectories (default: data/realbook_primus/package_aa)",
     )
     parser.add_argument(
         "--limit",

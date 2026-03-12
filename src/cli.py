@@ -14,10 +14,10 @@ evaluate    Evaluate a trained model checkpoint.
 
 Usage examples::
 
-    poetry run python src/cli.py render  --source data/primus/package_aa --output data/realbook_primus_aa
-    poetry run python src/cli.py convert --source data/realbook_primus_aa --workers 8
-    poetry run python src/cli.py augment --source data/realbook_primus_aa --output data/realbook_primus_aa_scanned
-    poetry run python src/cli.py vocab   --data-dir data/realbook_primus_aa
+    poetry run python src/cli.py render  --source data/primus/package_aa --output data/realbook_primus/package_aa
+    poetry run python src/cli.py convert --source data/realbook_primus/package_aa --workers 8
+    poetry run python src/cli.py augment --source data/realbook_primus/package_aa --output data/realbook_primus_augmented/package_aa
+    poetry run python src/cli.py vocab   --data-dir data/realbook_primus/package_aa
     poetry run python src/cli.py train   --epochs 50 --batch-size 16 --lr 1e-3
     poetry run python src/cli.py evaluate --checkpoint models/latest/best_model.pt --split test
     poetry run python src/cli.py pipeline
@@ -328,6 +328,17 @@ def cmd_pipeline_train(args: argparse.Namespace) -> None:
     """Run full pipeline followed by training."""
     cmd_pipeline(args)
     log.info("--- Starting Training ---")
+
+    # Wire pipeline output dirs into the training args so cmd_train finds the data.
+    # args.output_dir / package_aa → data_dir; remaining packages → extra_data_dirs.
+    # args.augmented_dir / package_aa → scanned_dir; remaining → extra_scanned_dirs.
+    packages = args.packages
+    args.data_dir = str(args.output_dir / packages[0])
+    args.scanned_dir = str(args.augmented_dir / packages[0])
+    if len(packages) > 1:
+        args.extra_data_dir = [str(args.output_dir / p) for p in packages[1:]]
+        args.extra_scanned_dir = [str(args.augmented_dir / p) for p in packages[1:]]
+
     cmd_train(args)
 
 
@@ -339,9 +350,9 @@ def _add_common_data_args(parser: argparse.ArgumentParser) -> None:
     """Add flags shared by train / evaluate."""
     g = parser.add_argument_group("data")
     g.add_argument("--data-dir", type=str, default=None,
-                   help="Root sample directory (default: data/realbook_primus_aa)")
+                   help="Root sample directory (default: data/realbook_primus/package_aa)")
     g.add_argument("--scanned-dir", type=str, default=None,
-                   help="Scanned-image directory (default: data/realbook_primus_aa_scanned)")
+                   help="Scanned-image directory (default: data/realbook_primus_augmented/package_aa)")
     g.add_argument("--vocab-path", type=str, default=None,
                    help="Vocabulary file (default: src/CRNN_CTC/vocabulary.txt)")
     g.add_argument("--img-height", type=int, default=None,
@@ -412,8 +423,8 @@ def build_parser() -> argparse.ArgumentParser:
                         default=Path("data/primus/package_aa"),
                         help="PrIMuS source directory (default: data/primus/package_aa)")
     p_rend.add_argument("--output", type=Path,
-                        default=Path("data/realbook_primus_aa"),
-                        help="Output dataset directory (default: data/realbook_primus_aa)")
+                        default=Path("data/realbook_primus/package_aa"),
+                        help="Output dataset directory (default: data/realbook_primus/package_aa)")
     p_rend.add_argument("--dpi", type=int, default=200,
                         help="Rendering resolution (default: 200)")
     p_rend.add_argument("--limit", type=int, default=None,
@@ -433,7 +444,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Run the semantic → LMX conversion pipeline.",
     )
     p_conv.add_argument("--source", type=Path,
-                        default=Path("data/realbook_primus_aa"),
+                        default=Path("data/realbook_primus/package_aa"),
                         help="Root directory of PrIMuS samples")
     p_conv.add_argument("--limit", type=int, default=None,
                         help="Process only N samples (for smoke tests)")
@@ -450,11 +461,11 @@ def build_parser() -> argparse.ArgumentParser:
         description="Distort clean LilyJAZZ PNGs to simulate physical scans.",
     )
     p_aug.add_argument("--source", type=Path,
-                       default=Path("data/realbook_primus_aa"),
-                       help="Clean dataset root (default: data/realbook_primus_aa)")
+                       default=Path("data/realbook_primus/package_aa"),
+                       help="Clean dataset root (default: data/realbook_primus/package_aa)")
     p_aug.add_argument("--output", type=Path,
-                       default=Path("data/realbook_primus_aa_scanned"),
-                       help="Output root (default: data/realbook_primus_aa_scanned)")
+                       default=Path("data/realbook_primus_augmented/package_aa"),
+                       help="Output root (default: data/realbook_primus_augmented/package_aa)")
     p_aug.add_argument("--copies", type=int, default=None,
                        help="Augmented copies per sample (default: 1)")
     p_aug.add_argument("--seed", type=int, default=None,
@@ -472,7 +483,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Scan .lmx files and produce a sorted vocabulary.",
     )
     p_vocab.add_argument("--data-dir", type=str,
-                         default="data/realbook_primus_aa",
+                         default="data/realbook_primus/package_aa",
                          help="Directory with .lmx files (searched recursively)")
     p_vocab.add_argument("--extra-data-dir", type=str, action="append", default=None,
                          help="Additional data directory (repeatable, for package_ab etc.)")
@@ -579,7 +590,7 @@ def build_parser() -> argparse.ArgumentParser:
     g_train.add_argument("--model-dir", type=str, default=None)
     g_train.add_argument("--resume", nargs="?", const="", default=None, metavar="CHECKPOINT")
     
-    p_ptrain.set_defaults(func=cmd_pipeline_train)
+    p_ptrain.set_defaults(func=cmd_pipeline_train, vocab_path="src/CRNN_CTC/vocabulary.txt")
 
     return parser
 

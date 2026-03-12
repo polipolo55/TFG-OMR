@@ -225,8 +225,8 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("data/realbook_primus_scanned"),
-        help="Output dataset root (default: data/realbook_primus_scanned)",
+        default=Path("data/realbook_primus_augmented"),
+        help="Output dataset root (default: data/realbook_primus_augmented)",
     )
     parser.add_argument(
         "--copies",

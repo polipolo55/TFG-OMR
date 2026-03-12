@@ -19,8 +19,8 @@ class Config:
     """Pipeline configuration — paths, data, model, and training settings."""
 
     # ── Paths ──────────────────────────────────────────────────────────────
-    data_dir: Path = Path("data/realbook_primus_aa")
-    scanned_dir: Path = Path("data/realbook_primus_aa_scanned")
+    data_dir: Path = Path("data/realbook_primus/package_aa")
+    scanned_dir: Path = Path("data/realbook_primus_augmented/package_aa")
     extra_data_dirs: list[Path] = field(default_factory=list)
     extra_scanned_dirs: list[Path] = field(default_factory=list)
     model_dir: Path = Path("models")

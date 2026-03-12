@@ -307,7 +307,7 @@ def process_sample(
     if with_lmx:
         try:
             from data_processing.semantic_to_lmx import convert_sample
-            result = convert_sample(out_sample, strip_visual=True)
+            result = convert_sample(out_sample)
             if not result:
                 return f"LMX generation failed to produce output for {sample_id}"
         except Exception as exc:

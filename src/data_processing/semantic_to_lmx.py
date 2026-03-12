@@ -1,22 +1,16 @@
 """
 semantic_to_lmx.py
 ==================
-Convert PrIMuS .semantic annotations → monophonic LMX (.lmx) via music21
-and the ``linearized-musicxml`` package.
+Convert PrIMuS .semantic annotations → monophonic LMX (.lmx) **directly**,
+without an intermediate music21 or MusicXML representation.
 
 Pipeline per sample:
-    .semantic  ──parse──▶  music21 Score  ──export──▶  MusicXML  ──lmx──▶  .lmx
+    .semantic  ──tokenise──▶  LMX token list  ──write──▶  .lmx
 
-The monophonic LMX output strips purely visual tokens (beam, stem, staff,
-voice) that carry no musical semantics for a CRNN-CTC model.
-
-The music21 intermediate representation is kept because it correctly computes
-written accidentals (natural signs, cautionary flats/sharps) from the key
-signature and intra-measure pitch history — logic that would be complex and
-error-prone to reimplement.  The sole responsibility of this module is to
-build a structurally correct Score so that music21's MusicXML exporter does
-not inject phantom fill rests that have no counterpart in the LilyPond-rendered
-image.
+The converter walks the PrIMuS semantic token stream and emits the
+corresponding LMX tokens using simple lookup tables.  Accidental display
+is based on the semantic pitch spelling plus the current key signature
+(to emit ``natural`` signs when a note cancels a key-signature accidental).
 
 Usage:
     poetry run python src/data_processing/semantic_to_lmx.py \\
@@ -35,14 +29,10 @@ import multiprocessing
 import os
 import re
 import sys
-import tempfile
-import xml.etree.ElementTree as ET
 from functools import partial
 from pathlib import Path
-from typing import Optional
 
 from tqdm import tqdm
-import music21
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -55,401 +45,289 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Tokens to strip for monophonic output
-# ---------------------------------------------------------------------------
-_STRIP_PREFIXES = (
-    "voice:",
-    "staff:",
-    "stem:",
-    "beam:",
-    "print-object:",
-)
-
-# ---------------------------------------------------------------------------
 # Conversion tables
 # ---------------------------------------------------------------------------
 
-# music21 pitch names: flat = "-", double-flat = "--", sharp = "#", double-sharp = "##"
-_ACC_M21: dict[str, str] = {
-    "":   "",
-    "b":  "-",
-    "bb": "--",
-    "#":  "#",
-    "x":  "##",   # double-sharp (×)
-}
-
-_DUR_QL: dict[str, float] = {
-    "breve":            8.0,
-    "whole":            4.0,
-    "half":             2.0,
-    "quarter":          1.0,
-    "eighth":           0.5,
-    "sixteenth":        0.25,
-    "32nd":             0.125,
-    "64th":             0.0625,
+# PrIMuS duration names → LMX duration token
+_DUR_LMX: dict[str, str] = {
+    "breve":            "breve",
+    "whole":            "whole",
+    "half":             "half",
+    "quarter":          "quarter",
+    "eighth":           "eighth",
+    "sixteenth":        "16th",
+    "32nd":             "32nd",
+    "64th":             "64th",
     # legacy PrIMuS aliases
-    "thirty_second":    0.125,
-    "sixty_fourth":     0.0625,
+    "thirty_second":    "32nd",
+    "sixty_fourth":     "64th",
     # longa (4 whole notes)
-    "quadruple_whole":  16.0,
+    "quadruple_whole":  "longa",
+    # double whole (breve alias sometimes seen)
+    "double_whole":     "breve",
 }
 
-_CLEF_MAP: dict[str, type] = {
-    "G2": music21.clef.TrebleClef,
-    "G1": music21.clef.FrenchViolinClef,
-    "F4": music21.clef.BassClef,
-    "F3": music21.clef.FBaritoneClef,
-    "C1": music21.clef.SopranoClef,
-    "C2": music21.clef.MezzoSopranoClef,
-    "C3": music21.clef.AltoClef,
-    "C4": music21.clef.TenorClef,
-    "C5": music21.clef.AltoClef,   # no exact music21 equivalent; alto is closest
+# Key-signature root → number of fifths.
+# The PrIMuS key format is e.g. "EbM", "F#m", "C", "AbM".
+_KEY_FIFTHS: dict[str, int] = {
+    "Cb": -7, "Gb": -6, "Db": -5, "Ab": -4, "Eb": -3, "Bb": -2,
+    "F":  -1, "C":   0, "G":   1, "D":   2, "A":   3, "E":   4,
+    "B":   5, "F#":  6, "C#":  7,
 }
 
-# ---------------------------------------------------------------------------
-# Parsing helpers
-# ---------------------------------------------------------------------------
-
-def _parse_pitch_m21(pitch_str: str) -> str:
-    """Convert PrIMuS pitch ``'Bb5'`` → music21 pitch string ``'B-5'``."""
-    m = re.match(r"^([A-G])(b{1,2}|#{1,2}|x?)(\d+)$", pitch_str)
-    if not m:
-        raise ValueError(f"Cannot parse pitch: {pitch_str!r}")
-    step, acc, octave = m.group(1), m.group(2), m.group(3)
-    return step + _ACC_M21.get(acc, acc) + octave
+# Steps altered by N fifths.  Positive fifths → sharps in FCGDAEB order;
+# negative fifths → flats in BEADGCF order.
+_SHARP_ORDER = "FCGDAEB"
+_FLAT_ORDER  = "BEADGCF"
 
 
-def _parse_duration_ql(dur_str: str) -> float:
-    """Convert PrIMuS duration string ``'quarter.'`` → quarterLength ``1.5``."""
-    stripped = dur_str.rstrip(".")
-    dots = len(dur_str) - len(stripped)
-    base = _DUR_QL.get(stripped)
-    if base is None:
-        raise ValueError(f"Unknown duration: {dur_str!r}")
-    ql, add = base, base
-    for _ in range(dots):
-        add /= 2.0
-        ql += add
-    return ql
+def _key_altered_steps(fifths: int) -> set[str]:
+    """Return the set of step letters altered by the key signature.
 
-
-def _parse_key_m21(ks_str: str) -> music21.key.Key:
-    """Convert PrIMuS key-signature string (e.g. ``'EbM'``) → music21 Key."""
-    if ks_str.endswith("M"):
-        mode, root = "major", ks_str[:-1]
-    elif ks_str.endswith("m"):
-        mode, root = "minor", ks_str[:-1]
-    else:
-        mode, root = "major", ks_str
-    root_m21 = root[0] + root[1:].replace("b", "-")
-    return music21.key.Key(root_m21, mode)
-
-
-def _parse_time_m21(ts_str: str) -> music21.meter.TimeSignature:
-    """Convert PrIMuS time-signature string (e.g. ``'C'``) → music21 TimeSignature."""
-    if ts_str == "C":
-        ts_str = "4/4"
-    elif ts_str in ("C/", "C|"):
-        ts_str = "2/2"
-    return music21.meter.TimeSignature(ts_str)
-
-
-# ---------------------------------------------------------------------------
-# PrIMuS semantic → music21 Score
-# ---------------------------------------------------------------------------
-
-def semantic_to_score(tokens: list[str]) -> music21.stream.Score:
+    E.g. fifths=-3 (E♭ major) → {"B", "E", "A"} (these are flatted).
     """
-    Build a ``music21.stream.Score`` from PrIMuS semantic tokens.
+    if fifths > 0:
+        return set(_SHARP_ORDER[i] for i in range(min(fifths, 7)))
+    elif fifths < 0:
+        return set(_FLAT_ORDER[i] for i in range(min(-fifths, 7)))
+    return set()
+
+
+# PrIMuS accidental suffixes → LMX accidental token
+_ACC_SEMANTIC_TO_LMX: dict[str, str] = {
+    "b":  "flat",
+    "bb": "flat-flat",
+    "#":  "sharp",
+    "x":  "double-sharp",
+    "##": "double-sharp",
+}
+
+# Pitch regex: step (A-G), optional accidental (b, bb, #, ##, x), octave digit(s)
+_PITCH_RE = re.compile(r"^([A-G])(b{1,2}|#{1,2}|x?)(\d+)$")
+
+
+# ---------------------------------------------------------------------------
+# Core converter: .semantic tokens → LMX tokens
+# ---------------------------------------------------------------------------
+
+def semantic_to_lmx_tokens(
+    tokens: list[str],
+    *,
+    verbose: bool = False,
+) -> list[str]:
+    """Convert a list of PrIMuS semantic tokens directly to LMX tokens.
 
     Design invariants
     -----------------
-    * ``multirest-N`` tokens are skipped entirely, matching ``generate_realbook.py``
-      which also does not render these bars in the LilyPond image.
-    * A barline that would flush a measure with no notes/rests is also skipped
-      (phantom measure produced after a skipped multirest).  The header tokens
-      (clef, key, time) stay in ``current_measure`` and are carried forward to
-      the first real content.
-    * Every incomplete measure is padded before being appended to the Part:
-      ``paddingLeft`` for measures flushed at an interior barline (anacrusis /
-      pickup bar), ``paddingRight`` for the final measure.  Both flags tell
-      music21's MusicXML exporter that the measure is intentionally incomplete,
-      preventing it from injecting phantom fill rests that have no counterpart
-      in the rendered image.
+    * ``multirest-N`` tokens are skipped entirely, matching
+      ``generate_realbook.py`` which does not render these bars.
+    * ``gracenote-*`` tokens are skipped (not in the LMX vocabulary).
+    * Barlines reset the measure — the next content starts a new ``measure``.
+    * The first token emitted is always ``measure`` (start of first measure).
+    * Ties produce ``tied:start`` on the preceding note and ``tied:stop``
+      on the following note.
+    * Accidental display: show on first occurrence of a step in the measure,
+      suppress on consecutive same-step notes, re-show after a different
+      step intervenes.  A ``natural`` is emitted when a step cancels a
+      key-signature or in-measure accidental.
     """
-    score = music21.stream.Score()
-    part = music21.stream.Part()
+    out: list[str] = ["measure"]  # first measure always starts immediately
 
-    current_measure = music21.stream.Measure(number=1)
-    measure_num = 1
-    pending_tie = False
+    # State
+    key_altered: set[str] = set()  # steps altered by current key sig
+    pending_tie_stop: bool = False
+    in_multirest: bool = False  # suppress barline after multirest
 
-    # Tracks the most-recently-seen TimeSignature across measure boundaries so
-    # we can compute bar_ql for any measure, not just the first.
-    current_ts: Optional[music21.meter.TimeSignature] = None
-
-    def _flush_measure(m: music21.stream.Measure, is_last: bool) -> None:
-        """Apply incomplete-measure padding to *m* then append it to *part*."""
-        nonlocal current_ts
-        # Update the running TimeSignature from any new TS inside this measure.
-        ts_in_measure = list(m.getElementsByClass(music21.meter.TimeSignature))
-        if ts_in_measure:
-            current_ts = ts_in_measure[-1]
-
-        if current_ts is not None:
-            bar_ql = current_ts.barDuration.quarterLength
-            notes_ql = sum(n.duration.quarterLength for n in m.notesAndRests)
-            remainder = bar_ql - notes_ql
-            if 0 < remainder < bar_ql:
-                # paddingLeft  → anacrusis / pickup bar (notes at END of bar)
-                # paddingRight → final partial bar   (notes at START of bar)
-                if is_last:
-                    m.paddingRight = remainder
-                else:
-                    m.paddingLeft = remainder
-
-        part.append(m)
+    # Per-measure accidental tracking:
+    # acc_shown[step] = the accidental token last shown for this step
+    # last_step = step of the most recent note (to detect "consecutive")
+    acc_shown: dict[str, str] = {}
+    last_step: str | None = None
 
     for tok in tokens:
         try:
-            # ── Clef / key / time-signature ───────────────────────────────────
+            # ── Clef ──────────────────────────────────────────────────────
             if tok.startswith("clef-"):
                 clef_id = tok[5:]
-                if clef_id not in _CLEF_MAP:
-                    raise ValueError(f"Unknown clef: {clef_id!r}. Add it to _CLEF_MAP.")
-                current_measure.append(_CLEF_MAP[clef_id]())
+                out.append(f"clef:{clef_id}")
 
+            # ── Key signature ─────────────────────────────────────────────
             elif tok.startswith("keySignature-"):
-                current_measure.append(_parse_key_m21(tok[13:]))
+                ks_str = tok[13:]
+                # Strip mode suffix (M/m) to get root
+                if ks_str.endswith("M") or ks_str.endswith("m"):
+                    root = ks_str[:-1]
+                else:
+                    root = ks_str  # bare "C" = C major
 
+                fifths = _KEY_FIFTHS.get(root)
+                if fifths is None:
+                    log.warning("Unknown key root %r in token %r", root, tok)
+                    continue
+                key_altered = _key_altered_steps(fifths)
+                out.append(f"key:fifths:{fifths}")
+
+            # ── Time signature ────────────────────────────────────────────
             elif tok.startswith("timeSignature-"):
-                current_measure.append(_parse_time_m21(tok[14:]))
+                ts_str = tok[14:]
+                if ts_str == "C":
+                    out.extend(["time", "beats:4", "beat-type:4"])
+                elif ts_str in ("C/", "C|"):
+                    out.extend(["time", "beats:2", "beat-type:2"])
+                else:
+                    parts = ts_str.split("/")
+                    if len(parts) == 2:
+                        out.extend(["time", f"beats:{parts[0]}", f"beat-type:{parts[1]}"])
+                    else:
+                        log.warning("Cannot parse time signature: %r", tok)
 
-            # ── Notes ─────────────────────────────────────────────────────────
+            # ── Notes ─────────────────────────────────────────────────────
             elif tok.startswith("note-"):
                 inner = tok[5:]
                 pitch_str, dur_str = inner.split("_", 1)
                 has_fermata = dur_str.endswith("_fermata")
                 if has_fermata:
                     dur_str = dur_str[: -len("_fermata")]
-                n = music21.note.Note(
-                    _parse_pitch_m21(pitch_str),
-                    quarterLength=_parse_duration_ql(dur_str),
-                )
-                if has_fermata:
-                    n.expressions.append(music21.expressions.Fermata())
-                if pending_tie:
-                    n.tie = music21.tie.Tie("stop")
-                    pending_tie = False
-                current_measure.append(n)
 
-            # ── Rests ─────────────────────────────────────────────────────────
+                # Parse pitch
+                m = _PITCH_RE.match(pitch_str)
+                if not m:
+                    if verbose:
+                        log.debug("Cannot parse pitch %r — skipping", pitch_str)
+                    continue
+                step, sem_acc, octave = m.group(1), m.group(2), m.group(3)
+
+                # Parse duration
+                stripped_dur = dur_str.rstrip(".")
+                dots = len(dur_str) - len(stripped_dur)
+                lmx_dur = _DUR_LMX.get(stripped_dur)
+                if lmx_dur is None:
+                    if verbose:
+                        log.debug("Unknown duration %r — skipping", dur_str)
+                    continue
+
+                # Emit: pitch, duration, [dots], [accidental], [tied:stop], [fermata]
+                out.append(f"{step}{octave}")
+                out.append(lmx_dur)
+
+                for _ in range(dots):
+                    out.append("dot")
+
+                # Accidental display
+                #
+                # Rules (clean, consistent):
+                # 1. Semantic has explicit accidental → display it
+                # 2. No semantic accidental, but key sig alters this step
+                #    → display "natural" (cancels key sig)
+                # 3. No semantic accidental, but a previous note in this
+                #    measure had an accidental on this step → display
+                #    "natural" (cancels in-measure deviation)
+                # 4. Suppress if same step as immediately preceding note
+                #    AND same accidental was already shown (consecutive dup)
+                if sem_acc:
+                    lmx_acc = _ACC_SEMANTIC_TO_LMX.get(sem_acc, "")
+                elif step in key_altered or step in acc_shown:
+                    # Need natural: either key sig says altered, or a
+                    # previous note in this measure was explicitly altered
+                    lmx_acc = "natural"
+                else:
+                    lmx_acc = ""
+
+                if lmx_acc:
+                    # Suppress consecutive duplicate on same step
+                    if step == last_step and acc_shown.get(step) == lmx_acc:
+                        pass  # suppress
+                    else:
+                        out.append(lmx_acc)
+                        acc_shown[step] = lmx_acc
+
+                last_step = step
+
+                # Tie stop
+                if pending_tie_stop:
+                    out.append("tied:stop")
+                    pending_tie_stop = False
+
+                # Fermata
+                if has_fermata:
+                    out.append("fermata")
+
+            # ── Rests ─────────────────────────────────────────────────────
             elif tok.startswith("rest-"):
                 dur_str = tok[5:]
                 has_fermata = dur_str.endswith("_fermata")
                 if has_fermata:
                     dur_str = dur_str[: -len("_fermata")]
-                r = music21.note.Rest(quarterLength=_parse_duration_ql(dur_str))
-                if has_fermata:
-                    r.expressions.append(music21.expressions.Fermata())
-                current_measure.append(r)
 
-            # ── Grace notes ───────────────────────────────────────────────────
-            elif tok.startswith("gracenote-"):
-                inner = tok[10:]
-                pitch_str, dur_str = inner.split("_", 1)
-                gn = music21.note.Note(
-                    _parse_pitch_m21(pitch_str),
-                    quarterLength=_parse_duration_ql(dur_str),
-                )
-                gn.duration.isGrace = True
-                current_measure.append(gn)
-
-            # ── Ties ──────────────────────────────────────────────────────────
-            elif tok == "tie":
-                elements = list(current_measure.notesAndRests)
-                if elements and isinstance(elements[-1], music21.note.Note):
-                    elements[-1].tie = music21.tie.Tie("start")
-                pending_tie = True
-
-            # ── Barlines ──────────────────────────────────────────────────────
-            elif tok == "barline":
-                if not list(current_measure.notesAndRests):
-                    # Empty measure — produced when multirest-N is followed
-                    # immediately by a barline.  Skip the flush; header tokens
-                    # (clef/key/time) that are already in current_measure will
-                    # be carried forward to the first real content token.
+                stripped_dur = dur_str.rstrip(".")
+                dots = len(dur_str) - len(stripped_dur)
+                lmx_dur = _DUR_LMX.get(stripped_dur)
+                if lmx_dur is None:
+                    if verbose:
+                        log.debug("Unknown rest duration %r — skipping", dur_str)
                     continue
-                _flush_measure(current_measure, is_last=False)
-                measure_num += 1
-                current_measure = music21.stream.Measure(number=measure_num)
 
-            # ── Multirest ─────────────────────────────────────────────────────
+                out.append("rest")
+                out.append(lmx_dur)
+
+                for _ in range(dots):
+                    out.append("dot")
+
+                if has_fermata:
+                    out.append("fermata")
+
+            # ── Grace notes ───────────────────────────────────────────────
+            elif tok.startswith("gracenote-"):
+                # Grace notes are skipped in LMX output
+                # They don't affect last_step tracking
+                pass
+
+            # ── Ties ──────────────────────────────────────────────────────
+            elif tok == "tie":
+                # Mark the previous note with tied:start
+                # and flag the next note for tied:stop
+                out.append("tied:start")
+                pending_tie_stop = True
+
+            # ── Barlines ──────────────────────────────────────────────────
+            elif tok == "barline":
+                if in_multirest:
+                    # Suppress the barline after a multirest — the multirest
+                    # was skipped so this barline's measure would be empty.
+                    in_multirest = False
+                else:
+                    # Start the next measure
+                    out.append("measure")
+                # Reset per-measure state
+                acc_shown.clear()
+                last_step = None
+
+            # ── Multirest ─────────────────────────────────────────────────
             elif tok.startswith("multirest-"):
-                # generate_realbook.py renders the image WITHOUT multirest bars.
-                # Skip these tokens so the LMX label matches the image.
+                # Skipped — not rendered in the image
+                in_multirest = True
                 log.debug("Skipping %s (not rendered in image)", tok)
 
-            # ── Unknown tokens (silently ignore) ──────────────────────────────
+            # ── Unknown ──────────────────────────────────────────────────
             else:
                 log.debug("Unhandled token %r — skipping", tok)
 
         except Exception as exc:
             log.debug("Error processing token %r: %s", tok, exc)
 
-    # Flush the final measure if it contains notes/rests or header tokens.
-    has_notes = bool(list(current_measure.notesAndRests))
-    has_headers = bool(list(current_measure.getElementsByClass(
-        (music21.clef.Clef, music21.key.Key, music21.meter.TimeSignature)
-    )))
-    if has_notes or has_headers:
-        _flush_measure(current_measure, is_last=True)
+    # Strip trailing "measure" token if it's the last thing (from a
+    # trailing barline with no content after)
+    while out and out[-1] == "measure":
+        out.pop()
 
-    score.append(part)
-    return score
-
-
-# ---------------------------------------------------------------------------
-# music21 Score → LMX tokens
-# ---------------------------------------------------------------------------
-
-def score_to_lmx(score: music21.stream.Score) -> list[str]:
-    """
-    Directly linearize a music21 Score into LMX tokens, bypassing the brittle
-    external `linearized-musicxml` package and avoiding intermediate XML export.
-    """
-    tokens = []
-
-    # Map music21 clefs back to LMX clef tokens
-    _CLEF_REVERSE_MAP = {
-        music21.clef.TrebleClef: "G2",
-        music21.clef.FrenchViolinClef: "G1",
-        music21.clef.BassClef: "F4",
-        music21.clef.FBaritoneClef: "F3",
-        music21.clef.SopranoClef: "C1",
-        music21.clef.MezzoSopranoClef: "C2",
-        music21.clef.AltoClef: "C3",
-        music21.clef.TenorClef: "C4",
-    }
-
-    # Ensure accidentals are computed based on key signature
-    score.makeAccidentals(inPlace=True, overrideStatus=True)
-
-    for part in score.parts:
-        for m in part.getElementsByClass(music21.stream.Measure):
-            tokens.append("measure")
-
-            for el in m.elements:
-                if isinstance(el, music21.clef.Clef):
-                    clef_t = _CLEF_REVERSE_MAP.get(type(el), "G2")
-                    tokens.append(f"clef:{clef_t}")
-
-                elif isinstance(el, music21.key.Key):
-                    # Key signature is represented by number of fifths (sharps>0, flats<0)
-                    tokens.append(f"key:fifths:{el.sharps}")
-
-                elif isinstance(el, music21.meter.TimeSignature):
-                    tokens.append("time")
-                    tokens.append(f"beats:{el.numerator}")
-                    tokens.append(f"beat-type:{el.denominator}")
-
-                elif isinstance(el, music21.note.GeneralNote):
-                    # Pitch or Rest
-                    if isinstance(el, music21.note.Note):
-                        tokens.append(f"{el.pitch.step}{el.pitch.octave}")
-                    elif isinstance(el, music21.note.Rest):
-                        tokens.append("rest")
-                    else:
-                        continue
-
-                    # Base duration
-                    tok_type = el.duration.type
-                    # Handle specific overrides/aliases
-                    if tok_type == "complex":
-                        # Fallback for weird tuplets or non-standard durations
-                        # We try to represent it with the closest single note type
-                        if el.duration.quarterLength >= 4:
-                            tok_type = "whole"
-                        elif el.duration.quarterLength >= 2:
-                            tok_type = "half"
-                        elif el.duration.quarterLength >= 1:
-                            tok_type = "quarter"
-                        elif el.duration.quarterLength >= 0.5:
-                            tok_type = "eighth"
-                        else:
-                            tok_type = "sixteenth"
-                            
-                    tokens.append(tok_type)
-
-                    # Tuplets (Time-modification)
-                    for tuplet in el.duration.tuplets:
-                        tokens.append(f"{tuplet.numberNotesActual}in{tuplet.numberNotesNormal}")
-
-                    # Dots
-                    for _ in range(el.duration.dots):
-                        tokens.append("dot")
-
-                    # Accidentals
-                    if isinstance(el, music21.note.Note) and el.pitch.accidental and el.pitch.accidental.displayStatus:
-                        acc = el.pitch.accidental.name
-                        # LMX names: flat, sharp, natural, double-sharp, flat-flat (not natively in music21 usually but similar)
-                        if acc == "double-sharp":
-                            tokens.append("double-sharp")
-                        elif acc == "double-flat":
-                            tokens.append("flat-flat")
-                        else:
-                            tokens.append(acc)  # flat, sharp, natural
-
-                    # Beams
-                    if getattr(el, "beams", None):
-                        for b in el.beams:
-                            if b.type == "start":
-                                tokens.append("beam:begin")
-                            elif b.type == "stop":
-                                tokens.append("beam:end")
-                            elif b.type == "continue":
-                                tokens.append("beam:continue")
-                            elif "partial" in b.type:
-                                # We treat forward/backward hooks implicitly or skip them,
-                                # semantic dataset doesn't generate them complexly
-                                pass
-
-                    # Ties
-                    if getattr(el, "tie", None):
-                        if el.tie.type == "start":
-                            tokens.append("tied:start")
-                        elif el.tie.type == "stop":
-                            tokens.append("tied:stop")
-                        elif el.tie.type == "continue":
-                            tokens.append("tied:stop")
-                            tokens.append("tied:start")
-
-                    # Articulations & Expressions (Fermata, Staccato, etc.)
-                    if getattr(el, "expressions", None):
-                        has_fermata = any(isinstance(e, music21.expressions.Fermata) for e in el.expressions)
-                        if has_fermata:
-                            tokens.append("fermata")
-
-    return tokens
-
-
-def filter_monophonic(tokens: list[str]) -> list[str]:
-    """
-    Strip tokens that are irrelevant for a monophonic CRNN-CTC model
-    (voice, staff, stem, beam markers).
-    """
-    return [t for t in tokens if not any(t.startswith(p) for p in _STRIP_PREFIXES)]
+    return out
 
 
 # ---------------------------------------------------------------------------
 # Full conversion: .semantic → .lmx
 # ---------------------------------------------------------------------------
 
-def convert_sample(
-    sample_dir: Path,
-    *,
-    strip_visual: bool = True,
-) -> list[str] | None:
+def convert_sample(sample_dir: Path) -> list[str] | None:
     """
     Read the ``.semantic`` file from *sample_dir*, convert to LMX, and write
     a ``.lmx`` file alongside the other annotations.
@@ -464,7 +342,7 @@ def convert_sample(
         log.warning("No .semantic file in %s — skipping", sample_dir)
         return None
 
-    # Read semantic tokens
+    # Read semantic tokens (tab-separated in PrIMuS files)
     text = sem_path.read_text(encoding="utf-8")
     tokens = text.split()
 
@@ -472,26 +350,16 @@ def convert_sample(
         log.warning("Empty semantic file: %s", sem_path)
         return None
 
-    # Parse into music21 Score
+    # Convert
     try:
-        score = semantic_to_score(tokens)
+        lmx_tokens = semantic_to_lmx_tokens(tokens)
     except Exception as exc:
-        log.warning("Score construction failed for %s: %s", sample_id, exc)
-        return None
-
-    # Linearize to LMX
-    try:
-        lmx_tokens = score_to_lmx(score)
-    except Exception as exc:
-        log.warning("LMX linearization failed for %s: %s", sample_id, exc)
+        log.warning("Conversion failed for %s: %s", sample_id, exc)
         return None
 
     if not lmx_tokens:
         log.warning("Empty LMX output for %s", sample_id)
         return None
-
-    if strip_visual:
-        lmx_tokens = filter_monophonic(lmx_tokens)
 
     # Write .lmx file (space-separated, single line)
     lmx_path.write_text(" ".join(lmx_tokens) + "\n", encoding="utf-8")
@@ -499,10 +367,9 @@ def convert_sample(
     return lmx_tokens
 
 
-def _convert_worker(sample_dir: Path, strip_visual: bool = True) -> bool:
+def _convert_worker(sample_dir: Path) -> bool:
     """Wrapper for multiprocessing (returns success bool)."""
-    result = convert_sample(sample_dir, strip_visual=strip_visual)
-    return result is not None
+    return convert_sample(sample_dir) is not None
 
 
 # ---------------------------------------------------------------------------
@@ -531,11 +398,7 @@ def main() -> None:
         default=max(1, (os.cpu_count() or 1) // 2),
         help="Parallel workers (default: half CPU count)",
     )
-    parser.add_argument(
-        "--keep-visual",
-        action="store_true",
-        help="Keep visual tokens (beam, stem, voice, staff) in the output",
-    )
+
     parser.add_argument(
         "--verbose",
         action="store_true",
@@ -559,10 +422,9 @@ def main() -> None:
     if args.limit:
         sample_dirs = sample_dirs[: args.limit]
 
-    strip = not args.keep_visual
     log.info(
-        "Converting %d samples → LMX (strip_visual=%s, workers=%d)",
-        len(sample_dirs), strip, args.workers,
+        "Converting %d samples → LMX (workers=%d)",
+        len(sample_dirs), args.workers,
     )
 
     error_log = args.source / "errors_convert.log"
@@ -576,7 +438,7 @@ def main() -> None:
         # Single-process (easier to debug)
         with tqdm(total=len(sample_dirs), desc="Converting") as pbar:
             for sd in sample_dirs:
-                if _convert_worker(sd, strip_visual=strip):
+                if _convert_worker(sd):
                     ok += 1
                 else:
                     fail += 1
@@ -584,10 +446,9 @@ def main() -> None:
                         err_f.write(f"FAILED: {sd.name}\n")
                 pbar.update(1)
     else:
-        worker = partial(_convert_worker, strip_visual=strip)
         with multiprocessing.Pool(processes=args.workers) as pool:
             with tqdm(total=len(sample_dirs), desc="Converting") as pbar:
-                for sd, success in zip(sample_dirs, pool.imap(worker, sample_dirs)):
+                for sd, success in zip(sample_dirs, pool.imap(_convert_worker, sample_dirs)):
                     if success:
                         ok += 1
                     else:

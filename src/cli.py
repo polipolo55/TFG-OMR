@@ -20,6 +20,8 @@ Usage examples::
     poetry run python src/cli.py vocab   --data-dir data/realbook_primus_aa
     poetry run python src/cli.py train   --epochs 50 --batch-size 16 --lr 1e-3
     poetry run python src/cli.py evaluate --checkpoint models/latest/best_model.pt --split test
+    poetry run python src/cli.py pipeline
+    poetry run python src/cli.py pipeline-train --epochs 50
 """
 
 from __future__ import annotations
@@ -78,7 +80,7 @@ def cmd_render(args: argparse.Namespace) -> None:
 # ── convert ───────────────────────────────────────────────────────────────
 
 def cmd_convert(args: argparse.Namespace) -> None:
-    """Convert PrIMuS .semantic annotations → monophonic LMX via music21."""
+    """Convert PrIMuS .semantic annotations → monophonic LMX (direct token remapping)."""
     from data_processing.semantic_to_lmx import main as _convert_main
 
     # Build argv for the converter's own argparse
@@ -89,8 +91,6 @@ def cmd_convert(args: argparse.Namespace) -> None:
         argv += ["--workers", str(args.workers)]
     if args.verbose:
         argv.append("--verbose")
-    if args.keep_visual:
-        argv.append("--keep-visual")
 
     old_argv = sys.argv
     sys.argv = ["semantic_to_lmx"] + argv
@@ -260,6 +260,69 @@ def cmd_augment(args: argparse.Namespace) -> None:
         sys.argv = old_argv
 
 
+# ── pipeline ──────────────────────────────────────────────────────────────
+
+def cmd_pipeline(args: argparse.Namespace) -> None:
+    """Run the full data pipeline (render → convert → augment → vocab)."""
+    # 1. Render all packages
+    for pkg in args.packages:
+        log.info("--- Rendering %s ---", pkg)
+        pkg_args = argparse.Namespace(
+            source=args.primus_dir / pkg,
+            output=args.output_dir / pkg,
+            dpi=200,
+            limit=args.limit,
+            workers=args.workers,
+            force=False,
+            no_lmx=False,
+            verbose=args.verbose,
+        )
+        cmd_render(pkg_args)
+
+    # 2. Convert all packages
+    for pkg in args.packages:
+        log.info("--- Converting %s ---", pkg)
+        pkg_args = argparse.Namespace(
+            source=args.output_dir / pkg,
+            limit=args.limit,
+            workers=args.workers,
+            verbose=args.verbose,
+        )
+        cmd_convert(pkg_args)
+
+    # 3. Augment all packages
+    for pkg in args.packages:
+        log.info("--- Augmenting %s ---", pkg)
+        pkg_args = argparse.Namespace(
+            source=args.output_dir / pkg,
+            output=args.augmented_dir / pkg,
+            copies=1,
+            seed=42,
+            workers=args.workers,
+            limit=args.limit,
+        )
+        cmd_augment(pkg_args)
+
+    # 4. Build unified vocabulary
+    log.info("--- Building Unified Vocabulary ---")
+    data_dirs = [str(args.output_dir / pkg) for pkg in args.packages]
+    vocab_args = argparse.Namespace(
+        data_dir=data_dirs[0],
+        extra_data_dir=data_dirs[1:] if len(data_dirs) > 1 else None,
+        output=args.vocab_path,
+    )
+    cmd_vocab(vocab_args)
+
+
+# ── pipeline-train ────────────────────────────────────────────────────────
+
+def cmd_pipeline_train(args: argparse.Namespace) -> None:
+    """Run full pipeline followed by training."""
+    cmd_pipeline(args)
+    log.info("--- Starting Training ---")
+    cmd_train(args)
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # Argument parser
 # ═══════════════════════════════════════════════════════════════════════════
@@ -370,8 +433,6 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Parallel workers for conversion (default: 10)")
     p_conv.add_argument("--verbose", action="store_true",
                         help="Per-sample conversion logging")
-    p_conv.add_argument("--keep-visual", action="store_true",
-                        help="Retain visual tokens (beam, stem, staff)")
     p_conv.set_defaults(func=cmd_convert)
 
     # ── augment ───────────────────────────────────────────────────────
@@ -457,6 +518,60 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common_data_args(p_eval)
     _add_model_args(p_eval)
     p_eval.set_defaults(func=cmd_evaluate)
+
+    # ── pipeline ──────────────────────────────────────────────────────
+    p_pipe = sub.add_parser(
+        "pipeline",
+        help="Run full data pipeline (render → convert → augment → vocab)",
+    )
+    p_pipe.add_argument("--primus-dir", type=Path, default=Path("data/primus"),
+                        help="PrIMuS source directory (default: data/primus)")
+    p_pipe.add_argument("--output-dir", type=Path, default=Path("data/realbook_primus"),
+                        help="Rendered output directory (default: data/realbook_primus)")
+    p_pipe.add_argument("--augmented-dir", type=Path, default=Path("data/realbook_primus_augmented"),
+                        help="Augmented output directory (default: data/realbook_primus_augmented)")
+    p_pipe.add_argument("--packages", nargs="+", default=["package_aa", "package_ab"],
+                        help="Packages to process (default: package_aa package_ab)")
+    p_pipe.add_argument("--vocab-path", type=str, default="src/CRNN_CTC/vocabulary.txt",
+                        help="Output vocabulary path")
+    p_pipe.add_argument("--limit", type=int, default=None,
+                        help="Limit samples per package (for testing)")
+    p_pipe.add_argument("--workers", type=int, default=10,
+                        help="Parallel workers (default: 10)")
+    p_pipe.add_argument("--verbose", action="store_true",
+                        help="Enable verbose output")
+    p_pipe.set_defaults(func=cmd_pipeline)
+
+    # ── pipeline-train ────────────────────────────────────────────────
+    p_ptrain = sub.add_parser(
+        "pipeline-train",
+        help="Run full data pipeline followed by training",
+    )
+    # Pipeline-specific args
+    p_ptrain.add_argument("--primus-dir", type=Path, default=Path("data/primus"))
+    p_ptrain.add_argument("--output-dir", type=Path, default=Path("data/realbook_primus"))
+    p_ptrain.add_argument("--augmented-dir", type=Path, default=Path("data/realbook_primus_augmented"))
+    p_ptrain.add_argument("--packages", nargs="+", default=["package_aa", "package_ab"])
+    p_ptrain.add_argument("--limit", type=int, default=None)
+    p_ptrain.add_argument("--workers", type=int, default=10)
+    p_ptrain.add_argument("--verbose", action="store_true")
+    
+    # Training-specific args (inherited)
+    _add_common_data_args(p_ptrain)
+    _add_model_args(p_ptrain)
+    
+    # Training-specific flags not covered by common groups
+    g_train = p_ptrain.add_argument_group("training")
+    g_train.add_argument("--epochs", type=int, default=None)
+    g_train.add_argument("--batch-size", type=int, default=None)
+    g_train.add_argument("--lr", type=float, default=None)
+    g_train.add_argument("--weight-decay", type=float, default=None)
+    g_train.add_argument("--warmup-frac", type=float, default=None)
+    g_train.add_argument("--early-stopping-patience", type=int, default=None)
+    g_train.add_argument("--model-dir", type=str, default=None)
+    g_train.add_argument("--resume", nargs="?", const="", default=None, metavar="CHECKPOINT")
+    
+    p_ptrain.set_defaults(func=cmd_pipeline_train)
 
     return parser
 

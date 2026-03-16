@@ -211,6 +211,7 @@ class OMRDataset(Dataset):
         self.max_image_width = max_image_width
         self.scanned_dir = Path(scanned_dir) if scanned_dir else None
         self.extra_scanned_dirs = [Path(p) for p in (extra_scanned_dirs or [])]
+        self._oov_counts: dict[str, int] = {}  # token → occurrence count
 
         # Discover all valid (png + lmx) samples from primary + extra dirs
         raw_samples = _discover_samples(self.data_dir, require_lmx=True)
@@ -269,6 +270,22 @@ class OMRDataset(Dataset):
         if not self._samples:
             raise RuntimeError(
                 f"No samples remain in {self.data_dir} after filtering."
+            )
+
+        # 3) Scan labels for OOV tokens (fast, one-time check at init)
+        oov: dict[str, int] = {}
+        for _sid, _png, lmx in self._samples:
+            for t in _load_lmx_tokens(lmx):
+                if t not in self.vocab:
+                    oov[t] = oov.get(t, 0) + 1
+        if oov:
+            total = sum(oov.values())
+            top5 = sorted(oov.items(), key=lambda x: -x[1])[:5]
+            log.warning(
+                "OOV tokens in dataset: %d unique, %d occurrences. "
+                "Top: %s",
+                len(oov), total,
+                ", ".join(f"{tok!r} ×{cnt}" for tok, cnt in top5),
             )
 
     # -- Dataset protocol ---------------------------------------------------

@@ -206,8 +206,9 @@ def semantic_to_lmx_tokens(
                         log.debug("Unknown duration %r — skipping", dur_str)
                     continue
 
-                # Emit: pitch, duration, [dots], [accidental], [tied:stop], [fermata]
-                out.append(f"{step}{octave}")
+                # Emit: pitch, octave, duration, [dots], [accidental], [tied:stop], [fermata]
+                out.append(f"pitch:{step}")
+                out.append(f"octave:{octave}")
                 out.append(lmx_dur)
 
                 for _ in range(dots):

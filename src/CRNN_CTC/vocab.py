@@ -27,20 +27,31 @@ log = logging.getLogger(__name__)
 
 
 class Vocabulary:
-    """Bidirectional token ↔ integer mapping with a CTC blank at index 0."""
+    """Bidirectional token ↔ integer mapping with a CTC blank at index 0.
+
+    Layout::
+
+        index 0: <blank>  (CTC blank)
+        index 1: <pad>    (sequence padding)
+        index 2: <unk>    (unknown / OOV fallback)
+        index 3…: music tokens (sorted alphabetically)
+    """
 
     BLANK = "<blank>"
     PAD = "<pad>"
+    UNK = "<unk>"
 
     def __init__(self, tokens: list[str]) -> None:
         """
         Parameters
         ----------
         tokens : list[str]
-            Ordered list of LMX tokens (without blank/pad — those are added
-            automatically at indices 0 and 1).
+            Ordered list of LMX tokens (without blank/pad/unk — those are
+            added automatically at indices 0, 1, 2).
         """
-        self._idx2tok: list[str] = [self.BLANK, self.PAD] + list(tokens)
+        # Strip special tokens if accidentally present in the input list
+        cleaned = [t for t in tokens if t not in (self.BLANK, self.PAD, self.UNK)]
+        self._idx2tok: list[str] = [self.BLANK, self.PAD, self.UNK] + list(cleaned)
         self._tok2idx: dict[str, int] = {t: i for i, t in enumerate(self._idx2tok)}
 
     # -- Properties ---------------------------------------------------------
@@ -53,8 +64,12 @@ class Vocabulary:
     def pad_idx(self) -> int:
         return 1
 
+    @property
+    def unk_idx(self) -> int:
+        return 2
+
     def __len__(self) -> int:
-        """Total size including blank + pad."""
+        """Total size including blank + pad + unk."""
         return len(self._idx2tok)
 
     # -- Encode / Decode ----------------------------------------------------
@@ -62,23 +77,27 @@ class Vocabulary:
     def encode(self, tokens: list[str]) -> list[int]:
         """Convert a list of LMX token strings to integer indices.
 
-        Unknown tokens are dropped with a warning so that data-quality
-        issues surface in the logs instead of being silently hidden.
+        Unknown tokens are mapped to the ``<unk>`` index so that
+        OOV symbols are preserved in the label sequence rather than
+        silently dropped.
         """
         indices: list[int] = []
         for t in tokens:
-            if t in self._tok2idx:
-                indices.append(self._tok2idx[t])
+            idx = self._tok2idx.get(t)
+            if idx is not None:
+                indices.append(idx)
             else:
-                log.warning("OOV token dropped during encode: %r", t)
+                log.warning("OOV token mapped to <unk>: %r", t)
+                indices.append(self.unk_idx)
         return indices
 
     def decode(self, indices: list[int]) -> list[str]:
         """Convert integer indices back to token strings, skipping blank/pad."""
+        _skip = (self.blank_idx, self.pad_idx)
         return [
             self._idx2tok[i]
             for i in indices
-            if 0 <= i < len(self._idx2tok) and i not in (self.blank_idx, self.pad_idx)
+            if 0 <= i < len(self._idx2tok) and i not in _skip
         ]
 
     def __contains__(self, token: str) -> bool:
@@ -94,10 +113,10 @@ class Vocabulary:
         return cls(tokens)
 
     def save(self, path: str | Path) -> None:
-        """Save vocabulary to a text file (one token per line, no blank/pad)."""
+        """Save vocabulary to a text file (one token per line, no blank/pad/unk)."""
         path = Path(path)
-        # Skip blank and pad (indices 0, 1)
-        lines = self._idx2tok[2:]
+        # Skip blank, pad, and unk (indices 0, 1, 2)
+        lines = self._idx2tok[3:]
         path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     @staticmethod
@@ -113,6 +132,10 @@ class Vocabulary:
         Scan all ``.lmx`` files under the given *data_dirs* and build a
         vocabulary from the union of all observed tokens, sorted alphabetically,
         using multiprocessing for speed.
+
+        Ensures the full ``pitch:A``–``pitch:G`` and ``octave:0``–``octave:8``
+        ranges are present even if not all combinations appear in the data,
+        so the model can generalise to unseen pitch/octave combinations.
         """
         import os
         if workers is None:
@@ -142,6 +165,12 @@ class Vocabulary:
                     for batch_tokens in pool.imap_unordered(cls._read_tokens, all_lmx_files, chunksize=100):
                         token_set.update(batch_tokens)
                         pbar.update(1)
+
+        # Ensure full pitch/octave ranges for OOV robustness
+        for step in "ABCDEFG":
+            token_set.add(f"pitch:{step}")
+        for octave in range(0, 9):
+            token_set.add(f"octave:{octave}")
 
         tokens = sorted(token_set)
         return cls(tokens)

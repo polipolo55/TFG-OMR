@@ -59,7 +59,7 @@ DUR_LY: dict[str, str] = {
 
 _SHARP_ORDER = list("FCGDAEB")
 _FLAT_ORDER  = list("BEADGCF")
-_PITCHES     = {f"{n}{o}" for n in "ABCDEFG" for o in range(0, 9)}
+_PITCH_STEPS = set("ABCDEFG")
 _DURATIONS   = set(DUR_LY)
 
 LY_TEMPLATE = r"""
@@ -117,8 +117,13 @@ def lmx_to_lilypond(tokens: list[str]) -> str:
         elif kind == "forward":
             lily.append(f"s{dur}{dots}")
         elif kind == "note":
-            letter  = pending["pitch"][0].lower()
-            octave  = int(pending["pitch"][1])
+            step    = pending.get("step")
+            octave  = pending.get("octave")
+            if step is None or octave is None:
+                # Incomplete note — skip
+                pending = None
+                return
+            letter  = step.lower()
             acc     = pending.get("acc")
 
             if acc == "flat":
@@ -129,10 +134,9 @@ def lmx_to_lilypond(tokens: list[str]) -> str:
                 pass  # no pitch suffix — but we add '!' after octave marks below
             else:
                 # Implicit: apply key-signature accidentals
-                note_upper = pending["pitch"][0]
-                if note_upper in key_sharps:
+                if step in key_sharps:
                     letter += "is"
-                elif note_upper in key_flats:
+                elif step in key_flats:
                     letter += "es"
 
             oct_off = octave - 3
@@ -199,10 +203,19 @@ def lmx_to_lilypond(tokens: list[str]) -> str:
                 )
             lily.append(rf"\clef {CLEF_LY[clef_id]}")
 
-        elif tok in _PITCHES:
+        elif tok.startswith("pitch:"):
             _flush()
-            pending = {"kind": "note", "pitch": tok, "dur": None,
-                       "acc": None, "dots": 0, "tie": False}
+            step = tok.split(":")[1]
+            if step in _PITCH_STEPS:
+                pending = {"kind": "note", "step": step, "octave": None,
+                           "dur": None, "acc": None, "dots": 0, "tie": False}
+
+        elif tok.startswith("octave:"):
+            if pending and pending["kind"] == "note" and pending.get("octave") is None:
+                try:
+                    pending["octave"] = int(tok.split(":")[1])
+                except ValueError:
+                    pass
 
         elif tok in _DURATIONS:
             if pending and pending.get("dur") is None:

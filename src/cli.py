@@ -51,6 +51,61 @@ def _get_default_workers() -> int:
     return max(1, cpu_count - 2)
 
 
+def _discover_packages(root: Path) -> list[str]:
+    """Return sorted package_* directory names inside ``root``."""
+    if not root.is_dir():
+        return []
+    return sorted(
+        p.name
+        for p in root.iterdir()
+        if p.is_dir() and p.name.startswith("package_")
+    )
+
+
+def _resolve_packages(primus_dir: Path, requested: list[str] | None) -> list[str]:
+    """Resolve package list, auto-discovering from ``primus_dir`` when omitted."""
+    if requested:
+        return requested
+
+    discovered = _discover_packages(primus_dir)
+    if not discovered:
+        log.error(
+            "No package_* directories found under %s. "
+            "Pass --packages explicitly or check the data path.",
+            primus_dir,
+        )
+        sys.exit(1)
+    log.info("Auto-discovered packages: %s", ", ".join(discovered))
+    return discovered
+
+
+def _wire_training_data_from_packages(args: argparse.Namespace, packages: list[str]) -> None:
+    """Populate train args using clean+augmented dirs for all selected packages."""
+    clean_packages = [p for p in packages if (args.output_dir / p).is_dir()]
+    augmented_packages = [p for p in packages if (args.augmented_dir / p).is_dir()]
+
+    usable_packages = [p for p in clean_packages if p in set(augmented_packages)]
+    if not usable_packages:
+        log.error(
+            "No package had both clean and augmented data. "
+            "Checked %s and %s for packages: %s",
+            args.output_dir,
+            args.augmented_dir,
+            ", ".join(packages),
+        )
+        sys.exit(1)
+
+    args.data_dir = str(args.output_dir / usable_packages[0])
+    args.scanned_dir = str(args.augmented_dir / usable_packages[0])
+    args.extra_data_dir = [str(args.output_dir / p) for p in usable_packages[1:]] or None
+    args.extra_scanned_dir = [str(args.augmented_dir / p) for p in usable_packages[1:]] or None
+
+    log.info(
+        "Training data packages: %s",
+        ", ".join(usable_packages),
+    )
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # Subcommand handlers
 # ═══════════════════════════════════════════════════════════════════════════
@@ -195,6 +250,23 @@ def cmd_train(args: argparse.Namespace) -> None:
     cfg = _build_config_from_args(args)
     log.info("Config: %s", cfg)
 
+    # Validate that data directories exist before committing to a training run
+    _missing: list[str] = []
+    if not cfg.data_dir.is_dir():
+        _missing.append(f"data_dir: {cfg.data_dir}")
+    if cfg.use_scanned and not cfg.scanned_dir.is_dir():
+        _missing.append(f"scanned_dir: {cfg.scanned_dir}")
+    for extra in cfg.extra_data_dirs or []:
+        if not Path(extra).is_dir():
+            _missing.append(f"extra_data_dir: {extra}")
+    if cfg.use_scanned:
+        for extra in cfg.extra_scanned_dirs or []:
+            if not Path(extra).is_dir():
+                _missing.append(f"extra_scanned_dir: {extra}")
+    if _missing:
+        log.error("Data directories not found:\n  %s", "\n  ".join(_missing))
+        sys.exit(1)
+
     resume_from: Path | None = None
     resume_arg = getattr(args, "resume", None)
     if resume_arg is not None:
@@ -272,6 +344,8 @@ def cmd_augment(args: argparse.Namespace) -> None:
 
 def cmd_pipeline(args: argparse.Namespace) -> None:
     """Run the full data pipeline (render → convert → augment → vocab)."""
+    args.packages = _resolve_packages(args.primus_dir, args.packages)
+
     # 1. Render all packages
     for pkg in args.packages:
         log.info("--- Rendering %s ---", pkg)
@@ -329,15 +403,8 @@ def cmd_pipeline_train(args: argparse.Namespace) -> None:
     cmd_pipeline(args)
     log.info("--- Starting Training ---")
 
-    # Wire pipeline output dirs into the training args so cmd_train finds the data.
-    # args.output_dir / package_aa → data_dir; remaining packages → extra_data_dirs.
-    # args.augmented_dir / package_aa → scanned_dir; remaining → extra_scanned_dirs.
-    packages = args.packages
-    args.data_dir = str(args.output_dir / packages[0])
-    args.scanned_dir = str(args.augmented_dir / packages[0])
-    if len(packages) > 1:
-        args.extra_data_dir = [str(args.output_dir / p) for p in packages[1:]]
-        args.extra_scanned_dir = [str(args.augmented_dir / p) for p in packages[1:]]
+    # Wire all pipeline-produced package dirs into training args.
+    _wire_training_data_from_packages(args, args.packages)
 
     cmd_train(args)
 
@@ -549,8 +616,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Rendered output directory (default: data/realbook_primus)")
     p_pipe.add_argument("--augmented-dir", type=Path, default=Path("data/realbook_primus_augmented"),
                         help="Augmented output directory (default: data/realbook_primus_augmented)")
-    p_pipe.add_argument("--packages", nargs="+", default=["package_aa", "package_ab"],
-                        help="Packages to process (default: package_aa package_ab)")
+    p_pipe.add_argument("--packages", nargs="+", default=None,
+                        help="Packages to process (default: auto-discover all package_* under --primus-dir)")
     p_pipe.add_argument("--vocab-path", type=str, default="src/CRNN_CTC/vocabulary.txt",
                         help="Output vocabulary path")
     p_pipe.add_argument("--limit", type=int, default=None,
@@ -570,7 +637,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_ptrain.add_argument("--primus-dir", type=Path, default=Path("data/primus"))
     p_ptrain.add_argument("--output-dir", type=Path, default=Path("data/realbook_primus"))
     p_ptrain.add_argument("--augmented-dir", type=Path, default=Path("data/realbook_primus_augmented"))
-    p_ptrain.add_argument("--packages", nargs="+", default=["package_aa", "package_ab"])
+    p_ptrain.add_argument("--packages", nargs="+", default=None,
+                          help="Packages to process (default: auto-discover all package_* under --primus-dir)")
     p_ptrain.add_argument("--limit", type=int, default=None)
     p_ptrain.add_argument("--workers", type=int, default=10)
     p_ptrain.add_argument("--verbose", action="store_true")

@@ -82,6 +82,7 @@ def _train_one_epoch(
     scaler: GradScaler,
     device: torch.device,
     use_amp: bool,
+    max_grad_norm: float = 5.0,
 ) -> float:
     """Run one training epoch. Returns average loss."""
     model.train()
@@ -105,7 +106,7 @@ def _train_one_epoch(
         scaler.scale(loss).backward()
         # Gradient clipping — essential for CTC stability
         scaler.unscale_(optimiser)
-        nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
+        nn.utils.clip_grad_norm_(model.parameters(), max_norm=max_grad_norm)
 
         # Track scale before step: if it drops, the step was skipped (inf/NaN
         # in gradients during AMP warm-up). Only advance the LR scheduler when
@@ -375,6 +376,7 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
 
         train_loss = _train_one_epoch(
             model, train_loader, criterion, optimiser, scheduler, scaler, device, use_amp,
+            max_grad_norm=cfg.max_grad_norm,
         )
         val_loss, val_ser = _validate(
             model, val_loader, criterion, vocab, device, use_amp,
@@ -404,6 +406,8 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
                     "epoch": epoch,
                     "model_state_dict": model.state_dict(),
                     "optimiser_state_dict": optimiser.state_dict(),
+                    "scheduler_state_dict": scheduler.state_dict(),
+                    "scaler_state_dict": scaler.state_dict(),
                     "val_ser": val_ser,
                     "val_loss": val_loss,
                     "config": cfg,

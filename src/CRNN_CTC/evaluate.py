@@ -290,8 +290,15 @@ def evaluate(
 
     # ── Load model from checkpoint ─────────────────────────────────────────
     ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    ckpt_vocab_size = ckpt.get("vocab_size")
+    if ckpt_vocab_size is not None and ckpt_vocab_size != len(vocab):
+        raise ValueError(
+            f"Vocab size mismatch: checkpoint was trained with {ckpt_vocab_size} "
+            f"tokens but current vocabulary has {len(vocab)}. "
+            f"Rebuild the vocabulary or use the matching vocab file."
+        )
     model = CRNN(
-        vocab_size=ckpt.get("vocab_size", len(vocab)),
+        vocab_size=ckpt_vocab_size or len(vocab),
         cnn_out_channels=cfg.cnn_out_channels,
         rnn_hidden=cfg.rnn_hidden,
         rnn_layers=cfg.rnn_layers,

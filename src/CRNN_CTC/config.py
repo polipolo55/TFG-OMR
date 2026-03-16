@@ -82,6 +82,7 @@ class Config:
     warmup_frac: float = 0.05      # fraction of total steps for LR warm-up
     num_workers: int = 10          # DataLoader workers
     early_stopping_patience: int = 10  # stop if val SER stalls N epochs (0 = off)
+    max_grad_norm: float = 5.0         # gradient clipping max norm
 
     def __post_init__(self) -> None:
         self.model_dir.mkdir(parents=True, exist_ok=True)

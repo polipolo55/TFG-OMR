@@ -27,7 +27,7 @@ from functools import partial
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 from tqdm import tqdm
 
 # Shared rendering back-end (single source of truth for clef maps, template,
@@ -116,6 +116,20 @@ def _parse_duration(dur_str: str) -> str:
     if lily_dur is None:
         raise ValueError(f"Unknown duration: {dur_str!r}")
     return lily_dur + dots
+
+
+def _is_valid_png(path: Path) -> bool:
+    """Return True when path exists and can be decoded as a non-empty PNG."""
+    if not path.exists():
+        return False
+    try:
+        if path.stat().st_size == 0:
+            return False
+        with Image.open(path) as img:
+            img.load()
+    except (OSError, ValueError, UnidentifiedImageError):
+        return False
+    return True
 
 
 def _parse_key(ks_str: str) -> str:
@@ -259,7 +273,9 @@ def process_sample(
     out_png    = out_sample / f"{sample_id}.png"
 
     if out_png.exists() and not force:
-        return True  # already processed
+        if _is_valid_png(out_png):
+            return True  # already processed and healthy
+        log.warning("Invalid existing PNG for %s (%s); re-rendering", sample_id, out_png)
 
     # Parse semantic → LilyPond music body
     try:

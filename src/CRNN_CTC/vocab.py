@@ -115,6 +115,7 @@ class Vocabulary:
     def save(self, path: str | Path) -> None:
         """Save vocabulary to a text file (one token per line, no blank/pad/unk)."""
         path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
         # Skip blank, pad, and unk (indices 0, 1, 2)
         lines = self._idx2tok[3:]
         path.write_text("\n".join(lines) + "\n", encoding="utf-8")

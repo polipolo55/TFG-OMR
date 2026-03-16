@@ -95,23 +95,21 @@ def _discover_samples(
     *,
     require_lmx: bool = True,
 ) -> list[tuple[str, Path, Path]]:
-    """Return ``(sample_id, png_path, lmx_path)`` triples, sorted by id.
+    """Return ``(sample_id, png_path, lmx_path)`` triples discovered recursively.
 
-    Parameters
-    ----------
-    data_dir : Path
-        Root directory containing per-sample sub-folders.
-    require_lmx : bool
-        If *True* (default), skip samples missing a ``.lmx`` file.
+    ``data_dir`` may contain arbitrary nested package structure; any directory
+    that contains a ``{name}.png`` (and optionally ``{name}.lmx``) is treated
+    as a sample directory with ``name`` as the sample_id.
     """
     samples: list[tuple[str, Path, Path]] = []
-    for sub in sorted(data_dir.iterdir()):
-        if not sub.is_dir():
-            continue
-        sid = sub.name
-        png = sub / f"{sid}.png"
+    if not data_dir.is_dir():
+        return samples
+
+    for png in sorted(data_dir.rglob("*.png")):
+        sid = png.stem
+        sub = png.parent
         lmx = sub / f"{sid}.lmx"
-        if not png.exists() or png.stat().st_size == 0:
+        if png.stat().st_size == 0:
             continue
         if require_lmx and not lmx.exists():
             log.debug("Skipping %s — no .lmx file", sid)

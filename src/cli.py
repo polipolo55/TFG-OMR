@@ -178,9 +178,14 @@ def cmd_vocab(args: argparse.Namespace) -> None:
     log.info("Building vocabulary from %d directories …", len(data_dirs))
     for d in data_dirs:
         log.info("  - %s", d)
-    vocab = Vocabulary.build_from_lmx_dirs(data_dirs)
+    try:
+        vocab = Vocabulary.build_from_lmx_dirs(data_dirs, workers=args.workers)
+    except RuntimeError as exc:
+        log.error("Vocabulary build failed: %s", exc)
+        sys.exit(1)
+
     vocab.save(out_path)
-    log.info("Saved vocabulary (%d tokens incl. blank+pad) → %s", len(vocab), out_path)
+    log.info("Saved vocabulary (%d tokens incl. blank+pad+unk) → %s", len(vocab), out_path)
 
 
 # ── train ─────────────────────────────────────────────────────────────────
@@ -343,55 +348,58 @@ def cmd_augment(args: argparse.Namespace) -> None:
 # ── pipeline ──────────────────────────────────────────────────────────────
 
 def cmd_pipeline(args: argparse.Namespace) -> None:
-    """Run the full data pipeline (render → convert → augment → vocab)."""
-    args.packages = _resolve_packages(args.primus_dir, args.packages)
+    """Run the full data pipeline (render → convert → augment → vocab).
 
-    # 1. Render all packages
-    for pkg in args.packages:
-        log.info("--- Rendering %s ---", pkg)
-        pkg_args = argparse.Namespace(
-            source=args.primus_dir / pkg,
-            output=args.output_dir / pkg,
-            dpi=200,
-            limit=args.limit,
-            workers=args.workers,
-            force=False,
-            no_lmx=False,
-            verbose=args.verbose,
-        )
-        cmd_render(pkg_args)
+    New layout (no package-specific wiring):
+        raw PrIMuS:          data/raw/primus/...
+        clean rendered:      data/processed/primus/clean/...
+        scanned/augmented:   data/processed/primus/scanned/...
+        vocabulary:          data/vocab/primus_lmx.txt
+    """
+    # 1. Render raw PrIMuS → clean dataset (PNG + .semantic/.agnostic/.mid + .lmx)
+    log.info("--- Rendering PrIMuS → clean dataset ---")
+    render_args = argparse.Namespace(
+        source=args.raw_primus_dir,
+        output=args.clean_dir,
+        dpi=200,
+        limit=args.limit,
+        workers=args.workers,
+        force=False,
+        no_lmx=False,
+        verbose=args.verbose,
+    )
+    cmd_render(render_args)
 
-    # 2. Convert all packages
-    for pkg in args.packages:
-        log.info("--- Converting %s ---", pkg)
-        pkg_args = argparse.Namespace(
-            source=args.output_dir / pkg,
-            limit=args.limit,
-            workers=args.workers,
-            verbose=args.verbose,
-        )
-        cmd_convert(pkg_args)
+    # 2. (Optional) Re-run semantic → LMX conversion over clean dataset
+    #    This is safe even if generate_realbook already produced .lmx files.
+    log.info("--- Converting .semantic → .lmx in clean dataset ---")
+    convert_args = argparse.Namespace(
+        source=args.clean_dir,
+        limit=args.limit,
+        workers=args.workers,
+        verbose=args.verbose,
+    )
+    cmd_convert(convert_args)
 
-    # 3. Augment all packages
-    for pkg in args.packages:
-        log.info("--- Augmenting %s ---", pkg)
-        pkg_args = argparse.Namespace(
-            source=args.output_dir / pkg,
-            output=args.augmented_dir / pkg,
-            copies=1,
-            seed=42,
-            workers=args.workers,
-            limit=args.limit,
-        )
-        cmd_augment(pkg_args)
+    # 3. Augment clean images → scanned/augmented dataset (labels copied over)
+    log.info("--- Augmenting clean images → scanned dataset ---")
+    augment_args = argparse.Namespace(
+        source=args.clean_dir,
+        output=args.scanned_dir,
+        copies=1,
+        seed=42,
+        workers=args.workers,
+        limit=args.limit,
+    )
+    cmd_augment(augment_args)
 
-    # 4. Build unified vocabulary
-    log.info("--- Building Unified Vocabulary ---")
-    data_dirs = [str(args.output_dir / pkg) for pkg in args.packages]
+    # 4. Build unified vocabulary over the clean dataset
+    log.info("--- Building unified LMX vocabulary ---")
     vocab_args = argparse.Namespace(
-        data_dir=data_dirs[0],
-        extra_data_dir=data_dirs[1:] if len(data_dirs) > 1 else None,
+        data_dir=str(args.clean_dir),
+        extra_data_dir=None,
         output=args.vocab_path,
+        workers=args.workers,
     )
     cmd_vocab(vocab_args)
 
@@ -403,9 +411,9 @@ def cmd_pipeline_train(args: argparse.Namespace) -> None:
     cmd_pipeline(args)
     log.info("--- Starting Training ---")
 
-    # Wire all pipeline-produced package dirs into training args.
-    _wire_training_data_from_packages(args, args.packages)
-
+    # Wire pipeline-produced dirs into training args for Config.
+    args.data_dir = str(args.clean_dir)
+    args.scanned_dir = str(args.scanned_dir)
     cmd_train(args)
 
 
@@ -417,15 +425,29 @@ def _add_common_data_args(parser: argparse.ArgumentParser) -> None:
     """Add flags shared by train / evaluate."""
     g = parser.add_argument_group("data")
     g.add_argument("--data-dir", type=str, default=None,
-                   help="Root sample directory (default: data/realbook_primus/package_aa)")
+                   help="Root clean sample directory "
+                        "(default: data/processed/primus/clean)")
     g.add_argument("--scanned-dir", type=str, default=None,
-                   help="Scanned-image directory (default: data/realbook_primus_augmented/package_aa)")
+                   help="Scanned-image directory "
+                        "(default: data/processed/primus/scanned)")
     g.add_argument("--vocab-path", type=str, default=None,
-                   help="Vocabulary file (default: src/CRNN_CTC/vocabulary.txt)")
+                   help="Vocabulary file (default: data/vocab/primus_lmx.txt)")
     g.add_argument("--img-height", type=int, default=None,
                    help="Resize images to this height (default: 128)")
-    g.add_argument("--use-scanned", action="store_true", default=None,
-                   help="Use augmented scanned images instead of clean originals (default: True)")
+    scan_group = g.add_mutually_exclusive_group()
+    scan_group.add_argument(
+        "--use-scanned",
+        dest="use_scanned",
+        action="store_true",
+        default=None,
+        help="Use augmented scanned images instead of clean originals (default: True)",
+    )
+    scan_group.add_argument(
+        "--no-use-scanned",
+        dest="use_scanned",
+        action="store_false",
+        help="Force use of clean originals only (override default True).",
+    )
     g.add_argument("--val-frac", type=float, default=None,
                    help="Validation split fraction (default: 0.10)")
     g.add_argument("--test-frac", type=float, default=None,
@@ -487,11 +509,12 @@ def build_parser() -> argparse.ArgumentParser:
                     "optionally generate LMX labels inline.",
     )
     p_rend.add_argument("--source", type=Path,
-                        default=Path("data/primus/package_aa"),
-                        help="PrIMuS source directory (default: data/primus/package_aa)")
+                        default=Path("data/raw/primus"),
+                        help="PrIMuS source root (default: data/raw/primus)")
     p_rend.add_argument("--output", type=Path,
-                        default=Path("data/realbook_primus/package_aa"),
-                        help="Output dataset directory (default: data/realbook_primus/package_aa)")
+                        default=Path("data/processed/primus/clean"),
+                        help="Clean rendered dataset root "
+                             "(default: data/processed/primus/clean)")
     p_rend.add_argument("--dpi", type=int, default=200,
                         help="Rendering resolution (default: 200)")
     p_rend.add_argument("--limit", type=int, default=None,
@@ -511,8 +534,9 @@ def build_parser() -> argparse.ArgumentParser:
         description="Run the semantic → LMX conversion pipeline.",
     )
     p_conv.add_argument("--source", type=Path,
-                        default=Path("data/realbook_primus/package_aa"),
-                        help="Root directory of PrIMuS samples")
+                        default=Path("data/processed/primus/clean"),
+                        help="Root directory of clean rendered samples "
+                             "(default: data/processed/primus/clean)")
     p_conv.add_argument("--limit", type=int, default=None,
                         help="Process only N samples (for smoke tests)")
     p_conv.add_argument("--workers", type=int, default=_get_default_workers(),
@@ -528,11 +552,12 @@ def build_parser() -> argparse.ArgumentParser:
         description="Distort clean LilyJAZZ PNGs to simulate physical scans.",
     )
     p_aug.add_argument("--source", type=Path,
-                       default=Path("data/realbook_primus/package_aa"),
-                       help="Clean dataset root (default: data/realbook_primus/package_aa)")
+                       default=Path("data/processed/primus/clean"),
+                       help="Clean dataset root (default: data/processed/primus/clean)")
     p_aug.add_argument("--output", type=Path,
-                       default=Path("data/realbook_primus_augmented/package_aa"),
-                       help="Output root (default: data/realbook_primus_augmented/package_aa)")
+                       default=Path("data/processed/primus/scanned"),
+                       help="Scanned/augmented dataset root "
+                            "(default: data/processed/primus/scanned)")
     p_aug.add_argument("--copies", type=int, default=None,
                        help="Augmented copies per sample (default: 1)")
     p_aug.add_argument("--seed", type=int, default=None,
@@ -550,13 +575,21 @@ def build_parser() -> argparse.ArgumentParser:
         description="Scan .lmx files and produce a sorted vocabulary.",
     )
     p_vocab.add_argument("--data-dir", type=str,
-                         default="data/realbook_primus/package_aa",
-                         help="Directory with .lmx files (searched recursively)")
+                         default="data/processed/primus/clean",
+                         help="Directory with .lmx files (searched recursively, "
+                              "default: data/processed/primus/clean)")
     p_vocab.add_argument("--extra-data-dir", type=str, action="append", default=None,
                          help="Additional data directory (repeatable, for package_ab etc.)")
     p_vocab.add_argument("--output", type=str,
-                         default="src/CRNN_CTC/vocabulary.txt",
-                         help="Output vocabulary file path")
+                         default="data/vocab/primus_lmx.txt",
+                         help="Output vocabulary file path "
+                              "(default: data/vocab/primus_lmx.txt)")
+    p_vocab.add_argument(
+        "--workers",
+        type=int,
+        default=_get_default_workers(),
+        help="Parallel workers when scanning .lmx files (default: cpu_count - 2)",
+    )
     p_vocab.set_defaults(func=cmd_vocab)
 
     # ── train ─────────────────────────────────────────────────────────
@@ -610,18 +643,19 @@ def build_parser() -> argparse.ArgumentParser:
         "pipeline",
         help="Run full data pipeline (render → convert → augment → vocab)",
     )
-    p_pipe.add_argument("--primus-dir", type=Path, default=Path("data/primus"),
-                        help="PrIMuS source directory (default: data/primus)")
-    p_pipe.add_argument("--output-dir", type=Path, default=Path("data/realbook_primus"),
-                        help="Rendered output directory (default: data/realbook_primus)")
-    p_pipe.add_argument("--augmented-dir", type=Path, default=Path("data/realbook_primus_augmented"),
-                        help="Augmented output directory (default: data/realbook_primus_augmented)")
-    p_pipe.add_argument("--packages", nargs="+", default=None,
-                        help="Packages to process (default: auto-discover all package_* under --primus-dir)")
-    p_pipe.add_argument("--vocab-path", type=str, default="src/CRNN_CTC/vocabulary.txt",
-                        help="Output vocabulary path")
+    p_pipe.add_argument("--raw-primus-dir", type=Path, default=Path("data/raw/primus"),
+                        help="PrIMuS source root (default: data/raw/primus)")
+    p_pipe.add_argument("--clean-dir", type=Path, default=Path("data/processed/primus/clean"),
+                        help="Rendered clean output root "
+                             "(default: data/processed/primus/clean)")
+    p_pipe.add_argument("--scanned-dir", type=Path, default=Path("data/processed/primus/scanned"),
+                        help="Scanned/augmented output root "
+                             "(default: data/processed/primus/scanned)")
+    p_pipe.add_argument("--vocab-path", type=str, default="data/vocab/primus_lmx.txt",
+                        help="Output vocabulary path "
+                             "(default: data/vocab/primus_lmx.txt)")
     p_pipe.add_argument("--limit", type=int, default=None,
-                        help="Limit samples per package (for testing)")
+                        help="Limit number of samples processed (for testing)")
     p_pipe.add_argument("--workers", type=int, default=_get_default_workers(),
                         help="Parallel workers (default: cpu_count - 2)")
     p_pipe.add_argument("--verbose", action="store_true",
@@ -633,18 +667,16 @@ def build_parser() -> argparse.ArgumentParser:
         "pipeline-train",
         help="Run full data pipeline followed by training",
     )
-    # Pipeline-specific args
-    p_ptrain.add_argument("--primus-dir", type=Path, default=Path("data/primus"))
-    p_ptrain.add_argument("--output-dir", type=Path, default=Path("data/realbook_primus"))
-    p_ptrain.add_argument("--augmented-dir", type=Path, default=Path("data/realbook_primus_augmented"))
-    p_ptrain.add_argument("--packages", nargs="+", default=None,
-                          help="Packages to process (default: auto-discover all package_* under --primus-dir)")
+    # Pipeline-specific args (dedicated to pipeline; train uses wired values)
+    p_ptrain.add_argument("--raw-primus-dir", type=Path, default=Path("data/raw/primus"))
+    p_ptrain.add_argument("--clean-dir", type=Path, default=Path("data/processed/primus/clean"))
+    p_ptrain.add_argument("--scanned-dir", type=Path, default=Path("data/processed/primus/scanned"))
+    p_ptrain.add_argument("--vocab-path", type=str, default="data/vocab/primus_lmx.txt")
     p_ptrain.add_argument("--limit", type=int, default=None)
-    p_ptrain.add_argument("--workers", type=int, default=10)
+    p_ptrain.add_argument("--workers", type=int, default=_get_default_workers())
     p_ptrain.add_argument("--verbose", action="store_true")
     
-    # Training-specific args (inherited)
-    _add_common_data_args(p_ptrain)
+    # Training-specific args (inherited, excluding generic data paths)
     _add_model_args(p_ptrain)
     
     # Training-specific flags not covered by common groups
@@ -657,8 +689,49 @@ def build_parser() -> argparse.ArgumentParser:
     g_train.add_argument("--early-stopping-patience", type=int, default=None)
     g_train.add_argument("--model-dir", type=str, default=None)
     g_train.add_argument("--resume", nargs="?", const="", default=None, metavar="CHECKPOINT")
+    # Data-related training overrides (optional; by default pipeline dirs are used)
+    g_data = p_ptrain.add_argument_group("data")
+    g_data.add_argument("--img-height", type=int, default=None,
+                        help="Resize images to this height (default: 128)")
+    scan_group = g_data.add_mutually_exclusive_group()
+    scan_group.add_argument(
+        "--use-scanned",
+        dest="use_scanned",
+        action="store_true",
+        default=None,
+        help="Use scanned/augmented images (default: True)",
+    )
+    scan_group.add_argument(
+        "--no-use-scanned",
+        dest="use_scanned",
+        action="store_false",
+        help="Force use of clean originals only (override default True).",
+    )
+    g_data.add_argument("--val-frac", type=float, default=None,
+                        help="Validation split fraction (default: 0.10)")
+    g_data.add_argument("--test-frac", type=float, default=None,
+                        help="Test split fraction (default: 0.10)")
+    g_data.add_argument("--num-workers", type=int, default=None,
+                        help="DataLoader workers (default: 10)")
+    g_data.add_argument("--seed", type=int, default=None,
+                        help="Random seed (default: 42)")
+    g_data.add_argument("--no-filter-rest-heavy", dest="filter_rest_heavy",
+                        action="store_false", default=None,
+                        help="Disable filtering of rest-heavy samples (default: enabled)")
+    g_data.add_argument("--no-filter-unwanted-clefs", dest="filter_unwanted_clefs",
+                        action="store_false", default=None,
+                        help="Disable filtering of C1/C2 clef samples (default: enabled)")
+    g_data.add_argument("--no-filter-multi-staff", dest="filter_multi_staff",
+                        action="store_false", default=None,
+                        help="Disable filtering of multi-staff (tall) images (default: enabled)")
+    g_data.add_argument("--max-source-height", type=int, default=None,
+                        help="Max original image height for single-staff filter (default: 180 px)")
+    g_data.add_argument("--extra-data-dir", type=str, action="append", default=None,
+                        help="Additional clean data directory (repeatable)")
+    g_data.add_argument("--extra-scanned-dir", type=str, action="append", default=None,
+                        help="Additional scanned data directory (repeatable)")
     
-    p_ptrain.set_defaults(func=cmd_pipeline_train, vocab_path="src/CRNN_CTC/vocabulary.txt")
+    p_ptrain.set_defaults(func=cmd_pipeline_train)
 
     return parser
 

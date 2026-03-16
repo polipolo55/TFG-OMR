@@ -24,11 +24,6 @@ from tqdm import tqdm
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%H:%M:%S",
-)
 log = logging.getLogger(__name__)
 
 PAPER_BRIGHT  = 242
@@ -257,8 +252,8 @@ def main() -> None:
     parser.add_argument(
         "--workers",
         type=int,
-        default=max(1, (os.cpu_count() or 4) // 2),
-        help="Parallel workers (default: half of CPU count)",
+        default=max(1, (os.cpu_count() or 4) - 2),
+        help="Parallel workers (default: cpu_count - 2)",
     )
     parser.add_argument(
         "--maxtasks",
@@ -287,6 +282,14 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    # Configure logging only if the root logger has no handlers yet
+    if not logging.getLogger().handlers:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s [%(levelname)s] %(message)s",
+            datefmt="%H:%M:%S",
+        )
+
     # --- Label-only sync mode (fast, no images) ---
     if args.sync_labels:
         log.info("Syncing labels from %s → %s ...", args.source, args.output)
@@ -295,7 +298,7 @@ def main() -> None:
         return
 
     candidate_dirs = sorted(
-        d for d in args.source.iterdir()
+        d for d in args.source.rglob("*")
         if d.is_dir() and not d.name.startswith(".")
         and (d / f"{d.name}.png").exists()
     )

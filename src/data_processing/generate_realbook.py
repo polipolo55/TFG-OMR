@@ -42,11 +42,6 @@ from CRNN_CTC.lilypond_render import (
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%H:%M:%S",
-)
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -367,8 +362,8 @@ def main() -> None:
     parser.add_argument(
         "--workers",
         type=int,
-        default=os.cpu_count(),
-        help="Parallel workers (default: CPU count)",
+        default=max(1, (os.cpu_count() or 4) - 2),
+        help="Parallel workers (default: cpu_count - 2)",
     )
     parser.add_argument(
         "--force",
@@ -387,7 +382,14 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    if args.verbose:
+    # Configure logging only if the root logger has no handlers yet
+    if not logging.getLogger().handlers:
+        logging.basicConfig(
+            level=logging.DEBUG if args.verbose else logging.INFO,
+            format="%(asctime)s [%(levelname)s] %(message)s",
+            datefmt="%H:%M:%S",
+        )
+    elif args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
     # Collect all sample directories (immediate children of package_* dirs)

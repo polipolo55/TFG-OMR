@@ -19,12 +19,16 @@ class Config:
     """Pipeline configuration — paths, data, model, and training settings."""
 
     # ── Paths ──────────────────────────────────────────────────────────────
-    data_dir: Path = Path("data/realbook_primus/package_aa")
-    scanned_dir: Path = Path("data/realbook_primus_augmented/package_aa")
+    # Clean / scanned data follow the new unified layout:
+    #   data/raw/primus/...
+    #   data/processed/primus/clean/...
+    #   data/processed/primus/scanned/...
+    data_dir: Path = Path("data/processed/primus/clean")
+    scanned_dir: Path = Path("data/processed/primus/scanned")
     extra_data_dirs: list[Path] = field(default_factory=list)
     extra_scanned_dirs: list[Path] = field(default_factory=list)
     model_dir: Path = Path("models")
-    vocab_path: Path = Path("src/CRNN_CTC/vocabulary.txt")
+    vocab_path: Path = Path("data/vocab/primus_lmx.txt")
 
     # ── Reproducibility ────────────────────────────────────────────────────
     seed: int = 42

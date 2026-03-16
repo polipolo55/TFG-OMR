@@ -149,8 +149,7 @@ class Vocabulary:
         token_set: set[str] = set()
 
         if not all_lmx_files:
-            log.warning("No .lmx files found in provided directories.")
-            return cls([])
+            raise RuntimeError("No .lmx files found in provided directories.")
 
         log.info("Scanning %d .lmx files using %d workers...", len(all_lmx_files), workers)
 

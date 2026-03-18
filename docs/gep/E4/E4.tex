@@ -1,0 +1,652 @@
+\documentclass[11pt, a4paper]{article}
+
+% --- PACKAGES ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage[margin=2.5cm]{geometry}
+\setlength{\headheight}{13.6pt}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{caption}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{csquotes}
+\usepackage{enumitem}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{eurosym}
+\usepackage{siunitx}
+\usepackage{pgfgantt}
+\usepackage{pdflscape}
+
+% --- BIBLIOGRAPHY SETUP ---
+\usepackage[style=ieee, sorting=none]{biblatex}
+\DeclareBibliographyAlias{video}{online}
+\addbibresource{../E1/references.bib}
+\addbibresource{../E3/references.bib}
+
+% --- HEADER & FOOTER ---
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{Optical Music Recognition for jazz lead sheets}
+\fancyhead[R]{GEP Deliverable 4}
+\fancyfoot[C]{\thepage}
+
+% --- LINKS ---
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    filecolor=magenta,
+    urlcolor=blue,
+    citecolor=blue,
+}
+
+% --- GANTT COLORS ---
+\definecolor{gpMgmt}{HTML}{1565C0}
+\definecolor{gpSprint1}{HTML}{2E7D32}
+\definecolor{gpSprint2}{HTML}{E65100}
+\definecolor{gpSprint3}{HTML}{880E4F}
+\definecolor{gpSprint4}{HTML}{6A1B9A}
+\definecolor{gpSprint5}{HTML}{00695C}
+\definecolor{gpMilestone}{HTML}{D32F2F}
+
+\begin{document}
+
+% ==========================================
+% TITLE PAGE
+% ==========================================
+\begin{titlepage}
+    \centering
+
+    \vspace*{-1.5cm}
+    \begin{figure}[h!]
+        \centering
+        \includegraphics[width=\textwidth]{../E1/figures/portada_logo.png}
+    \end{figure}
+
+    \vspace{2.5cm}
+
+    {\LARGE\bfseries OPTICAL MUSIC RECOGNITION FOR JAZZ LEAD SHEETS:\ A CRNN-CTC APPROACH FOR MONOPHONIC LINES \par}
+
+    \vspace{2.5cm}
+
+    {\large\bfseries POL CASANOVAS PUIG \par}
+
+    \vspace{2.5cm}
+
+    {\small Thesis supervisor \par}
+    {\small MANEL FRIGOLA BOURLON (Department of Automatic Control) \par}
+
+    \vspace{0.5cm}
+
+    {\small GEP tutor \par}
+    {\small XAVIER MORALES SOROLLA \par}
+
+    \vspace{0.5cm}
+
+    {\small Degree \par}
+    {\small Bachelor's Degree in Informatics Engineering (Computing) \par}
+
+    \vspace{1cm}
+
+    {\small\bfseries GEP Deliverable 4: Final Document \par}
+
+    \vfill
+
+    {\small\bfseries Facultat d'Inform\`atica de Barcelona (FIB) \par}
+
+    \vspace{0.2cm}
+
+    {\small\bfseries Universitat Polit\`ecnica de Catalunya (UPC) -- BarcelonaTech \par}
+
+    \vspace{0.8cm}
+    {\small March 2026 \par}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ==========================================
+\section{Introduction and Context}
+\label{sec:intro-context}
+
+\subsection{Academic and Professional Framework}
+This project is developed in the academic context of the Bachelor's Thesis (TFG) at FIB--UPC, under modality A, as part of the requirements to complete the Computer Science degree at the Universitat Polit\`ecnica de Catalunya (UPC). The project is supervised by Manel Frigola Bourlon and guided in project management by Xavier Morales Sorolla.
+
+The work is framed within the Computacio specialty and focuses on the intersection of music and artificial intelligence. The topic is motivated by a practical need in music education and performance: converting printed lead sheets into machine-readable formats with less manual effort.
+
+\subsection{Domain Terms and Concepts}
+The project uses the following key concepts:
+\begin{itemize}
+    \item \textbf{Optical Music Recognition (OMR):} automatic conversion of sheet-music images into symbolic formats such as MusicXML or MIDI~\cite{shatriOPTICALMUSICRECOGNITION}.
+    \item \textbf{CRNN-CTC:} architecture combining convolutional feature extraction with recurrent sequence modeling and CTC alignment.
+    \item \textbf{Lead sheet:} compact score representation used in jazz, typically containing melody and harmonic symbols.
+    \item \textbf{Monophonic transcription:} recognition of a single melodic line, without simultaneous note voices.
+    \item \textbf{SER (Symbol Error Rate):} sequence-level metric used to evaluate transcription quality~\cite{SymbolErrorRate}.
+\end{itemize}
+
+\subsection{Problem Statement}
+Jazz lead sheets are often available only as scanned or printed documents. Manual transcription into notation software is slow, repetitive, and prone to mistakes. Generic OMR systems are usually optimized for classical full-score notation and often perform poorly on lead-sheet conventions (compact layout, jazz engraving style, mixed symbolic elements).
+
+The project addresses this gap by developing a reproducible end-to-end prototype tailored to monophonic lead-sheet lines, prioritizing practical feasibility within the constraints of a Bachelor's thesis.
+
+\subsection{Stakeholders}
+\begin{itemize}
+    \item \textbf{Musicians and students:} need searchable, editable, and transposable scores.
+    \item \textbf{Educators:} require digital materials for classes and exercises.
+    \item \textbf{Archivists and libraries:} benefit from improved preservation and retrieval of music documents.
+    \item \textbf{MIR and OMR researchers:} can reuse dataset, code, and evaluation outputs.
+\end{itemize}
+
+% ==========================================
+\section{Justification of the Chosen Alternative}
+\label{sec:justification}
+
+\subsection{Existing Alternatives}
+Current OMR systems can be grouped into three families~\cite{shatriOPTICALMUSICRECOGNITION}:
+\begin{enumerate}
+    \item \textbf{Traditional modular pipelines} (staff detection/removal, segmentation, classification), with known error propagation issues~\cite{dalitzComparativeStudyStaff2008}.
+    \item \textbf{CRNN-CTC sequence models}, well suited to left-to-right staff-line transcription and widely used in modern monophonic OMR benchmarks~\cite{PrIMuSDataset,simonettaOpticalMusicRecognition2024}.
+    \item \textbf{Transformer-based end-to-end models}, stronger for page-level and polyphonic settings but heavier in data and compute needs~\cite{vilaAntoniorv6SMT2026,UfalOlimpicicdar24Practical,simonettaOpticalMusicRecognition2024}.
+\end{enumerate}
+
+\subsection{Selection Criteria}
+The decision is based on: expected accuracy in monophonic lines, implementation complexity, compatibility with available GPU resources, reproducibility, and suitability for an incremental development plan.
+
+\begin{table}[h!]
+    \centering
+    \caption{Comparison of alternatives against project criteria (++, +, -, --).}
+    \label{tab:alt-comparison}
+    \renewcommand{\arraystretch}{1.15}
+    \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{3.6cm} c c c}
+        \toprule
+        \textbf{Criterion} & \textbf{Traditional pipeline} & \textbf{CRNN-CTC} & \textbf{Transformer} \\
+        \midrule
+        Monophonic line accuracy         & -  & +  & ++ \\
+        Computational feasibility        & ++ & +  & -- \\
+        Data requirements                & ++ & +  & -- \\
+        Implementation complexity        & +  & +  & -- \\
+        Reproducibility in TFG timeline  & +  & ++ & -  \\
+        Extension potential (future work)& -  & +  & ++ \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+This comparison shows why CRNN-CTC is the best fit for this TFG stage: it provides enough modeling capacity for monophonic lead sheets while remaining trainable and debuggable within the available timeframe and hardware.
+
+\subsection{Chosen Alternative}
+The selected solution is a \textbf{CRNN-CTC architecture} trained for \textbf{monophonic line transcription}. This option provides a good compromise between performance and feasibility: it is lighter than transformer alternatives, has strong prior art in OMR datasets, and supports robust sequence prediction without requiring symbol-level segmentation.
+
+The decision is also justified by risk control. A modular baseline can be implemented early and used as a lower bound, while the CRNN-CTC model can be iteratively improved through data and training refinements. This creates a robust path where the project still produces valid results even if advanced extensions cannot be completed in time.
+
+\subsection{Methodology and Rigour}
+The project follows an \textbf{iterative and incremental} methodology, with sprint-based checkpoints and supervisor reviews. Each cycle produces measurable outputs (datasets, training logs, SER values, and error analyses), enabling evidence-based replanning.
+
+Monitoring tools include Git/GitHub for version control, experiment logs for model runs, and periodic milestone meetings with the supervisor to validate priorities and risk responses.
+
+Rigour is enforced through four concrete practices:
+\begin{itemize}
+    \item \textbf{Traceability:} every milestone output is linked to repository commits and documented decisions.
+    \item \textbf{Reproducibility:} data generation, training, and evaluation are script-driven, with fixed configuration files.
+    \item \textbf{Quantitative control:} SER is measured at each significant training iteration, with side metrics for failure analysis.
+    \item \textbf{Corrective loop:} each sprint ends with a review that can adjust scope, estimates, and risk responses.
+\end{itemize}
+
+% ==========================================
+\section{Project Scope}
+\label{sec:scope}
+
+\subsection{General Objective}
+Develop and evaluate a proof-of-concept OMR system based on CRNN-CTC capable of transcribing monophonic jazz lead-sheet lines into a machine-readable symbolic representation.
+
+\subsection{Specific Objectives}
+\begin{itemize}
+    \item Review state-of-the-art OMR methods and identify practical design decisions.
+    \item Build a baseline pipeline and a CRNN-CTC model for comparison.
+    \item Construct a suitable training/evaluation dataset using synthetic rendering and augmentation.
+    \item Evaluate model quality with SER and qualitative error analysis.
+    \item Release a reproducible code and configuration workflow.
+\end{itemize}
+
+\subsection{Functional Requirements}
+\begin{itemize}
+    \item Input: scanned or photographed score images.
+    \item Processing: extraction of monophonic line images and sequence recognition.
+    \item Output: symbolic sequence preserving pitch, duration, rests, and meter context.
+    \item Evaluation: quantitative metrics and comparable baseline results.
+\end{itemize}
+
+\subsection{Non-Functional Requirements}
+\begin{itemize}
+    \item \textbf{Accuracy:} improve over the classical baseline in SER.
+    \item \textbf{Reproducibility:} scripts and configuration available in repository.
+    \item \textbf{Feasibility:} training on consumer-grade GPU (RTX 3060 12GB class).
+    \item \textbf{Modularity:} separable stages for data, model, and evaluation.
+\end{itemize}
+
+\subsection{Scope Boundaries}
+\textbf{In scope:} monophonic lead-sheet lines, model training and evaluation, synthetic data pipeline, and comparative analysis.
+
+\textbf{Out of scope:} full polyphonic transcription, complete page-layout understanding, handwritten notation coverage, and large-scale transformer training from scratch.
+
+\subsection{Main Risks and Obstacles}
+\begin{itemize}
+    \item Limited target-domain labels.
+    \item Error propagation from preprocessing into recognition.
+    \item CTC alignment instability in early runs.
+    \item GPU-time constraints during iterative retraining.
+    \item Scope creep toward polyphony before reaching monophonic targets.
+\end{itemize}
+
+% ==========================================
+\section{Project Planning}
+\label{sec:planning}
+
+\subsection{Task-Level Planning, Dependencies, and Resources}
+The planning spans 21 weeks (February--June 2026), organized into 5 technical sprints plus a transversal management package (WP0). Table~\ref{tab:task-summary} details tasks at task level, estimated hours, dependencies, and required resources.
+
+The precedence logic is the following: Sprint 1 provides the analytical and baseline foundation; Sprint 2 builds the dataset and label encoding required by training; Sprint 3 develops the first CRNN-CTC model; Sprint 4 performs the iterative train-evaluate-improve loop; Sprint 5 consolidates final evaluation and thesis delivery. WP0 runs in parallel to guarantee management continuity and documentation quality.
+
+\begin{table}[h!]
+    \centering
+    \caption{Task summary with estimates, dependencies, and resources.}
+    \label{tab:task-summary}
+    \renewcommand{\arraystretch}{1.05}
+    \scriptsize
+    \begin{tabularx}{\linewidth}{c >{\raggedright}p{4.2cm} r >{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}p{2.0cm}}
+        \toprule
+        \textbf{Code} & \textbf{Task} & \textbf{h} & \textbf{Dependencies} & \textbf{Resources} \\
+        \midrule
+        \multicolumn{5}{l}{\textbf{WP0 -- Project Management (130 h)}} \\
+        \midrule
+        T0.1 & Context and scope definition         & 20  & --           & Zotero \\
+        T0.2 & Temporal planning                    & 12  & T0.1           & -- \\
+        T0.3 & Budget and sustainability             & 15  & T0.2           & -- \\
+        T0.4 & Final GEP integration                & 8   & T0.3           & -- \\
+        T0.5 & Supervisor meetings                  & 25  & Concurrent     & -- \\
+        T0.6 & Thesis writing                       & 50  & Concurrent     & LaTeX \\
+        \midrule
+        \multicolumn{5}{l}{\textbf{WP1 -- Sprint 1: Literature Review and Baseline (78 h)}} \\
+        \midrule
+        T1.1 & OMR literature survey                & 25  & --           & Library access \\
+        T1.2 & Dataset exploration                  & 15  & T1.1 (partial) & -- \\
+        T1.3 & Classical CV baseline implementation  & 25  & T1.2           & OpenCV \\
+        T1.4 & Baseline evaluation                  & 10  & T1.3           & -- \\
+        T1.5 & Sprint 1 review                      & 3   & T1.4           & -- \\
+        \midrule
+        \multicolumn{5}{l}{\textbf{WP2 -- Sprint 2: Dataset Construction (73 h)}} \\
+        \midrule
+        T2.1 & Output encoding design               & 12  & T1.5           & music21 \\
+        T2.2 & Synthetic rendering pipeline         & 35  & T2.1           & LilyPond \\
+        T2.3 & Data augmentation                    & 15  & T2.2           & OpenCV \\
+        T2.4 & Validation and splits                & 8   & T2.3           & -- \\
+        T2.5 & Sprint 2 review                      & 3   & T2.4           & -- \\
+        \midrule
+        \multicolumn{5}{l}{\textbf{WP3 -- Sprint 3: CRNN-CTC Development (75 h)}} \\
+        \midrule
+        T3.1 & CRNN architecture design             & 25  & T2.5           & Consumer GPU \\
+        T3.2 & Training pipeline implementation      & 20  & T3.1           & -- \\
+        T3.3 & Initial training run                 & 15  & T3.2           & GPU \\
+        T3.4 & Evaluation framework                 & 12  & T3.2 (partial) & -- \\
+        T3.5 & Sprint 3 review                      & 3   & T3.3, T3.4     & -- \\
+        \midrule
+        \multicolumn{5}{l}{\textbf{WP4 -- Sprint 4: Iterative Refinement (68 h)}} \\
+        \midrule
+        T4.1 & Error analysis                       & 10  & T3.5           & -- \\
+        T4.2 & Data pipeline improvements           & 15  & T4.1           & -- \\
+        T4.3 & Model refinement runs                & 25  & T4.2           & GPU \\
+        T4.4 & Ablation studies                     & 15  & T4.3           & GPU \\
+        T4.5 & Sprint 4 review                      & 3   & T4.4           & -- \\
+        \midrule
+        \multicolumn{5}{l}{\textbf{WP5 -- Sprint 5: Final Evaluation and Defence (85 h)}} \\
+        \midrule
+        T5.1 & Final evaluation                     & 15  & T4.5           & GPU \\
+        T5.2 & Qualitative error analysis           & 10  & T5.1           & -- \\
+        T5.3 & Extension exploration (conditional)  & 20  & T5.1           & GPU \\
+        T5.4 & Final thesis writing                 & 30  & T5.2           & LaTeX \\
+        T5.5 & Defence preparation                  & 10  & T5.4           & -- \\
+        \midrule
+        & \textbf{TOTAL}                           & \textbf{509} & & \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\subsection{Gantt and Time Estimates}
+The schedule includes realistic task concurrence, review milestones, and a conditional extension buffer in Sprint 5. Figure~\ref{fig:gantt} summarizes the full timeline.
+
+Estimates are expressed in hours per task and were validated against available weekly workload (4--5 effective hours/day). Concurrency is intentionally limited to avoid unrealistic multitasking in a single-person project; overlap is only introduced when tasks are naturally compatible (for example, evaluation framework development while the first training run is ongoing).
+
+\begin{landscape}
+\begin{figure}[p]
+    \centering
+    \begin{ganttchart}[
+        hgrid,
+        vgrid={dotted},
+        x unit=0.84cm,
+        y unit title=0.5cm,
+        y unit chart=0.35cm,
+        title height=1,
+        title label font=\scriptsize,
+        bar label font=\tiny,
+        bar height=0.6,
+        group label font=\tiny\bfseries,
+        milestone label font=\tiny\bfseries,
+    ]{1}{21}
+
+        \gantttitle{February}{4}
+        \gantttitle{March}{4}
+        \gantttitle{April}{5}
+        \gantttitle{May}{4}
+        \gantttitle{June}{4} \\
+        \gantttitlelist{1,...,21}{1} \\
+
+        \ganttgroup[group/.append style={fill=gpMgmt!30}]{WP0: Project Management}{1}{21} \\
+        \ganttbar[bar/.append style={fill=gpMgmt!60}]{T0.1 Context and scope}{1}{3} \\
+        \ganttbar[bar/.append style={fill=gpMgmt!60}]{T0.2 Planning}{3}{5} \\
+        \ganttbar[bar/.append style={fill=gpMgmt!60}]{T0.3 Budget and sustain.}{5}{7} \\
+        \ganttbar[bar/.append style={fill=gpMgmt!60}]{T0.4 GEP final}{7}{9} \\
+        \ganttbar[bar/.append style={fill=gpMgmt!40}]{T0.5 Meetings}{1}{21} \\
+        \ganttbar[bar/.append style={fill=gpMgmt!40}]{T0.6 Thesis writing}{5}{21} \\
+
+        \ganttgroup[group/.append style={fill=gpSprint1!30}]{WP1: Sprint 1}{1}{4} \\
+        \ganttbar[bar/.append style={fill=gpSprint1!60}]{T1.1 Literature survey}{1}{2} \\
+        \ganttbar[bar/.append style={fill=gpSprint1!60}]{T1.2 Dataset exploration}{2}{3} \\
+        \ganttbar[bar/.append style={fill=gpSprint1!60}]{T1.3 CV baseline}{2}{4} \\
+        \ganttbar[bar/.append style={fill=gpSprint1!60}]{T1.4 Baseline eval.}{3}{4} \\
+        \ganttmilestone[milestone/.append style={fill=gpMilestone}]{M1 review}{4} \\
+
+        \ganttgroup[group/.append style={fill=gpSprint2!30}]{WP2: Sprint 2}{5}{8} \\
+        \ganttbar[bar/.append style={fill=gpSprint2!60}]{T2.1 Encoding}{5}{5} \\
+        \ganttbar[bar/.append style={fill=gpSprint2!60}]{T2.2 Rendering}{5}{7} \\
+        \ganttbar[bar/.append style={fill=gpSprint2!60}]{T2.3 Augmentation}{7}{7} \\
+        \ganttbar[bar/.append style={fill=gpSprint2!60}]{T2.4 Validation}{7}{8} \\
+        \ganttmilestone[milestone/.append style={fill=gpMilestone}]{M2 review}{8} \\
+
+        \ganttgroup[group/.append style={fill=gpSprint3!30}]{WP3: Sprint 3}{9}{12} \\
+        \ganttbar[bar/.append style={fill=gpSprint3!60}]{T3.1 Architecture}{9}{10} \\
+        \ganttbar[bar/.append style={fill=gpSprint3!60}]{T3.2 Training pipeline}{10}{11} \\
+        \ganttbar[bar/.append style={fill=gpSprint3!60}]{T3.3 Initial training}{11}{12} \\
+        \ganttbar[bar/.append style={fill=gpSprint3!60}]{T3.4 Evaluation framework}{11}{12} \\
+        \ganttmilestone[milestone/.append style={fill=gpMilestone}]{M3 review}{12} \\
+
+        \ganttgroup[group/.append style={fill=gpSprint4!30}]{WP4: Sprint 4}{13}{16} \\
+        \ganttbar[bar/.append style={fill=gpSprint4!60}]{T4.1 Error analysis}{13}{13} \\
+        \ganttbar[bar/.append style={fill=gpSprint4!60}]{T4.2 Data fixes}{13}{14} \\
+        \ganttbar[bar/.append style={fill=gpSprint4!60}]{T4.3 Refinement}{14}{15} \\
+        \ganttbar[bar/.append style={fill=gpSprint4!60}]{T4.4 Ablations}{15}{16} \\
+        \ganttmilestone[milestone/.append style={fill=gpMilestone}]{M4 review}{16} \\
+
+        \ganttgroup[group/.append style={fill=gpSprint5!30}]{WP5: Sprint 5}{17}{21} \\
+        \ganttbar[bar/.append style={fill=gpSprint5!60}]{T5.1 Final eval.}{17}{17} \\
+        \ganttbar[bar/.append style={fill=gpSprint5!60}]{T5.2 Error analysis}{17}{18} \\
+        \ganttbar[bar/.append style={fill=gpSprint5!60}]{T5.3 Extension (cond.)}{17}{19} \\
+        \ganttbar[bar/.append style={fill=gpSprint5!60}]{T5.4 Thesis final}{19}{20} \\
+        \ganttbar[bar/.append style={fill=gpSprint5!60}]{T5.5 Defence prep.}{20}{21} \\
+        \ganttmilestone[milestone/.append style={fill=gpMilestone}]{Final defence}{21} \\
+    \end{ganttchart}
+    \caption{Gantt chart for weeks 1--21 (February--June 2026).}
+    \label{fig:gantt}
+\end{figure}
+\end{landscape}
+
+\subsection{Alternative Plans and Risk Response}
+Table~\ref{tab:risk-register} identifies the main risks and explicit response plans.
+
+\begin{table}[h!]
+    \centering
+    \caption{Risk register with alternative plans and estimated impact.}
+    \label{tab:risk-register}
+    \renewcommand{\arraystretch}{1.15}
+    \scriptsize
+    \begin{tabularx}{\linewidth}{>{\raggedright}p{2.1cm} c >{\raggedright}p{3.2cm} >{\raggedright}p{2.7cm} >{\raggedright\arraybackslash}p{2.0cm}}
+        \toprule
+        \textbf{Risk} & \textbf{L/I} & \textbf{Alternative plan} & \textbf{Duration impact} & \textbf{Extra resources} \\
+        \midrule
+        Limited ground-truth data & H/H & Fall back to PrIMuS-only data and strengthen augmentation. & Reallocate up to 10 h. & None. \\
+        Staff detection instability & M/M & Use manually cropped line regions for critical evaluations. & Shift hours from T5.3 to T5.4. & None. \\
+        CTC underfitting/misalignment & M/H & Simplify vocabulary, retrain with cleaned subsets. & Up to 10 h from buffer. & Additional GPU time. \\
+        Compute constraints & L-M/M & Reduce model/data size or rent cloud GPU. & Up to 5 h setup. & Cloud GPU (\EUR{}20--50). \\
+        Scope creep & M/H & Restrict extension to feasibility discussion only. & Recover up to 18 h. & None. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+To improve schedule robustness, the plan includes explicit slack in three places: conservative estimation in high-uncertainty tasks (dataset rendering and model refinement), a conditional extension task that can be reduced without affecting core objectives, and progressive thesis writing during execution instead of postponing writing to the final weeks.
+
+% ==========================================
+\section{Economic Management}
+\label{sec:economic-management}
+
+\subsection{Budget Structure and Cost Identification}
+The budget follows the GEP framework and includes: human resources by activity, general costs, amortization, contingency, and incidentals~\cite{gepModule24EconomicManagement}.
+
+\subsection{Human Resources Cost Estimates}
+Hourly rates are based on Spanish ICT salary data and loaded with a 1.35 multiplier to account for employer social-security costs~\cite{ineEncuestaEstructuraSalarial2023,segSocialCotizacion2025}.
+
+\begin{table}[h!]
+    \centering
+    \caption{Roles and loaded hourly rates.}
+    \label{tab:roles-cost}
+    \renewcommand{\arraystretch}{1.1}
+    \begin{tabularx}{\linewidth}{l r r r}
+        \toprule
+        \textbf{Role} & \textbf{Gross (\EUR{}/year)} & \textbf{Loaded (\EUR{}/year)} & \textbf{\EUR{}/h} \\
+        \midrule
+        Project Manager   & 38,000 & 51,300 & 29.15 \\
+        Research Analyst  & 33,000 & 44,550 & 25.31 \\
+        ML Engineer       & 36,000 & 48,600 & 27.61 \\
+        Technical Writer  & 30,000 & 40,500 & 23.01 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+In addition to work-package totals, Table~\ref{tab:staff-task-cost} itemizes staff cost by activity, aligned with the Gantt tasks. A blended loaded rate of \EUR{}26.75/h is used for planning-level allocation (rounded); this yields \EUR{}13,615.57 total human resources cost.
+
+\begin{table}[h!]
+    \centering
+    \caption{Staff cost by activity (task-level itemization).}
+    \label{tab:staff-task-cost}
+    \renewcommand{\arraystretch}{1.04}
+    \scriptsize
+    \begin{tabularx}{\linewidth}{c >{\raggedright\arraybackslash}X r r}
+        \toprule
+        \textbf{Task} & \textbf{Description} & \textbf{Hours} & \textbf{Staff cost (\EUR{})} \\
+        \midrule
+        T0.1 & Context and scope definition & 20 & 535.00 \\
+        T0.2 & Temporal planning & 12 & 321.00 \\
+        T0.3 & Budget and sustainability & 15 & 401.25 \\
+        T0.4 & Final GEP integration & 8 & 214.00 \\
+        T0.5 & Supervisor meetings & 25 & 668.75 \\
+        T0.6 & Thesis writing & 50 & 1,337.50 \\
+        T1.1 & OMR literature survey & 25 & 668.75 \\
+        T1.2 & Dataset exploration & 15 & 401.25 \\
+        T1.3 & Classical CV baseline implementation & 25 & 668.75 \\
+        T1.4 & Baseline evaluation & 10 & 267.50 \\
+        T1.5 & Sprint 1 review & 3 & 80.25 \\
+        T2.1 & Output encoding design & 12 & 321.00 \\
+        T2.2 & Synthetic rendering pipeline & 35 & 936.25 \\
+        T2.3 & Data augmentation & 15 & 401.25 \\
+        T2.4 & Validation and splits & 8 & 214.00 \\
+        T2.5 & Sprint 2 review & 3 & 80.25 \\
+        T3.1 & CRNN architecture design & 25 & 668.75 \\
+        T3.2 & Training pipeline implementation & 20 & 535.00 \\
+        T3.3 & Initial training run & 15 & 401.25 \\
+        T3.4 & Evaluation framework & 12 & 321.00 \\
+        T3.5 & Sprint 3 review & 3 & 80.25 \\
+        T4.1 & Error analysis & 10 & 267.50 \\
+        T4.2 & Data pipeline improvements & 15 & 401.25 \\
+        T4.3 & Model refinement runs & 25 & 668.75 \\
+        T4.4 & Ablation studies & 15 & 401.25 \\
+        T4.5 & Sprint 4 review & 3 & 80.25 \\
+        T5.1 & Final evaluation & 15 & 401.25 \\
+        T5.2 & Qualitative error analysis & 10 & 267.50 \\
+        T5.3 & Extension exploration (conditional) & 20 & 535.00 \\
+        T5.4 & Final thesis writing & 30 & 802.50 \\
+        T5.5 & Defence preparation & 10 & 267.50 \\
+        \midrule
+        \multicolumn{2}{r}{\textbf{TOTAL}} & \textbf{509} & \textbf{13,615.57} \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[h!]
+    \centering
+    \caption{Human resources budget by work package.}
+    \label{tab:hr-budget}
+    \renewcommand{\arraystretch}{1.05}
+    \begin{tabularx}{\linewidth}{c >{\raggedright\arraybackslash}X r r}
+        \toprule
+        \textbf{WP} & \textbf{Work package} & \textbf{Hours} & \textbf{Cost (\EUR{})} \\
+        \midrule
+        WP0 & Project management & 130 & 3,482.50 \\
+        WP1 & Literature review and baseline & 78 & 2,066.20 \\
+        WP2 & Dataset construction & 73 & 1,992.55 \\
+        WP3 & CRNN-CTC development & 75 & 2,075.37 \\
+        WP4 & Iterative refinement & 68 & 1,859.10 \\
+        WP5 & Final evaluation and defence & 85 & 2,139.85 \\
+        \midrule
+        & \textbf{TOTAL HUMAN RESOURCES} & \textbf{509} & \textbf{13,615.57} \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\subsection{General Costs, Amortization, and Incidentals}
+\begin{table}[h!]
+    \centering
+    \caption{General costs summary.}
+    \label{tab:general-costs}
+    \renewcommand{\arraystretch}{1.1}
+    \begin{tabularx}{\linewidth}{X r}
+        \toprule
+        \textbf{Item} & \textbf{Cost (\EUR{})} \\
+        \midrule
+        Hardware amortization (desktop, monitor, peripherals) & 125.69 \\
+        Software licenses (open-source stack) & 0.00 \\
+        Overheads (electricity + internet) & 125.00 \\
+        \midrule
+        \textbf{TOTAL GENERAL COSTS} & \textbf{250.69} \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[h!]
+    \centering
+    \caption{Incidentals linked to risk materialization scenarios.}
+    \label{tab:incidentals}
+    \renewcommand{\arraystretch}{1.1}
+    \scriptsize
+    \begin{tabularx}{\linewidth}{>{\raggedright}p{1.0cm} >{\raggedright}p{4.2cm} r r r}
+        \toprule
+        \textbf{Risk} & \textbf{Contingency action} & \textbf{Full cost (\EUR{})} & \textbf{Prob.} & \textbf{Weighted (\EUR{})} \\
+        \midrule
+        R1 & Additional data cleaning and augmentation cycle & 276.10 & 25\% & 69.03 \\
+        R3 & Retraining cycle with simplified vocabulary and tuning & 276.10 & 20\% & 55.22 \\
+        R4 & Temporary cloud GPU rental and setup & 178.05 & 15\% & 26.71 \\
+        R5 & Scope reduction in extension task (already internalized) & 0.00 & 30\% & 0.00 \\
+        \midrule
+        \multicolumn{4}{r}{\textbf{TOTAL INCIDENTALS}} & \textbf{150.96} \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+A contingency reserve of 15\% is applied over human resources + general costs:
+\[
+\text{Contingency} = 0.15 \times (13,615.57 + 250.69) = \EUR{}2,079.94
+\]
+
+Incidentals linked to the main risk responses are estimated at \EUR{}150.96.
+
+\begin{table}[h!]
+    \centering
+    \caption{Total budget.}
+    \label{tab:total-budget}
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabularx}{\linewidth}{X r}
+        \toprule
+        \textbf{Budget component} & \textbf{Cost (\EUR{})} \\
+        \midrule
+        Human resources & 13,615.57 \\
+        General costs & 250.69 \\
+        Contingency (15\%) & 2,079.94 \\
+        Incidentals & 150.96 \\
+        \midrule
+        \textbf{TOTAL PROJECT BUDGET} & \textbf{16,097.16} \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\subsection{Budget Management Control}
+Budget tracking is performed at each sprint review with earned-value-inspired indicators:
+\begin{itemize}
+    \item \textbf{Cost Variance (CV)}: $\mathrm{CV} = \mathrm{BCWP} - \mathrm{ACWP}$.
+    \item \textbf{Schedule Variance (SV)}: $\mathrm{SV} = \mathrm{BCWP} - \mathrm{BCWS}$.
+    \item \textbf{Cost Performance Index (CPI)}: $\mathrm{CPI} = \mathrm{BCWP} / \mathrm{ACWP}$.
+\end{itemize}
+
+Corrective actions are triggered when: $|\mathrm{CV}| > 10\%$ of sprint budget, $\mathrm{SV} < -5\%$, or $\mathrm{CPI} < 0.90$ for two consecutive reviews.
+
+% ==========================================
+\section{Sustainability and Social Commitment}
+\label{sec:sustainability}
+
+\subsection{Self-Assessment Summary}
+After completing the sustainability self-assessment questionnaire, I identified that my strongest area is the economic dimension of sustainability in software projects, especially cost estimation, trade-off analysis, and management control. I am comfortable reasoning about whether a technical decision is financially realistic within a constrained project and about how planning choices affect viability and long-term maintenance cost. The questionnaire also showed a medium level in social reflection: I generally consider accessibility and user benefit, but I still tend to prioritize technical performance first and social impact second when under time pressure.
+
+My weakest area is the environmental lifecycle perspective. Before this project, I mainly associated environmental impact with direct energy consumption during model training. The reflection process made me consider additional factors that I had not analyzed in depth: hardware manufacturing footprint, end-of-life device management, and the difference between one-time experimentation and sustained deployment impact. I also realized that selecting lighter architectures is not only a computational decision, but also an environmental one.
+
+As a result, this self-assessment produced three concrete improvement commitments for the rest of the thesis: first, to quantify energy-related impact whenever possible instead of using only qualitative statements; second, to justify architecture choices with both performance and efficiency criteria; and third, to explicitly discuss who benefits from the resulting tool and under what limitations. Overall, the questionnaire was useful because it transformed sustainability from a formal reporting requirement into a design constraint that can guide technical decisions throughout the project lifecycle.
+
+This reflection also improves my personal competency for future professional work: I now see project quality as a balance between technical success, economic feasibility, environmental responsibility, and social value.
+
+\subsection{Sustainability Matrix (Initial Milestone)}
+Table~\ref{tab:sustainability-matrix} summarizes the reflection using the economic, environmental, and social dimensions requested in the GEP sustainability guide~\cite{gepSustainabilityReport2018}.
+
+\subsubsection{Economic Dimension Reflection}
+\textbf{PPP.} The project cost is estimated at \EUR{}16,097.16, dominated by specialized engineering time. This is coherent with a research-intensive software project where tooling and hardware costs are relatively low compared with human capital.
+
+\textbf{Useful life and state of the art.} Current alternatives for lead-sheet digitization are manual transcription or generic OMR tools. Manual transcription is expensive in recurring cost and turnaround time. Generic OMR tools may require substantial correction for jazz notation specifics. A specialized and open-source CRNN-CTC model can lower recurrent cost by reducing correction workload and eliminating license barriers for many users.
+
+\textbf{Improvement contribution.} The main economic improvement is not zero-cost digitization but a lower cost per corrected page after deployment, plus reproducibility benefits for research and education.
+
+\subsubsection{Environmental Dimension Reflection}
+\textbf{PPP.} The estimated project energy consumption is approximately 57.5 kWh, corresponding to around 13.2 kg CO\textsubscript{2} with the Spanish electricity factor used in this report~\cite{reeInformeSistemaElectrico2024,mitecoFactorEmision2025}. The largest contributor is GPU training.
+
+\textbf{Minimization plan.} To reduce impact, the project uses a lightweight backbone, mixed-precision training, early stopping, and reuse of existing hardware. Data generation and training are organized in batches to avoid repeated redundant runs.
+
+\textbf{Useful life and improvement contribution.} Once trained, inference has low marginal energy cost compared with retraining. Sharing model weights and scripts allows re-use of the one-time training cost across multiple users and academic iterations.
+
+\subsubsection{Social Dimension Reflection}
+\textbf{PPP.} In personal development terms, the project strengthens competencies in machine learning engineering, project planning, and scientific communication. It also reinforces ethical awareness on limitations and failure modes.
+
+\textbf{Useful life and real need.} There is a real demand for digitizing lead sheets used in education and performance contexts. Beneficiaries include musicians, teachers, archivists, and researchers. The project can improve quality of life by reducing repetitive manual work, enabling quicker access to learning material, and facilitating preservation of music content.
+
+\textbf{Boundaries.} Social value depends on transparent communication of current limitations (monophonic focus, expected error profile), avoiding overpromising in scenarios outside the validated scope.
+
+\begin{table}[h!]
+    \centering
+    \caption{Sustainability matrix for the project.}
+    \label{tab:sustainability-matrix}
+    \renewcommand{\arraystretch}{1.2}
+    \scriptsize
+    \begin{tabularx}{\linewidth}{>{\raggedright}p{2.3cm} >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X}
+        \toprule
+        \textbf{Dimension} & \textbf{PPP (design and development)} & \textbf{Useful life (deployment and impact)} \\
+        \midrule
+        Economic & Project budget is estimated at \EUR{}16,097.16, with explicit contingency and incidentals. Main cost driver is specialized engineering time. & Open-source release and fast local inference can reduce recurrent transcription costs compared with manual copying and commercial tools. \\
+        Environmental & Estimated energy use is approximately 57.5 kWh for the project, with mitigation via mixed precision, early stopping, and reuse of existing hardware~\cite{reeInformeSistemaElectrico2024,mitecoFactorEmision2025}. & One-time training cost is amortized over repeated inference; local execution can reduce cloud dependency for common use cases. \\
+        Social & The project strengthens personal technical competencies and promotes responsible data and software practices. & Potential beneficiaries include musicians, educators, archivists, and researchers through improved accessibility, searchability, and preservation of music documents. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\subsection{Commitment and Ethical Position}
+The project is aligned with social commitment through open-science practices (reproducible code, transparent metrics, and documented limitations). It does not process personal data and does not involve safety-critical automated decision making. Ethical limitations are explicitly documented, especially regarding performance boundaries outside monophonic lead-sheet scenarios.
+
+% ==========================================
+\newpage
+\printbibliography[heading=bibintoc, title={References}]
+
+\end{document}

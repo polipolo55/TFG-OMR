@@ -40,18 +40,21 @@ _CHORD_ALLOWLIST = (
 # Preprocessing
 # ---------------------------------------------------------------------------
 
-_MIN_OCR_HEIGHT = 160   # Target ~5× upscale from the typical 28px chord strip
+_MIN_OCR_HEIGHT = 160   # Target ~5× upscale from a typical 28-40px chord strip
+_MIN_GRAY_HEIGHT = 100
+
+# EasyOCR can stall on very wide images.  We cap the processed width at this
+# value.  At 200 DPI a full-page chord strip scaled to 160px height reaches
+# ~7 000-8 000 px; 6 500 px keeps the widest strips intact while staying
+# within EasyOCR's comfortable range.
+_MAX_OCR_WIDTH = 6500
 
 
 def _ensure_light_background(gray: np.ndarray) -> np.ndarray:
     """Invert the image if the background appears to be dark."""
-    # If the median pixel is below 128, background is dark — invert
     if float(np.median(gray)) < 128:
         return cv2.bitwise_not(gray)
     return gray
-
-
-_MAX_OCR_WIDTH = 5000  # EasyOCR struggles with very wide images
 
 
 def _preprocess_binary(binary: np.ndarray) -> np.ndarray:
@@ -60,13 +63,14 @@ def _preprocess_binary(binary: np.ndarray) -> np.ndarray:
     Uses INTER_NEAREST so binary edges stay sharp without gray anti-aliasing.
     Inverts the strip so background is white and text is black.
     """
-    # binary has ink=1; invert → white background, black text
     img = cv2.bitwise_not((binary > 0).astype(np.uint8) * 255)
     h, w = img.shape
+    if h == 0 or w == 0:
+        return img
 
     if h < _MIN_OCR_HEIGHT:
         scale = _MIN_OCR_HEIGHT / h
-        new_h = int(h * scale)
+        new_h = _MIN_OCR_HEIGHT
         new_w = int(w * scale)
         if new_w > _MAX_OCR_WIDTH:
             new_w = _MAX_OCR_WIDTH
@@ -80,22 +84,16 @@ def _preprocess_binary(binary: np.ndarray) -> np.ndarray:
     return img
 
 
-_MIN_GRAY_HEIGHT = 100   # 100px grayscale works better than 160px (smaller → less width distortion)
-
-
 def _preprocess_gray(gray: np.ndarray) -> np.ndarray:
-    """Upscale a grayscale strip for EasyOCR using Cubic + CLAHE + sharpen.
-
-    Used as a fallback when binary-based OCR finds nothing.  100px target
-    keeps images at ~2900px wide which EasyOCR handles comfortably.
-    """
+    """Upscale a grayscale strip for EasyOCR using Cubic + CLAHE + sharpen."""
     if gray.dtype != np.uint8:
         gray = np.clip(gray, 0, 255).astype(np.uint8)
     if gray.ndim == 3:
         gray = cv2.cvtColor(gray, cv2.COLOR_BGR2GRAY) if gray.shape[2] == 3 else gray[:, :, 0]
-
     img = _ensure_light_background(gray)
     h, w = img.shape
+    if h == 0 or w == 0:
+        return img
 
     if h < _MIN_GRAY_HEIGHT:
         scale = _MIN_GRAY_HEIGHT / h
@@ -164,7 +162,7 @@ def recognize_chords(
         # Primary: binary-based (crisp edges from the pre-binarized strip)
         result = _run_ocr_on_image(reader, _preprocess_binary(binary))
 
-        # Fallback: grayscale-based OCR (Lanczos + CLAHE) when binary misses
+        # Fallback: grayscale-based OCR (Cubic + CLAHE) when binary misses
         if not result:
             result = _run_ocr_on_image(reader, _preprocess_gray(gray))
 

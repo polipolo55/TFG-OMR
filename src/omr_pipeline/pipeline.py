@@ -22,26 +22,36 @@ def is_pdf(data: bytes) -> bool:
 
 _OCR_PAD_Y = 25    # extra rows above/below text strip when feeding OCR
 
-# Vertical padding added to music strips before CRNN inference.
-# Training images include ~20-30 px of whitespace above and below the staff
-# (LilyPond rendering margin), but the slicer cuts strips to the dense-ink
-# boundary, chopping the treble clef's top spiral and low ledger lines.
-# This padding restores the headroom the model expects.
-_MUSIC_PAD_Y = 20  # px added above AND below the tight strip bbox
+# Vertical padding target for music strips before CRNN inference.
+# The treble clef's top spiral extends ~35 px above the top staff line; the
+# slicer's dense-ink threshold cuts it off.  We expand by up to this amount
+# but cap at the actual gap to the neighbouring strip so we don't bleed into
+# chord text from the adjacent system.
+_MUSIC_PAD_Y = 60  # target px — actual expansion is min(this, gap_to_neighbour)
 
 
-def _music_crop(s: Strip, grayscale: np.ndarray) -> np.ndarray:
+def _music_crop(
+    s: Strip,
+    grayscale: np.ndarray,
+    prev_end: int = 0,
+    next_start: int | None = None,
+) -> tuple[np.ndarray, int, int]:
     """Expand a music strip vertically for CRNN inference.
 
-    The slicer cuts strips to the dense-ink boundary.  Training images include
-    ~20-30 px of white margin above and below the staff (LilyPond rendering
-    adds padding).  Without this margin the treble clef's top curl is missing,
-    causing consistent clef:C3 predictions instead of clef:G2.
+    Returns ``(crop, y0, y1)`` where ``y0``/``y1`` are the absolute page
+    coordinates of the returned crop (used to draw the correct UI overlay).
+
+    Padding is adaptive: we use up to ``_MUSIC_PAD_Y`` pixels but never
+    cross into the neighbouring strip (gaps can be as small as 15 px).
     """
     H = grayscale.shape[0]
-    y0 = max(0, s.y_start - _MUSIC_PAD_Y)
-    y1 = min(H, s.y_end + _MUSIC_PAD_Y)
-    return grayscale[y0:y1, :]
+    if next_start is None:
+        next_start = H
+    top_pad = min(_MUSIC_PAD_Y, max(0, s.y_start - prev_end))
+    bot_pad = min(_MUSIC_PAD_Y, max(0, next_start - s.y_end))
+    y0 = max(0, s.y_start - top_pad)
+    y1 = min(H, s.y_end + bot_pad)
+    return grayscale[y0:y1, :], y0, y1
 
 
 def _ocr_crop(s: Strip, grayscale: np.ndarray) -> np.ndarray:
@@ -183,7 +193,16 @@ def run_pipeline(
     text_indices = [i for i, t in enumerate(types) if t == "text"]
 
     # Expand music crops vertically: tight slicer bbox clips the treble clef top.
-    music_images = [_music_crop(strips[i], page.grayscale) for i in music_indices]
+    # Pass actual neighbour boundaries so padding is capped by the real gap.
+    def _music_crop_with_bounds(strip_idx: int) -> tuple[np.ndarray, int, int]:
+        s = strips[strip_idx]
+        prev_end   = strips[strip_idx - 1].y_end   if strip_idx > 0              else 0
+        next_start = strips[strip_idx + 1].y_start if strip_idx < len(strips) - 1 else page.meta["height"]
+        return _music_crop(s, page.grayscale, prev_end=prev_end, next_start=next_start)
+
+    music_crops = [_music_crop_with_bounds(i) for i in music_indices]
+    music_images = [c for c, _, _ in music_crops]
+    music_y_bounds = {idx: (y0, y1) for idx, (_, y0, y1) in zip(music_indices, music_crops)}
 
     # For OCR pass both grayscale and binary images.
     # The binary image (pre-binarized by the slicer) gives EasyOCR cleaner
@@ -200,7 +219,11 @@ def run_pipeline(
 
     segments = []
     for i, (s, t) in enumerate(zip(strips, types)):
-        bbox = [s.x_start, s.y_start, s.x_end - s.x_start, s.y_end - s.y_start]
+        if t == "music" and i in music_y_bounds:
+            y0, y1 = music_y_bounds[i]
+            bbox = [s.x_start, y0, s.x_end - s.x_start, y1 - y0]
+        else:
+            bbox = [s.x_start, s.y_start, s.x_end - s.x_start, s.y_end - s.y_start]
         if t == "music":
             content = music_map.get(i, "")
             segments.append({"type": "music", "bbox": bbox, "content": content})

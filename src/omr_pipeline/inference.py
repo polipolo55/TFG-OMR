@@ -1,17 +1,16 @@
 """
-CRNN inference — load model once, prepare strips matching training, run recognition.
+CRNN inference — load model, normalise crops to match training, recognise.
 
-Strip preprocessing exactly matches dataset.py:
+Strip preprocessing matches dataset.py exactly:
   1. Grayscale uint8 → resize height to img_height, proportional width
-  2. float32 / 255.0
-  3. Per-image (img - mean) / (std + 1e-6)
+  2. float32 / 255
+  3. Per-image zero-mean unit-variance normalisation
   4. Pad batch to max width with zeros
 
-Domain-gap mitigation — width:
-  Training images are ~877 px wide at 128 px height (median).  Sliced Real Book
-  strips upscale to ~2150 px after the same height-resize — outside the training
-  distribution.  Wide strips are tiled into ~850 px chunks so each tile is
-  in-distribution before being fed to the CRNN.
+Staff-aware normalization centres the 5-line staff vertically in the crop
+so it occupies the same region as in the clean training images.  Overlapping
+tiles (50 %) with centre-crop merging avoid boundary-cut artefacts on wide
+strips.
 """
 from __future__ import annotations
 
@@ -30,24 +29,17 @@ if str(_SRC) not in sys.path:
 
 log = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Domain-gap constants
-# ---------------------------------------------------------------------------
-
-# Training median width at 128px height = 877px; p95 = 1219px.
-# Test strips resize to ~2150px — outside the training distribution.
-# We tile wide strips into chunks of this size so each tile matches training.
-_TILE_W_AT_128 = 850  # target tile width in resized (128px-height) coordinates
+_TILE_W_AT_128 = 850
+_TILE_OVERLAP = 0.50
 
 # ---------------------------------------------------------------------------
-# Cached model state (loaded once per process)
+# Model cache (loaded once per process)
 # ---------------------------------------------------------------------------
 
 _model_cache: dict = {}
 
 
 def _load_model(checkpoint_path: Path):
-    """Load and cache the CRNN model + vocab from a checkpoint."""
     key = str(checkpoint_path.resolve())
     if key in _model_cache:
         return _model_cache[key]
@@ -60,22 +52,20 @@ def _load_model(checkpoint_path: Path):
     ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
     cfg = ckpt.get("config", Config())
 
-    # Resolve vocab path.  The checkpoint stores a path that was valid when
-    # training ran; resolve it relative to several anchors to handle CWD
-    # differences and repo restructures.
-    _repo_root = checkpoint_path.resolve().parent
-    while _repo_root.parent != _repo_root and not (_repo_root / "pyproject.toml").exists():
-        _repo_root = _repo_root.parent
-    _vocab_candidates = [
-        Path(cfg.vocab_path),                                      # as-saved (works if CWD == project root)
-        _repo_root / cfg.vocab_path,                               # relative to repo root
-        _repo_root / "data" / "vocab" / "primus_lmx.txt",         # canonical location
-        checkpoint_path.parent.parent / "data" / "vocab" / "primus_lmx.txt",  # relative to run dir
+    repo_root = checkpoint_path.resolve().parent
+    while repo_root.parent != repo_root and not (repo_root / "pyproject.toml").exists():
+        repo_root = repo_root.parent
+
+    vocab_candidates = [
+        Path(cfg.vocab_path),
+        repo_root / cfg.vocab_path,
+        repo_root / "data" / "vocab" / "primus_lmx.txt",
+        checkpoint_path.parent.parent / "data" / "vocab" / "primus_lmx.txt",
     ]
-    vocab_path = next((p for p in _vocab_candidates if p.exists()), None)
+    vocab_path = next((p for p in vocab_candidates if p.exists()), None)
     if vocab_path is None:
         raise FileNotFoundError(
-            f"Cannot find vocab file; tried: {[str(p) for p in _vocab_candidates]}"
+            f"Cannot find vocab file; tried: {[str(p) for p in vocab_candidates]}"
         )
     vocab = Vocabulary.from_file(vocab_path)
 
@@ -92,58 +82,127 @@ def _load_model(checkpoint_path: Path):
 
     entry = {"model": model, "vocab": vocab, "cfg": cfg, "device": device}
     _model_cache[key] = entry
-    log.info("CRNN loaded from %s (epoch %d, val_SER=%.4f)",
-             checkpoint_path, ckpt.get("epoch", -1), ckpt.get("val_ser", -1))
+    log.info(
+        "CRNN loaded from %s (epoch %d, val_SER=%.4f)",
+        checkpoint_path, ckpt.get("epoch", -1), ckpt.get("val_ser", -1),
+    )
     return entry
 
 
 # ---------------------------------------------------------------------------
-# Strip preprocessing (must match dataset._load_image + __getitem__)
+# Staff-aware normalization
 # ---------------------------------------------------------------------------
 
-def _tile_strip(img: np.ndarray, img_height: int) -> list[np.ndarray]:
-    """Split a wide strip into horizontal tiles whose resized width matches
-    the training distribution (~850px at 128px height).
+def normalize_staff_crop(
+    grayscale: np.ndarray,
+    staff_line_ys: list[int] | None,
+    bbox_y0: int,
+) -> np.ndarray:
+    """Re-crop so the staff is centred vertically with a fixed margin.
 
-    Tiles are taken in the *original* image coordinates so that the
-    proportional resize in _prepare_strip happens per-tile.
+    Training images have a consistent vertical staff placement (~60 % of image
+    height).  Real-page crops have variable whitespace above/below.  This
+    function trims / pads the crop to match the training distribution.
+
+    Parameters
+    ----------
+    grayscale : 2-D uint8 array — the music region crop.
+    staff_line_ys : absolute page y-coordinates of the 5 staff lines, or None.
+    bbox_y0 : absolute y-offset of *grayscale* within the full page.
+    """
+    if grayscale.size == 0 or staff_line_ys is None or len(staff_line_ys) < 5:
+        return grayscale
+
+    local = [y - bbox_y0 for y in staff_line_ys]
+    top, bot = local[0], local[-1]
+    span = bot - top
+    if span <= 0:
+        return grayscale
+
+    # Target: staff occupies ~62 % of the crop height → multiplier ≈ 1.6
+    desired_h = max(int(span * 1.6), span + 20)
+    mid = (top + bot) / 2.0
+    y0 = int(mid - desired_h / 2.0)
+    y1 = y0 + desired_h
+
+    h = grayscale.shape[0]
+    pad_top = max(0, -y0)
+    pad_bot = max(0, y1 - h)
+    y0 = max(0, y0)
+    y1 = min(h, y1)
+
+    crop = grayscale[y0:y1, :]
+    if pad_top or pad_bot:
+        crop = cv2.copyMakeBorder(crop, pad_top, pad_bot, 0, 0,
+                                  cv2.BORDER_CONSTANT, value=255)
+    return crop
+
+
+# ---------------------------------------------------------------------------
+# Tiling
+# ---------------------------------------------------------------------------
+
+def _tile_strip(img: np.ndarray, img_height: int) -> list[tuple[np.ndarray, float, float]]:
+    """Split a wide strip into overlapping tiles.
+
+    Returns (tile, keep_start_frac, keep_end_frac) per tile.  Interior tiles
+    keep only the central 50 %; edge tiles keep more to avoid losing content.
     """
     h, w = img.shape[:2]
     if h == 0:
-        return [img]
-    # Compute what width each tile should be in the ORIGINAL image
-    tile_w_orig = max(1, round(_TILE_W_AT_128 * h / img_height))
+        return [(img, 0.0, 1.0)]
 
-    # If the strip is already narrow enough, no tiling needed
-    if w <= int(tile_w_orig * 1.3):
-        return [img]
+    tile_w = max(1, round(_TILE_W_AT_128 * h / img_height))
+    if w <= int(tile_w * 1.3):
+        return [(img, 0.0, 1.0)]
 
-    tiles = []
+    stride = max(1, int(tile_w * (1.0 - _TILE_OVERLAP)))
+    positions: list[tuple[int, int]] = []
     x = 0
     while x < w:
-        x1 = min(x + tile_w_orig, w)
-        tiles.append(img[:, x:x1])
-        x = x1
+        x1 = min(x + tile_w, w)
+        positions.append((x, x1))
+        if x1 >= w:
+            break
+        x += stride
+
+    n = len(positions)
+    tiles: list[tuple[np.ndarray, float, float]] = []
+    for i, (x0, x1) in enumerate(positions):
+        tile = img[:, x0:x1]
+        if n == 1:
+            tiles.append((tile, 0.0, 1.0))
+        elif i == 0:
+            tiles.append((tile, 0.0, 0.75))
+        elif i == n - 1:
+            tiles.append((tile, 0.25, 1.0))
+        else:
+            tiles.append((tile, 0.25, 0.75))
     return tiles
 
 
-def _prepare_strip(img: np.ndarray, img_height: int, max_width: int) -> tuple[Tensor, int]:
-    """Preprocess one grayscale strip exactly like the training dataset."""
+# ---------------------------------------------------------------------------
+# Per-tile preprocessing (must match dataset.py)
+# ---------------------------------------------------------------------------
+
+def _prepare_tile(img: np.ndarray, img_height: int, max_width: int) -> tuple[Tensor, int]:
     if img.dtype != np.uint8:
         img = (np.clip(img, 0, 1) * 255).astype(np.uint8)
-    if len(img.shape) == 3:
+    if img.ndim == 3:
         img = img[:, :, 0]
+
     h, w = img.shape
     if h == 0 or w == 0:
-        raise ValueError(f"Empty strip: {img.shape}")
+        raise ValueError(f"Empty tile: {img.shape}")
 
     new_w = max(1, round(w * img_height / h))
-    if max_width > 0 and new_w > max_width:
+    if 0 < max_width < new_w:
         new_w = max_width
     resized = cv2.resize(img, (new_w, img_height), interpolation=cv2.INTER_AREA)
+
     f = resized.astype(np.float32) / 255.0
     f = (f - f.mean()) / (f.std() + 1e-6)
-    return torch.from_numpy(f).unsqueeze(0), new_w  # (1, H, W), width
+    return torch.from_numpy(f).unsqueeze(0), new_w
 
 
 # ---------------------------------------------------------------------------
@@ -153,8 +212,13 @@ def _prepare_strip(img: np.ndarray, img_height: int, max_width: int) -> tuple[Te
 def recognize_music(
     strip_images: list[np.ndarray],
     checkpoint_path: Path | None = None,
+    staff_line_positions: list[list[int] | None] | None = None,
+    music_bbox_y0s: list[int] | None = None,
 ) -> list[str]:
-    """Run CRNN on staff strip images. Returns one LMX string per strip."""
+    """Run the CRNN on a list of music-staff crops.
+
+    Returns one LMX token string per strip.
+    """
     if not strip_images:
         return []
 
@@ -163,12 +227,7 @@ def recognize_music(
     if not checkpoint_path.exists():
         return [f"[no checkpoint: {checkpoint_path}]"] * len(strip_images)
 
-    try:
-        entry = _load_model(checkpoint_path)
-    except Exception as e:
-        log.error("Model load failed: %s", e)
-        return [f"[model error: {e}]"] * len(strip_images)
-
+    entry = _load_model(checkpoint_path)
     model = entry["model"]
     vocab = entry["vocab"]
     cfg = entry["cfg"]
@@ -178,57 +237,67 @@ def recognize_music(
 
     from CRNN_CTC.evaluate import greedy_decode
 
-    def _decode_batch(tiles: list[np.ndarray]) -> list[list[str]]:
-        """Run CRNN on a list of image tiles; return one token list per tile."""
+    # ----- batch-decode helper -----
+    def _decode(tiles: list[np.ndarray]) -> list[list[str]]:
         tensors: list[Tensor] = []
-        tile_widths: list[int] = []
-        for tile in tiles:
+        widths: list[int] = []
+        for t in tiles:
             try:
-                t, tw = _prepare_strip(tile, img_height, max_width)
-                tensors.append(t)
-                tile_widths.append(tw)
-            except Exception as e:
-                log.warning("Tile prep failed: %s", e)
-                tensors.append(torch.zeros(1, img_height, 1))
-                tile_widths.append(1)
+                tensor, tw = _prepare_tile(t, img_height, max_width)
+            except Exception as exc:
+                log.warning("Tile prep failed: %s", exc)
+                tensor = torch.zeros(1, img_height, 1)
+                tw = 1
+            tensors.append(tensor)
+            widths.append(tw)
 
         max_w = max(t.shape[-1] for t in tensors)
         padded = []
         for t in tensors:
             if t.shape[-1] < max_w:
-                pad = torch.zeros(1, img_height, max_w - t.shape[-1])
-                t = torch.cat([t, pad], dim=-1)
+                t = torch.cat([t, torch.zeros(1, img_height, max_w - t.shape[-1])], dim=-1)
             padded.append(t.unsqueeze(0))
 
         batch = torch.cat(padded, dim=0).to(device)
-        width_t = torch.tensor(tile_widths, dtype=torch.long, device=device)
+        width_t = torch.tensor(widths, dtype=torch.long, device=device)
         with torch.inference_mode():
             log_probs, out_lens = model(batch, width_t)
             return greedy_decode(log_probs, out_lens, vocab)
 
+    # ----- fill defaults -----
+    if staff_line_positions is None:
+        staff_line_positions = [None] * len(strip_images)
+    if music_bbox_y0s is None:
+        music_bbox_y0s = [0] * len(strip_images)
+
     results: list[str] = []
-    for img in strip_images:
+    for img, staff_ys, y0 in zip(strip_images, staff_line_positions, music_bbox_y0s):
         if img is None or img.size == 0:
             results.append("")
             continue
 
-        # Tile wide strips so each chunk is in the training width distribution
-        tiles = _tile_strip(img, img_height)
-        all_token_lists = _decode_batch(tiles)
+        normed = normalize_staff_crop(img, staff_ys, y0)
+        tile_info = _tile_strip(normed, img_height)
 
-        # Merge tile outputs.  Simple concatenation — the first token of each
-        # tile after the first is usually a mid-sequence note, so we just join.
-        # Drop leading 'measure' tokens from tiles 2+ to avoid duplicating
-        # the barline that marks the tile boundary.
-        merged: list[str] = list(all_token_lists[0]) if all_token_lists else []
-        for tl in all_token_lists[1:]:
-            token_list = list(tl)
-            # Remove duplicate leading 'measure' token when the previous tile
-            # already ended with one
-            if merged and merged[-1] == "measure" and token_list and token_list[0] == "measure":
-                token_list = token_list[1:]
-            merged.extend(token_list)
+        if len(tile_info) == 1:
+            token_lists = _decode([tile_info[0][0]])
+            merged = list(token_lists[0]) if token_lists else []
+        else:
+            tile_imgs = [t for t, _, _ in tile_info]
+            fracs = [(ks, ke) for _, ks, ke in tile_info]
+            token_lists = _decode(tile_imgs)
+
+            merged: list[str] = []
+            for tokens, (ks, ke) in zip(token_lists, fracs):
+                n = len(tokens)
+                if n == 0:
+                    continue
+                si = int(n * ks)
+                ei = max(si + 1, int(n * ke))
+                kept = tokens[si:ei]
+                if merged and kept and merged[-1] == "measure" and kept[0] == "measure":
+                    kept = kept[1:]
+                merged.extend(kept)
 
         results.append(" ".join(merged))
-
     return results

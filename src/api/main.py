@@ -47,7 +47,7 @@ async def process_lead_sheet(file: UploadFile = File(..., description="PDF or im
     if not data:
         raise HTTPException(400, "Empty file")
     result = run_pipeline(data, file.filename or "upload")
-    if result.get("error"):
+    if result.get("error") and not result.get("pages"):
         raise HTTPException(422, result["error"])
     return result
 

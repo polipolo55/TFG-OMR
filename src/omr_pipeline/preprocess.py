@@ -24,7 +24,7 @@ except ImportError:
 class PageImage:
     """Single page as grayscale and binary versions."""
     grayscale: np.ndarray  # (H, W) uint8
-    binary: np.ndarray     # (H, W) 0/255 for slicer
+    binary: np.ndarray     # (H, W) 0/255
     meta: dict
 
 
@@ -75,7 +75,7 @@ def load_pdf_page(pdf_bytes: bytes, page: int = 0, dpi: int = 150) -> np.ndarray
 # ---------------------------------------------------------------------------
 
 def binarize(img: np.ndarray) -> np.ndarray:
-    """Otsu binarization → ink=255, bg=0. For slicer only; CRNN uses grayscale."""
+    """Otsu binarization → ink=255, bg=0."""
     if img.dtype in (np.float32, np.float64):
         img = (np.clip(img, 0, 1) * 255).astype(np.uint8)
     _, binary = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)

@@ -1,1 +1,1 @@
-"""OMR pipeline for lead sheet processing — skeleton for web integration."""
+"""OMR pipeline for jazz lead sheet processing."""

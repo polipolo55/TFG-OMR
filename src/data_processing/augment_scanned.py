@@ -26,38 +26,35 @@ from tqdm import tqdm
 # ---------------------------------------------------------------------------
 log = logging.getLogger(__name__)
 
-PAPER_BRIGHT  = 242
-PAPER_DARK    = 22
-INK_DILATE_ITERATIONS = 2
-INK_DILATE_KERNEL     = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-VIGNETTE_STRENGTH = 0.22
-
-
-# Albumentations pipeline (scan-like distortions)
+PAPER_BRIGHT  = 245
+PAPER_DARK    = 28
+INK_DILATE_ITERATIONS = 1
+INK_DILATE_KERNEL     = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2))
+VIGNETTE_STRENGTH = 0.15
 
 def build_pipeline(seed: int | None = None) -> A.Compose:
     """Return an albumentations Compose pipeline for scan simulation."""
     return A.Compose(
         [
-            A.ElasticTransform(alpha=28, sigma=5, p=0.90),
-            A.GridDistortion(num_steps=5, distort_limit=(-0.10, 0.10), p=0.80),
+            A.ElasticTransform(alpha=15, sigma=4, p=0.80),
+            A.GridDistortion(num_steps=5, distort_limit=(-0.06, 0.06), p=0.70),
             A.Affine(
                 translate_percent={"x": (-0.01, 0.01), "y": (-0.01, 0.01)},
                 scale=(0.98, 1.02),
-                rotate=(-3.0, 3.0),
-                shear=(-1.5, 1.5),
+                rotate=(-2.0, 2.0),
+                shear=(-1.0, 1.0),
                 border_mode=cv2.BORDER_CONSTANT,
                 fill=255,
-                p=0.9,
+                p=0.85,
             ),
-            A.GaussianBlur(blur_limit=0, sigma_limit=(0.3, 0.8), p=0.70),
-            A.Sharpen(alpha=(0.2, 0.5), lightness=(0.85, 1.0), p=0.55),
-            A.RandomToneCurve(scale=0.15, p=0.80),
-            A.GaussNoise(std_range=(0.02, 0.06), mean_range=(0.0, 0.0),
-                         per_channel=False, p=0.85),
-            A.RandomBrightnessContrast(brightness_limit=(-0.10, 0.05),
-                                       contrast_limit=(0.05, 0.20),
-                                       p=0.90),
+            A.GaussianBlur(blur_limit=0, sigma_limit=(0.2, 0.6), p=0.60),
+            A.Sharpen(alpha=(0.15, 0.4), lightness=(0.85, 1.0), p=0.45),
+            A.RandomToneCurve(scale=0.10, p=0.70),
+            A.GaussNoise(std_range=(0.01, 0.04), mean_range=(0.0, 0.0),
+                         per_channel=False, p=0.75),
+            A.RandomBrightnessContrast(brightness_limit=(-0.08, 0.04),
+                                       contrast_limit=(0.03, 0.15),
+                                       p=0.85),
         ],
         seed=seed,
     )
@@ -95,6 +92,62 @@ def add_vignette(img_gray: np.ndarray, strength: float = VIGNETTE_STRENGTH) -> n
     return out
 
 
+def vary_staff_line_thickness(
+    img_gray: np.ndarray,
+    rng: random.Random,
+) -> np.ndarray:
+    """Randomly thin or thicken staff lines to match Real Book variation.
+
+    The Real Book has thinner staff lines than LilyPond defaults.  This
+    applies a mild morphological operation on detected horizontal structures.
+    """
+    if rng.random() > 0.5:
+        return img_gray
+
+    binary = cv2.threshold(img_gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
+    h, w = binary.shape
+    kernel_w = max(15, w // 10)
+    h_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_w, 1))
+    lines = cv2.morphologyEx(binary, cv2.MORPH_OPEN, h_kernel)
+
+    if rng.random() < 0.7:
+        thin_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 2))
+        lines_mod = cv2.erode(lines, thin_kernel, iterations=1)
+    else:
+        thick_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 2))
+        lines_mod = cv2.dilate(lines, thick_kernel, iterations=1)
+
+    diff = lines.astype(np.int16) - lines_mod.astype(np.int16)
+    result = img_gray.astype(np.int16)
+    result = np.where(diff > 0, np.clip(result + 60, 0, 255), result)
+    result = np.where(diff < 0, np.clip(result - 60, 0, 255), result)
+    return result.astype(np.uint8)
+
+
+def add_edge_shadow(
+    img_gray: np.ndarray,
+    rng: random.Random,
+    max_width: int = 20,
+) -> np.ndarray:
+    """Add a book-spine shadow on a random edge (mimics Real Book binding)."""
+    if rng.random() > 0.4:
+        return img_gray
+
+    h, w = img_gray.shape
+    shadow_w = rng.randint(5, max_width)
+    side = rng.choice(["left", "right"])
+
+    grad = np.linspace(0.7, 1.0, shadow_w).astype(np.float32)
+    if side == "left":
+        mask = np.ones((h, w), dtype=np.float32)
+        mask[:, :shadow_w] *= grad[np.newaxis, :]
+    else:
+        mask = np.ones((h, w), dtype=np.float32)
+        mask[:, -shadow_w:] *= grad[np.newaxis, ::-1]
+
+    return np.clip(img_gray.astype(np.float32) * mask, 0, 255).astype(np.uint8)
+
+
 # ---------------------------------------------------------------------------
 # Per-sample augmentation
 # ---------------------------------------------------------------------------
@@ -107,12 +160,18 @@ def augment_sample(
 ) -> None:
     """Augment a single grayscale PNG and write result."""
     img = np.array(Image.open(src_png).convert("L"))
-    img = dilate_ink(img)
+
+    dilate_iters = rng.choice([0, 1]) if INK_DILATE_ITERATIONS <= 1 else INK_DILATE_ITERATIONS
+    img = dilate_ink(img, iterations=dilate_iters)
+    img = vary_staff_line_thickness(img, rng)
+
     img3 = np.stack([img, img, img], axis=-1)
     result = pipeline(image=img3)["image"]
     img = result[:, :, 0]
     img = remap_tones(img)
     img = add_vignette(img)
+
+    img = add_edge_shadow(img, rng)
 
     dst_png.parent.mkdir(parents=True, exist_ok=True)
     Image.fromarray(img).save(dst_png)

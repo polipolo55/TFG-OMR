@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OMR Lead Sheet</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+    h1 { font-size: 1.25rem; }
+    h2 { font-size: 1.1rem; margin-top: 1.5rem; }
+    .upload { border: 2px dashed #999; padding: 2rem; text-align: center; border-radius: 8px; margin: 1rem 0; transition: .15s; }
+    .upload.dragover { border-color: #333; background: #f9f9f9; }
+    input[type="file"] { display: none; }
+    button { padding: 0.5rem 1rem; background: #333; color: white; border: none; border-radius: 6px; cursor: pointer; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .status { margin: 1rem 0; color: #666; }
+    .error { color: #c00; }
+    .result { margin-top: 1.5rem; }
+
+    /* Debug panel */
+    .debug { margin: 0.75rem 0 1rem 0; padding: 0.75rem; border: 1px solid #ddd; border-radius: 6px; background: #fafafa; }
+    .debug summary { cursor: pointer; font-weight: 600; font-size: 0.95rem; }
+    .debug .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem 1rem; margin-top: 0.5rem; }
+    .debug .k { color: #444; font-size: 0.85rem; }
+    .debug .v { color: #111; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem; }
+    .debug .full { grid-column: 1 / -1; }
+
+    /* Segments */
+    .segments-list { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.75rem; }
+    .segment { padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.875rem; }
+    .segment.music { background: #eff6ff; border-left: 4px solid #2563eb; }
+    .segment.text  { background: #fff7ed; border-left: 4px solid #f97316; }
+    .segment .label { font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.2rem; }
+    .segment.music .label { color: #2563eb; }
+    .segment.text  .label { color: #f97316; }
+    .segment pre { white-space: pre-wrap; margin: 0; font-size: 0.82rem; color: #333; }
+
+    pre { white-space: pre-wrap; font-size: 0.875rem; }
+  </style>
+</head>
+<body>
+  <h1>OMR Lead Sheet</h1>
+  <p>Upload a PDF or image of a jazz lead sheet.</p>
+  <div class="upload" id="drop">Drop file here or <button type="button" id="browse">Browse</button></div>
+  <input type="file" id="file" accept=".pdf,.png,.jpg,.jpeg,.webp">
+  <div class="status" id="status"></div>
+  <div class="result" id="result"></div>
+
+  <script>
+    const drop = document.getElementById('drop');
+    const browse = document.getElementById('browse');
+    const input = document.getElementById('file');
+    const status = document.getElementById('status');
+    const result = document.getElementById('result');
+
+    browse.onclick = () => input.click();
+    input.onchange = () => { if (input.files[0]) upload(input.files[0]); };
+
+    drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('dragover'); };
+    drop.ondragleave = () => drop.classList.remove('dragover');
+    drop.ondrop = (e) => {
+      e.preventDefault();
+      drop.classList.remove('dragover');
+      const f = e.dataTransfer.files[0];
+      if (f) upload(f);
+    };
+
+    async function upload(file) {
+      status.textContent = 'Processing…';
+      status.className = 'status';
+      result.innerHTML = '';
+      const form = new FormData();
+      form.append('file', file);
+      try {
+        const res = await fetch('/api/omr/lead-sheet', { method: 'POST', body: form });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || data.error || 'Request failed');
+        status.textContent = 'Done.';
+        render(data);
+      } catch (e) {
+        status.textContent = 'Error: ' + e.message;
+        status.className = 'status error';
+      }
+    }
+
+    function render(data) {
+      if (!data.pages || !data.pages.length) return;
+      const meta = data.meta || {};
+      const pages = data.pages || [];
+
+      // Debug panel (collapsible)
+      const dbg = document.createElement('details');
+      dbg.className = 'debug';
+      const summary = document.createElement('summary');
+      const segCount = pages.reduce((a, p) => a + (p.segments || []).length, 0);
+      const musicCount = pages.reduce((a, p) => a + (p.segments || []).filter(s => s.type === 'music').length, 0);
+      const textCount = pages.reduce((a, p) => a + (p.segments || []).filter(s => s.type === 'text').length, 0);
+      summary.textContent = `Debug — ${segCount} segments (${musicCount} music, ${textCount} text)`;
+      dbg.appendChild(summary);
+      const grid = document.createElement('div');
+      grid.className = 'grid';
+      const rows = [
+        ['filename', meta.filename || '?'],
+        ['page size', `${meta.page_width || '?'} x ${meta.page_height || '?'}`],
+        ['deskew angle', (meta.deskew_angle_deg !== undefined) ? meta.deskew_angle_deg.toFixed(2) + '\u00b0' : '?'],
+      ];
+      for (const [k, v] of rows) {
+        const kk = document.createElement('div'); kk.className = 'k'; kk.textContent = k;
+        const vv = document.createElement('div'); vv.className = 'v'; vv.textContent = v;
+        grid.appendChild(kk); grid.appendChild(vv);
+      }
+      const metaPre = document.createElement('pre');
+      metaPre.className = 'v full';
+      metaPre.textContent = JSON.stringify(meta, null, 2);
+      grid.appendChild(metaPre);
+      dbg.appendChild(grid);
+      result.appendChild(dbg);
+
+      for (const page of pages) {
+        const h = document.createElement('h2');
+        h.textContent = 'Page ' + (page.index + 1);
+        result.appendChild(h);
+
+        // Page image with overlay boxes
+        if (page.page_image_data_url) {
+          const viz = document.createElement('div');
+          viz.style.cssText = 'position:relative;display:inline-block;max-width:100%;border:1px solid #ddd;border-radius:6px;overflow:hidden;margin:0.5rem 0 1rem 0';
+
+          const img = document.createElement('img');
+          img.src = page.page_image_data_url;
+          img.alt = 'Rendered page';
+          img.style.cssText = 'display:block;max-width:100%;height:auto';
+
+          const overlay = document.createElement('div');
+          overlay.style.cssText = 'position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none';
+
+          viz.appendChild(img);
+          viz.appendChild(overlay);
+          result.appendChild(viz);
+
+          const pageW = meta.page_width;
+          const pageH = meta.page_height;
+
+          const drawBoxes = () => {
+            overlay.innerHTML = '';
+            if (!pageW || !pageH) return;
+            const dW = img.clientWidth, dH = img.clientHeight;
+            if (!dW || !dH) return;
+            const sX = dW / pageW, sY = dH / pageH;
+            for (const seg of (page.segments || [])) {
+              const [x, y, w, hh] = seg.bbox || [0, 0, 0, 0];
+              const isMusic = seg.type === 'music';
+              const isEmpty = seg.type === 'text' && !seg.content;
+              const box = document.createElement('div');
+              const color = isMusic ? '#2563eb' : (isEmpty ? '#ccc' : '#f97316');
+              const bg = isMusic ? 'rgba(37,99,235,0.08)' : (isEmpty ? 'rgba(0,0,0,0.02)' : 'rgba(249,115,22,0.08)');
+              box.style.cssText = `position:absolute;left:${x*sX}px;top:${y*sY}px;width:${w*sX}px;height:${hh*sY}px;`
+                + `border:${isEmpty ? '1px dashed' : '2px solid'} ${color};`
+                + `background:${bg};`
+                + 'pointer-events:auto;';
+              box.title = seg.type + (isEmpty ? ' (empty)' : '') + '\n' + (seg.content || '');
+              overlay.appendChild(box);
+            }
+          };
+          img.onload = drawBoxes;
+          window.addEventListener('resize', drawBoxes);
+        }
+
+        // Segment list (skip empty text segments)
+        const list = document.createElement('div');
+        list.className = 'segments-list';
+        for (const seg of page.segments || []) {
+          if (seg.type === 'text' && !seg.content) continue;
+          const div = document.createElement('div');
+          div.className = 'segment ' + seg.type;
+          const lbl = document.createElement('div');
+          lbl.className = 'label';
+          lbl.textContent = seg.type === 'music' ? 'Staff (LMX)' : 'Chords / Text';
+          div.appendChild(lbl);
+          const pre = document.createElement('pre');
+          pre.textContent = seg.content || '(empty)';
+          div.appendChild(pre);
+          list.appendChild(div);
+        }
+        result.appendChild(list);
+      }
+    }
+  </script>
+</body>
+</html>

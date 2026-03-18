@@ -20,6 +20,7 @@ Usage examples::
     poetry run python src/cli.py vocab   --data-dir data/realbook_primus/package_aa
     poetry run python src/cli.py train   --epochs 50 --batch-size 16 --lr 1e-3
     poetry run python src/cli.py evaluate --checkpoint models/latest/best_model.pt --split test
+    poetry run python src/cli.py api
     poetry run python src/cli.py pipeline
     poetry run python src/cli.py pipeline-train --epochs 50
 """
@@ -345,6 +346,17 @@ def cmd_augment(args: argparse.Namespace) -> None:
         sys.argv = old_argv
 
 
+# ── api ────────────────────────────────────────────────────────────────────
+
+def cmd_api(args: argparse.Namespace) -> None:
+    """Start the OMR web API server."""
+    import uvicorn
+    # Run from project root; api lives in src/api
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from api.main import app
+    uvicorn.run(app, host=args.host, port=args.port)
+
+
 # ── pipeline ──────────────────────────────────────────────────────────────
 
 def cmd_pipeline(args: argparse.Namespace) -> None:
@@ -637,6 +649,15 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common_data_args(p_eval)
     _add_model_args(p_eval)
     p_eval.set_defaults(func=cmd_evaluate)
+
+    # ── api ───────────────────────────────────────────────────────────
+    p_api = sub.add_parser(
+        "api",
+        help="Start the OMR web API server",
+    )
+    p_api.add_argument("--host", default="0.0.0.0", help="Bind host (default: 0.0.0.0)")
+    p_api.add_argument("--port", type=int, default=8000, help="Bind port (default: 8000)")
+    p_api.set_defaults(func=cmd_api)
 
     # ── pipeline ──────────────────────────────────────────────────────
     p_pipe = sub.add_parser(

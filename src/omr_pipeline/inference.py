@@ -7,12 +7,11 @@ Strip preprocessing exactly matches dataset.py:
   3. Per-image (img - mean) / (std + 1e-6)
   4. Pad batch to max width with zeros
 
-Domain-gap mitigations (test vs training):
-  - Training images are ~877px wide at 128px height (median).  Sliced Real Book
-    strips upscale to ~2150px — completely outside the training distribution.
-    Wide strips are tiled into ~850px chunks so each tile is in-distribution.
-  - Training augmentation produces heavy, dark ink.  Real Book scans are
-    lighter.  A light CLAHE pass before the CRNN restores local contrast.
+Domain-gap mitigation — width:
+  Training images are ~877 px wide at 128 px height (median).  Sliced Real Book
+  strips upscale to ~2150 px after the same height-resize — outside the training
+  distribution.  Wide strips are tiled into ~850 px chunks so each tile is
+  in-distribution before being fed to the CRNN.
 """
 from __future__ import annotations
 
@@ -61,13 +60,17 @@ def _load_model(checkpoint_path: Path):
     ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
     cfg = ckpt.get("config", Config())
 
-    # Resolve vocab path — checkpoints saved before the repo restructure may
-    # contain a stale path.  Try the saved path first; fall back to the
-    # canonical location in data/vocab/.
+    # Resolve vocab path.  The checkpoint stores a path that was valid when
+    # training ran; resolve it relative to several anchors to handle CWD
+    # differences and repo restructures.
+    _repo_root = checkpoint_path.resolve().parent
+    while _repo_root.parent != _repo_root and not (_repo_root / "pyproject.toml").exists():
+        _repo_root = _repo_root.parent
     _vocab_candidates = [
-        Path(cfg.vocab_path),
-        checkpoint_path.parent.parent / "data" / "vocab" / "primus_lmx.txt",
-        Path("data/vocab/primus_lmx.txt"),
+        Path(cfg.vocab_path),                                      # as-saved (works if CWD == project root)
+        _repo_root / cfg.vocab_path,                               # relative to repo root
+        _repo_root / "data" / "vocab" / "primus_lmx.txt",         # canonical location
+        checkpoint_path.parent.parent / "data" / "vocab" / "primus_lmx.txt",  # relative to run dir
     ]
     vocab_path = next((p for p in _vocab_candidates if p.exists()), None)
     if vocab_path is None:

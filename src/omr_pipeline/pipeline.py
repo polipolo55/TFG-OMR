@@ -20,7 +20,28 @@ def is_pdf(data: bytes) -> bool:
     return data[:4] == b"%PDF"
 
 
-_OCR_PAD_Y = 25  # extra rows above/below text strip when feeding OCR
+_OCR_PAD_Y = 25    # extra rows above/below text strip when feeding OCR
+
+# Vertical padding added to music strips before CRNN inference.
+# Training images include ~20-30 px of whitespace above and below the staff
+# (LilyPond rendering margin), but the slicer cuts strips to the dense-ink
+# boundary, chopping the treble clef's top spiral and low ledger lines.
+# This padding restores the headroom the model expects.
+_MUSIC_PAD_Y = 20  # px added above AND below the tight strip bbox
+
+
+def _music_crop(s: Strip, grayscale: np.ndarray) -> np.ndarray:
+    """Expand a music strip vertically for CRNN inference.
+
+    The slicer cuts strips to the dense-ink boundary.  Training images include
+    ~20-30 px of white margin above and below the staff (LilyPond rendering
+    adds padding).  Without this margin the treble clef's top curl is missing,
+    causing consistent clef:C3 predictions instead of clef:G2.
+    """
+    H = grayscale.shape[0]
+    y0 = max(0, s.y_start - _MUSIC_PAD_Y)
+    y1 = min(H, s.y_end + _MUSIC_PAD_Y)
+    return grayscale[y0:y1, :]
 
 
 def _ocr_crop(s: Strip, grayscale: np.ndarray) -> np.ndarray:
@@ -101,7 +122,7 @@ def run_pipeline(
     # 1) Load
     if is_pdf(file_data):
         try:
-            img = load_pdf_page(file_data, page=0)
+            img = load_pdf_page(file_data, page=0, dpi=200)
         except Exception as e:
             return {"error": f"PDF load failed: {e}", "pages": []}
     else:
@@ -129,6 +150,31 @@ def run_pipeline(
     # 4) Route
     types = [route_strip(s) for s in strips]
 
+    # 4b) Title-strip correction
+    # Real Book PDFs overlay the song title on the first blank staff system.
+    # That staff gets detected as "music" (it has 5 horizontal lines) but
+    # contains no actual notes — sending it to the CRNN produces garbage.
+    # Heuristic: the first classified-music strip that sits in the top 22% of
+    # the page AND is denser than typical staves (title text lifts ink
+    # density above ~0.33) is almost certainly a title/header strip.
+    page_h = page.meta["height"]
+    music_idx_raw = [i for i, t in enumerate(types) if t == "music"]
+    if music_idx_raw:
+        first_music_i = music_idx_raw[0]
+        s0 = strips[first_music_i]
+        # Ink density of all OTHER music strips
+        other_music_ink = [
+            strips[i].ink_density for i in music_idx_raw[1:]
+        ] if len(music_idx_raw) > 1 else []
+        ink_threshold = (
+            max(0.30, (sum(other_music_ink) / len(other_music_ink)) * 1.10)
+            if other_music_ink else 0.30
+        )
+        is_title_position = s0.y_start / page_h < 0.22
+        is_title_ink = s0.ink_density > ink_threshold
+        if is_title_position and is_title_ink:
+            types[first_music_i] = "text"
+
     # 5) Merge adjacent text strips
     strips, types = _merge_adjacent_text_strips(strips, types, page.grayscale, page.binary)
 
@@ -136,7 +182,8 @@ def run_pipeline(
     music_indices = [i for i, t in enumerate(types) if t == "music"]
     text_indices = [i for i, t in enumerate(types) if t == "text"]
 
-    music_images = [strips[i].image for i in music_indices]
+    # Expand music crops vertically: tight slicer bbox clips the treble clef top.
+    music_images = [_music_crop(strips[i], page.grayscale) for i in music_indices]
 
     # For OCR pass both grayscale and binary images.
     # The binary image (pre-binarized by the slicer) gives EasyOCR cleaner

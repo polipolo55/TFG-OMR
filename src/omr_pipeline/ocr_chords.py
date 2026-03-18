@@ -37,8 +37,8 @@ _CHORD_ALLOWLIST = (
     "ABCDEFGabcdefg#b0123456789"
     "mMajdimaugsusoø+-/(). ,"
 )
-_MIN_OCR_HEIGHT = 160
-_MIN_GRAY_HEIGHT = 100
+_MIN_OCR_HEIGHT = 200
+_MIN_GRAY_HEIGHT = 140
 _MAX_OCR_WIDTH = 6500
 
 _VLM_MODEL = os.environ.get("OMR_VLM_MODEL", "gpt-4o")
@@ -97,11 +97,14 @@ def _clamp_width(img: np.ndarray) -> np.ndarray:
 
 
 def _enhance(gray: np.ndarray) -> np.ndarray:
-    """CLAHE + unsharp mask."""
+    """CLAHE + unsharp mask + adaptive threshold cleanup."""
     clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(4, 4))
     out = clahe.apply(gray)
-    blur = cv2.GaussianBlur(out, (0, 0), sigmaX=1.0)
-    out = cv2.addWeighted(out, 1.5, blur, -0.5, 0)
+    # Mild denoise to reduce background noise from scans
+    out = cv2.fastNlMeansDenoising(out, h=8, templateWindowSize=7, searchWindowSize=21)
+    # Unsharp mask for crisp edges
+    blur = cv2.GaussianBlur(out, (0, 0), sigmaX=1.2)
+    out = cv2.addWeighted(out, 1.6, blur, -0.6, 0)
     return np.clip(out, 0, 255).astype(np.uint8)
 
 
@@ -128,13 +131,13 @@ def _prep_binary(binary: np.ndarray) -> np.ndarray:
 def _isolate_groups(
     binary: np.ndarray,
     gray: np.ndarray,
-    min_area: int = 30,
-    merge_gap: int = 8,
+    min_area: int = 15,
 ) -> list[tuple[int, np.ndarray]]:
     """Segment a chord strip into individual chord-symbol groups via CCs.
 
     Returns (x_centre, cropped_gray) pairs sorted left → right.  Horizontally
     close components are merged (a chord like "Gmaj7" spans multiple CCs).
+    The merge gap is computed adaptively from the median component height.
     """
     ink = (binary > 0).astype(np.uint8) * 255
     if ink.max() == 0:
@@ -143,6 +146,7 @@ def _isolate_groups(
     n_labels, _labels, stats, _centroids = cv2.connectedComponentsWithStats(ink, connectivity=8)
 
     bboxes: list[tuple[int, int, int, int]] = []
+    heights: list[int] = []
     for i in range(1, n_labels):
         x = stats[i, cv2.CC_STAT_LEFT]
         y = stats[i, cv2.CC_STAT_TOP]
@@ -151,19 +155,56 @@ def _isolate_groups(
         if stats[i, cv2.CC_STAT_AREA] < min_area:
             continue
         bboxes.append((x, y, x + w, y + h))
+        heights.append(h)
 
     if not bboxes:
         return []
 
+    # Adaptive merge gap: characters within a chord symbol are close together
+    # relative to the font size.  Use ~40% of median character height.
+    median_h = float(np.median(heights)) if heights else 12.0
+    merge_gap = max(4, int(median_h * 0.4))
+
     bboxes.sort(key=lambda b: b[0])
 
-    groups: list[tuple[int, int, int, int]] = [bboxes[0]]
+    # First pass: merge CCs that are within merge_gap of each other
+    merged: list[tuple[int, int, int, int]] = [bboxes[0]]
     for x0, y0, x1, y1 in bboxes[1:]:
-        gx0, gy0, gx1, gy1 = groups[-1]
+        gx0, gy0, gx1, gy1 = merged[-1]
         if x0 - gx1 <= merge_gap:
-            groups[-1] = (min(gx0, x0), min(gy0, y0), max(gx1, x1), max(gy1, y1))
+            merged[-1] = (min(gx0, x0), min(gy0, y0), max(gx1, x1), max(gy1, y1))
         else:
-            groups.append((x0, y0, x1, y1))
+            merged.append((x0, y0, x1, y1))
+
+    # Second pass: split groups that are too wide (likely two separate chords
+    # that got merged).  "Too wide" = wider than 3× median height.
+    max_chord_w = max(int(median_h * 5), 80)
+    groups: list[tuple[int, int, int, int]] = []
+    for gx0, gy0, gx1, gy1 in merged:
+        if gx1 - gx0 > max_chord_w:
+            # Find natural gaps within this group and split
+            sub_bbs = [b for b in bboxes if b[0] >= gx0 and b[2] <= gx1]
+            if len(sub_bbs) >= 2:
+                sub_bbs.sort(key=lambda b: b[0])
+                gaps = [(sub_bbs[j + 1][0] - sub_bbs[j][2], j)
+                        for j in range(len(sub_bbs) - 1)]
+                gaps.sort(key=lambda g: g[0], reverse=True)
+                # Split at the widest internal gap
+                split_idx = gaps[0][1] + 1
+                left = sub_bbs[:split_idx]
+                right = sub_bbs[split_idx:]
+                lx0 = min(b[0] for b in left)
+                ly0 = min(b[1] for b in left)
+                lx1 = max(b[2] for b in left)
+                ly1 = max(b[3] for b in left)
+                rx0 = min(b[0] for b in right)
+                ry0 = min(b[1] for b in right)
+                rx1 = max(b[2] for b in right)
+                ry1 = max(b[3] for b in right)
+                groups.append((lx0, ly0, lx1, ly1))
+                groups.append((rx0, ry0, rx1, ry1))
+                continue
+        groups.append((gx0, gy0, gx1, gy1))
 
     h_img, w_img = gray.shape[:2]
     pad = 4
@@ -183,16 +224,16 @@ def _isolate_groups(
 # Per-image EasyOCR runner (shared by contour and easyocr backends)
 # ---------------------------------------------------------------------------
 
-def _ocr_image(reader, img: np.ndarray) -> str:
+def _ocr_image(reader, img: np.ndarray, min_confidence: float = 0.15) -> str:
     """Run EasyOCR on a single preprocessed image, return raw text."""
     try:
         dets = reader.readtext(
             img, detail=1, paragraph=False,
             allowlist=_CHORD_ALLOWLIST,
-            text_threshold=0.25, low_text=0.15, width_ths=0.7,
+            text_threshold=0.20, low_text=0.10, width_ths=0.7,
         )
         dets.sort(key=lambda d: d[0][0][0])
-        parts = [d[1].strip() for d in dets if d[2] >= 0.20 and d[1].strip()]
+        parts = [d[1].strip() for d in dets if d[2] >= min_confidence and d[1].strip()]
         return " ".join(parts)
     except Exception as exc:
         log.warning("EasyOCR readtext failed: %s", exc)
@@ -223,7 +264,7 @@ def _backend_contour(gray: np.ndarray, binary: np.ndarray | None) -> str:
     reader = _easyocr()
     parts: list[str] = []
     for _cx, crop in groups:
-        text = _ocr_image(reader, _prep_gray(crop))
+        text = _ocr_image(reader, _prep_gray(crop), min_confidence=0.10)
         if text:
             parts.append(text)
 

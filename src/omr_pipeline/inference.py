@@ -15,6 +15,7 @@ strips.
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -209,15 +210,20 @@ def _prepare_tile(img: np.ndarray, img_height: int, max_width: int) -> tuple[Ten
 # Public API
 # ---------------------------------------------------------------------------
 
+_BEAM_WIDTH = int(os.environ.get("OMR_BEAM_WIDTH", "5"))
+
+
 def recognize_music(
     strip_images: list[np.ndarray],
     checkpoint_path: Path | None = None,
     staff_line_positions: list[list[int] | None] | None = None,
     music_bbox_y0s: list[int] | None = None,
+    beam_width: int | None = None,
 ) -> list[str]:
     """Run the CRNN on a list of music-staff crops.
 
-    Returns one LMX token string per strip.
+    Returns one LMX token string per strip.  Uses beam search decoding by
+    default (beam_width=5, configurable via OMR_BEAM_WIDTH env var).
     """
     if not strip_images:
         return []
@@ -235,7 +241,16 @@ def recognize_music(
     img_height = getattr(cfg, "img_height", 128)
     max_width = getattr(cfg, "max_image_width", 2048)
 
-    from CRNN_CTC.evaluate import greedy_decode
+    if beam_width is None:
+        beam_width = _BEAM_WIDTH
+
+    if beam_width > 1:
+        from CRNN_CTC.evaluate import beam_search_decode
+        _decode_fn = lambda lp, ol, v: beam_search_decode(lp, ol, v, beam_width)
+        log.info("Using beam search (width=%d)", beam_width)
+    else:
+        from CRNN_CTC.evaluate import greedy_decode
+        _decode_fn = greedy_decode
 
     # ----- batch-decode helper -----
     def _decode(tiles: list[np.ndarray]) -> list[list[str]]:
@@ -262,7 +277,7 @@ def recognize_music(
         width_t = torch.tensor(widths, dtype=torch.long, device=device)
         with torch.inference_mode():
             log_probs, out_lens = model(batch, width_t)
-            return greedy_decode(log_probs, out_lens, vocab)
+            return _decode_fn(log_probs, out_lens, vocab)
 
     # ----- fill defaults -----
     if staff_line_positions is None:

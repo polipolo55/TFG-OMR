@@ -21,6 +21,7 @@
 \usepackage{siunitx}
 \usepackage{pgfgantt}
 \usepackage{pdflscape}
+\usepackage{pdfpages}
 
 % --- BIBLIOGRAPHY SETUP ---
 \usepackage[style=ieee, sorting=none]{biblatex}
@@ -58,6 +59,9 @@
 % ==========================================
 % TITLE PAGE
 % ==========================================
+
+\includepdf[pages=1]{../../main/portada.pdf}
+
 \begin{titlepage}
     \centering
 
@@ -182,8 +186,12 @@ The selected solution is a \textbf{CRNN-CTC architecture} trained for \textbf{mo
 
 The decision is also justified by risk control. A modular baseline can be implemented early and used as a lower bound, while the CRNN-CTC model can be iteratively improved through data and training refinements. This creates a robust path where the project still produces valid results even if advanced extensions cannot be completed in time.
 
+Regarding existing practical alternatives, there are already solutions in the market and in the research ecosystem (for example, general-purpose OMR tools and open-source repositories). However, these solutions are not specifically optimized for the targeted scenario in this thesis: monophonic jazz lead sheets with domain-specific notation style. The expected improvement of this project is not to replace all OMR tools, but to provide a more task-oriented and reproducible pipeline for this specific use case, potentially reducing correction effort and licensing barriers in educational and research contexts.
+
 \subsection{Methodology and Rigour}
 The project follows an \textbf{iterative and incremental} methodology, with sprint-based checkpoints and supervisor reviews. Each cycle produces measurable outputs (datasets, training logs, SER values, and error analyses), enabling evidence-based replanning.
+
+To avoid a waterfall interpretation, the execution is explicitly organized as an iterative loop between data construction, model training, and evaluation/refinement. In practice, phases associated with dataset evolution, model development, and error-driven improvements are revisited multiple times based on intermediate results.
 
 Monitoring tools include Git/GitHub for version control, experiment logs for model runs, and periodic milestone meetings with the supervisor to validate priorities and risk responses.
 
@@ -246,9 +254,128 @@ Develop and evaluate a proof-of-concept OMR system based on CRNN-CTC capable of 
 \label{sec:planning}
 
 \subsection{Task-Level Planning, Dependencies, and Resources}
-The planning spans 21 weeks (February--June 2026), organized into 5 technical sprints plus a transversal management package (WP0). Table~\ref{tab:task-summary} details tasks at task level, estimated hours, dependencies, and required resources.
+The planning spans 21 weeks (February--June 2026), organized into 5 work packages plus a transversal management package (WP0). Execution control is performed with \textbf{fixed two-week sprints} for inspection and adaptation, where backlog priorities, risks, and estimates are reviewed.
 
-The precedence logic is the following: Sprint 1 provides the analytical and baseline foundation; Sprint 2 builds the dataset and label encoding required by training; Sprint 3 develops the first CRNN-CTC model; Sprint 4 performs the iterative train-evaluate-improve loop; Sprint 5 consolidates final evaluation and thesis delivery. WP0 runs in parallel to guarantee management continuity and documentation quality.
+The precedence logic is the following: WP1 provides the analytical and baseline foundation; WP2 builds the dataset and label encoding required by training; WP3 develops the first CRNN-CTC model; WP4 performs the iterative train-evaluate-improve loop; WP5 consolidates final evaluation and thesis delivery. WP0 runs in parallel to guarantee management continuity and documentation quality.
+
+\subsection{Detailed Task Descriptions}
+This subsection provides the detailed task descriptions from the planning deliverable.
+
+\subsubsection*{WP0: Project Management (130 h -- concurrent)}
+\begin{description}[style=nextline, nosep, leftmargin=1.2cm]
+    \item[T0.1 -- Context and scope definition (20 h)]
+    Research and write the project context, state of the art, scope, requirements, risks, and methodology. \emph{Dep:} none. \emph{Res:} Zotero.
+
+    \item[T0.2 -- Temporal planning (12 h)]
+    Work breakdown structure, effort estimates, dependencies, and Gantt chart. \emph{Dep:} T0.1.
+
+    \item[T0.3 -- Budget and sustainability report (15 h)]
+    Economic budget and sustainability analysis. \emph{Dep:} T0.2.
+
+    \item[T0.4 -- Final document integration (8 h)]
+    Compile and revise management deliverables into the final management document. \emph{Dep:} T0.3.
+
+    \item[T0.5 -- Supervisor meetings (25 h)]
+    Biweekly meetings (including preparation), around 15 sessions. Concurrent with all tasks.
+
+    \item[T0.6 -- Thesis writing (50 h)]
+    Continuous writing of the thesis document; intensifies during the final stage. Concurrent with all tasks.
+\end{description}
+
+\subsubsection*{WP1: Literature Review and Baseline (78 h)}
+\textit{Goal:} establish the theoretical foundation and implement a classical CV baseline.
+\begin{description}[style=nextline, nosep, leftmargin=1.2cm]
+    \item[T1.1 -- OMR literature survey (25 h)]
+    Review traditional pipelines, CRNN-CTC, and transformer approaches. \emph{Dep:} none.
+
+    \item[T1.2 -- Dataset exploration (15 h)]
+    Inspect public OMR datasets and assess suitability. \emph{Dep:} T1.1 (partial overlap).
+
+    \item[T1.3 -- Classical CV baseline (25 h)]
+    Morphological staff-line detection/removal with OpenCV; evaluation on varied conditions. \emph{Dep:} T1.2.
+
+    \item[T1.4 -- Baseline evaluation (10 h)]
+    Quantitative evaluation and failure-mode analysis. \emph{Dep:} T1.3.
+
+    \item[T1.5 -- Stage review (3 h)]
+    Present results and confirm next priorities. \emph{Dep:} T1.4.
+\end{description}
+
+\subsubsection*{WP2: Dataset Construction (73 h)}
+\textit{Goal:} build a synthetic monophonic dataset in Real Book style for CRNN-CTC training.
+\begin{description}[style=nextline, nosep, leftmargin=1.2cm]
+    \item[T2.1 -- Output encoding design (12 h)]
+    Define LMX-based vocabulary and conversion process. \emph{Dep:} T1.5.
+
+    \item[T2.2 -- Synthetic rendering pipeline (35 h)]
+    LilyPond pipeline rendering paired image/annotation samples. \emph{Dep:} T2.1.
+
+    \item[T2.3 -- Data augmentation (15 h)]
+    Noise, blur, and perspective transforms to simulate scanned degradation. \emph{Dep:} T2.2.
+
+    \item[T2.4 -- Validation and splits (8 h)]
+    Validate image-label alignment and prepare train/validation/test splits. \emph{Dep:} T2.3.
+
+    \item[T2.5 -- Stage review (3 h)]
+    Review dataset quality and decide refinement actions. \emph{Dep:} T2.4.
+\end{description}
+
+\subsubsection*{WP3: CRNN-CTC Model Development (75 h)}
+\textit{Goal:} design, implement, and perform the initial training run; establish the evaluation framework.
+\begin{description}[style=nextline, nosep, leftmargin=1.2cm]
+    \item[T3.1 -- CRNN architecture design (25 h)]
+    CNN backbone + bidirectional LSTM + CTC head in PyTorch. \emph{Dep:} T2.5.
+
+    \item[T3.2 -- Training pipeline (20 h)]
+    Full training loop with checkpointing and stabilization mechanisms. \emph{Dep:} T3.1.
+
+    \item[T3.3 -- Initial training run (15 h)]
+    First end-to-end run and convergence monitoring. \emph{Dep:} T3.2.
+
+    \item[T3.4 -- Evaluation framework (12 h)]
+    Decoding, SER computation, and per-sample error breakdown. \emph{Dep:} T3.2 (partial overlap).
+
+    \item[T3.5 -- Stage review (3 h)]
+    Analyse outputs and plan refinement iteration. \emph{Dep:} T3.3, T3.4.
+\end{description}
+
+\subsubsection*{WP4: Iterative Refinement (68 h)}
+\textit{Goal:} close the train-evaluate-improve loop until SER stabilizes.
+\begin{description}[style=nextline, nosep, leftmargin=1.2cm]
+    \item[T4.1 -- Error analysis (10 h)]
+    Breakdown by error type and token; identify systematic patterns. \emph{Dep:} T3.5.
+
+    \item[T4.2 -- Data pipeline improvements (15 h)]
+    Fix annotation/filtering/vocabulary issues and regenerate data as needed. \emph{Dep:} T4.1.
+
+    \item[T4.3 -- Model refinement runs (25 h)]
+    Hyperparameter adjustment and iterative retraining. \emph{Dep:} T4.2.
+
+    \item[T4.4 -- Ablation studies (15 h)]
+    Controlled experiments isolating key design choices. \emph{Dep:} T4.3.
+
+    \item[T4.5 -- Stage review (3 h)]
+    Decide additional iteration vs final evaluation transition. \emph{Dep:} T4.4.
+\end{description}
+
+\subsubsection*{WP5: Final Evaluation and Defence (85 h)}
+\textit{Goal:} definitive evaluation, conditional extension, thesis completion, and defence preparation.
+\begin{description}[style=nextline, nosep, leftmargin=1.2cm]
+    \item[T5.1 -- Final evaluation (15 h)]
+    Evaluate best model on held-out test set and compare against baseline. \emph{Dep:} T4.5.
+
+    \item[T5.2 -- Qualitative error analysis (10 h)]
+    Case studies and failure-mode analysis by difficulty profile. \emph{Dep:} T5.1.
+
+    \item[T5.3 -- Extension exploration (conditional) (20 h)]
+    Prototype extension only if monophonic objective is sufficiently achieved. \emph{Dep:} T5.1.
+
+    \item[T5.4 -- Final thesis writing (30 h)]
+    Final integration, revision, and consistency pass. \emph{Dep:} T5.2.
+
+    \item[T5.5 -- Defence preparation (10 h)]
+    Slides, rehearsal, and expected questions preparation. \emph{Dep:} T5.4.
+\end{description}
 
 \begin{table}[h!]
     \centering
@@ -318,6 +445,8 @@ The precedence logic is the following: Sprint 1 provides the analytical and base
 The schedule includes realistic task concurrence, review milestones, and a conditional extension buffer in Sprint 5. Figure~\ref{fig:gantt} summarizes the full timeline.
 
 Estimates are expressed in hours per task and were validated against available weekly workload (4--5 effective hours/day). Concurrency is intentionally limited to avoid unrealistic multitasking in a single-person project; overlap is only introduced when tasks are naturally compatible (for example, evaluation framework development while the first training run is ongoing).
+
+Although the chart is organized by work-package blocks for readability, planning control is performed with a fixed two-week sprint cadence and frequent inspection/adaptation checkpoints.
 
 \begin{landscape}
 \begin{figure}[p]
@@ -405,11 +534,12 @@ Table~\ref{tab:risk-register} identifies the main risks and explicit response pl
         \toprule
         \textbf{Risk} & \textbf{L/I} & \textbf{Alternative plan} & \textbf{Duration impact} & \textbf{Extra resources} \\
         \midrule
-        Limited ground-truth data & H/H & Fall back to PrIMuS-only data and strengthen augmentation. & Reallocate up to 10 h. & None. \\
-        Staff detection instability & M/M & Use manually cropped line regions for critical evaluations. & Shift hours from T5.3 to T5.4. & None. \\
-        CTC underfitting/misalignment & M/H & Simplify vocabulary, retrain with cleaned subsets. & Up to 10 h from buffer. & Additional GPU time. \\
-        Compute constraints & L-M/M & Reduce model/data size or rent cloud GPU. & Up to 5 h setup. & Cloud GPU (\EUR{}20--50). \\
-        Scope creep & M/H & Restrict extension to feasibility discussion only. & Recover up to 18 h. & None. \\
+        Limited ground-truth data & H/H & Fall back to synthetic/typeset sources and strengthen augmentation. & Reallocate up to 10 h. & None. \\
+        Staff detection errors propagating downstream & M/M & Use manually cropped line regions for critical evaluations. & Shift hours from T5.3 to T5.4. & None. \\
+        Encoding design complexity & M/M & Start from minimal vocabulary and extend incrementally after stable runs. & Up to 6 h redesign. & None. \\
+        Model underfitting or CTC misalignment & M/H & Simplify vocabulary, retrain with cleaned subsets and adjusted image scale. & Up to 10 h from buffer. & Additional GPU time. \\
+        Scope creep toward polyphony & M/H & Restrict extension to feasibility discussion only. & Recover up to 18 h. & None. \\
+        Computational resource constraints & L-M/M & Reduce model/data size or rent cloud GPU. & Up to 5 h setup. & Cloud GPU (\EUR{}20--50). \\
         \bottomrule
     \end{tabularx}
 \end{table}
@@ -422,7 +552,7 @@ To improve schedule robustness, the plan includes explicit slack in three places
 \label{sec:economic-management}
 
 \subsection{Budget Structure and Cost Identification}
-The budget follows the GEP framework and includes: human resources by activity, general costs, amortization, contingency, and incidentals~\cite{gepModule24EconomicManagement}.
+The budget follows a standard software-project cost framework and includes: human resources by activity, general costs, amortization, contingency, and incidentals~\cite{gepModule24EconomicManagement}.
 
 \subsection{Human Resources Cost Estimates}
 Hourly rates are based on Spanish ICT salary data and loaded with a 1.35 multiplier to account for employer social-security costs~\cite{ineEncuestaEstructuraSalarial2023,segSocialCotizacion2025}.
@@ -558,7 +688,7 @@ A contingency reserve of 15\% is applied over human resources + general costs:
 \text{Contingency} = 0.15 \times (13,615.57 + 250.69) = \EUR{}2,079.94
 \]
 
-Incidentals linked to the main risk responses are estimated at \EUR{}150.96.
+Incidentals linked to the main risk responses are estimated at \EUR{}150.96. Although this value is relatively low, it is consistent with the project context: mitigation actions mainly involve reallocation of planned effort and short additional execution bursts rather than major procurement or infrastructure purchases.
 
 \begin{table}[h!]
     \centering

@@ -8,11 +8,14 @@ Single flow:
   4. For each system: recognise music (CRNN) and chords (OCR).
   5. Apply music-theory grammar corrections across all systems.
   6. Assemble the JSON result.
+
+Set OMR_DEBUG_DIR to a path to save intermediate crops for inspection.
 """
 from __future__ import annotations
 
 import base64
 import logging
+import os
 from pathlib import Path
 
 import cv2
@@ -20,11 +23,13 @@ import numpy as np
 
 from .preprocess import PageImage, load_image, load_pdf_page, preprocess_page
 from .staff_detect import System, detect_systems
-from .inference import recognize_music
+from .inference import recognize_music, normalize_staff_crop
 from .ocr_chords import recognize_chords
 from .grammar_fix import fix_sequence
 
 log = logging.getLogger(__name__)
+
+_DEBUG_DIR = os.environ.get("OMR_DEBUG_DIR", "")
 
 
 def _is_pdf(data: bytes) -> bool:
@@ -76,6 +81,20 @@ def _process_systems(
         else:
             chord_imgs.append(np.zeros((10, 10), dtype=np.uint8))
             chord_bins.append(None)
+
+    # Save debug crops if OMR_DEBUG_DIR is set
+    if _DEBUG_DIR:
+        dbg = Path(_DEBUG_DIR)
+        dbg.mkdir(parents=True, exist_ok=True)
+        for idx, (img, staff_ys, y0) in enumerate(zip(music_imgs, staff_positions, bbox_y0s)):
+            if img is not None and img.size > 0:
+                cv2.imwrite(str(dbg / f"music_raw_{idx}.png"), img)
+                normed = normalize_staff_crop(img, staff_ys, y0)
+                cv2.imwrite(str(dbg / f"music_norm_{idx}.png"), normed)
+        for idx, img in enumerate(chord_imgs):
+            if img is not None and img.size > 0:
+                cv2.imwrite(str(dbg / f"chord_{idx}.png"), img)
+        log.info("Debug crops saved to %s", dbg)
 
     music_preds = recognize_music(
         music_imgs, checkpoint_path,

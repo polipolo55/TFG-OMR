@@ -61,6 +61,8 @@ _DUR_LILY    = {"breve": r"\breve", "whole": "1", "half": "2", "quarter": "4",
                 "eighth": "8", "sixteenth": "16", "32nd": "32", "64th": "64",
                 # PrIMuS aliases — some samples spell these out
                 "thirty_second": "32", "sixty_fourth": "64",
+                # PrIMuS breve spelling (must match semantic_to_lmx._DUR_LMX)
+                "double_whole": r"\breve",
                 # longa (4 whole notes); LilyPond calls it \longa
                 "quadruple_whole": r"\longa"}
 
@@ -222,11 +224,9 @@ def semantic_to_lily_music(semantic_path: Path) -> str:
                 pending_tie = True
 
             elif tok.startswith("gracenote-"):
-                # grace notes: render as acciaccatura
-                inner     = tok[len("gracenote-"):]
-                pitch_str = inner.split("_")[0]
-                lily_pitch = _parse_pitch(pitch_str)
-                lily_tokens.append(rf"\acciaccatura {lily_pitch}8")
+                # Skipped — not in the LMX vocabulary, so must not appear
+                # in the rendered PNG either (keeps image ↔ label aligned).
+                pass
 
             # anything else (multirest, fermata markers, etc.) is skipped
 

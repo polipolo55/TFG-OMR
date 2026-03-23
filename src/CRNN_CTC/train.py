@@ -274,6 +274,7 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
         extra_scanned_dirs=(
             cfg.extra_scanned_dirs if cfg.use_scanned else None
         ) or None,
+        strip_header_prob=cfg.strip_header_prob,
     )
 
     train_loader = DataLoader(

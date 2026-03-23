@@ -244,6 +244,31 @@ def compute_ser_batch(
 
 
 # ---------------------------------------------------------------------------
+# Melodic SER — structural tokens stripped
+# ---------------------------------------------------------------------------
+
+_STRUCTURAL_TOKENS = frozenset({"measure", "tied:start", "tied:stop"})
+
+
+def _strip_structural(tokens: list[str]) -> list[str]:
+    """Remove barline and tie tokens, keeping only melodic content."""
+    return [t for t in tokens if t not in _STRUCTURAL_TOKENS]
+
+
+def melodic_edit_distance(hyp: list[str], ref: list[str]) -> int:
+    """Edit distance after stripping ``measure`` and tie tokens."""
+    return _edit_distance(_strip_structural(hyp), _strip_structural(ref))
+
+
+def melodic_ser(hyp: list[str], ref: list[str]) -> float:
+    """SER computed on melodic content only (barlines and ties excluded)."""
+    h, r = _strip_structural(hyp), _strip_structural(ref)
+    if not r:
+        return 0.0 if not h else float("inf")
+    return _edit_distance(h, r) / len(r)
+
+
+# ---------------------------------------------------------------------------
 # Full evaluation
 # ---------------------------------------------------------------------------
 

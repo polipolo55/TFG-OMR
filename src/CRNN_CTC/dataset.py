@@ -23,6 +23,7 @@ The custom ``collate_fn`` pads images to the widest sample in each mini-batch
 from __future__ import annotations
 
 import logging
+import random
 from pathlib import Path
 
 import cv2
@@ -161,6 +162,75 @@ def _load_lmx_tokens(path: Path) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# Header-strip augmentation helpers
+# ---------------------------------------------------------------------------
+
+_HEADER_PREFIXES = ("clef:", "key:fifths:", "time", "beats:", "beat-type:")
+
+
+def _strip_header_tokens(tokens: list[str]) -> list[str]:
+    """Remove leading header tokens (clef, key, time) from an LMX sequence.
+
+    Keeps the initial ``measure`` but drops every contiguous header token
+    that follows it, returning ``["measure", <first note/rest>, ...]``.
+    """
+    if not tokens or tokens[0] != "measure":
+        return tokens
+
+    i = 1
+    while i < len(tokens) and any(
+        tokens[i] == p or tokens[i].startswith(p)
+        for p in _HEADER_PREFIXES
+    ):
+        i += 1
+    return ["measure"] + tokens[i:]
+
+
+def _find_header_crop_x(img: np.ndarray) -> int | None:
+    """Estimate the pixel x-coordinate where the header region ends.
+
+    Uses morphological staff-line removal followed by vertical projection
+    to find the first content gap between the header glyphs (clef, key sig,
+    time sig) and the first note/rest.  Returns *None* if no clean gap is
+    found (the image should not be stripped in that case).
+    """
+    h, w = img.shape[:2]
+    if w < 40:
+        return None
+
+    gray = img if img.ndim == 2 else cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    _, binary = cv2.threshold(
+        (gray * 255).astype(np.uint8) if gray.dtype == np.float32 else gray,
+        0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU,
+    )
+
+    h_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (max(15, w // 10), 1))
+    staff_mask = cv2.morphologyEx(binary, cv2.MORPH_OPEN, h_kernel)
+    content = np.clip(binary.astype(np.int16) - staff_mask.astype(np.int16),
+                      0, 255).astype(np.uint8)
+
+    col_ink = content.sum(axis=0).astype(np.float32) / 255.0
+    k = max(3, w // 100) | 1
+    col_ink = cv2.GaussianBlur(col_ink.reshape(1, -1), (k, 1), 0).flatten()
+
+    threshold = h * 0.02
+    min_x = int(w * 0.06)
+    max_x = int(w * 0.35)
+
+    gap_start = None
+    for c in range(min_x, min(max_x, w)):
+        if col_ink[c] < threshold:
+            if gap_start is None:
+                gap_start = c
+        else:
+            if gap_start is not None and (c - gap_start) >= 3:
+                return gap_start
+            gap_start = None
+
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Dataset
 # ---------------------------------------------------------------------------
 
@@ -202,6 +272,7 @@ class OMRDataset(Dataset):
         max_source_height: int = 180,
         extra_data_dirs: list[Path] | None = None,
         extra_scanned_dirs: list[Path] | None = None,
+        strip_header_prob: float = 0.0,
     ) -> None:
         self.data_dir = Path(data_dir)
         self.vocab = vocab
@@ -209,6 +280,7 @@ class OMRDataset(Dataset):
         self.max_image_width = max_image_width
         self.scanned_dir = Path(scanned_dir) if scanned_dir else None
         self.extra_scanned_dirs = [Path(p) for p in (extra_scanned_dirs or [])]
+        self._strip_header_prob = strip_header_prob
         self._oov_counts: dict[str, int] = {}  # token → occurrence count
 
         # Discover all valid (png + lmx) samples from primary + extra dirs
@@ -307,13 +379,23 @@ class OMRDataset(Dataset):
                         png_path = alt2
                         break
 
-        # Image → (1, H, W) float32 tensor, normalised
-        img = _load_image(png_path, self.img_height, self.max_image_width)  # (H, W) float32 [0,1]
-        img = (img - img.mean()) / (img.std() + 1e-6)  # zero-mean, unit-var
+        # Image → (H, W) float32 [0, 1]
+        img = _load_image(png_path, self.img_height, self.max_image_width)
+        tokens = _load_lmx_tokens(lmx_path)
+
+        # Header-strip augmentation: randomly remove the visual header (clef,
+        # key, time glyphs) from the image and the corresponding label tokens
+        # so the model learns to recognise headerless continuation lines.
+        if self._strip_header_prob > 0 and random.random() < self._strip_header_prob:
+            crop_x = _find_header_crop_x(img)
+            if crop_x is not None and crop_x < img.shape[1] - 20:
+                img = img[:, crop_x:]
+                tokens = _strip_header_tokens(tokens)
+
+        # Normalise to zero-mean, unit-variance
+        img = (img - img.mean()) / (img.std() + 1e-6)
         img_t = torch.from_numpy(img).unsqueeze(0)      # (1, H, W)
 
-        # Label → list[int]
-        tokens = _load_lmx_tokens(lmx_path)
         label = self.vocab.encode(tokens)
 
         return {
@@ -379,6 +461,31 @@ def collate_fn(
 # Train / val split helper
 # ---------------------------------------------------------------------------
 
+class _AugSubset(Dataset):
+    """Thin wrapper around a ``Subset`` that enables an augmentation flag.
+
+    DataLoader workers receive independent copies (via fork/pickle), so the
+    temporary mutation of the underlying dataset's ``_strip_header_prob`` is
+    safe — no cross-worker or cross-loader interference.
+    """
+
+    def __init__(self, subset: Dataset, strip_header_prob: float) -> None:
+        self._subset = subset
+        self._prob = strip_header_prob
+
+    def __len__(self) -> int:
+        return len(self._subset)  # type: ignore[arg-type]
+
+    def __getitem__(self, idx: int):
+        ds: OMRDataset = self._subset.dataset  # type: ignore[attr-defined]
+        old = ds._strip_header_prob
+        ds._strip_header_prob = self._prob
+        try:
+            return self._subset[idx]
+        finally:
+            ds._strip_header_prob = old
+
+
 def make_splits(
     data_dir: Path | str,
     vocab: Vocabulary,
@@ -394,11 +501,18 @@ def make_splits(
     max_source_height: int = 180,
     extra_data_dirs: list[Path] | None = None,
     extra_scanned_dirs: list[Path] | None = None,
+    strip_header_prob: float = 0.0,
 ) -> tuple[Dataset, Dataset, Dataset]:
     """Create train / val / test splits from a single data directory.
 
     The split is deterministic (seeded) and stratified at the sample-id level
     (no data leakage across splits).
+
+    Parameters
+    ----------
+    strip_header_prob : float
+        Probability of stripping the header from training samples.
+        Applied to the *training* split only (val/test are never augmented).
 
     Returns
     -------
@@ -418,7 +532,6 @@ def make_splits(
         extra_scanned_dirs=extra_scanned_dirs,
     )
     n = len(full_ds)
-    indices = list(range(n))
 
     rng = torch.Generator().manual_seed(seed)
     perm = torch.randperm(n, generator=rng).tolist()
@@ -431,5 +544,9 @@ def make_splits(
     val_idx = perm[n_train : n_train + n_val]
     test_idx = perm[n_train + n_val :]
 
+    train_ds: Dataset = Subset(full_ds, train_idx)
+    if strip_header_prob > 0:
+        train_ds = _AugSubset(train_ds, strip_header_prob)
+
     log.info("Split: train=%d  val=%d  test=%d", n_train, n_val, n_test)
-    return Subset(full_ds, train_idx), Subset(full_ds, val_idx), Subset(full_ds, test_idx)
+    return train_ds, Subset(full_ds, val_idx), Subset(full_ds, test_idx)

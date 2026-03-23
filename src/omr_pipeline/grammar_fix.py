@@ -36,6 +36,13 @@ _DURATIONS = frozenset({
     "breve", "longa",
 })
 
+# Duration → fraction of a whole note (used by barline regulariser)
+_DUR_BEATS: dict[str, float] = {
+    "longa": 4.0, "breve": 2.0, "whole": 1.0, "half": 0.5,
+    "quarter": 0.25, "eighth": 0.125, "16th": 0.0625,
+    "32nd": 0.03125, "64th": 0.015625,
+}
+
 _ACCIDENTALS = frozenset({"flat", "sharp", "natural"})
 
 _LEAD_SHEET_CLEF = "clef:G2"
@@ -334,6 +341,53 @@ def _propagate_key(
 
 
 # ---------------------------------------------------------------------------
+# Time-signature propagation
+# ---------------------------------------------------------------------------
+
+def _propagate_time(
+    tokens: list[str],
+    global_time: tuple[str, str, str] | None,
+) -> tuple[list[str], tuple[str, str, str] | None]:
+    """Carry time signature across systems, mirroring ``_propagate_key``.
+
+    Parameters
+    ----------
+    tokens : list[str]
+        Repaired LMX token list for one system.
+    global_time : tuple | None
+        ``("time", "beats:N", "beat-type:N")`` detected from a previous
+        system, or *None* if not yet seen.
+
+    Returns
+    -------
+    (tokens, detected_time)
+        The possibly-modified token list and the time signature that should
+        be forwarded to the next system.
+    """
+    # Find existing time signature in this system
+    for i, tok in enumerate(tokens):
+        if tok == "time" and i + 2 < len(tokens):
+            if _is_beats(tokens[i + 1]) and _is_beat_type(tokens[i + 2]):
+                local_time = (tok, tokens[i + 1], tokens[i + 2])
+                return tokens, local_time
+
+    # No time signature found — inject the global one if available
+    if global_time is None:
+        return tokens, None
+
+    # Insert after the last header token (clef or key) in the first measure
+    insert_after = 0
+    for j, tok in enumerate(tokens):
+        if _is_clef(tok) or _is_key(tok):
+            insert_after = j + 1
+    tokens = list(tokens)
+    for k, t in enumerate(global_time):
+        tokens.insert(insert_after + k, t)
+
+    return tokens, global_time
+
+
+# ---------------------------------------------------------------------------
 # Post-validation cleanup
 # ---------------------------------------------------------------------------
 
@@ -403,25 +457,145 @@ def _remove_empty_measures(tokens: list[str]) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# Barline regularisation — re-insert / remove barlines by beat counting
+# ---------------------------------------------------------------------------
+
+def _element_duration(tokens: list[str], start: int) -> tuple[float, int]:
+    """Return (duration_in_whole_notes, tokens_consumed) for a note/rest at *start*.
+
+    Handles dotted durations: each dot adds half the previous dot's value.
+    """
+    i = start
+    n = len(tokens)
+
+    # skip pitch + octave / rest token to reach the duration
+    if _is_pitch(tokens[i]):
+        i += 1  # pitch:X
+        if i < n and _is_octave(tokens[i]):
+            i += 1  # octave:Y
+    elif tokens[i] == "rest":
+        i += 1
+    else:
+        return 0.0, 1
+
+    dur = 0.0
+    if i < n and tokens[i] in _DUR_BEATS:
+        dur = _DUR_BEATS[tokens[i]]
+        i += 1
+    else:
+        return 0.25, i - start  # fallback: quarter
+
+    # dots
+    dot_val = dur / 2
+    while i < n and tokens[i] == "dot":
+        dur += dot_val
+        dot_val /= 2
+        i += 1
+
+    # accidental
+    if i < n and tokens[i] in _ACCIDENTALS:
+        i += 1
+
+    # tie
+    if i < n and tokens[i] in ("tied:start", "tied:stop"):
+        i += 1
+
+    # fermata
+    if i < n and tokens[i] == "fermata":
+        i += 1
+
+    return dur, i - start
+
+
+def _regularise_barlines(tokens: list[str]) -> list[str]:
+    """Insert missing barlines based on accumulated beat duration.
+
+    Requires a valid time signature in the header (``time beats:N beat-type:N``).
+    If no time signature is found the tokens are returned unchanged.
+
+    The algorithm **trusts** model-emitted barlines (resetting the beat
+    accumulator when one is encountered) but **inserts** a ``measure`` token
+    whenever the accumulated duration reaches a full measure without one.
+    This handles pickup measures (anacrusis) naturally — the first measure
+    may be shorter than the time signature indicates, and the model's first
+    barline resets the grid.
+    """
+    # Extract time signature from the header
+    measure_len: float | None = None
+
+    for i, tok in enumerate(tokens):
+        if tok == "time" and i + 2 < len(tokens):
+            try:
+                b = int(tokens[i + 1].split(":")[1])   # beats:N
+                bt = int(tokens[i + 2].split(":")[1])   # beat-type:N
+                measure_len = b / bt  # in whole notes
+            except (IndexError, ValueError):
+                pass
+            break
+
+    if measure_len is None or measure_len <= 0:
+        return tokens
+
+    out: list[str] = []
+    accum = 0.0
+    eps = 1e-6
+    i = 0
+    n = len(tokens)
+
+    while i < n:
+        tok = tokens[i]
+
+        # Model-emitted barline — trust it and reset accumulator
+        if tok == "measure":
+            out.append(tok)
+            accum = 0.0
+            i += 1
+            continue
+
+        if _is_pitch(tok) or tok == "rest":
+            dur, consumed = _element_duration(tokens, i)
+
+            # If the accumulator has reached a full measure, the model
+            # missed a barline — insert one before this element.
+            if accum > eps and accum + eps >= measure_len:
+                out.append("measure")
+                accum = 0.0
+
+            out.extend(tokens[i : i + consumed])
+            accum += dur
+            i += consumed
+            continue
+
+        # Everything else: pass through
+        out.append(tok)
+        i += 1
+
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
 def fix_sequence(
     lmx_string: str,
     global_key: str | None = None,
+    global_time: tuple[str, str, str] | None = None,
     force_clef: bool = True,
-) -> tuple[str, str | None]:
+) -> tuple[str, str | None, tuple[str, str, str] | None]:
     """Parse, validate, and repair an LMX token string.
 
-    Returns (fixed_string, detected_key).
+    Returns ``(fixed_string, detected_key, detected_time)``.
     """
     if not lmx_string or not lmx_string.strip():
-        return lmx_string, global_key
+        return lmx_string, global_key, global_time
 
     tokens = lmx_string.split()
     tokens = _parse_and_repair(tokens, force_clef)
     tokens = _clean_ties(tokens)
     tokens, detected_key = _propagate_key(tokens, global_key)
+    tokens, detected_time = _propagate_time(tokens, global_time)
     tokens = _remove_empty_measures(tokens)
+    tokens = _regularise_barlines(tokens)
 
-    return " ".join(tokens), detected_key
+    return " ".join(tokens), detected_key, detected_time

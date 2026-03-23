@@ -78,6 +78,13 @@ class Config:
     rnn_layers: int = 2            # stacked LSTM layers
     dropout: float = 0.3           # dropout between LSTM layers
 
+    # ── Data augmentation ──────────────────────────────────────────────────
+    # strip_header_prob: during training, randomly remove the visual header
+    # (clef + key + time region) from this fraction of samples so the model
+    # learns to recognise continuation lines that lack a header — as they
+    # appear on lines 2+ of a Real Book page.  Applied to training only.
+    strip_header_prob: float = 0.4
+
     # ── Training ───────────────────────────────────────────────────────────
     epochs: int = 50
     batch_size: int = 16

@@ -103,11 +103,15 @@ def _process_systems(
     )
     chord_preds = recognize_chords(chord_imgs, chord_bins)
 
-    # Grammar correction with cross-system key propagation
+    # Grammar correction with cross-system key + time propagation
     global_key: str | None = None
+    global_time: tuple[str, str, str] | None = None
     fixed_music: list[str] = []
     for pred in music_preds:
-        fixed, global_key = fix_sequence(pred, global_key=global_key, force_clef=True)
+        fixed, global_key, global_time = fix_sequence(
+            pred, global_key=global_key, global_time=global_time,
+            force_clef=True,
+        )
         fixed_music.append(fixed)
 
     # Assemble segments

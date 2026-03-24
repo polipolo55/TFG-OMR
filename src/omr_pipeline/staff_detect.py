@@ -168,42 +168,69 @@ def _refine_x_bounds(staves: list[Staff], binary: np.ndarray) -> None:
 # Building systems (chord + music region pairs)
 # ---------------------------------------------------------------------------
 
+def _bottommost_ink_row_run(rows_ink: np.ndarray) -> tuple[int, int] | None:
+    """Largest vertical run of rows with ink; prefer the run closest to the staff (bottom of band)."""
+    h = len(rows_ink)
+    if h == 0:
+        return None
+    best: tuple[int, int, int] | None = None  # (start, end, score) score = end index
+    i = 0
+    while i < h:
+        if not rows_ink[i]:
+            i += 1
+            continue
+        j = i
+        while j < h and rows_ink[j]:
+            j += 1
+        # Prefer runs nearer bottom (chord symbols sit just above the staff)
+        score = j
+        if best is None or score > best[2]:
+            best = (i, j, score)
+        i = j
+    if best is None:
+        return None
+    return best[0], best[1]
+
+
 def _build_systems(
     staves: list[Staff],
     grayscale: np.ndarray,
     binary: np.ndarray,
-    stem_margin: float = 1.8,
+    stem_margin: float = 2.2,
     chord_min_h: int = 10,
 ) -> list[System]:
     """Pair each staff with the chord-text region above it.
 
     Music region = top_line - margin … bottom_line + margin
-    Chord region = previous system's bottom … current music region's top
+    Chord region = a thin band *immediately above* the staff (excludes page
+    titles / headers that sit far above the first system).
     """
     H, W = grayscale.shape[:2]
     systems: list[System] = []
+    pad_x = max(15, int(W * 0.015))
 
     for idx, staff in enumerate(staves):
         margin = int(staff.staff_space * stem_margin)
 
         music_y0 = max(0, staff.top - margin)
         music_y1 = min(H, staff.bottom + margin)
-        music_x0 = max(0, staff.x_start - 5)
-        music_x1 = min(W, staff.x_end + 5)
+        music_x0 = max(0, staff.x_start - pad_x)
+        music_x1 = min(W, staff.x_end + pad_x)
 
-        # Chord region: gap between previous system's bottom and this music_y0
+        # Chord band: only the last few staff-spaces above this staff (not whole page top)
         if idx > 0:
             prev = staves[idx - 1]
             prev_bottom = min(H, prev.bottom + int(prev.staff_space * stem_margin))
         else:
             prev_bottom = 0
-        chord_y0 = prev_bottom
+        max_chord_depth = max(int(staff.staff_space * 8), 56)
+        chord_y0 = max(prev_bottom, music_y0 - max_chord_depth)
         chord_y1 = music_y0
 
         music_gray = grayscale[music_y0:music_y1, music_x0:music_x1]
         music_bin = (binary[music_y0:music_y1, music_x0:music_x1] > 0).astype(np.uint8)
 
-        # Chord crop — tight-bbox around actual ink in the chord band
+        # Chord crop — ink in band, keep bottom-most row cluster (chord row)
         chord_bbox = None
         chord_gray = None
         chord_bin = None
@@ -216,8 +243,14 @@ def _build_systems(
                 if np.any(cols_ink) and np.any(rows_ink):
                     cx0 = max(0, int(np.where(cols_ink)[0][0]) - 3)
                     cx1 = min(W, int(np.where(cols_ink)[0][-1]) + 4)
-                    ry0 = max(chord_y0, chord_y0 + int(np.where(rows_ink)[0][0]) - 3)
-                    ry1 = min(chord_y1, chord_y0 + int(np.where(rows_ink)[0][-1]) + 4)
+                    row_run = _bottommost_ink_row_run(rows_ink)
+                    if row_run is not None:
+                        r0, r1 = row_run
+                        ry0 = max(chord_y0, chord_y0 + r0 - 3)
+                        ry1 = min(chord_y1, chord_y0 + r1 + 4)
+                    else:
+                        ry0 = max(chord_y0, chord_y0 + int(np.where(rows_ink)[0][0]) - 3)
+                        ry1 = min(chord_y1, chord_y0 + int(np.where(rows_ink)[0][-1]) + 4)
                     chord_bbox = (cx0, ry0, cx1 - cx0, ry1 - ry0)
                     chord_gray = grayscale[ry0:ry1, cx0:cx1]
                     chord_bin = (binary[ry0:ry1, cx0:cx1] > 0).astype(np.uint8)
@@ -233,6 +266,42 @@ def _build_systems(
         ))
 
     return systems
+
+
+# ---------------------------------------------------------------------------
+# Per-crop staff validation (CRNN input quality)
+# ---------------------------------------------------------------------------
+
+def local_primary_staff_lines(music_binary: np.ndarray) -> list[int] | None:
+    """Re-detect five staff lines inside a music strip (crop coordinates).
+
+    Page-level grouping can occasionally mis-assign regions; the CRNN was
+    trained on crops that always contain a real staff.  If this returns
+    *None*, the strip is unlikely to be readable music.
+    """
+    if music_binary.size == 0 or music_binary.shape[0] < 12:
+        return None
+    line_mask = _extract_line_mask(music_binary)
+    line_ys = _line_row_centroids(line_mask)
+    w = music_binary.shape[1]
+    staves_local = _group_into_staves(line_ys, w)
+    if not staves_local:
+        return None
+    if len(staves_local) == 1:
+        return staves_local[0].line_ys
+    hc = music_binary.shape[0] / 2.0
+
+    def centre_dist(st: Staff) -> float:
+        c = (st.line_ys[0] + st.line_ys[-1]) / 2.0
+        return abs(c - hc)
+
+    best = min(staves_local, key=centre_dist)
+    return best.line_ys
+
+
+def music_strip_has_valid_staff(music_binary: np.ndarray) -> bool:
+    """True if *music_binary* contains a plausible five-line staff."""
+    return local_primary_staff_lines(music_binary) is not None
 
 
 # ---------------------------------------------------------------------------
@@ -262,6 +331,20 @@ def detect_systems(grayscale: np.ndarray, binary: np.ndarray) -> list[System]:
 
     _refine_x_bounds(staves, binary)
     systems = _build_systems(staves, grayscale, binary)
+
+    validated = [s for s in systems if music_strip_has_valid_staff(s.music_binary)]
+    if validated:
+        if len(validated) < len(systems):
+            log.info(
+                "Dropped %d region(s) without a local five-line staff",
+                len(systems) - len(validated),
+            )
+        systems = validated
+    else:
+        log.warning(
+            "No strip passed local staff validation — keeping all %d page-level system(s)",
+            len(systems),
+        )
 
     log.info(
         "Detected %d staff system(s); staff-space ≈ %.1f px",

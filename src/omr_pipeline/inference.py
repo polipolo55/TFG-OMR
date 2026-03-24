@@ -23,6 +23,9 @@ import cv2
 import numpy as np
 import torch
 from torch import Tensor
+from torch.amp import autocast
+
+from .staff_detect import local_primary_staff_lines
 
 _SRC = Path(__file__).resolve().parent.parent
 if str(_SRC) not in sys.path:
@@ -148,9 +151,16 @@ def _tile_strip(img: np.ndarray, img_height: int) -> list[tuple[np.ndarray, floa
 
     Returns (tile, keep_start_frac, keep_end_frac) per tile.  Interior tiles
     keep only the central 50 %; edge tiles keep more to avoid losing content.
+
+    Merging by slicing token lists is only a heuristic (CTC time ≠ token index).
+    Set ``OMR_DISABLE_TILING=1`` to run one forward pass (may squash wide staves
+    to ``max_image_width``, matching training clamp behaviour).
     """
     h, w = img.shape[:2]
     if h == 0:
+        return [(img, 0.0, 1.0)]
+
+    if os.environ.get("OMR_DISABLE_TILING", "").lower() in ("1", "true", "yes"):
         return [(img, 0.0, 1.0)]
 
     tile_w = max(1, round(_TILE_W_AT_128 * h / img_height))
@@ -210,7 +220,8 @@ def _prepare_tile(img: np.ndarray, img_height: int, max_width: int) -> tuple[Ten
 # Public API
 # ---------------------------------------------------------------------------
 
-_BEAM_WIDTH = int(os.environ.get("OMR_BEAM_WIDTH", "5"))
+# Greedy (1) matches notebook / default ``cli.py evaluate``; raise via OMR_BEAM_WIDTH.
+_BEAM_WIDTH = int(os.environ.get("OMR_BEAM_WIDTH", "1"))
 
 
 def recognize_music(
@@ -218,12 +229,14 @@ def recognize_music(
     checkpoint_path: Path | None = None,
     staff_line_positions: list[list[int] | None] | None = None,
     music_bbox_y0s: list[int] | None = None,
+    music_binaries: list[np.ndarray | None] | None = None,
     beam_width: int | None = None,
 ) -> list[str]:
     """Run the CRNN on a list of music-staff crops.
 
-    Returns one LMX token string per strip.  Uses beam search decoding by
-    default (beam_width=5, configurable via OMR_BEAM_WIDTH env var).
+    Returns one LMX token string per strip.  Decoding defaults to greedy CTC
+    (same as ``evaluate`` / the phase-2 notebook); set ``OMR_BEAM_WIDTH`` > 1
+    for beam search.
     """
     if not strip_images:
         return []
@@ -238,6 +251,7 @@ def recognize_music(
     vocab = entry["vocab"]
     cfg = entry["cfg"]
     device = entry["device"]
+    use_amp = device.type == "cuda"
     img_height = getattr(cfg, "img_height", 128)
     max_width = getattr(cfg, "max_image_width", 2048)
 
@@ -276,7 +290,8 @@ def recognize_music(
         batch = torch.cat(padded, dim=0).to(device)
         width_t = torch.tensor(widths, dtype=torch.long, device=device)
         with torch.inference_mode():
-            log_probs, out_lens = model(batch, width_t)
+            with autocast("cuda", enabled=use_amp):
+                log_probs, out_lens = model(batch, width_t)
             return _decode_fn(log_probs, out_lens, vocab)
 
     # ----- fill defaults -----
@@ -284,14 +299,24 @@ def recognize_music(
         staff_line_positions = [None] * len(strip_images)
     if music_bbox_y0s is None:
         music_bbox_y0s = [0] * len(strip_images)
+    if music_binaries is None:
+        music_binaries = [None] * len(strip_images)
 
     results: list[str] = []
-    for img, staff_ys, y0 in zip(strip_images, staff_line_positions, music_bbox_y0s):
+    for img, staff_ys, y0, mbin in zip(
+        strip_images, staff_line_positions, music_bbox_y0s, music_binaries,
+    ):
         if img is None or img.size == 0:
             results.append("")
             continue
 
-        normed = normalize_staff_crop(img, staff_ys, y0)
+        local_lines: list[int] | None = None
+        if mbin is not None and mbin.size > 0:
+            local_lines = local_primary_staff_lines(mbin)
+        if local_lines is not None:
+            normed = normalize_staff_crop(img, local_lines, 0)
+        else:
+            normed = normalize_staff_crop(img, staff_ys, y0)
         tile_info = _tile_strip(normed, img_height)
 
         if len(tile_info) == 1:

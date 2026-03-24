@@ -96,10 +96,16 @@ def _process_systems(
                 cv2.imwrite(str(dbg / f"chord_{idx}.png"), img)
         log.info("Debug crops saved to %s", dbg)
 
+    music_bins: list[np.ndarray | None] = [
+        sys.music_binary if sys.music_image is not None and sys.music_image.size > 0 else None
+        for sys in systems
+    ]
+
     music_preds = recognize_music(
         music_imgs, checkpoint_path,
         staff_line_positions=staff_positions,
         music_bbox_y0s=bbox_y0s,
+        music_binaries=music_bins,
     )
     chord_preds = recognize_chords(chord_imgs, chord_bins)
 

@@ -85,14 +85,27 @@ class Config:
     # appear on lines 2+ of a Real Book page.  Applied to training only.
     strip_header_prob: float = 0.4
 
+    # rare_lmx_oversample: training indices for samples whose .lmx contains
+    # any token in rare_lmx_tokens are repeated (N-1) extra times so each
+    # epoch sees them N× as often.  1 = disabled.  Default 2 up-weights ties,
+    # which are visually subtle and often under-predicted on scans.
+    rare_lmx_oversample: int = 2
+    rare_lmx_tokens: tuple[str, ...] = ("tied:start", "tied:stop")
+
+    # ── Fine-tuning (optional target-domain data) ─────────────────────────
+    # Extra clean-image directories merged into the training split only.
+    finetune_data_dirs: list[Path] = field(default_factory=list)
+    finetune_scanned_dirs: list[Path] = field(default_factory=list)
+
     # ── Training ───────────────────────────────────────────────────────────
-    epochs: int = 50
+    # Defaults tuned for a full PrIMuS → scanned run on ~12 GB VRAM (OneCycleLR).
+    epochs: int = 60
     batch_size: int = 16
-    lr: float = 5e-4               # peak learning rate (OneCycleLR)
+    lr: float = 1e-3               # peak LR — higher than 5e-4 for faster convergence
     weight_decay: float = 1e-4
-    warmup_frac: float = 0.05      # fraction of total steps for LR warm-up
+    warmup_frac: float = 0.08      # slightly longer warm-up for large loaders
     num_workers: int = 10          # DataLoader workers
-    early_stopping_patience: int = 10  # stop if val SER stalls N epochs (0 = off)
+    early_stopping_patience: int = 12  # val SER plateau (0 = off)
     max_grad_norm: float = 5.0         # gradient clipping max norm
 
     def __post_init__(self) -> None:

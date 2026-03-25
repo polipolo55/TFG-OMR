@@ -8,9 +8,11 @@ Strip preprocessing matches dataset.py exactly:
   4. Pad batch to max width with zeros
 
 Staff-aware normalization centres the 5-line staff vertically in the crop
-so it occupies the same region as in the clean training images.  Overlapping
-tiles (50 %) with centre-crop merging avoid boundary-cut artefacts on wide
-strips.
+so it occupies the same region as in the clean training images.
+
+By default **wide strips use one forward pass** (width clamped to
+``max_image_width`` like the training loader), avoiding heuristic tile merges.
+Set ``OMR_ENABLE_TILING=1`` to restore overlapping 50 %-overlap tiles.
 """
 from __future__ import annotations
 
@@ -146,21 +148,28 @@ def normalize_staff_crop(
 # Tiling
 # ---------------------------------------------------------------------------
 
+def _tiling_enabled() -> bool:
+    """Return True only when legacy multi-tile wide-strip decoding is requested."""
+    if os.environ.get("OMR_DISABLE_TILING", "").lower() in ("1", "true", "yes"):
+        return False
+    return os.environ.get("OMR_ENABLE_TILING", "").lower() in ("1", "true", "yes")
+
+
 def _tile_strip(img: np.ndarray, img_height: int) -> list[tuple[np.ndarray, float, float]]:
-    """Split a wide strip into overlapping tiles.
+    """Split a wide strip into overlapping tiles when ``OMR_ENABLE_TILING=1``.
 
     Returns (tile, keep_start_frac, keep_end_frac) per tile.  Interior tiles
     keep only the central 50 %; edge tiles keep more to avoid losing content.
 
     Merging by slicing token lists is only a heuristic (CTC time ≠ token index).
-    Set ``OMR_DISABLE_TILING=1`` to run one forward pass (may squash wide staves
-    to ``max_image_width``, matching training clamp behaviour).
+    Default is **one** forward pass (``max_image_width`` clamp — same idea as a
+    manual full-width crop in training).
     """
     h, w = img.shape[:2]
     if h == 0:
         return [(img, 0.0, 1.0)]
 
-    if os.environ.get("OMR_DISABLE_TILING", "").lower() in ("1", "true", "yes"):
+    if not _tiling_enabled():
         return [(img, 0.0, 1.0)]
 
     tile_w = max(1, round(_TILE_W_AT_128 * h / img_height))
@@ -220,8 +229,9 @@ def _prepare_tile(img: np.ndarray, img_height: int, max_width: int) -> tuple[Ten
 # Public API
 # ---------------------------------------------------------------------------
 
-# Greedy (1) matches notebook / default ``cli.py evaluate``; raise via OMR_BEAM_WIDTH.
-_BEAM_WIDTH = int(os.environ.get("OMR_BEAM_WIDTH", "1"))
+def _env_beam_width() -> int:
+    """Read OMR_BEAM_WIDTH at call time so the API/process can change it without reload."""
+    return max(1, int(os.environ.get("OMR_BEAM_WIDTH", "1")))
 
 
 def recognize_music(
@@ -235,8 +245,8 @@ def recognize_music(
     """Run the CRNN on a list of music-staff crops.
 
     Returns one LMX token string per strip.  Decoding defaults to greedy CTC
-    (same as ``evaluate`` / the phase-2 notebook); set ``OMR_BEAM_WIDTH`` > 1
-    for beam search.
+    (same as ``evaluate`` / the phase-2 notebook).  Pass *beam_width* or set
+    ``OMR_BEAM_WIDTH`` in the environment (read at each call) for beam search.
     """
     if not strip_images:
         return []
@@ -256,7 +266,7 @@ def recognize_music(
     max_width = getattr(cfg, "max_image_width", 2048)
 
     if beam_width is None:
-        beam_width = _BEAM_WIDTH
+        beam_width = _env_beam_width()
 
     if beam_width > 1:
         from CRNN_CTC.evaluate import beam_search_decode

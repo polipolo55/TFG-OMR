@@ -4,6 +4,9 @@ semantic_to_lmx.py
 Convert PrIMuS .semantic annotations → monophonic LMX (.lmx) **directly**,
 without an intermediate music21 or MusicXML representation.
 
+Rare soprano / mezzo / varbaritone clefs (C1, C2, F3) are emitted as
+``clef:G2`` to match ``generate_realbook.py`` LilyPond output.
+
 Pipeline per sample:
     .semantic  ──tokenise──▶  LMX token list  ──write──▶  .lmx
 
@@ -33,6 +36,8 @@ from functools import partial
 from pathlib import Path
 
 from tqdm import tqdm
+
+from CRNN_CTC.lilypond_render import normalize_clef_id_for_lead_sheet
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -143,7 +148,7 @@ def semantic_to_lmx_tokens(
         try:
             # ── Clef ──────────────────────────────────────────────────────
             if tok.startswith("clef-"):
-                clef_id = tok[5:]
+                clef_id = normalize_clef_id_for_lead_sheet(tok[5:])
                 out.append(f"clef:{clef_id}")
 
             # ── Key signature ─────────────────────────────────────────────

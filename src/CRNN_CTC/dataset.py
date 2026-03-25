@@ -32,9 +32,37 @@ import torch
 from torch import Tensor
 from torch.utils.data import Dataset
 
+from .lilypond_render import CLEF_IDS_NORMALIZE_TO_G2
 from .vocab import Vocabulary
 
 log = logging.getLogger(__name__)
+
+# Tokens that are easy to under-predict on distorted scans (ties); kept
+# narrow so we do not up-weight most of the corpus (e.g. every sample with a
+# key signature).
+_DEFAULT_RARE_LMX_TOKENS: frozenset[str] = frozenset({"tied:start", "tied:stop"})
+
+
+def _train_indices_with_rare_oversample(
+    full_ds: "OMRDataset",
+    train_idx: list[int],
+    *,
+    oversample: int,
+    rare_tokens: frozenset[str],
+) -> list[int]:
+    """Duplicate training indices for samples whose LMX contains *rare_tokens*."""
+    if oversample <= 1 or not rare_tokens:
+        return train_idx
+    expanded: list[int] = []
+    for i in train_idx:
+        expanded.append(i)
+        _sid, _png, lmx_path = full_ds._samples[i]
+        tokens = _load_lmx_tokens(lmx_path)
+        if any(t in rare_tokens for t in tokens):
+            for _ in range(oversample - 1):
+                expanded.append(i)
+    return expanded
+
 
 # ---------------------------------------------------------------------------
 # Sample-quality filter
@@ -43,10 +71,10 @@ log = logging.getLogger(__name__)
 # Structural tokens that carry no pitched content
 _REST_STRUCTURAL = frozenset({"rest", "rest:measure", "measure"})
 
-# C-clef and F3-clef variants that are not used in jazz lead sheets and cause
-# systematic pitch-cascade errors due to visual similarity with a neighbouring
-# clef (C1/C2 ≈ C4 tenor; F3 baritone ≈ F4 bass, one line off).
-_CLEF_UNWANTED = frozenset({"clef:C1", "clef:C2", "clef:F3"})
+# Raw LMX that still uses these clefs (e.g. old renders) is dropped.
+# Fresh ``generate_realbook`` + ``semantic_to_lmx`` emit ``clef:G2`` instead
+# (see ``CLEF_IDS_NORMALIZE_TO_G2`` in ``lilypond_render``).
+_CLEF_UNWANTED = frozenset(f"clef:{c}" for c in CLEF_IDS_NORMALIZE_TO_G2)
 
 
 def _is_degenerate(
@@ -66,12 +94,10 @@ def _is_degenerate(
         — the CTC edit distance explodes and they contribute no signal.
 
     unwanted-clefs
-        The sample contains a soprano (``clef:C1``) or mezzo-soprano
-        (``clef:C2``) clef.  These C-clef variants look visually like tenor
-        clef but sit on a different staff line; the model confuses them and
-        every subsequent pitch prediction is shifted by a fixed interval,
-        creating a large cascade of substitution errors.  Neither clef appears
-        in jazz lead sheets.
+        The sample's LMX still contains ``clef:C1``, ``clef:C2``, or ``clef:F3``
+        (legacy data).  Re-render and re-convert so those clefs are normalized
+        to ``clef:G2`` while keeping absolute pitches — then this filter no
+        longer removes them.
     """
     if not tokens:
         return True
@@ -502,6 +528,10 @@ def make_splits(
     extra_data_dirs: list[Path] | None = None,
     extra_scanned_dirs: list[Path] | None = None,
     strip_header_prob: float = 0.0,
+    rare_lmx_oversample: int = 1,
+    rare_lmx_tokens: frozenset[str] | None = None,
+    finetune_data_dirs: list[Path] | None = None,
+    finetune_scanned_dirs: list[Path] | None = None,
 ) -> tuple[Dataset, Dataset, Dataset]:
     """Create train / val / test splits from a single data directory.
 
@@ -520,6 +550,12 @@ def make_splits(
     """
     from torch.utils.data import Subset
 
+    extra_clean = list(extra_data_dirs or [])
+    extra_clean.extend(finetune_data_dirs or [])
+
+    extra_scanned_combined = list(extra_scanned_dirs or [])
+    extra_scanned_combined.extend(finetune_scanned_dirs or [])
+
     full_ds = OMRDataset(
         data_dir, vocab, img_height=img_height,
         max_image_width=max_image_width,
@@ -528,8 +564,8 @@ def make_splits(
         filter_unwanted_clefs=filter_unwanted_clefs,
         filter_multi_staff=filter_multi_staff,
         max_source_height=max_source_height,
-        extra_data_dirs=extra_data_dirs,
-        extra_scanned_dirs=extra_scanned_dirs,
+        extra_data_dirs=extra_clean or None,
+        extra_scanned_dirs=extra_scanned_combined or None,
     )
     n = len(full_ds)
 
@@ -541,6 +577,25 @@ def make_splits(
     n_train = n - n_val - n_test
 
     train_idx = perm[:n_train]
+    rare_set = (
+        rare_lmx_tokens
+        if rare_lmx_tokens is not None
+        else _DEFAULT_RARE_LMX_TOKENS
+    )
+    train_idx = _train_indices_with_rare_oversample(
+        full_ds,
+        train_idx,
+        oversample=rare_lmx_oversample,
+        rare_tokens=rare_set,
+    )
+    if rare_lmx_oversample > 1 and rare_set:
+        log.info(
+            "Rare-token oversample: factor=%d tokens=%s → train virtual size %d (unique %d)",
+            rare_lmx_oversample,
+            sorted(rare_set),
+            len(train_idx),
+            n_train,
+        )
     val_idx = perm[n_train : n_train + n_val]
     test_idx = perm[n_train + n_val :]
 
@@ -548,5 +603,8 @@ def make_splits(
     if strip_header_prob > 0:
         train_ds = _AugSubset(train_ds, strip_header_prob)
 
-    log.info("Split: train=%d  val=%d  test=%d", n_train, n_val, n_test)
+    log.info(
+        "Split: train_loader=%d (unique ids %d)  val=%d  test=%d",
+        len(train_idx), n_train, n_val, n_test,
+    )
     return train_ds, Subset(full_ds, val_idx), Subset(full_ds, test_idx)

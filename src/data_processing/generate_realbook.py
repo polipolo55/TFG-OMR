@@ -4,6 +4,11 @@ generate_realbook.py
 Re-render PrIMuS monophonic staff lines using LilyPond + LilyJAZZ to produce
 a Real Book-styled dataset.
 
+``clef-C1``, ``clef-C2``, and ``clef-F3`` in the semantic stream are written
+as treble (``\\clef treble``) so PNGs match lead-sheet practice; absolute
+pitches from PrIMuS are unchanged (ledger lines as needed).  Run
+``semantic_to_lmx`` with the same codebase so ``.lmx`` uses ``clef:G2``.
+
 Output structure mirrors PrIMuS:
     data/realbook_primus/{sample_id}/{sample_id}.png
     data/realbook_primus/{sample_id}/{sample_id}.semantic   (copied from PrIMuS)
@@ -36,6 +41,7 @@ from CRNN_CTC.lilypond_render import (
     CLEF_LY,
     LY_TEMPLATE,
     crop_content,
+    normalize_clef_id_for_lead_sheet,
     run_lilypond,
 )
 
@@ -164,7 +170,7 @@ def semantic_to_lily_music(semantic_path: Path) -> str:
     for tok in tokens:
         try:
             if tok.startswith("clef-"):
-                clef_id  = tok[len("clef-"):]
+                clef_id = normalize_clef_id_for_lead_sheet(tok[len("clef-"):])
                 if clef_id not in CLEF_LY:
                     raise ValueError(
                         f"Unknown clef token: {tok!r}. "

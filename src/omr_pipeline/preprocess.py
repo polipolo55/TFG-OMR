@@ -8,6 +8,7 @@ for document/score images with dominant horizontal lines.
 """
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -68,6 +69,22 @@ def load_pdf_page(pdf_bytes: bytes, page: int = 0, dpi: int = 150) -> np.ndarray
         raise ValueError(f"Unsupported pixmap channels: {n}")
     finally:
         doc.close()
+
+
+def pdf_load_dpi() -> int:
+    """DPI for PyMuPDF rasterisation before deskew / staff detection.
+
+    Higher values give taller staff crops so, after resize to ``img_height``,
+    symbols stay sharper (same idea as a tight manual crop).  Override with
+    env ``OMR_PDF_DPI`` (clamped to 72–600).  Default ``300``.
+    """
+    raw = os.environ.get("OMR_PDF_DPI", "").strip()
+    if raw:
+        try:
+            return max(72, min(600, int(raw)))
+        except ValueError:
+            pass
+    return 300
 
 
 # ---------------------------------------------------------------------------

@@ -36,25 +36,27 @@ def build_pipeline(seed: int | None = None) -> A.Compose:
     """Return an albumentations Compose pipeline for scan simulation."""
     return A.Compose(
         [
-            A.ElasticTransform(alpha=15, sigma=4, p=0.80),
-            A.GridDistortion(num_steps=5, distort_limit=(-0.06, 0.06), p=0.70),
+            # Stronger elastic / grid warp → curved staves and binding stress
+            A.ElasticTransform(alpha=22, sigma=4.5, p=0.82),
+            A.GridDistortion(num_steps=5, distort_limit=(-0.08, 0.08), p=0.72),
+            A.OpticalDistortion(distort_limit=0.12, p=0.38),
             A.Affine(
-                translate_percent={"x": (-0.01, 0.01), "y": (-0.01, 0.01)},
-                scale=(0.98, 1.02),
-                rotate=(-2.0, 2.0),
-                shear=(-1.0, 1.0),
+                translate_percent={"x": (-0.015, 0.015), "y": (-0.015, 0.015)},
+                scale=(0.97, 1.03),
+                rotate=(-2.5, 2.5),
+                shear=(-1.2, 1.2),
                 border_mode=cv2.BORDER_CONSTANT,
                 fill=255,
                 p=0.85,
             ),
-            A.GaussianBlur(blur_limit=0, sigma_limit=(0.2, 0.6), p=0.60),
-            A.Sharpen(alpha=(0.15, 0.4), lightness=(0.85, 1.0), p=0.45),
-            A.RandomToneCurve(scale=0.10, p=0.70),
-            A.GaussNoise(std_range=(0.01, 0.04), mean_range=(0.0, 0.0),
-                         per_channel=False, p=0.75),
-            A.RandomBrightnessContrast(brightness_limit=(-0.08, 0.04),
-                                       contrast_limit=(0.03, 0.15),
-                                       p=0.85),
+            A.GaussianBlur(blur_limit=0, sigma_limit=(0.2, 0.75), p=0.62),
+            A.Sharpen(alpha=(0.15, 0.45), lightness=(0.85, 1.0), p=0.48),
+            A.RandomToneCurve(scale=0.12, p=0.72),
+            A.GaussNoise(std_range=(0.012, 0.045), mean_range=(0.0, 0.0),
+                         per_channel=False, p=0.78),
+            A.RandomBrightnessContrast(brightness_limit=(-0.10, 0.05),
+                                       contrast_limit=(0.03, 0.18),
+                                       p=0.86),
         ],
         seed=seed,
     )
@@ -101,7 +103,7 @@ def vary_staff_line_thickness(
     The Real Book has thinner staff lines than LilyPond defaults.  This
     applies a mild morphological operation on detected horizontal structures.
     """
-    if rng.random() > 0.5:
+    if rng.random() > 0.40:
         return img_gray
 
     binary = cv2.threshold(img_gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
@@ -161,7 +163,10 @@ def augment_sample(
     """Augment a single grayscale PNG and write result."""
     img = np.array(Image.open(src_png).convert("L"))
 
-    dilate_iters = rng.choice([0, 1]) if INK_DILATE_ITERATIONS <= 1 else INK_DILATE_ITERATIONS
+    if INK_DILATE_ITERATIONS <= 1:
+        dilate_iters = rng.choices([0, 1, 2], weights=[0.42, 0.48, 0.10], k=1)[0]
+    else:
+        dilate_iters = INK_DILATE_ITERATIONS
     img = dilate_ink(img, iterations=dilate_iters)
     img = vary_staff_line_thickness(img, rng)
 

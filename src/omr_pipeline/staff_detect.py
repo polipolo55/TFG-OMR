@@ -65,7 +65,12 @@ def _extract_line_mask(binary: np.ndarray) -> np.ndarray:
     return cv2.morphologyEx(ink, cv2.MORPH_OPEN, kernel, iterations=1)
 
 
-def _line_row_centroids(line_mask: np.ndarray, merge_dist: int = 3) -> list[int]:
+def _line_row_centroids(
+    line_mask: np.ndarray,
+    merge_dist: int = 3,
+    *,
+    ink_threshold_frac: float = 0.15,
+) -> list[int]:
     """Find centroid y of each horizontal line in the mask.
 
     Adjacent active rows within *merge_dist* are fused (thick lines span
@@ -75,7 +80,7 @@ def _line_row_centroids(line_mask: np.ndarray, merge_dist: int = 3) -> list[int]
     if proj.max() == 0:
         return []
 
-    threshold = proj.max() * 0.15
+    threshold = proj.max() * ink_threshold_frac
     active = proj >= threshold
 
     runs: list[tuple[int, int]] = []
@@ -149,16 +154,43 @@ def _group_into_staves(
 
 
 def _refine_x_bounds(staves: list[Staff], binary: np.ndarray) -> None:
-    """Tighten each staff's x-bounds to the actual ink extent."""
-    _, w = binary.shape[:2]
+    """Tighten each staff's x-bounds toward notation ink, not bare staff lines.
+
+    Projecting ``binary`` in the staff band marks every column that contains a
+    staff-line pixel, so ``x_start``/``x_end`` often span the full page.  We
+    subtract a horizontal morphological opening (long horizontal runs) to drop
+    most staff lines while keeping noteheads, stems, and barlines, then pad.
+    Falls back to full-band ink if no non-staff content is found.
+    """
+    h_full, w = binary.shape[:2]
+    hh = max(25, min(w // 10, 120))
+    hk = cv2.getStructuringElement(cv2.MORPH_RECT, (hh, 1))
+
     for staff in staves:
         y0 = max(0, staff.top - int(staff.staff_space * 0.5))
-        y1 = min(binary.shape[0], staff.bottom + int(staff.staff_space * 0.5))
-        cols = np.any(binary[y0:y1] > 0, axis=0)
+        y1 = min(h_full, staff.bottom + int(staff.staff_space * 0.5))
+        band = binary[y0:y1, :]
+        if band.size == 0:
+            staff.x_start, staff.x_end = 0, w
+            continue
+
+        ink = (band > 0).astype(np.uint8) * 255
+        horiz = cv2.morphologyEx(ink, cv2.MORPH_OPEN, hk)
+        content = cv2.subtract(ink, horiz)
+        cols = np.any(content > 0, axis=0)
+        pad = max(8, int(staff.staff_space * 2))
+
         if np.any(cols):
             xs = np.where(cols)[0]
-            staff.x_start = int(xs[0])
-            staff.x_end = int(xs[-1]) + 1
+            staff.x_start = max(0, int(xs[0]) - pad)
+            staff.x_end = min(w, int(xs[-1]) + 1 + pad)
+            continue
+
+        cols_all = np.any(ink > 0, axis=0)
+        if np.any(cols_all):
+            xs2 = np.where(cols_all)[0]
+            staff.x_start = int(xs2[0])
+            staff.x_end = int(xs2[-1]) + 1
         else:
             staff.x_start = 0
             staff.x_end = w
@@ -308,47 +340,98 @@ def music_strip_has_valid_staff(music_binary: np.ndarray) -> bool:
 # Public API
 # ---------------------------------------------------------------------------
 
+def _detect_systems_one_pass(
+    grayscale: np.ndarray,
+    binary: np.ndarray,
+    *,
+    spacing_tolerance: float,
+    line_merge_dist: int,
+    ink_threshold_frac: float,
+) -> tuple[list[System], list[int]]:
+    """One staff-detection attempt; returns (systems, line_ys)."""
+    _H, W = grayscale.shape[:2]
+    line_mask = _extract_line_mask(binary)
+    line_ys = _line_row_centroids(
+        line_mask,
+        merge_dist=line_merge_dist,
+        ink_threshold_frac=ink_threshold_frac,
+    )
+    if len(line_ys) < 5:
+        return [], line_ys
+
+    staves = _group_into_staves(line_ys, W, spacing_tolerance=spacing_tolerance)
+    if not staves:
+        return [], line_ys
+
+    _refine_x_bounds(staves, binary)
+    systems = _build_systems(staves, grayscale, binary)
+    return systems, line_ys
+
+
 def detect_systems(grayscale: np.ndarray, binary: np.ndarray) -> list[System]:
     """Detect staff systems and their chord regions on a preprocessed page.
 
     Returns an ordered list of System objects (top → bottom).  Returns an
     empty list only when fewer than 5 horizontal lines can be found (i.e.
     the image contains no recognisable staff).
+
+    Retries with looser line clustering and spacing tolerance when wavy or
+    thick hand-drawn staves fail the default morphological pass.
     """
-    H, W = grayscale.shape[:2]
+    attempts: list[tuple[float, int, float]] = [
+        (0.35, 3, 0.15),
+        (0.48, 5, 0.11),
+        (0.55, 6, 0.085),
+    ]
 
-    line_mask = _extract_line_mask(binary)
-    line_ys = _line_row_centroids(line_mask)
+    last_line_count = 0
+    fallback_systems: list[System] | None = None
 
-    log.info("Staff-line detection: %d horizontal lines found", len(line_ys))
-
-    if len(line_ys) < 5:
-        return []
-
-    staves = _group_into_staves(line_ys, W)
-    if not staves:
-        return []
-
-    _refine_x_bounds(staves, binary)
-    systems = _build_systems(staves, grayscale, binary)
-
-    validated = [s for s in systems if music_strip_has_valid_staff(s.music_binary)]
-    if validated:
-        if len(validated) < len(systems):
-            log.info(
-                "Dropped %d region(s) without a local five-line staff",
-                len(systems) - len(validated),
-            )
-        systems = validated
-    else:
-        log.warning(
-            "No strip passed local staff validation — keeping all %d page-level system(s)",
-            len(systems),
+    for spacing_tol, merge_dist, ink_thr in attempts:
+        systems, line_ys = _detect_systems_one_pass(
+            grayscale,
+            binary,
+            spacing_tolerance=spacing_tol,
+            line_merge_dist=merge_dist,
+            ink_threshold_frac=ink_thr,
+        )
+        last_line_count = len(line_ys)
+        log.info(
+            "Staff-line pass (tol=%.2f merge=%d ink=%.3f): %d lines → %d raw system(s)",
+            spacing_tol, merge_dist, ink_thr, len(line_ys), len(systems),
         )
 
-    log.info(
-        "Detected %d staff system(s); staff-space ≈ %.1f px",
-        len(systems),
-        float(np.mean([s.staff.staff_space for s in systems])),
-    )
-    return systems
+        if not systems:
+            continue
+
+        validated = [s for s in systems if music_strip_has_valid_staff(s.music_binary)]
+        if validated:
+            if len(validated) < len(systems):
+                log.info(
+                    "Dropped %d region(s) without a local five-line staff",
+                    len(systems) - len(validated),
+                )
+            systems = validated
+            log.info(
+                "Detected %d staff system(s); staff-space ≈ %.1f px",
+                len(systems),
+                float(np.mean([s.staff.staff_space for s in systems])),
+            )
+            return systems
+
+        fallback_systems = systems
+
+    if fallback_systems:
+        log.warning(
+            "No strip passed local staff validation — keeping all %d page-level system(s)",
+            len(fallback_systems),
+        )
+        log.info(
+            "Detected %d staff system(s); staff-space ≈ %.1f px",
+            len(fallback_systems),
+            float(np.mean([s.staff.staff_space for s in fallback_systems])),
+        )
+        return fallback_systems
+
+    log.info("Staff-line detection: %d horizontal lines found", last_line_count)
+    return []

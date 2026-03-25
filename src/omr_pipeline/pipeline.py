@@ -9,7 +9,10 @@ Single flow:
   5. Apply music-theory grammar corrections across all systems.
   6. Assemble the JSON result.
 
-Set OMR_DEBUG_DIR to a path to save intermediate crops for inspection.
+Set ``OMR_DEBUG_DIR`` to save intermediate crops.  PDF rasterisation uses
+``pdf_load_dpi()`` (env ``OMR_PDF_DPI``, default 300).  Wide music strips use a
+single CRNN pass by default; set ``OMR_ENABLE_TILING=1`` for legacy tiled decode
+(see ``omr_pipeline.inference``).
 """
 from __future__ import annotations
 
@@ -21,7 +24,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from .preprocess import PageImage, load_image, load_pdf_page, preprocess_page
+from .preprocess import load_image, load_pdf_page, pdf_load_dpi, preprocess_page
 from .staff_detect import System, detect_systems
 from .inference import recognize_music, normalize_staff_crop
 from .ocr_chords import recognize_chords
@@ -152,10 +155,12 @@ def run_pipeline(
 ) -> dict:
     """Process an uploaded file and return a JSON-serialisable result dict."""
 
-    # 1. Load
+    # 1. Load (PDF: higher default DPI → more pixels per glyph before CRNN resize)
+    pdf_render_dpi: int | None = None
     try:
         if _is_pdf(file_data):
-            img = load_pdf_page(file_data, page=0, dpi=200)
+            pdf_render_dpi = pdf_load_dpi()
+            img = load_pdf_page(file_data, page=0, dpi=pdf_render_dpi)
         else:
             img = load_image(file_data)
     except Exception as exc:
@@ -185,6 +190,7 @@ def run_pipeline(
                 "page_height": page.meta["height"],
                 "page_width": page.meta["width"],
                 "deskew_angle_deg": page.meta.get("deskew_angle_deg", 0.0),
+                "pdf_render_dpi": pdf_render_dpi,
             },
         }
 
@@ -206,5 +212,6 @@ def run_pipeline(
             "page_width": page.meta["width"],
             "deskew_angle_deg": page.meta.get("deskew_angle_deg", 0.0),
             "num_systems": len(systems),
+            "pdf_render_dpi": pdf_render_dpi,
         },
     }

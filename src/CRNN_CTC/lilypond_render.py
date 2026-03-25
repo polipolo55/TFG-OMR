@@ -42,6 +42,17 @@ CLEF_LY: dict[str, str] = {
 }
 """Map PrIMuS / LMX clef identifiers to LilyPond clef names."""
 
+# Same IDs as ``filter_unwanted_clefs`` in ``CRNN_CTC.dataset`` — soprano /
+# mezzo / varbaritone clefs that are rare in jazz and confuse the CRNN.
+# ``generate_realbook`` / ``semantic_to_lmx`` map these to G2 so PNG and LMX
+# stay matched (absolute pitches unchanged; LilyPond uses ledger lines).
+CLEF_IDS_NORMALIZE_TO_G2: frozenset[str] = frozenset({"C1", "C2", "F3"})
+
+
+def normalize_clef_id_for_lead_sheet(clef_id: str) -> str:
+    """Return ``G2`` for clefs we drop from raw training; otherwise *clef_id*."""
+    return "G2" if clef_id in CLEF_IDS_NORMALIZE_TO_G2 else clef_id
+
 KEY_LY: dict[int, str] = {
     -7: r"\key ces \major", -6: r"\key ges \major", -5: r"\key des \major",
     -4: r"\key aes \major", -3: r"\key ees \major", -2: r"\key bes \major",

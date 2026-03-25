@@ -11,6 +11,7 @@ augment     Apply scan-simulation augmentations to clean images.
 vocab       Build LMX vocabulary from converted data.
 train       Train the CRNN-CTC model.
 evaluate    Evaluate a trained model checkpoint.
+evaluate-ab Compare SER for multiple beam widths on one split.
 
 Usage examples::
 
@@ -22,7 +23,7 @@ Usage examples::
     poetry run python src/cli.py evaluate --checkpoint models/latest/best_model.pt --split test
     poetry run python src/cli.py api
     poetry run python src/cli.py pipeline
-    poetry run python src/cli.py pipeline-train --epochs 50
+    poetry run python src/cli.py pipeline-train
 """
 
 from __future__ import annotations
@@ -43,6 +44,11 @@ for _p in (str(_SRC), str(_SRC.parent)):
         sys.path.insert(0, _p)
 
 log = logging.getLogger("omr.cli")
+
+# Full pipeline defaults (render DPI matches generate_realbook / load_pdf_page)
+_FULL_RUN_RENDER_DPI = 200
+_FULL_RUN_AUGMENT_SEED = 42
+_FULL_RUN_AUGMENT_COPIES = 1  # scanned tree mirrors clean sample ids (one PNG per id)
 
 
 def _get_default_workers() -> int:
@@ -221,6 +227,7 @@ def _build_config_from_args(args: argparse.Namespace):
         "num_workers": "num_workers",
         "early_stopping_patience": "early_stopping_patience",
         "max_source_height": "max_source_height",
+        "rare_lmx_oversample": "rare_lmx_oversample",
     }
     # Boolean filter flags use store_false with default=None (only
     # override when the user explicitly passes the --no-... flag)
@@ -240,6 +247,19 @@ def _build_config_from_args(args: argparse.Namespace):
     extra_scanned = getattr(args, "extra_scanned_dir", None)
     if extra_scanned:
         overrides["extra_scanned_dirs"] = [Path(p) for p in extra_scanned]
+
+    ft_clean = getattr(args, "finetune_data_dir", None)
+    if ft_clean:
+        overrides["finetune_data_dirs"] = [Path(p) for p in ft_clean]
+    ft_scanned = getattr(args, "finetune_scanned_dir", None)
+    if ft_scanned:
+        overrides["finetune_scanned_dirs"] = [Path(p) for p in ft_scanned]
+
+    rlx = getattr(args, "rare_lmx_tokens", None)
+    if rlx is not None:
+        overrides["rare_lmx_tokens"] = tuple(
+            t.strip() for t in rlx.split(",") if t.strip()
+        )
 
     # Convert string paths to Path objects
     for key in ("data_dir", "scanned_dir", "model_dir", "vocab_path"):
@@ -269,6 +289,13 @@ def cmd_train(args: argparse.Namespace) -> None:
         for extra in cfg.extra_scanned_dirs or []:
             if not Path(extra).is_dir():
                 _missing.append(f"extra_scanned_dir: {extra}")
+    for ft in cfg.finetune_data_dirs or []:
+        if not Path(ft).is_dir():
+            _missing.append(f"finetune_data_dir: {ft}")
+    if cfg.use_scanned:
+        for ft in cfg.finetune_scanned_dirs or []:
+            if not Path(ft).is_dir():
+                _missing.append(f"finetune_scanned_dir: {ft}")
     if _missing:
         log.error("Data directories not found:\n  %s", "\n  ".join(_missing))
         sys.exit(1)
@@ -317,6 +344,27 @@ def cmd_evaluate(args: argparse.Namespace) -> None:
         beam_width=getattr(args, "beam_width", 1) or 1,
     )
     print(f"SER ({args.split}): {ser:.4f}")
+
+
+def cmd_evaluate_ab(args: argparse.Namespace) -> None:
+    """Compare greedy vs beam search SER on the same split (CRNN dataloader path)."""
+    from CRNN_CTC.evaluate import evaluate
+
+    cfg = _build_config_from_args(args)
+    checkpoint = Path(args.checkpoint)
+    if not checkpoint.exists():
+        log.error("Checkpoint not found: %s", checkpoint)
+        sys.exit(1)
+
+    beams = [int(x.strip()) for x in args.beams.split(",") if x.strip()]
+    if not beams:
+        log.error("No beam widths parsed from %r", args.beams)
+        sys.exit(1)
+
+    print(f"{'beam':>6}  SER ({args.split})")
+    for bw in beams:
+        ser = evaluate(cfg, checkpoint, split=args.split, beam_width=max(1, bw))
+        print(f"{bw:>6d}  {ser:.4f}")
 
 
 # ── augment ───────────────────────────────────────────────────────────────
@@ -368,15 +416,17 @@ def cmd_pipeline(args: argparse.Namespace) -> None:
         scanned/augmented:   data/processed/primus/scanned/...
         vocabulary:          data/vocab/primus_lmx.txt
     """
+    extra_vocab = getattr(args, "extra_vocab_data_dir", None) or None
+
     # 1. Render raw PrIMuS → clean dataset (PNG + .semantic/.agnostic/.mid + .lmx)
     log.info("--- Rendering PrIMuS → clean dataset ---")
     render_args = argparse.Namespace(
         source=args.raw_primus_dir,
         output=args.clean_dir,
-        dpi=200,
+        dpi=getattr(args, "render_dpi", _FULL_RUN_RENDER_DPI),
         limit=args.limit,
         workers=args.workers,
-        force=False,
+        force=getattr(args, "force_render", False),
         no_lmx=False,
         verbose=args.verbose,
     )
@@ -398,8 +448,8 @@ def cmd_pipeline(args: argparse.Namespace) -> None:
     augment_args = argparse.Namespace(
         source=args.clean_dir,
         output=args.scanned_dir,
-        copies=1,
-        seed=42,
+        copies=getattr(args, "augment_copies", _FULL_RUN_AUGMENT_COPIES),
+        seed=getattr(args, "augment_seed", _FULL_RUN_AUGMENT_SEED),
         workers=args.workers,
         limit=args.limit,
     )
@@ -409,7 +459,7 @@ def cmd_pipeline(args: argparse.Namespace) -> None:
     log.info("--- Building unified LMX vocabulary ---")
     vocab_args = argparse.Namespace(
         data_dir=str(args.clean_dir),
-        extra_data_dir=None,
+        extra_data_dir=extra_vocab,
         output=args.vocab_path,
         workers=args.workers,
     )
@@ -426,6 +476,10 @@ def cmd_pipeline_train(args: argparse.Namespace) -> None:
     # Wire pipeline-produced dirs into training args for Config.
     args.data_dir = str(args.clean_dir)
     args.scanned_dir = str(args.scanned_dir)
+    args.vocab_path = str(args.vocab_path)
+    # Full-run default: train on scanned aug unless explicitly disabled
+    if getattr(args, "use_scanned", None) is None:
+        args.use_scanned = True
     cmd_train(args)
 
 
@@ -614,22 +668,50 @@ def build_parser() -> argparse.ArgumentParser:
     _add_model_args(p_train)
     g_train = p_train.add_argument_group("training")
     g_train.add_argument("--epochs", type=int, default=None,
-                   help="Number of training epochs (default: 50)")
+                   help="Number of training epochs (default: 60)")
     g_train.add_argument("--batch-size", type=int, default=None,
                    help="Training batch size (default: 16)")
     g_train.add_argument("--lr", type=float, default=None,
-                   help="Peak learning rate — OneCycleLR (default: 5e-4)")
+                   help="Peak learning rate — OneCycleLR (default: 1e-3)")
     g_train.add_argument("--weight-decay", type=float, default=None,
                    help="AdamW weight decay (default: 1e-4)")
     g_train.add_argument("--warmup-frac", type=float, default=None,
-                   help="Fraction of steps for LR warm-up (default: 0.05)")
+                   help="Fraction of steps for LR warm-up (default: 0.08)")
     g_train.add_argument("--early-stopping-patience", type=int, default=None,
-                   help="Epochs without val SER improvement to wait before stopping (default: 10)")
+                   help="Epochs without val SER improvement to wait before stopping (default: 12)")
     g_train.add_argument("--model-dir", type=str, default=None,
                          help="Directory for checkpoints (default: models/)")
     g_train.add_argument("--resume", nargs="?", const="", default=None, metavar="CHECKPOINT",
                          help="Resume from a checkpoint. Omit a path to auto-use "
                               "the latest run's checkpoint, or supply an explicit .pt path.")
+    g_train.add_argument(
+        "--rare-lmx-oversample",
+        type=int,
+        default=None,
+        help="Repeat training indices for samples containing rare LMX tokens "
+             "(default: 2; 1 disables). Tokens: --rare-lmx-tokens.",
+    )
+    g_train.add_argument(
+        "--rare-lmx-tokens",
+        type=str,
+        default=None,
+        help="Comma-separated LMX tokens to up-weight (default: tied:start,tied:stop). "
+             "Pass empty string to disable token-based oversampling.",
+    )
+    g_train.add_argument(
+        "--finetune-data-dir",
+        type=str,
+        action="append",
+        default=None,
+        help="Extra clean dataset root for fine-tuning (repeatable); merged into train split.",
+    )
+    g_train.add_argument(
+        "--finetune-scanned-dir",
+        type=str,
+        action="append",
+        default=None,
+        help="Extra scanned-image root for fine-tuning (repeatable); used when --use-scanned.",
+    )
     p_train.set_defaults(func=cmd_train)
 
     # ── evaluate ──────────────────────────────────────────────────────
@@ -649,6 +731,25 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common_data_args(p_eval)
     _add_model_args(p_eval)
     p_eval.set_defaults(func=cmd_evaluate)
+
+    p_eval_ab = sub.add_parser(
+        "evaluate-ab",
+        help="Compare SER across multiple beam widths (same split)",
+        description="Runs evaluate() once per beam width for A/B comparison.",
+    )
+    p_eval_ab.add_argument("--checkpoint", type=str, required=True,
+                           help="Path to model checkpoint (.pt)")
+    p_eval_ab.add_argument("--split", choices=["train", "val", "test"],
+                           default="test", help="Split (default: test)")
+    p_eval_ab.add_argument(
+        "--beams",
+        type=str,
+        default="1,5,10",
+        help="Comma-separated beam widths (default: 1,5,10)",
+    )
+    _add_common_data_args(p_eval_ab)
+    _add_model_args(p_eval_ab)
+    p_eval_ab.set_defaults(func=cmd_evaluate_ab)
 
     # ── api ───────────────────────────────────────────────────────────
     p_api = sub.add_parser(
@@ -675,6 +776,34 @@ def build_parser() -> argparse.ArgumentParser:
     p_pipe.add_argument("--vocab-path", type=str, default="data/vocab/primus_lmx.txt",
                         help="Output vocabulary path "
                              "(default: data/vocab/primus_lmx.txt)")
+    p_pipe.add_argument(
+        "--extra-vocab-data-dir",
+        type=str,
+        action="append",
+        default=None,
+        help="Extra directory to scan for .lmx when building vocab (repeatable), "
+             "e.g. an additional realbook_primus package.",
+    )
+    p_pipe.add_argument("--render-dpi", type=int, default=_FULL_RUN_RENDER_DPI,
+                        help=f"LilyPond render DPI (default: {_FULL_RUN_RENDER_DPI})")
+    p_pipe.add_argument(
+        "--force-render",
+        action="store_true",
+        help="Re-render every sample even if PNG exists (use after pipeline code changes).",
+    )
+    p_pipe.add_argument(
+        "--augment-copies",
+        type=int,
+        default=_FULL_RUN_AUGMENT_COPIES,
+        help=f"Augmented PNGs per clean sample; keep 1 so scanned/ mirrors clean ids "
+             f"(default: {_FULL_RUN_AUGMENT_COPIES}).",
+    )
+    p_pipe.add_argument(
+        "--augment-seed",
+        type=int,
+        default=_FULL_RUN_AUGMENT_SEED,
+        help=f"Augmentation RNG seed (default: {_FULL_RUN_AUGMENT_SEED}).",
+    )
     p_pipe.add_argument("--limit", type=int, default=None,
                         help="Limit number of samples processed (for testing)")
     p_pipe.add_argument("--workers", type=int, default=_get_default_workers(),
@@ -693,6 +822,21 @@ def build_parser() -> argparse.ArgumentParser:
     p_ptrain.add_argument("--clean-dir", type=Path, default=Path("data/processed/primus/clean"))
     p_ptrain.add_argument("--scanned-dir", type=Path, default=Path("data/processed/primus/scanned"))
     p_ptrain.add_argument("--vocab-path", type=str, default="data/vocab/primus_lmx.txt")
+    p_ptrain.add_argument(
+        "--extra-vocab-data-dir",
+        type=str,
+        action="append",
+        default=None,
+        help="Extra .lmx roots for vocab (repeatable); same as pipeline.",
+    )
+    p_ptrain.add_argument("--render-dpi", type=int, default=_FULL_RUN_RENDER_DPI)
+    p_ptrain.add_argument(
+        "--force-render",
+        action="store_true",
+        help="Re-render all samples (see pipeline).",
+    )
+    p_ptrain.add_argument("--augment-copies", type=int, default=_FULL_RUN_AUGMENT_COPIES)
+    p_ptrain.add_argument("--augment-seed", type=int, default=_FULL_RUN_AUGMENT_SEED)
     p_ptrain.add_argument("--limit", type=int, default=None)
     p_ptrain.add_argument("--workers", type=int, default=_get_default_workers())
     p_ptrain.add_argument("--verbose", action="store_true")
@@ -702,9 +846,12 @@ def build_parser() -> argparse.ArgumentParser:
     
     # Training-specific flags not covered by common groups
     g_train = p_ptrain.add_argument_group("training")
-    g_train.add_argument("--epochs", type=int, default=None)
-    g_train.add_argument("--batch-size", type=int, default=None)
-    g_train.add_argument("--lr", type=float, default=None)
+    g_train.add_argument("--epochs", type=int, default=None,
+                         help="Training epochs (default: from Config, 60)")
+    g_train.add_argument("--batch-size", type=int, default=None,
+                         help="Batch size (default: 16)")
+    g_train.add_argument("--lr", type=float, default=None,
+                         help="Peak learning rate / OneCycleLR (default: 1e-3)")
     g_train.add_argument("--weight-decay", type=float, default=None)
     g_train.add_argument("--warmup-frac", type=float, default=None)
     g_train.add_argument("--early-stopping-patience", type=int, default=None)

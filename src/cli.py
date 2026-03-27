@@ -15,10 +15,10 @@ evaluate-ab Compare SER for multiple beam widths on one split.
 
 Usage examples::
 
-    poetry run python src/cli.py render  --source data/primus/package_aa --output data/realbook_primus/package_aa
-    poetry run python src/cli.py convert --source data/realbook_primus/package_aa --workers 8
-    poetry run python src/cli.py augment --source data/realbook_primus/package_aa --output data/realbook_primus_augmented/package_aa
-    poetry run python src/cli.py vocab   --data-dir data/realbook_primus/package_aa
+    poetry run python src/cli.py render  --source data/raw/primus --output data/processed/primus/clean
+    poetry run python src/cli.py convert --source data/processed/primus/clean --workers 8
+    poetry run python src/cli.py augment --source data/processed/primus/clean --output data/processed/primus/scanned
+    poetry run python src/cli.py vocab   --data-dir data/processed/primus/clean
     poetry run python src/cli.py train   --epochs 50 --batch-size 16 --lr 1e-3
     poetry run python src/cli.py evaluate --checkpoint models/latest/best_model.pt --split test
     poetry run python src/cli.py api

@@ -231,7 +231,7 @@ def _prepare_tile(img: np.ndarray, img_height: int, max_width: int) -> tuple[Ten
 
 def _env_beam_width() -> int:
     """Read OMR_BEAM_WIDTH at call time so the API/process can change it without reload."""
-    return max(1, int(os.environ.get("OMR_BEAM_WIDTH", "1")))
+    return max(1, int(os.environ.get("OMR_BEAM_WIDTH", "5")))
 
 
 def recognize_music(

@@ -3,7 +3,7 @@
 % --- PACKAGES ---
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
-\usepackage[english]{babel}
+\usepackage[catalan,spanish,english]{babel}
 \usepackage[margin=2.5cm]{geometry}
 \setlength{\headheight}{13.6pt}
 
@@ -47,42 +47,60 @@
 \hypersetup{pageanchor=false}
 \begin{titlepage}
     \centering
-    \vspace*{3cm}
+    \vspace*{2cm}
     {\LARGE\bfseries OPTICAL MUSIC RECOGNITION FOR JAZZ LEAD SHEETS\par}
-    \vspace{0.5cm}
-    {\Large\bfseries A CRNN--CTC approach for monophonic lines\par}
+    \vspace{0.4cm}
+    {\large A CRNN--CTC Approach for Monophonic Lines\par}
     \vspace{2.5cm}
     {\large\bfseries Pol Casanovas Puig\par}
-    \vspace{1.5cm}
-    {\large\bfseries Bachelor's Thesis (TFG) -- FIB / UPC\par}
+    \vspace{1.8cm}
+    \begin{tabular}{rl}
+        \textit{Supervisor:} & Manel Frigola Bourlon \\[4pt]
+        \textit{Department:} & Automatic Control (ESAII) -- FIB/UPC \\[4pt]
+        \textit{Degree:}     & Bachelor's in Informatics Engineering (Computing) \\[4pt]
+        \textit{Speciality:} & Computing \\
+    \end{tabular}
     \vfill
-    {\small\bfseries \today\par}
+    {\small Facultat d'Inform\`atica de Barcelona (FIB)\par}
+    {\small Universitat Polit\`ecnica de Catalunya (UPC) -- BarcelonaTech\par}
+    \vspace{0.6cm}
+    {\small\bfseries Spring 2026\par}
 \end{titlepage}
 \hypersetup{pageanchor=true}
 
 \pagenumbering{roman}
 
 % --- Abstracts (Catalan, Spanish, English) ---
-\chapter*{Resum (Catal\`a)}
+\selectlanguage{catalan}
+\chapter*{Resum}
 \addcontentsline{toc}{chapter}{Resum (Catal\`a)}
-\noindent\textbf{Paraules clau:} Optical Music Recognition, CRNN, CTC, LMX, Real Book.
 
-\vspace{0.8cm}
-\noindent\textit{[TODO: 1--2 pages max. Summary in Catalan.]}
+El \term{Reconeixement \`Optic de M\'usica} (OMR) \'es el proc\'es d'obtenir representacions simb\`oliques llegibles per m\`aquina a partir d'imatges de partitures. Malgrat els avan\c cos en el camp, la transcripci\'o autom\`atica de partitures reals de baixa qualitat continua essent un repte obert. Aquesta mem\`oria presenta un sistema OMR orientat a l\'inies de melodia monof\`oniques de jazz del recull \textit{The Real Book}.
 
-\chapter*{Resumen (Espa\~nol)}
+El sistema es basa en una xarxa neuronal recurrent convolucional amb p\`erdua CTC (\term{CRNN-CTC}), entrenada sobre dades sint\`etiques generades a partir del conjunt PrIMuS. Per reduir la difer\`encia entre imatges sint\`etiques i escaneigs reals, s'aplica una etapa d'augmentaci\'o que simula artefactes fotogr\`afics habituals. El model s'avalua amb la \term{Taxa d'Error de S\'imbols} (SER), assolint un \textbf{1,17\%} al conjunt de prova sint\`etic, i un ajust fi sobre p\`agines reals del Real Book millora el rendiment sobre imatges fora de domini.
+
+El sistema complet integra detecci\'o de pentagrames, reconeixement de melodia, extracci\'o de s\'imbols d'acords i correcci\'o gramatical, i accepta fitxers PDF o imatges com a entrada. Aquest treball demostra la viabilitat dels models CRNN-CTC per al domini espec\'ific de les l\'inies de jazz monof\`oniques i estableix les bases per a extensions futures cap a la transcripci\'o polif\`onica.
+
+\selectlanguage{spanish}
+\chapter*{Resumen}
 \addcontentsline{toc}{chapter}{Resumen (Espa\~nol)}
-\noindent\textbf{Palabras clave:} Optical Music Recognition, CRNN, CTC, LMX, Real Book.
 
-\vspace{0.8cm}
-\noindent\textit{[TODO: 1--2 pages max. Summary in Spanish.]}
+El \term{Reconocimiento \'Optico de M\'usica} (OMR) es el proceso de obtener representaciones simb\'olicas legibles por m\'aquina a partir de im\'agenes de partituras. A pesar de los avances en el campo, la transcripci\'on autom\'atica de partituras reales de baja calidad sigue siendo un desaf\'io abierto. Esta memoria presenta un sistema OMR orientado a l\'ineas de melod\'ia monof\'onicas de jazz de la colecci\'on \textit{The Real Book}.
 
-\chapter*{Abstract (English)}
+El sistema se basa en una red neuronal recurrente convolucional con p\'erdida CTC (\term{CRNN-CTC}), entrenada sobre datos sint\'eticos generados a partir del conjunto PrIMuS. Para reducir la brecha entre im\'agenes sint\'eticas y esc\'aneres reales, se aplica una etapa de aumento que simula artefactos fotogr\'aficos habituales. El modelo se eval\'ua con la \term{Tasa de Error de S\'imbolos} (SER), alcanzando un \textbf{1,17\%} en el conjunto de prueba sint\'etico, y un ajuste fino sobre p\'aginas reales del Real Book mejora el rendimiento sobre im\'agenes fuera de dominio.
+
+El sistema completo integra detecci\'on de pentagramas, reconocimiento de melod\'ia, extracci\'on de s\'imbolos de acorde y correcci\'on gramatical, y acepta archivos PDF o im\'agenes como entrada. Este trabajo demuestra la viabilidad de los modelos CRNN-CTC para el dominio espec\'ifico de las l\'ineas de jazz monof\'onicas y sienta las bases para extensiones futuras hacia la transcripci\'on polifónica.
+
+
+\selectlanguage{english}
+\chapter*{Abstract}
 \addcontentsline{toc}{chapter}{Abstract (English)}
-\noindent\textbf{Keywords:} Optical Music Recognition, CRNN, CTC, LMX, Real Book.
 
-\vspace{0.8cm}
-\noindent\textit{[TODO: 1--2 pages max. Summary in English.]}
+\term{Optical Music Recognition} (OMR) is the task of automatically converting images of musical scores into machine-readable symbolic representations. Despite advances in the field, transcribing real-world scans of informal or low-quality sources remains an open challenge. This thesis presents an end-to-end OMR system targeting monophonic melody lines in jazz lead sheets, with a focus on the \textit{Real Book} collection.
+
+The system is built around a \term{Convolutional Recurrent Neural Network with Connectionist Temporal Classification} loss (CRNN-CTC), trained on synthetic data derived from the PrIMuS dataset. To bridge the gap between clean synthetic renderings and real scans, an augmentation stage simulates common photographic artefacts. Evaluated using the \term{Symbol Error Rate} (SER), the model achieves \textbf{1.17\%} on the synthetic test set, and a fine-tuning stage on real Real Book pages further improves performance on out-of-domain images.
+
+The full inference pipeline integrates staff detection, melody recognition, chord symbol extraction, and a grammar correction stage, accepting PDF or image input. This work demonstrates the feasibility of CRNN-CTC-based OMR for the specific domain of monophonic jazz lead sheets and lays the groundwork for future extensions towards polyphonic transcription.
 
 % --- Index / Table of contents + lists ---
 \tableofcontents
@@ -97,31 +115,71 @@
 \pagenumbering{arabic}
 
 \chapter{Introduction and Context}
+
 \section{Motivation}
-\textit{[TODO: Preservation of musical heritage, digital musicology, accessibility, education.]}
+
+\term{Optical Music Recognition} (OMR) is the discipline concerned with the automatic conversion of images of musical scores into machine-readable symbolic representations~\cite{shatriOPTICALMUSICRECOGNITION}. In the same way that Optical Character Recognition (OCR) made it possible to extract text from printed documents, OMR aims to unlock the musical content locked inside scanned pages---enabling search, transposition, playback, and archival at scale.
+
+The need for OMR is acute in music education, archiving, and performance. Vast quantities of musical knowledge exist only in paper or low-resolution scan form: public libraries, private collections, and active working musicians all hold repertoire that is inaccessible to music software. Digitising this material manually is slow, expensive, and requires specialist training. A reliable automated pipeline would make collections searchable, allow musicians to transpose or edit parts without retyping, and open new avenues for computational musicology and music information retrieval.
+
+This project focuses on a particularly underserved corner of the problem: \term{jazz lead sheets}. A lead sheet is a compact score format that specifies a melody line together with harmonic symbols (\term{chord symbols}), and sometimes lyrics. \textit{The Real Book}---an iconic compilation of jazz standards---exists in the hands of most working jazz musicians worldwide, yet remains almost entirely in paper or scanned-image form. Digitising it represents a concrete, high-impact target that is also tractable for a single-person research project, since the melodies are monophonic and the layout is relatively regular.
 
 \section{Problem Formulation}
-\textit{[TODO: Challenge of transcribing sheet music; focus on handwritten/complex lead sheets; domain gap.]}
+
+Despite decades of research, automated transcription of real-world scores remains an open problem. The challenge has several compounding sources of difficulty.
+
+\textbf{Notation complexity.} Musical notation encodes pitch, duration, articulation, dynamics, and structure through a rich two-dimensional graphical language. Unlike text, where symbols are mostly independent, musical symbols interact in two dimensions: a note's pitch is determined by its vertical position on a staff relative to a clef, and its duration by a combination of head shape, stems, beams, and dots. Any recognition system must capture these joint dependencies.
+
+\textbf{Domain gap.} Most publicly available annotated datasets consist of cleanly rendered computer-engraved scores (e.g., the PrIMuS dataset~\cite{PrIMuSDataset}). Real-world documents are photographed under imperfect lighting, suffer from scanner noise, perspective distortion, paper ageing, and ink bleed. A model trained exclusively on clean synthetic data degrades sharply when presented with real scans.
+
+\textbf{Domain specificity.} General-purpose OMR tools are optimised for classical full-score notation. Jazz lead sheets use a different engraving style---often emulating handwritten notation, with larger noteheads, jazz-specific articulation marks, and chord symbols above the staff---for which no labelled corpus is publicly available.
+
+This thesis addresses these three issues jointly: by generating a synthetic training corpus in the jazz style, applying scan-simulation augmentation, and fine-tuning on a small set of manually annotated Real Book pages, the aim is to produce a system that works on the actual scanned documents that musicians encounter in practice.
 
 \section{Objectives}
-\begin{itemize}[nosep]
-    \item \textit{[TODO: Develop a CRNN--CTC pipeline for monophonic staff-line OMR.]}
-    \item \textit{[TODO: Achieve low Symbol Error Rate (SER) on synthetic validation/test sets.]}
-    \item \textit{[TODO: Handle out-of-vocabulary symbols via normalisation / mapping.]}
-\end{itemize}
+
+The general objective of this project is to develop a proof-of-concept end-to-end OMR system for monophonic jazz lead sheets, evaluate it rigorously, and demonstrate that deep learning can bridge the gap between clean synthetic training data and real scanned pages.
+
+The specific objectives are:
+
+\begin{enumerate}
+    \item Survey the state of the art in OMR, covering traditional modular pipelines, CRNN-CTC sequence models, and transformer-based end-to-end approaches, and justify the choice of architecture.
+    \item Build a synthetic training dataset by rendering excerpts from the PrIMuS dataset in a jazz engraving style using LilyPond and LilyJAZZ, paired with ground-truth annotations in LMX format.
+    \item Design and implement a scan-simulation augmentation pipeline calibrated against real Real Book scan characteristics, to reduce the domain gap during training.
+    \item Design, implement, and train a CRNN-CTC model for monophonic staff-line recognition and evaluate it using the \term{Symbol Error Rate} (SER)~\cite{SymbolErrorRate}.
+    \item Analyse the domain gap quantitatively and close it via fine-tuning on a small corpus of manually annotated Real Book pages.
+    \item Build a complete inference pipeline that accepts a PDF or image as input and produces structured output covering melody and chord symbols.
+\end{enumerate}
 
 \section{Scope}
-\textbf{Included:}
-\begin{itemize}[nosep]
-    \item \textit{[TODO: Monophonic lines; synthetic data generation; augmentation; fine-tuning to real scans.]}
+
+\textbf{In scope:}
+\begin{itemize}
+    \item Monophonic melody lines of the kind found in jazz lead sheets.
+    \item Synthetic dataset construction and scan-simulation augmentation.
+    \item Staff region detection and individual line cropping as a preprocessing stage.
+    \item Design, training, and evaluation of a CRNN-CTC model for single-voice line recognition.
+    \item Chord symbol extraction via OCR as a complementary module.
+    \item Quantitative evaluation using SER and qualitative error analysis.
+    \item Domain-gap analysis and fine-tuning on real scanned pages.
 \end{itemize}
-\textbf{Excluded:}
-\begin{itemize}[nosep]
-    \item \textit{[TODO: Polyphony; full-page reading order / layout analysis beyond line-level.]}
+
+\textbf{Out of scope:}
+\begin{itemize}
+    \item Full polyphonic transcription or simultaneous multi-voice recognition.
+    \item Full-page layout analysis and reading-order recovery across multiple systems.
+    \item Handwritten scores or non-Western notation systems.
+    \item Real-time or mobile deployment.
+    \item Training large-scale transformer models from scratch.
 \end{itemize}
+
+\section{Document Structure}
+
+The remainder of this document is organised as follows. Chapter~\ref{ch:soa} surveys the state of the art in OMR. Chapter~\ref{ch:mgmt} covers project management: justification of the approach, planning, and budget. Chapter~\ref{ch:method} describes the methodology and system architecture in detail. Chapter~\ref{ch:results} presents experimental results and evaluation. Chapter~\ref{ch:sustain} discusses sustainability and ethical implications. Finally, Chapter~\ref{ch:conclusions} draws conclusions and outlines directions for future work.
 
 
 \chapter{State of the Art}
+\label{ch:soa}
 \section{Historical Approaches}
 \textit{[TODO: Traditional heuristic/rule-based pipelines; staff detection/removal; why OpenCV morphology was insufficient.]}
 
@@ -136,6 +194,7 @@
 
 
 \chapter{Project Management (GEP Integration)}
+\label{ch:mgmt}
 \section{Justification of Alternatives}
 \textit{[TODO: CRNN--CTC vs.\ classic CV vs.\ large transformers; constraints and rationale.]}
 
@@ -147,6 +206,7 @@
 
 
 \chapter{Methodology and Architecture}
+\label{ch:method}
 \section{The Data Pipeline}
 \subsection{Synthetic generation with LilyPond and LilyJAZZ}
 \textit{[TODO: Rendering pipeline; notation constraints; dataset size targets.]}
@@ -172,6 +232,7 @@
 
 
 \chapter{Results and Evaluation}
+\label{ch:results}
 \section{Synthetic Baseline Results}
 \textit{[TODO: SER improvements (e.g., 7.4\% \textrightarrow{} 1.17\%); tables/plots; ablations.]}
 
@@ -186,6 +247,7 @@
 
 
 \chapter{Sustainability and Ethical Implications}
+\label{ch:sustain}
 \section{Environmental Sustainability}
 \textit{[TODO: Training energy, GPU hours, carbon footprint; mitigations: AMP, early stopping.]}
 
@@ -197,6 +259,7 @@
 
 
 \chapter{Conclusions and Future Work}
+\label{ch:conclusions}
 \section{Conclusions}
 \textit{[TODO: Key achievements; framing as Seq2Seq; synthetic SER; domain-gap fine-tuning.]}
 

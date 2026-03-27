@@ -47,7 +47,9 @@ _ACCIDENTALS = frozenset({"flat", "sharp", "natural"})
 
 _LEAD_SHEET_CLEF = "clef:G2"
 
-_COMMON_TIME_SIGS = {
+# Must stay in sync with ``_COMMON_TIME_SIGS`` in ``src/CRNN_CTC/dataset.py``
+# (the training-side counterpart used for dataset filtering).
+_COMMON_TIME_SIGS: frozenset[tuple[str, str]] = frozenset({
     ("beats:4", "beat-type:4"),
     ("beats:3", "beat-type:4"),
     ("beats:2", "beat-type:4"),
@@ -56,7 +58,7 @@ _COMMON_TIME_SIGS = {
     ("beats:6", "beat-type:4"),
     ("beats:5", "beat-type:4"),
     ("beats:12", "beat-type:8"),
-}
+})
 
 _OCTAVE_MIN = 3
 _OCTAVE_MAX = 6

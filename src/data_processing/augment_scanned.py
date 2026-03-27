@@ -43,13 +43,13 @@ def build_pipeline(seed: int | None = None) -> A.Compose:
             A.Affine(
                 translate_percent={"x": (-0.015, 0.015), "y": (-0.015, 0.015)},
                 scale=(0.97, 1.03),
-                rotate=(-2.5, 2.5),
+                rotate=(-4.0, 4.0),
                 shear=(-1.2, 1.2),
                 border_mode=cv2.BORDER_CONSTANT,
                 fill=255,
                 p=0.85,
             ),
-            A.GaussianBlur(blur_limit=0, sigma_limit=(0.2, 0.75), p=0.62),
+            A.GaussianBlur(blur_limit=0, sigma_limit=(0.2, 1.1), p=0.62),
             A.Sharpen(alpha=(0.15, 0.45), lightness=(0.85, 1.0), p=0.48),
             A.RandomToneCurve(scale=0.12, p=0.72),
             A.GaussNoise(std_range=(0.012, 0.045), mean_range=(0.0, 0.0),
@@ -57,6 +57,7 @@ def build_pipeline(seed: int | None = None) -> A.Compose:
             A.RandomBrightnessContrast(brightness_limit=(-0.10, 0.05),
                                        contrast_limit=(0.03, 0.18),
                                        p=0.86),
+            A.ImageCompression(quality_lower=72, quality_upper=92, p=0.35),
         ],
         seed=seed,
     )
@@ -67,7 +68,12 @@ def build_pipeline(seed: int | None = None) -> A.Compose:
 # ---------------------------------------------------------------------------
 
 def dilate_ink(img_gray: np.ndarray, iterations: int = INK_DILATE_ITERATIONS) -> np.ndarray:
-    """Erode to simulate ink bleed."""
+    """Simulate ink bleed by eroding the grayscale image.
+
+    The image convention is ink=dark, background=light.  Erosion shrinks
+    bright regions (background) and expands dark regions (ink), imitating
+    the spread of wet ink into paper fibres.
+    """
     if iterations == 0:
         return img_gray
     return cv2.erode(img_gray, INK_DILATE_KERNEL, iterations=iterations)
@@ -150,6 +156,52 @@ def add_edge_shadow(
     return np.clip(img_gray.astype(np.float32) * mask, 0, 255).astype(np.uint8)
 
 
+def add_uneven_illumination(
+    img_gray: np.ndarray,
+    rng: random.Random,
+    max_strength: float = 0.25,
+) -> np.ndarray:
+    """Directional lighting gradient from one edge (phone scan / book-spine shadow).
+
+    The existing vignette darkens corners symmetrically; real book photos have
+    a directional gradient — spine shadow on the left, hand shadow on the right,
+    or backlight from above.
+    """
+    if rng.random() > 0.45:
+        return img_gray
+    h, w = img_gray.shape
+    strength = rng.uniform(0.10, max_strength)
+    side = rng.choice(["left", "right", "top"])
+    Y, X = np.ogrid[:h, :w]
+    if side == "left":
+        gradient = 1.0 - strength * (1.0 - X.astype(np.float32) / w)
+    elif side == "right":
+        gradient = 1.0 - strength * (X.astype(np.float32) / w)
+    else:  # top
+        gradient = 1.0 - strength * (1.0 - Y.astype(np.float32) / h)
+    return np.clip(img_gray.astype(np.float32) * gradient, 0, 255).astype(np.uint8)
+
+
+def add_halftone_lines(
+    img_gray: np.ndarray,
+    rng: random.Random,
+) -> np.ndarray:
+    """Add faint periodic horizontal scan lines (photocopy / scanner artifact).
+
+    Many Real Book copies are widely photocopied; the scan head leaves faint
+    horizontal banding that the model should learn to ignore.
+    """
+    if rng.random() > 0.25:
+        return img_gray
+    h, w = img_gray.shape
+    period = rng.randint(4, 9)
+    strength = rng.uniform(0.03, 0.07)
+    # 1-D row vector broadcast to (h, w) — avoids allocating a full h×w mask.
+    row = np.ones(h, dtype=np.float32)
+    row[::period] = 1.0 - strength
+    return np.clip(img_gray.astype(np.float32) * row[:, np.newaxis], 0, 255).astype(np.uint8)
+
+
 # ---------------------------------------------------------------------------
 # Per-sample augmentation
 # ---------------------------------------------------------------------------
@@ -177,6 +229,8 @@ def augment_sample(
     img = add_vignette(img)
 
     img = add_edge_shadow(img, rng)
+    img = add_uneven_illumination(img, rng)
+    img = add_halftone_lines(img, rng)
 
     dst_png.parent.mkdir(parents=True, exist_ok=True)
     Image.fromarray(img).save(dst_png)
@@ -430,7 +484,7 @@ def main() -> None:
 
     log.info("Done. Success: %d  Failed: %d", ok, fail)
     if fail > 0:
-        log.warning(f"See {error_log} for list of failed samples.")
+        log.warning("See %s for list of failed samples.", error_log)
 
 
 if __name__ == "__main__":

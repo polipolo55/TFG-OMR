@@ -347,11 +347,17 @@ def evaluate(
         seed=cfg.seed,
         filter_rest_heavy=cfg.filter_rest_heavy,
         filter_unwanted_clefs=cfg.filter_unwanted_clefs,
+        filter_non_leadsheet_clef=cfg.filter_non_leadsheet_clef,
+        filter_unusual_time=cfg.filter_unusual_time,
         filter_multi_staff=cfg.filter_multi_staff,
         max_source_height=cfg.max_source_height,
         extra_data_dirs=cfg.extra_data_dirs or None,
         extra_scanned_dirs=(
             cfg.extra_scanned_dirs if cfg.use_scanned else None
+        ) or None,
+        finetune_data_dirs=cfg.finetune_data_dirs or None,
+        finetune_scanned_dirs=(
+            cfg.finetune_scanned_dirs if cfg.use_scanned else None
         ) or None,
     )
     ds_map = {"train": train_ds, "val": val_ds, "test": test_ds}

@@ -20,6 +20,12 @@ try:
 except ImportError:
     fitz = None
 
+# Single CLAHE instance reused across all binarize() calls in a process.
+# clipLimit=2.0 and tileGridSize=(8,8) are gentler than the OCR preprocessing
+# (ocr_chords.py uses 3.0/(4,4)) — we only need to normalise coarse page-level
+# illumination gradients, not enhance fine text contrast.
+_CLAHE = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+
 
 @dataclass
 class PageImage:
@@ -92,10 +98,16 @@ def pdf_load_dpi() -> int:
 # ---------------------------------------------------------------------------
 
 def binarize(img: np.ndarray) -> np.ndarray:
-    """Otsu binarization → ink=255, bg=0."""
+    """CLAHE equalization + Otsu binarization → ink=255, bg=0.
+
+    CLAHE normalises local illumination before the global Otsu threshold,
+    preventing spine shadows or uneven phone-scan lighting from causing
+    staff lines to drop out on the darker side of the page.
+    """
     if img.dtype in (np.float32, np.float64):
         img = (np.clip(img, 0, 1) * 255).astype(np.uint8)
-    _, binary = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    equalized = _CLAHE.apply(img)
+    _, binary = cv2.threshold(equalized, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     return binary
 
 

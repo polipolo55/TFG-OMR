@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 TFG-OMR is an Optical Music Recognition (OMR) system for monophonic jazz lead sheets (The Real Book). It extracts musical information from score images using computer vision and deep learning.
 
+This a TFG (treball de final de grau) at FIB-UPC, so it is an academin thesis
+
 **Core Model**: CRNN-CTC (ResNet18 CNN → BiLSTM → CTC loss)
 **Output Format**: LMX (Linear MusicXML), vocabulary in `src/CRNN_CTC/vocabulary.txt`
 **Scope**: Monophonic only (single melody line, no chords, no polyphony)
@@ -39,9 +41,11 @@ poetry run python src/cli.py train --resume  # auto-resume from latest checkpoin
 
 # Evaluation
 poetry run python src/cli.py evaluate --checkpoint models/latest/best_model.pt --split test --beam-width 10
+poetry run python src/cli.py evaluate-ab --checkpoint models/latest/best_model.pt --split test  # compare multiple beam widths
 
 # API server
 poetry run python src/cli.py api --host 0.0.0.0 --port 8000
+# API endpoint: POST /api/omr/lead-sheet with multipart file (PDF or image)
 ```
 
 ## Architecture
@@ -61,6 +65,7 @@ CTCLoss (blank index = 0)
 ```
 
 **Key Files**:
+
 - `model.py` — `CRNN` class with swappable CNN (`backbone: "resnet18"` or `"vgg"`)
 - `config.py` — Single `Config` dataclass for all hyperparameters; serialized into every checkpoint
 - `dataset.py` — `OMRDataset` loads `{id}.png` + `{id}.lmx` pairs; applies multi-stage filtering
@@ -77,12 +82,18 @@ Load → Preprocess (deskew + binarize) → Detect staves → Recognize music (C
 ```
 
 **Key Files**:
+
 - `pipeline.py` — Main entry point `run_pipeline()`
 - `preprocess.py` — `PageImage`, `load_image()`, `load_pdf_page()`, `preprocess_page()`
 - `staff_detect.py` — `System`, `detect_systems()` — morphological staff-line finder
 - `inference.py` — `recognize_music()`, `normalize_staff_crop()`
 - `ocr_chords.py` — `recognize_chords()` using EasyOCR
+- `chord_postprocess.py` — post-processes raw OCR text into valid jazz chord tokens (grammar: ROOT ACC? QUALITY? EXTEN? ALT* SLASH?)
 - `grammar_fix.py` — `fix_sequence()` applies music-theory corrections
+
+### Shared Utilities
+
+- `src/CRNN_CTC/lilypond_render.py` — LMX token → LilyPond → PNG; shared by dataset generation and evaluation notebooks. Contains authoritative look-up tables (`CLEF_LY`, `KEY_LY`, `DUR_LY`) and `CLEF_IDS_NORMALIZE_TO_G2` (C1, C2, F3 → G2 on render).
 
 ### Data Processing (`src/data_processing/`)
 
@@ -106,6 +117,7 @@ Use `style.C["<role>"]` for all explicit colors — never hardcode hex literals.
 ### Data Filtering
 
 Three filters are applied before training (all enabled by default in `Config`):
+
 - **`filter_rest_heavy`** — Drops samples where >80% of tokens are `rest/rest:measure/measure` AND total length >50 (orchestral tacet passages irrelevant to jazz)
 - **`filter_unwanted_clefs`** — Drops samples with `clef:C1`, `clef:C2`, or `clef:F3` (not used in jazz, cause pitch-cascade substitution errors)
 - **`filter_multi_staff`** — Drops images whose original height >180 px (LilyPond multi-staff wraps; single-staff images are 84–152 px)
@@ -158,3 +170,9 @@ notebooks/              # Jupyter notebooks for evaluation
 - **Primary evaluation metric**: SER (Symbol Error Rate), not accuracy
 - **No Verovio** — use LilyPond or MuseScore for score rendering
 - Set `OMR_DEBUG_DIR` to save intermediate crops during pipeline execution for inspection
+- Set `OMR_ENABLE_TILING=1` to use overlapping 50%-overlap tiles during inference instead of single forward pass (disabled by default; single pass is the standard mode)
+
+### Training-time augmentation / oversampling (Config fields)
+
+- `strip_header_prob=0.4` — randomly strips the clef+key+time header region from 40% of training samples, teaching the model to handle continuation lines (line 2+ of a Real Book page)
+- `rare_lmx_oversample=2` / `rare_lmx_tokens=("tied:start","tied:stop")` — duplicates training samples containing tie tokens so each epoch sees them 2× (ties are visually subtle and under-predicted on scans)

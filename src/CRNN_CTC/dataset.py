@@ -76,16 +76,39 @@ _REST_STRUCTURAL = frozenset({"rest", "rest:measure", "measure"})
 # (see ``CLEF_IDS_NORMALIZE_TO_G2`` in ``lilypond_render``).
 _CLEF_UNWANTED = frozenset(f"clef:{c}" for c in CLEF_IDS_NORMALIZE_TO_G2)
 
+# Jazz lead-sheet target domain: only treble clef.
+# C3 (alto), C4 (tenor), G1 (French violin), F4 (bass) appear in orchestral
+# PrIMuS but never in Real Book melody lines.
+_CLEF_LEADSHEET = frozenset({"clef:G2"})
+
+# Common jazz time signatures — must match ``_COMMON_TIME_SIGS`` in
+# ``src/omr_pipeline/grammar_fix.py`` (the inference-side counterpart).
+# Exotic meters (7/4, 9/8, 11/8 …) appear in classical PrIMuS but not Real Book.
+# These two constants are kept in separate modules to avoid coupling CRNN_CTC
+# (training) to omr_pipeline (inference).
+_COMMON_TIME_SIGS: frozenset[tuple[str, str]] = frozenset({
+    ("beats:4", "beat-type:4"),
+    ("beats:3", "beat-type:4"),
+    ("beats:2", "beat-type:4"),
+    ("beats:2", "beat-type:2"),
+    ("beats:6", "beat-type:8"),
+    ("beats:6", "beat-type:4"),
+    ("beats:5", "beat-type:4"),
+    ("beats:12", "beat-type:8"),
+})
+
 
 def _is_degenerate(
     tokens: list[str],
     *,
     filter_rest_heavy: bool = True,
     filter_unwanted_clefs: bool = True,
+    filter_non_leadsheet_clef: bool = False,
+    filter_unusual_time: bool = False,
 ) -> bool:
     """Return *True* if a sample should be excluded from training/evaluation.
 
-    Two independent criteria:
+    Criteria:
 
     rest-heavy
         More than 80 % of tokens are structural (``rest``, ``rest:measure``,
@@ -98,12 +121,34 @@ def _is_degenerate(
         (legacy data).  Re-render and re-convert so those clefs are normalized
         to ``clef:G2`` while keeping absolute pitches — then this filter no
         longer removes them.
+
+    non-leadsheet-clef
+        Any clef token not in ``_CLEF_LEADSHEET`` (i.e. not ``clef:G2``).
+        Drops C3 (alto), C4 (tenor), G1, F4 etc. that appear in orchestral
+        PrIMuS excerpts but never in jazz lead sheets.
+
+    unusual-time
+        A time signature not in ``_COMMON_TIME_SIGS`` (common jazz meters).
+        Drops 7/4, 9/8, 11/8 etc. that appear in classical PrIMuS but not
+        Real Book.
     """
     if not tokens:
         return True
 
     if filter_unwanted_clefs and any(t in _CLEF_UNWANTED for t in tokens):
         return True
+
+    if filter_non_leadsheet_clef:
+        for t in tokens:
+            if t.startswith("clef:") and t not in _CLEF_LEADSHEET:
+                return True
+
+    if filter_unusual_time:
+        for i, t in enumerate(tokens):
+            if t == "time" and i + 2 < len(tokens):
+                pair = (tokens[i + 1], tokens[i + 2])
+                if pair not in _COMMON_TIME_SIGS:
+                    return True
 
     if filter_rest_heavy and len(tokens) > 50:
         n_structural = sum(1 for t in tokens if t in _REST_STRUCTURAL)
@@ -283,6 +328,11 @@ class OMRDataset(Dataset):
         Upper bound on original image height used by the multi-staff filter.
         A value of 180 px cleanly separates the entire normal population
         (p95 = 152 px) from all multi-staff images (≥200 px).
+
+    Note: ``filter_non_leadsheet_clef`` and ``filter_unusual_time`` default
+    to *False* here for backward compatibility.  ``Config`` sets them True
+    (the intended default for jazz lead-sheet training); ``train.py`` and
+    ``evaluate.py`` always pass these flags explicitly from ``Config``.
     """
 
     def __init__(
@@ -294,6 +344,8 @@ class OMRDataset(Dataset):
         scanned_dir: Path | str | None = None,
         filter_rest_heavy: bool = True,
         filter_unwanted_clefs: bool = True,
+        filter_non_leadsheet_clef: bool = False,  # Config default: True
+        filter_unusual_time: bool = False,         # Config default: True
         filter_multi_staff: bool = True,
         max_source_height: int = 180,
         extra_data_dirs: list[Path] | None = None,
@@ -321,7 +373,7 @@ class OMRDataset(Dataset):
             raise RuntimeError(f"No valid samples found in {self.data_dir}")
 
         # 1) Token-level quality filters (fast — reads tiny .lmx files)
-        if filter_rest_heavy or filter_unwanted_clefs:
+        if filter_rest_heavy or filter_unwanted_clefs or filter_non_leadsheet_clef or filter_unusual_time:
             after_token_filter = [
                 (sid, png, lmx)
                 for sid, png, lmx in raw_samples
@@ -329,6 +381,8 @@ class OMRDataset(Dataset):
                     _load_lmx_tokens(lmx),
                     filter_rest_heavy=filter_rest_heavy,
                     filter_unwanted_clefs=filter_unwanted_clefs,
+                    filter_non_leadsheet_clef=filter_non_leadsheet_clef,
+                    filter_unusual_time=filter_unusual_time,
                 )
             ]
             n_removed = len(raw_samples) - len(after_token_filter)
@@ -523,6 +577,8 @@ def make_splits(
     seed: int = 42,
     filter_rest_heavy: bool = True,
     filter_unwanted_clefs: bool = True,
+    filter_non_leadsheet_clef: bool = False,  # Config default: True
+    filter_unusual_time: bool = False,         # Config default: True
     filter_multi_staff: bool = True,
     max_source_height: int = 180,
     extra_data_dirs: list[Path] | None = None,
@@ -562,6 +618,8 @@ def make_splits(
         scanned_dir=scanned_dir,
         filter_rest_heavy=filter_rest_heavy,
         filter_unwanted_clefs=filter_unwanted_clefs,
+        filter_non_leadsheet_clef=filter_non_leadsheet_clef,
+        filter_unusual_time=filter_unusual_time,
         filter_multi_staff=filter_multi_staff,
         max_source_height=max_source_height,
         extra_data_dirs=extra_clean or None,

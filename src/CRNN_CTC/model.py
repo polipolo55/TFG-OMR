@@ -45,18 +45,14 @@ from torch import Tensor
 
 
 # ---------------------------------------------------------------------------
-# CNN backbone  (placeholder — replace with your own)
+# CNN backbone — VGG-style
 # ---------------------------------------------------------------------------
 
 class CNNBackbone(nn.Module):
-    """Feature extractor: (B, 1, H=128, W) → (B, cnn_out_channels, 1, W').
+    """VGG-style feature extractor: (B, 1, H=128, W) → (B, cnn_out_channels, 1, W').
 
-    The current implementation is a minimal 5-block VGG-style stack that
-    collapses height to 1.  Replace with ResNet18/MobileNet once you have a
-    working baseline.
-
-    Width reduction factor:  W' ≈ W / 4   (two stride-2 pools on width,
-    the remaining pools only shrink height).
+    Five convolutional blocks that collapse height to 1 via progressive
+    pooling.  Width reduction factor: W' ≈ W / 4.
     """
 
     def __init__(self, cnn_out_channels: int = 256, cnn_dropout: float = 0.0) -> None:

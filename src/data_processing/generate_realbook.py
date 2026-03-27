@@ -24,6 +24,7 @@ import argparse
 import logging
 import multiprocessing
 import os
+import random
 import re
 import shutil
 import sys
@@ -85,10 +86,9 @@ def _parse_pitch(pitch_str: str) -> str:
         raise ValueError(f"Cannot parse pitch: {pitch_str!r}")
     step, acc_str, oct_str = m.group(1), m.group(2), m.group(3)
 
-    # normalise double-sharp written as ## → x
+    # normalise double-sharp written as ## → x (double-flat is always "bb")
     if acc_str == "##":
         acc_str = "x"
-    # normalise double-flat written as ## is impossible; bb is the convention
 
     lily_step = _STEP_LILY[step]
     lily_acc  = _ACC_LILY.get(acc_str, "")
@@ -243,9 +243,33 @@ def semantic_to_lily_music(semantic_path: Path) -> str:
     return " ".join(lily_tokens)
 
 
-def make_lily_source(music_body: str) -> str:
-    """Fill the shared LY_TEMPLATE with a music body string."""
-    return LY_TEMPLATE.format(music=music_body)
+def make_lily_source(music_body: str, numeric_time_prob: float = 0.5) -> str:
+    """Fill the shared LY_TEMPLATE with a music body string.
+
+    Randomly varies three notation styles that differ between LilyJAZZ renders
+    and Real Book PDFs, while keeping LMX labels identical:
+
+    * **Time signature** (prob 0.5): numeric "4/4" vs common-time "C".
+    * **Accidental style** (prob 0.5): ``modern`` adds cautionary accidentals
+      (reminders after ties, at bar boundaries) as Real Book does; ``default``
+      omits them.
+    * **Beam grouping** (prob 0.5): ``\autoBeamOff`` forces unbeamed individual
+      flags — Real Book sometimes uses this style for sparse/rubato passages —
+      vs LilyPond's default beat-grouped beaming.
+    """
+    cmds: list[str] = []
+
+    if random.random() < numeric_time_prob:
+        cmds.append(r"\numericTimeSignature")
+
+    if random.random() < 0.5:
+        cmds.append(r"\accidentalStyle modern")
+
+    if random.random() < 0.5:
+        cmds.append(r"\autoBeamOff")
+
+    prefix = " ".join(cmds) + " " if cmds else ""
+    return LY_TEMPLATE.format(music=prefix + music_body)
 
 
 # ---------------------------------------------------------------------------

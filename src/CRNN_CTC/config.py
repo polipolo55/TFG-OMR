@@ -92,6 +92,18 @@ class Config:
     rare_lmx_oversample: int = 2
     rare_lmx_tokens: tuple[str, ...] = ("tied:start", "tied:stop")
 
+    # filter_non_leadsheet_clef: drop samples containing any clef token except
+    # clef:G2.  C3 (alto), C4 (tenor), G1 (French violin), and F4 (bass) appear
+    # in orchestral PrIMuS excerpts but never in jazz lead sheets.  Keeping them
+    # wastes model capacity on visual patterns it will never encounter at inference.
+    filter_non_leadsheet_clef: bool = True
+
+    # filter_unusual_time: drop samples whose time signature is not in the common
+    # jazz set {4/4, 3/4, 2/4, 2/2, 6/8, 6/4, 5/4, 12/8}.  Exotic meters like
+    # 7/4 or 11/8 appear in classical PrIMuS but not in Real Book.  grammar_fix
+    # already rejects these at inference so there is no point training on them.
+    filter_unusual_time: bool = True
+
     # ── Fine-tuning (optional target-domain data) ─────────────────────────
     # Extra clean-image directories merged into the training split only.
     finetune_data_dirs: list[Path] = field(default_factory=list)

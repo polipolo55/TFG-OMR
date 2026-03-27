@@ -59,7 +59,7 @@ _VLM_PROMPT = (
 _easyocr_reader = None
 
 
-def _easyocr(lazy: bool = True):
+def _easyocr():
     global _easyocr_reader
     if _easyocr_reader is None:
         import easyocr

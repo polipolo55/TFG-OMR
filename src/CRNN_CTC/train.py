@@ -268,6 +268,8 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
         seed=cfg.seed,
         filter_rest_heavy=cfg.filter_rest_heavy,
         filter_unwanted_clefs=cfg.filter_unwanted_clefs,
+        filter_non_leadsheet_clef=cfg.filter_non_leadsheet_clef,
+        filter_unusual_time=cfg.filter_unusual_time,
         filter_multi_staff=cfg.filter_multi_staff,
         max_source_height=cfg.max_source_height,
         extra_data_dirs=cfg.extra_data_dirs or None,
@@ -338,7 +340,8 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
         optimiser.load_state_dict(ckpt["optimiser_state_dict"])
         start_epoch = ckpt["epoch"] + 1
         best_ser = ckpt.get("val_ser", float("inf"))
-        log.info("  Resumed at epoch %d  (best val_SER so far: %.4f)", start_epoch, best_ser)
+        patience_counter = ckpt.get("patience_counter", 0)
+        log.info("  Resumed at epoch %d  (best val_SER so far: %.4f, patience: %d)", start_epoch, best_ser, patience_counter)
 
     remaining_epochs = cfg.epochs - (start_epoch - 1)
     if remaining_epochs <= 0:
@@ -420,6 +423,7 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
                     "scaler_state_dict": scaler.state_dict(),
                     "val_ser": val_ser,
                     "val_loss": val_loss,
+                    "patience_counter": 0,
                     "config": cfg,
                     "vocab_size": len(vocab),
                 },
@@ -438,6 +442,7 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
                 "scheduler_state_dict": scheduler.state_dict(),
                 "scaler_state_dict": scaler.state_dict(),
                 "val_ser": val_ser,
+                "patience_counter": patience_counter,
                 "config": cfg,
             },
             run_dir / "latest_checkpoint.pt",

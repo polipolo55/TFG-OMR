@@ -53,6 +53,9 @@ models/
 *.nav
 *.snm
 
+# Notebook exports
+notebooks/*.pdf
+
 # Build helpers / temporary files
 *.dvi
 *.ps

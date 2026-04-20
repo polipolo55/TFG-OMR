@@ -1,0 +1,330 @@
+\documentclass[11pt, a4paper]{article}
+
+% --- PACKAGES ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel} % Set to English
+\usepackage[margin=2.5cm]{geometry}
+\setlength{\headheight}{13.6pt}
+\usepackage{graphicx}       % For logos and images
+\usepackage{svg}            % For SVG support
+\usepackage{hyperref}       % For clickable links and TOC
+\usepackage{fancyhdr}       % For headers and footers
+\usepackage{caption}        % For figure/table legends
+\usepackage{booktabs}       % For professional table rules
+\usepackage{array}          % For extended column types
+\usepackage{tabularx}       % For auto-stretching table columns
+\usepackage{csquotes}
+
+% --- BIBLIOGRAPHY SETUP ---
+% The rubric allows [n] format, which IEEE handles perfectly
+\usepackage[style=ieee, sorting=none]{biblatex} 
+\addbibresource{references.bib}
+
+% --- HEADER & FOOTER SETUP ---
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{Optical Music Recognition for monophonic lines}       % Project short name
+\fancyhead[R]{GEP Deliverable 1}        % Deliverable name
+\fancyfoot[C]{\thepage}                 % Page numbers are mandatory
+
+% --- LINK COLORS ---
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    filecolor=magenta,      
+    urlcolor=blue,
+    citecolor=blue,
+}
+
+\begin{document}
+
+% ==========================================
+% TITLE PAGE
+% ==========================================
+\begin{titlepage}
+    \centering
+    
+    % Logo at the top
+    \vspace*{-1.5cm}
+    \begin{figure}[h!]
+        \centering
+        \includegraphics[width=\textwidth]{figures/portada_logo.png}
+    \end{figure}
+    
+    \vspace{3cm}
+    
+    {\LARGE\bfseries OPTICAL MUSIC RECOGNITION FOR JAZZ LEAD SHEETS:\\ A CRNN-CTC APPROACH FOR MONOPHONIC LINES \par}
+    
+    \vspace{3cm}
+    
+    {\large\bfseries POL CASANOVAS PUIG \par}
+    
+    \vspace{3cm}
+    
+    {\small Thesis supervisor \par}
+    {\small MANEL FRIGOLA BOURLON (Department of Automatic Control) \par}
+    
+    \vspace{0.5cm}
+    
+    {\small GEP tutor \par}
+    {\small XAVIER MORALES SOROLLA \par}
+    
+    \vspace{0.5cm}
+    
+    {\small Degree \par}
+    {\small Bachelor's Degree in Informatics Engineering (Computing) \par}
+    
+    \vspace{1cm}
+    
+    {\small\bfseries GEP Deliverable 1: Context and Scope \par}
+    
+    \vfill
+    
+    {\small\bfseries Facultat d'Informàtica de Barcelona (FIB) \par}
+    
+    \vspace{0.2cm}
+    
+    {\small\bfseries Universitat Politècnica de Catalunya (UPC) - BarcelonaTech \par}
+    
+    \vspace{1cm}
+\end{titlepage}
+
+% ==========================================
+% TABLE OF CONTENTS
+% ==========================================
+\tableofcontents
+\newpage
+
+% ==========================================
+% DOCUMENT BODY
+% ==========================================
+
+\section{Introduction and Context}
+\subsection{Academic/Professional Framework}
+This project is developed in the academic context of the Bachelor's Thesis (TFG) at FIB--UPC, under modality A, as part of the requirements to complete the Computer Science degree at the Universitat Polit\`ecnica de Catalunya (UPC). The project is supervised by Manel Frigola Bourlon, professor at the Facultat d'Inform\`atica de Barcelona (FIB), and guided by Xavier Morales Sorolla as GEP tutor.
+
+The work is framed within the Computaci\'o specialty. The topic was selected due to my interest in the intersection of music and technology, and because of the potential impact of Optical Music Recognition (OMR) in areas such as music education, digital archiving, and music information retrieval.
+
+\subsection{Domain Concepts and Terminology}
+\begin{description}
+    \item[Optical Music Recognition (OMR):] The process of automatically converting scanned or photographed music sheets into machine-readable symbolic formats (e.g., MusicXML, MIDI)~\cite{shatriOPTICALMUSICRECOGNITION}.
+    \item[Music Sheet/Score:] A printed or digital document containing musical notation, including notes, staves, time signatures, and other musical symbols.
+    \item[End-to-End System:] A unified approach that maps input directly to output without intermediate manual steps, typically using a single neural network or an integrated pipeline.
+    \item[Music Information Retrieval (MIR):] The interdisciplinary field focused on extracting meaningful information from music data.
+    \item[Symbolic Notation:] A machine-readable representation of music (e.g., MusicXML, MIDI), in contrast to audio waveforms.
+    \item[Digital Archiving:] The process of converting and preserving documents in digital form for long-term accessibility.
+    \item[CRNN (Convolutional Recurrent Neural Network):] A neural network architecture that combines convolutional layers for visual feature extraction with recurrent layers for sequence modeling.
+    \item[CTC (Connectionist Temporal Classification):] A loss function and decoding algorithm used to train sequence models on unsegmented data, allowing the network to align input features with output sequences automatically.
+    \item[Monophonic / Polyphonic:] Monophonic refers to music consisting of a single melodic line without simultaneous notes, whereas polyphonic involves multiple independent voices or simultaneous notes (chords).
+    \item[Lead Sheet:] A form of musical score commonly used in jazz and popular music that specifies the essential elements of a song: the melody, lyrics, and harmony (chord symbols).
+    \item[The Real Book:] A widely used compilation of jazz lead sheets.
+\end{description}
+
+In addition to these core concepts, the project relies on basic music theory (notation, rhythm, and structure) and technical foundations in deep learning, computer vision, and data processing. When required, these notions will be introduced and explained to keep the document accessible to readers with different backgrounds.
+
+
+\subsection{Problem Statement}
+As a musician, I have repeatedly faced the need to digitize paper scores for sharing, archival purposes, and use in composition or analysis software. This is especially relevant in rehearsal and live-performance contexts, where musicians may receive a physical chart and need to perform it immediately.
+
+In these situations, paper limits flexibility. Performers may need to transpose parts for different instruments, generate quick audio playback to understand style and groove, or store the score in a searchable digital library (e.g., on a tablet). Manual transcription is slow and error-prone, which motivates the need for an efficient and accurate method to convert physical music sheets into machine-readable formats.
+
+\subsection{Stakeholders}
+\begin{itemize}
+    \item \textbf{Musicians:} Readers and performers who benefit from digital scores for practice, performance, sharing, and transposition.
+    \item \textbf{Music Educators:} Teachers who use digital sheet music in class and provide interactive learning resources to students.
+    \item \textbf{Music Archivists:} Professionals responsible for preserving and organizing collections, who benefit from improved accessibility and long-term preservation.
+    \item \textbf{Music Software Developers:} Companies and independent developers who can integrate OMR outputs into notation, playback, or learning applications.
+    \item \textbf{MIR Researchers:} Researchers in music information retrieval who can use OMR data for analysis, recommendation systems, and musicology studies.
+    \item \textbf{General Public:} Music enthusiasts interested in accessing and interacting with digital music sheets for personal use and learning.
+\end{itemize}
+
+\section{Justification of the Chosen Alternative}
+
+\subsection{State of the Art / Existing Alternatives}
+Current OMR literature distinguishes three broad families of approaches~\cite{shatriOPTICALMUSICRECOGNITION}:
+
+\begin{enumerate}
+    \item \textbf{Traditional modular pipelines (e.g., rule-based systems):} They decompose the task into fixed stages (pre-processing, staff detection/removal, symbol segmentation, symbol classification, and reconstruction). Their main weakness is error propagation between stages, and they require significant manual engineering for each new score style or notation condition~\cite{dalitzComparativeStudyStaff2008}.
+    \item \textbf{CRNN-CTC approaches:} They combine convolutional feature extraction with recurrent sequence modeling (typically a bidirectional LSTM) trained with Connectionist Temporal Classification (CTC) loss, adapting methods originally developed for handwriting and text recognition. They are well-suited for monophonic staff lines where a left-to-right sequential assumption holds naturally, and they are lighter and faster to train than attention-based counterparts~\cite{PrIMuSDataset,opticalmusicrecognitionresearchSelfLearningOpticalMusic2019,simonettaOpticalMusicRecognition2024}.
+    \item \textbf{End-to-end transformer approaches:} They formulate OMR as image-to-sequence translation with attention-based encoder-decoder architectures. This family handles long-range dependencies and complex page layouts well, making it the most promising direction for polyphonic and full-page scores, at the cost of higher data and compute requirements~\cite{vilaAntoniorv6SMT2026,UfalOlimpicicdar24Practical,simonettaOpticalMusicRecognition2024}.
+\end{enumerate}
+
+\subsection{Comparison Criteria}
+\label{sec:criteria}
+The alternatives are compared using criteria aligned with the scope of this TFG:
+
+\begin{itemize}
+    \item \textbf{Accuracy and robustness:} Resistance to image noise, quality variation, and notation complexity.
+    \item \textbf{Polyphony support:} Ability to represent simultaneous notes and multiple voices correctly.
+    \item \textbf{Layout awareness:} Capacity to process complete pages with multiple systems and non-trivial reading order.
+    \item \textbf{Semantic completeness:} Generation of outputs that preserve musical meaning (pitch, duration, meter, and key context).
+    \item \textbf{Implementation feasibility:} Compatibility with available time, compute resources, and development effort for a Bachelor's thesis.
+    \item \textbf{Evaluation compatibility:} Possibility of benchmarking with public datasets and reproducible metrics.
+\end{itemize}
+
+\subsection{Comparative Analysis}
+
+\begin{table}[h!]
+    \centering
+    \caption{Comparison of OMR approach families across evaluation criteria
+    (\textbf{+}~good, \textbf{$\sim$}~moderate, \textbf{--}~poor).}
+    \label{tab:approach-comparison}
+    \renewcommand{\arraystretch}{1.4}
+    \begin{tabularx}{\linewidth}{>{}p{3.8cm} X X X}
+        \toprule
+        \textbf{Criteria}
+            & \textbf{Traditional Pipeline}~\cite{dalitzComparativeStudyStaff2008}
+            & \textbf{CRNN-CTC}~\cite{PrIMuSDataset,opticalmusicrecognitionresearchSelfLearningOpticalMusic2019}
+            & \textbf{Transformer}~\cite{vilaAntoniorv6SMT2026,UfalOlimpicicdar24Practical} \\
+        \midrule
+        Accuracy \& robustness
+            & -- Errors amplified stage-by-stage
+            & $\sim$ Good on typeset; degrades on distorted images
+            & + Attention handles high visual variance \\
+        \addlinespace
+        Polyphony support
+            & -- Requires explicit per-symbol segmentation
+            & -- Monophonic only
+            & + Full polyphony capable \\
+        \addlinespace
+        Layout awareness
+            & -- Assumes pre-cropped lines
+            & -- Assumes pre-cropped lines
+            & $\sim$ Page-level models exist \\
+        \addlinespace
+        Semantic completeness
+            & $\sim$ Symbol detection without sequence context
+            & + Sequential context via bidirectional LSTM
+            & + Encoder-decoder captures full musical context \\
+        \addlinespace
+        Implementation feasibility
+            & + Interpretable; low data requirements
+            & + Well-documented; lightweight training
+            & -- Requires large annotated corpus and compute \\
+        \addlinespace
+        Evaluation compatibility
+            & + Classic baselines readily available
+            & + PrIMuS benchmarks and SER well-defined
+            & $\sim$ Fewer standardised public benchmarks \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\subsection{Selected Alternative and Rationale}
+The selected approach is a \textbf{CRNN-CTC model} for \textbf{monophonic music line recognition}, with the primary evaluation target being lead-sheet scores from \textbf{The Real Book in C}.
+
+I've chosen this approach because Real Book melodies are mostly monophonic and read left-to-right, making them an ideal fit for CTC-based sequence models. Furthermore, a CRNN-CTC architecture is computationally lighter than full transformer models, fitting well within the resource constraints. It also benefits from strong prior art~\cite{PrIMuSDataset,opticalmusicrecognitionresearchSelfLearningOpticalMusic2019} and a clear evaluation path using standard metrics like Symbol Error Rate (SER)~\cite{SymbolErrorRate}. Finally, it provides a solid foundation that can later be extended to handle polyphony if needed.
+
+\subsection{Constraints and Decision Boundaries}
+The project is constrained by the lack of publicly available annotated Real Book data, necessitating the creation of a custom dataset through synthetic generation and manual annotation. The scope is strictly monophonic-first, targeting single-voice melodic lines to ensure computational feasibility within the available GPU resources and time. The output will use a compact symbolic encoding (e.g., a simplified \texttt{**kern}-like~\cite{Humdrum} or \texttt{LMX}~\cite{OMRResearchLmx2025}) to balance expressiveness and training efficiency. The primary goal is a reproducible prototype, with polyphony and full-page layout parsing considered as potential future extensions.
+
+\section{Project Scope}
+\subsection{General Objective}
+To develop a proof-of-concept CRNN-CTC model capable of transcribing monophonic music lines into a symbolic format, with the Real Book as the primary target corpus, and to explore potential extensions toward polyphonic recognition, demonstrating the feasibility of this approach within the constraints of a Bachelor's thesis.
+
+\subsection{Specific Objectives}
+\begin{itemize}
+    \item Survey and document the state of the art in OMR, covering traditional modular pipelines, CRNN-CTC models, and transformer-based end-to-end approaches.
+    \item Implement a traditional modular pipeline as a baseline, using classical computer vision techniques (morphological operations, horizontal projection) for explicit staff line detection, removal, and symbol segmentation.
+    \item Build or adapt an annotated dataset of monophonic staff lines derived from Real Book pages, including synthetic augmentation to increase sample diversity and quantity.
+    \item Design, implement, and train a CRNN-CTC model for monophonic staff-line recognition, defining a compact symbolic output encoding suitable for melody representation.
+    \item Evaluate the CRNN-CTC model against the baseline using standard OMR metrics (e.g., Symbol Error Rate) and analyse failure modes.
+    \item Investigate and prototype, if feasible within scope and time, an extension of the system to handle limited polyphony or chord symbols commonly found in lead sheets.
+\end{itemize}    
+
+\subsection{Functional Requirements}
+\begin{itemize}
+    \item The system shall accept as input a scanned or photographed image of a music sheet page; a page segmentation stage shall detect and crop each staff region to produce individual staff line images.
+    \item For each detected staff line, the system shall produce a symbolic sequence representing the musical content (pitches, durations, rests, accidentals, time and key signatures) in a compact, machine-readable format.
+    \item The output format shall be sufficient to reconstruct the melody of a monophonic line unambiguously (e.g., reconstruct MIDI or be able to be translated into a standard notation format like MusicXML).
+    \item The system shall process Real Book lead-sheet pages as a self-imposed bechmark.
+    \item The system shall include a traditional modular pipeline baseline against which the CRNN-CTC model can be compared quantitatively.
+    \item The system shall provide evaluation outputs (metric scores and error analysis) for the trained model on a held-out test set.
+\end{itemize}
+
+\subsection{Non-Functional Requirements}
+\begin{itemize}
+    \item \textbf{Accuracy:} The CRNN-CTC model should achieve a Symbol Error Rate (SER)~\cite{SymbolErrorRate} clearly below that of the modular baseline on the test set, demonstrating a meaningful improvement.
+    \item \textbf{Reproducibility:} All experiments must be reproducible from a public repository with documented dependencies, dataset preparation scripts, and training configuration files.
+    \item \textbf{Computational feasibility:} Training must complete in a reasonable time on a single consumer-grade GPU (e.g., NVIDIA RTX-class). Inference on a single staff line must run in well under one second.
+    \item \textbf{Modularity:} The codebase should be structured so that the page segmentation (staff region cropping), CRNN-CTC recognition, and evaluation stages are independently testable and replaceable.
+    \item \textbf{Portability:} The implementation should run on standard Linux environments using open-source libraries (PyTorch, OpenCV, etc.) without proprietary dependencies.
+    \item \textbf{Documentation:} Code and experimental results must be documented clearly enough to allow the project supervisor and evaluators to understand and verify the work.
+\end{itemize}
+
+\subsection{Scope Boundaries and Exclusions}
+\textbf{In scope:}
+\begin{itemize}
+    \item Monophonic melody lines like the ones found on the Real Book pages.
+    \item Staff region detection and individual line cropping as a page segmentation preprocessing stage.
+    \item Design, training, and evaluation of a CRNN-CTC model for single-voice line recognition.
+    \item Implementation of a traditional modular pipeline as a comparative baseline.
+    \item Dataset construction, including synthetic data generation and/or manual annotation of a Real Book subset.
+    \item Quantitative evaluation using standard OMR metrics (SER, pitch accuracy, rhythm accuracy).
+    \item A survey and discussion of transformer-based OMR approaches as context and potential future direction.
+\end{itemize}
+\textbf{Out of scope (for this TFG stage):}
+\begin{itemize}
+    \item Full polyphonic transcription (multiple simultaneous voices or complex chords beyond simple chord symbols).
+    \item Full-page layout analysis (reading order recovery across multiple systems, lyrics, annotations).
+    \item Audio synthesis or playback integration beyond basic MIDI export.
+    \item Real-time or mobile deployment.
+    \item Support for handwritten scores or non-Western notation systems.
+    \item Training or fine-tuning large-scale transformer models from scratch.
+\end{itemize}
+
+\subsection{Risks and Potential Obstacles}
+\begin{itemize}
+    \item \textbf{Limited ground-truth data:} Annotated Real Book data is not freely available. Building a sufficient training set manually is time-consuming. \textit{Mitigation:} Use synthetic score generation (e.g., via LilyPond or MuseScore) to bootstrap training data in the style of the Real Book, and apply data augmentation (noise, blur, rotation) to improve generalisation.
+    \item \textbf{Staff detection errors propagating downstream:} If staff lines are incorrectly detected or cropped, the recogniser receives corrupted input. \textit{Mitigation:} Dedicate early project phases to validating the detection stage independently before coupling it to the recognition model.
+    \item \textbf{Encoding design complexity:} Defining a compact yet expressive symbolic encoding for the CTC output vocabulary may require iteration. \textit{Mitigation:} Start with a minimal vocabulary (pitch class + octave + duration) and extend incrementally.
+    \item \textbf{Model underfitting or CTC misalignment:} CTC training can be sensitive to vocabulary size and sequence length ratios. \textit{Mitigation:} Follow established CRNN-CTC OMR recipes from the literature~\cite{PrIMuSDataset,opticalmusicrecognitionresearchSelfLearningOpticalMusic2019} and monitor CTC loss curves carefully during training.
+    \item \textbf{Scope creep toward polyphony:} Attempting to address polyphony prematurely could divert time from solidifying the monophonic core. \textit{Mitigation:} Treat polyphony as a clearly gated extension, only pursued after the monophonic system meets the defined accuracy targets.
+    \item \textbf{Computational resource constraints:} Limited GPU access could slow training iteration cycles. \textit{Mitigation:} Use lightweight model configurations, mixed-precision training, and cloud compute credits if available.
+\end{itemize}
+
+\section{Methodology and Rigour}
+\label{sec:methodology}
+\subsection{Project Methodology}
+This project adopts an iterative and incremental methodology, inspired by agile principles, rather than a classical waterfall approach. A rigid cascade model is ill-suited for a research-oriented TFG, where experimental outcomes influence subsequent design decisions and the scope of certain components depends on earlier results. Instead, an iterative approach allows each cycle to produce a working, evaluated artefact (e.g., a baseline model, an initial CRNN-CTC prototype), providing concrete checkpoints for feedback and replanning. This aligns with software engineering practices taught in the degree.
+
+\subsection{Adaptation to This Project}
+The iterative methodology is adapted to the TFG context by aligning short development iterations with regular supervisor meetings. This keeps the project on track without requiring a rigid sprint structure. The initial iterations focus on literature review and dataset construction to establish a solid foundation before implementation. The scope is kept incremental, treating the monophonic CRNN-CTC system as the primary deliverable, with polyphony considered only if time permits. Progress is continuously evaluated using quantitative metrics like SER at the end of each iteration.
+
+\subsection{Execution Approach}
+The project is divided into five sequential phases, each producing a concrete deliverable:
+
+\begin{enumerate}
+    \item \textbf{Literature Review and Baseline Study} \\
+    Systematic review of OMR approaches~\cite{shatriOPTICALMUSICRECOGNITION} (traditional pipelines, CRNN-CTC, transformers). Implementation and evaluation of a rule-based modular pipeline as a lower-bound baseline. \\
+    \textit{Deliverable:} Annotated bibliography and baseline evaluation report.
+
+    \item \textbf{Dataset Construction} \\
+    Design of the output encoding vocabulary. Generation of a synthetic dataset of monophonic staff lines using LilyPond or MuseScore, with data augmentation to simulate real scan conditions. Manual annotation of a Real Book subset for evaluation. \\
+    \textit{Deliverable:} Annotated dataset with train/validation/test splits and preprocessing scripts.
+
+    \item \textbf{CRNN-CTC Model Development} \\
+    Design, implementation, and iterative training of the CRNN-CTC architecture. Hyperparameter tuning and ablation studies. \\
+    \textit{Deliverable:} Trained model with documented configuration and training logs.
+
+    \item \textbf{Evaluation and Analysis} \\
+    Quantitative benchmark of the CRNN-CTC model against the baseline using SER and related metrics. Qualitative error analysis and identification of systematic failure modes. \\
+    \textit{Deliverable:} Evaluation report with metric tables and error case studies.
+
+    \item \textbf{Extension (Conditional)} \\
+    If the monophonic system achieves satisfactory accuracy and time permits, exploration of limited polyphony (chord symbols, two-voice passages) or full-page line detection. \\
+    \textit{Deliverable:} Prototype extension with preliminary results.
+\end{enumerate}
+
+\subsection{Monitoring and Follow-up Tools}
+Progress is monitored using Git/GitHub for version control of code and datasets, ensuring a complete record of technical progress. Experiment tracking is used to log training runs, metrics, and hyperparameter configurations. Additionally, regular meetings with the thesis director are held to review results, discuss obstacles, and redefine priorities.
+
+
+% ==========================================
+% REFERENCES
+% ==========================================
+\newpage
+\printbibliography[heading=bibintoc, title={References}]
+
+\end{document}

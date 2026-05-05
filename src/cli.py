@@ -710,7 +710,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--rare-lmx-tokens",
         type=str,
         default=None,
-        help="Comma-separated LMX tokens to up-weight (default: tied:start,tied:stop,key:fifths:0). "
+        help="Comma-separated LMX tokens to up-weight (default: tied:start,tied:stop). "
              "Pass empty string to disable token-based oversampling.",
     )
     g_train.add_argument(

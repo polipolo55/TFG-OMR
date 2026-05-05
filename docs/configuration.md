@@ -53,7 +53,7 @@ These must stay in sync with `_COMMON_TIME_SIGS` in both `src/CRNN_CTC/dataset.p
 | `strip_header_prob` | 0.4 | Probability of removing clef+key+time from image and label (training only) |
 | `online_aug_prob` | 0.5 | Probability of light per-sample jitter (brightness, noise, ±2 px shift) on top of the offline-augmented PNG (training only) |
 | `rare_lmx_oversample` | 2 | Oversampling factor for samples containing rare tokens |
-| `rare_lmx_tokens` | `("tied:start", "tied:stop", "key:fifths:0")` | Tokens that trigger oversampling.  C-major (`key:fifths:0`) is included because PrIMuS underrepresents it severely (~0.05 % of corpus) while the Real Book uses it constantly. |
+| `rare_lmx_tokens` | `("tied:start", "tied:stop")` | Tokens that trigger oversampling.  Ties are visually subtle on degraded scans and chronically under-predicted.  `key:fifths:0` was previously included here because PrIMuS only had 8 explicit C-major labels; the root cause was a converter bug (missing default key injection) that is now fixed — C major is ~45 % of the corpus after the fix and needs no oversampling. |
 
 ## Model Architecture
 

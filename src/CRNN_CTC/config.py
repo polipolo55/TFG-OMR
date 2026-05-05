@@ -91,13 +91,17 @@ class Config:
     # epoch sees them N× as often.  1 = disabled.  Default 2 up-weights:
     #
     #   * ``tied:start`` / ``tied:stop`` — visually subtle, under-predicted on scans.
-    #   * ``key:fifths:0`` (C major) — under-represented in classical PrIMuS
-    #     (only ~0.05 % of corpus) but extremely common in the Real Book.
-    #     Without oversampling the model rarely sees C major during training
-    #     and tends to mis-predict the key signature on real C-major scans.
+    #
+    # Note: ``key:fifths:0`` (C major) was previously listed here because
+    # ``semantic_to_lmx.py`` did not emit it for samples with no explicit
+    # ``keySignature-`` token, leaving only 8 C-major training labels.
+    # That bug is now fixed — the converter always injects ``key:fifths:0``
+    # when no key is specified, so ~45 % of the corpus is C major and no
+    # oversampling is needed or desired (adding it back would make C major
+    # ~59 % of the virtual training set).
     rare_lmx_oversample: int = 2
     rare_lmx_tokens: tuple[str, ...] = (
-        "tied:start", "tied:stop", "key:fifths:0",
+        "tied:start", "tied:stop",
     )
 
     # filter_non_leadsheet_clef: drop samples containing any clef token except

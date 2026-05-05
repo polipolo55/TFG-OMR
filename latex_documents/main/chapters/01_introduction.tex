@@ -1,0 +1,503 @@
+\chapter{Introduction and Context}
+\label{ch:intro}
+
+Music notation is one of the most sophisticated symbolic languages ever devised: a
+two-dimensional graphical system capable of encoding pitch, rhythm, dynamics, phrasing,
+and expressive intent with sufficient precision to allow performers separated by centuries
+to reproduce a composer's intentions from a printed page.
+Yet the overwhelming majority of notated music exists today only as paper or
+low-resolution scanned image---inaccessible to the computational tools that now drive
+music education, music information retrieval (MIR), computational musicology, and
+digital archiving.
+\term{Optical Music Recognition} (OMR) is the discipline that bridges this divide: it
+translates images of musical scores into structured, machine-readable representations in
+the same way that Optical Character Recognition (OCR) transformed printed text into
+searchable, editable data~\cite{shatriOPTICALMUSICRECOGNITION}.
+
+This thesis describes the design, implementation, and quantitative evaluation of an
+end-to-end OMR system tailored to a concrete and practically significant target:
+the monophonic melody lines and chord symbols of jazz lead sheets, with a primary focus
+on \textit{The Real Book}---the iconic fake-book in the hands of most working jazz
+musicians worldwide.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Motivation}
+\label{sec:motivation}
+
+\subsection{The Digitization Gap in Music}
+
+Music archives, educational institutions, and individual musicians hold enormous
+quantities of repertoire that exists only in paper or low-resolution scanned form.
+Public libraries, conservatory collections, and private fake-book editions contain
+hundreds of thousands of pages of notation that cannot be searched, transposed, played
+back, or analysed without manual transcription into notation software.
+Manual transcription is slow, expensive---typically requiring fifteen to sixty minutes
+per page depending on complexity---and demands specialist training that is unavailable
+at scale.
+
+The practical consequences are significant.
+A music educator who wishes to assign a jazz standard in a different key must either
+own commercial software with the piece already encoded, transcribe it manually, or
+distribute a photocopy that students cannot edit.
+A musicologist studying harmonic patterns across a large corpus cannot apply statistical
+methods to scanned PDFs without first converting them to machine-readable format.
+A musician practising from a worn photocopy of \textit{The Real Book} cannot feed the
+page to a practice app that transposes the melody to a B\(\flat\) instrument.
+
+OCR technology solved an equivalent problem for text decades ago, making printed books,
+newspapers, and documents searchable and editable at almost zero marginal cost.
+OMR is the musical analogue, but it remains far less mature: the visual language of
+music notation is substantially more complex than alphabetic text, the available
+annotated data is orders of magnitude smaller, and the community of researchers and
+tools is correspondingly narrower.
+
+\subsection{Jazz Lead Sheets and \textit{The Real Book}}
+
+Among the many formats of notated music, \term{jazz lead sheets} occupy a special
+position.
+A lead sheet is a compact score format that encodes only the most essential musical
+information: a single-voice melody line written on a staff, chord symbols printed above
+it indicating the harmonic context, and---occasionally---lyrics beneath the staff.
+This format is the lingua franca of jazz practice: it allows musicians to memorise and
+improvise over a tune from a minimal, portable representation without the burden of a
+full orchestral score.
+
+\textit{The Real Book} is the most widely circulated collection of jazz lead sheets.
+Originally assembled as an unauthorised compilation by Berklee College of Music students
+in the 1970s, it circulated as a hand-copied samizdat for years before receiving
+official publication.
+It contains several hundred of the most important jazz standards---tunes by Miles Davis,
+Thelonious Monk, Bill Evans, John Coltrane, and dozens of other canonical
+figures---and is found on the music stands of jazz musicians at virtually every level of
+practice, worldwide.
+
+Despite its cultural centrality, the content of \textit{The Real Book} remains almost
+entirely locked in paper or scanned-image form.
+The officially published editions exist as PDFs, but those PDFs are image-based: the
+musical content is not encoded as symbolic data, and standard music notation software
+cannot interpret them directly.
+Digitising \textit{The Real Book}---and the broader class of jazz lead sheets it
+represents---would unlock a range of practical applications: automatic transposition for
+B\(\flat\), E\(\flat\), and F instruments; instant MIDI playback for practice and
+accompaniment; corpus-level harmonic analysis for musicologists; improved search and
+cataloguing in digital music libraries; and accessible preparation of educational
+materials for jazz educators.
+
+\subsection{Why Existing OMR Tools Fall Short}
+
+General-purpose OMR systems have advanced significantly in recent
+years~\cite{shatriOPTICALMUSICRECOGNITION}, but they are designed and evaluated
+primarily on classical full-score notation: orchestral scores, piano scores, and choral
+settings printed in standard engraving styles (Finale, Sibelius, Dorico, or LilyPond's
+default font).
+Lead sheets diverge from this baseline in several ways that cause measurable
+degradation in existing tools.
+
+\textbf{Engraving style.}
+Many editions of \textit{The Real Book} use fonts and layouts that deliberately imitate
+handwritten notation.
+The LilyJAZZ font used by LilyPond---and the original hand-copy style of the
+Berklee editions---produce noteheads, stems, and clefs that differ visually from the
+upright, regularised glyphs of classical engraving software.
+Models trained on PrIMuS, DeepScoresV2~\cite{tuggenerDeepScoresV22020}, or similar
+classical-style datasets do not transfer naturally to this visual register.
+
+\textbf{Chord symbols.}
+Jazz chord symbols---comprising a root letter, quality abbreviation, extensions,
+alterations, and an optional slash bass note---appear above the staff as free-form text
+and are a core part of the lead-sheet semantics.
+Standard OMR pipelines are designed to transcribe pitch and rhythm from the staff; they
+either ignore chord symbols entirely or treat them as noise.
+Any OMR system targeting lead sheets must include a complementary chord recognition
+module that is coordinated with the melody transcription.
+
+\textbf{Absence of labelled data.}
+To the best of the author's knowledge, no publicly available, labelled dataset of Real
+Book pages with ground-truth symbolic transcriptions exists as of 2026.
+Supervised training of modern deep learning models without such a corpus requires
+synthetic data generation and domain adaptation techniques whose quality directly
+governs the performance of the resulting system.
+
+These three gaps---engraving style, chord semantics, and missing training data---define
+the specific challenges this thesis addresses and distinguish it from prior OMR work on
+classical notation.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Musical Notation Fundamentals}
+\label{sec:notation-primer}
+
+This section provides a self-contained introduction to the elements of Western staff
+notation relevant to this thesis.
+It is intended for readers with a computer science background who may not have formal
+training in music theory.
+Familiarity with this material is necessary to understand the vocabulary design, the
+data pipeline, and the error analysis presented in later chapters.
+
+\subsection{The Staff and the Treble Clef}
+
+Western music is written on a \term{staff}: a set of five equally spaced horizontal
+lines and the four spaces between them.
+Pitches are represented by the vertical position of a notehead on this grid: each line
+and space corresponds to a specific pitch, and moving a notehead one position upward
+(one line to the adjacent space, or one space to the adjacent line) raises the pitch by
+one diatonic step.
+
+The absolute pitch assigned to each staff position depends on the \term{clef} symbol
+placed at the left edge of the staff.
+The most common clef in Western notation is the \term{treble clef} (also called the
+\term{G clef}), which curls around the second line from the bottom and designates that
+line as G4---the G above middle C.
+With this anchor established, the remaining lines read, from bottom to top, E4, G4, B4,
+D5, F5; the spaces between them read F4, A4, C5, E5.
+
+When a pitch falls above or below the range of the five-line staff, short horizontal
+\term{ledger lines} extend the staff as needed.
+Middle C (C4), for example, sits on the first ledger line below the treble staff; a
+high A (A5) sits on the first ledger line above it.
+Jazz lead sheets use the treble clef exclusively, and this thesis targets the treble
+clef only (see Section~\ref{sec:scope}).
+
+\subsection{Pitch, Accidentals, and Key Signatures}
+
+Western tonal music divides the octave into twelve chromatic semitones.
+The seven diatonic pitch classes---A, B, C, D, E, F, G---correspond to the white keys
+of a piano keyboard and to the named staff positions described above.
+The five remaining semitones are represented using \term{accidentals}: a \term{sharp}
+(\(\sharp\)) raises a note by one semitone; a \term{flat} (\(\flat\)) lowers it by one
+semitone; a \term{natural} (\(\natural\)) cancels a preceding sharp or flat.
+Accidentals appear immediately to the left of the notehead they modify and remain in
+effect for the remainder of the bar in which they appear.
+
+A \term{key signature}---placed at the beginning of each staff, immediately after the
+clef---specifies the tonal context of the piece by indicating which pitch classes are to
+be systematically sharpened or flattened throughout.
+A key signature of two sharps, for example, signals the key of D major and means that
+every F and every C should be played as F\(\sharp\) and C\(\sharp\) unless explicitly
+cancelled by a natural sign.
+Key signatures range from seven flats (C\(\flat\) major) to seven sharps
+(C\(\sharp\) major), passing through C major, which carries no accidentals.
+
+\subsection{Note Duration and Rhythm}
+
+The \term{duration} of a note is encoded by a combination of three visual features:
+
+\textit{Notehead shape.}
+A hollow (open) notehead indicates a half note or whole note; a filled (solid) notehead
+indicates a quarter note or any shorter value.
+A whole note has no stem; all shorter notes have a vertical stem attached to the
+notehead.
+
+\textit{Flags and beams.}
+Each flag attached to a stem halves the duration of the note relative to a plain
+stemmed notehead: a single flag denotes an eighth note; two flags a sixteenth note;
+three flags a thirty-second note.
+When two or more short notes appear consecutively, their flags may be replaced by a
+horizontal \term{beam} connecting their stems, which clarifies the rhythmic grouping
+within the bar without changing the individual durations.
+
+\textit{Augmentation dots.}
+A dot placed immediately to the right of a notehead extends the note's duration by half
+its original value.
+A dotted quarter note therefore lasts for one and a half beats in common time;
+a dotted eighth note lasts for three sixteenth-note durations.
+Multiple dots are possible (each adding half the preceding augmentation), though double
+dots rarely appear in jazz lead sheets.
+
+\term{Rests} indicate periods of silence and follow the same duration hierarchy as
+notes, with distinct graphical symbols for each value.
+A \term{whole-bar rest}---a filled rectangle hanging below a staff line---indicates that
+an entire measure is silent, regardless of the time signature.
+
+\subsection{Time Signatures and Measures}
+
+The staff is divided by vertical \term{barlines} into segments called \term{measures}
+(or \term{bars}).
+Each measure contains a fixed total duration determined by the \term{time signature},
+which appears at the beginning of a piece---and again whenever it changes---as a pair
+of stacked numbers.
+The upper number specifies how many beats are in each measure; the lower number
+specifies which note value counts as one beat (4 for a quarter note, 8 for an eighth
+note, 2 for a half note).
+
+The time signature 4/4 (``common time'') therefore assigns four quarter-note beats to
+every measure, while 3/4 assigns three, and 6/8 organises six eighth notes into two
+compound beats of three.
+The jazz repertoire is overwhelmingly written in 4/4, though 3/4 (waltz), 2/2 (cut
+time), 6/8, and 5/4 all appear in the Real Book.
+
+\subsection{Chord Symbols}
+
+Jazz notation supplements the melodic staff with \term{chord symbols} printed above the
+staff at positions corresponding, approximately, to the beat on which each harmonic
+change takes effect.
+These symbols specify the harmonic accompaniment and guide the rhythm section and
+improvising soloists.
+
+A chord symbol encodes: (1)~a \textit{root pitch class} (A through G, with an optional
+flat or sharp); (2)~an optional \textit{quality abbreviation} specifying the chord type
+(e.g.\ \texttt{maj7} for major seventh, \texttt{m7} for minor seventh, \texttt{7} for
+dominant seventh, \texttt{m7b5} for half-diminished, \texttt{dim7} for fully
+diminished); (3)~optional \textit{extensions and alterations} modifying specific chord
+tones (e.g.\ \texttt{\#9}, \texttt{b5}, \texttt{13}); and (4)~an optional
+\textit{slash bass note} indicating a non-root bass (e.g.\ \texttt{C/E} = C major
+chord over an E in the bass).
+Representative examples from \textit{The Real Book} include: \texttt{Cmaj7},
+\texttt{F\#m7b5}, \texttt{D7\#9}, \texttt{Bb13}, \texttt{Am7/D}.
+
+Chord symbols are typeset as free-form text---not as graphical notation symbols---and
+their recognition requires optical character recognition (OCR) rather than the
+staff-pattern recognition applied to the melody line.
+This distinction motivates the two-stream architecture described in
+Chapter~\ref{ch:method}.
+
+\subsection{The Lead-Sheet Format}
+
+A complete jazz lead sheet consists of: (1)~one or more systems of single-voice
+treble-clef staves carrying the melody, with clef, key signature, and time signature
+at the start of each system; (2)~chord symbols above each staff, roughly aligned with
+the beat at which each harmonic change takes effect; and (3)~occasionally, structural
+markers such as repeat signs, section labels (\textit{A}, \textit{B},
+\textit{Bridge}), and tempo or style indications---though these are absent from many
+informal editions, including large parts of \textit{The Real Book}.
+
+Figure~\ref{fig:leadsheet-example} illustrates the key notation elements described
+above as they appear in a representative excerpt.
+
+\begin{figure}[htbp]
+    \centering
+    \fbox{\parbox{0.82\textwidth}{%
+        \centering
+        \vspace{1.4cm}
+        {\small\textit{[Annotated lead-sheet excerpt: treble clef, key signature,
+        time signature, noteheads of varying duration, beams, augmentation dots,
+        accidentals, barlines, and chord symbols above the staff.]}}
+        \vspace{1.4cm}
+    }}
+    \caption{Representative jazz lead-sheet excerpt illustrating the principal notation
+    elements recognised by the system.
+    Key features include: the treble (G2) clef; a key signature indicating sharps or
+    flats; a time signature; noteheads with varying durations encoded through head
+    shape, stems, beams, and dots; barlines separating measures; individual accidentals;
+    and jazz chord symbols (\texttt{Cmaj7}, \texttt{Am7}, etc.)\ printed above the
+    staff.}
+    \label{fig:leadsheet-example}
+\end{figure}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Problem Formulation}
+\label{sec:problem-formulation}
+
+The goal of this thesis is to build a system that, given a PDF or image of a jazz lead
+sheet, automatically produces a structured, machine-readable transcription of its
+contents: the sequence of notes, rests, and rhythmic markers making up the melody, and
+the chord symbols specifying the harmonic progression.
+Despite decades of OMR research, reliable automated transcription of real-world scores
+remains an open problem~\cite{shatriOPTICALMUSICRECOGNITION}.
+The challenge has several compounding sources of difficulty.
+
+\textbf{Notation complexity.}
+Unlike alphabetic text, where symbols are largely independent and arranged in a single
+linear sequence, musical notation encodes information jointly across two spatial
+dimensions.
+A note's pitch is determined by its vertical position on the staff \textit{relative to
+the clef}, not by the symbol shape alone; its duration is determined by a combination
+of head shape, stem presence, flag count, and dot presence.
+Beams create joint dependencies across groups of notes; ties extend a single pitch
+across a barline.
+Any recognition system must capture these two-dimensional, context-dependent symbol
+interactions without relying on explicit per-symbol segmentation at inference time.
+
+\textbf{Domain gap.}
+The most widely used annotated OMR datasets---including
+PrIMuS~\cite{PrIMuSDataset} and DeepScoresV2~\cite{tuggenerDeepScoresV22020}---consist
+of cleanly computer-engraved images rendered at high resolution with standard engraving
+fonts.
+Real-world documents, by contrast, are photographed under imperfect lighting
+conditions, and suffer from scanner noise, perspective distortion, ink bleed, paper
+yellowing, and JPEG compression artefacts.
+A model trained exclusively on clean synthetic data generalises poorly to real scans:
+the feature distribution shifts substantially when crisp black symbols on a white
+background are replaced by blurred, uneven, noisy images with variable contrast.
+Bridging this \term{domain gap} without real annotated training data requires a
+scan-simulation augmentation pipeline that teaches the model to be invariant to
+scan-related distortions.
+
+\textbf{Domain specificity.}
+General-purpose OMR tools are designed and evaluated on classical full-score notation.
+Jazz lead sheets use a different engraving style---frequently imitating hand-lettered
+notation with rounded noteheads, loosely spaced beams, and a distinctive chord-symbol
+typography---for which no publicly labelled corpus currently exists.
+Training a model for this specific domain therefore requires constructing a new
+synthetic dataset from scratch, using a rendering pipeline tuned to the jazz style.
+
+\textbf{Dual-stream recognition.}
+The lead-sheet format requires simultaneously processing two distinct visual streams
+from the same image region: the melodic staff content, which calls for pattern-based
+sequence recognition, and the chord symbols above the staff, which call for text OCR.
+These two streams require different feature representations and must ultimately be
+integrated into a coherent structured output.
+A complete lead-sheet OMR system must solve both sub-problems and align their results.
+
+This thesis addresses all four difficulties jointly: by constructing a synthetic
+training corpus in the jazz engraving style, applying a calibrated scan-simulation
+augmentation pipeline, training a CRNN-CTC model for melody recognition, and building
+a separate OCR pathway for chord symbols that is fused into a unified output by the
+inference pipeline.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Objectives}
+\label{sec:objectives}
+
+The \textbf{general objective} of this project is to develop, evaluate, and document a
+proof-of-concept end-to-end OMR system for monophonic jazz lead sheets, and to
+demonstrate that a CRNN-CTC architecture trained on synthetic data can bridge the
+domain gap between clean rendered images and real scanned pages.
+
+The \textbf{specific objectives} are:
+
+\begin{enumerate}
+    \item Survey the state of the art in OMR, covering traditional modular pipelines,
+          CRNN-CTC sequence models, and transformer-based end-to-end approaches, and
+          justify the architectural choices made in this project.
+
+    \item Design and implement a synthetic training dataset by rendering excerpts from
+          the PrIMuS corpus~\cite{PrIMuSDataset} in a jazz engraving style using
+          LilyPond and the LilyJAZZ font, paired with ground-truth annotations in the
+          LMX token format~\cite{OMRResearchLmx2025}.
+
+    \item Design and implement a scan-simulation augmentation pipeline calibrated
+          against real Real Book scan characteristics, to close the domain gap at
+          training time without requiring manually labelled real-world data.
+
+    \item Design, implement, and train a CRNN-CTC model for monophonic staff-line
+          recognition, and evaluate it rigorously using the \term{Symbol Error Rate}
+          (SER)~\cite{SymbolErrorRate} metric.
+
+    \item Perform quantitative error analysis to characterise systematic failure modes
+          and guide iterative data and model refinements.
+
+    \item Build a complete inference pipeline---encompassing PDF input handling, staff
+          detection, melody recognition, grammar correction, and chord symbol
+          extraction---that returns structured JSON output suitable for downstream
+          musical applications.
+
+    \item Quantify the domain gap between synthetic and real-scan performance, and
+          reduce it via a fine-tuning stage on a small set of manually annotated Real
+          Book pages.
+\end{enumerate}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Proposed Approach}
+\label{sec:approach}
+
+The core design choice of this thesis is a \term{CRNN-CTC} architecture: a
+Convolutional Recurrent Neural Network trained with the Connectionist Temporal
+Classification (CTC) loss.
+This model class is well-matched to the left-to-right, variable-length token sequences
+that arise from reading a single staff line from left to right: the convolutional
+backbone extracts local visual features along the width of the staff image; two
+bidirectional LSTM layers model long-range sequential dependencies; and CTC decoding
+maps the resulting frame-level distributions to a token sequence without requiring
+explicit segmentation of the image into individual symbols.
+
+An alternative---transformer-based end-to-end models such as the Sheet Music
+Transformer~\cite{vilaAntoniorv6SMT2026} or the OLIMPIC system for
+pianoform music~\cite{UfalOlimpicicdar24Practical}---offers higher modelling capacity
+but demands substantially larger labelled datasets and compute budgets than are
+available within the scope of a Bachelor's thesis.
+Traditional heuristic pipelines~\cite{dalitzComparativeStudyStaff2008} avoid data
+requirements but accumulate segmentation errors that propagate irreversibly through the
+recognition chain.
+The CRNN-CTC architecture represents the best trade-off for this project's constraints;
+this judgement is substantiated by the comparative analysis in
+Chapter~\ref{ch:mgmt}.
+
+The system is organised around a five-stage inference pipeline:
+(1)~\textit{Preprocessing} binarises and deskews the input image;
+(2)~\textit{Staff detection} locates individual staff systems using morphological
+operations;
+(3)~\textit{Melody recognition} applies the CRNN-CTC model to each isolated staff
+image and produces a raw token sequence in LMX format;
+(4)~\textit{Grammar correction} validates the sequence against the LMX grammar and
+repairs structurally ill-formed outputs;
+(5)~\textit{Chord OCR} extracts chord symbols from the strip above each staff and
+post-processes them.
+The outputs of stages 4 and 5 are merged into the structured JSON format described in
+Chapter~\ref{ch:method}.
+
+The training strategy also deserves mention.
+In the absence of labelled real-world data, the model is first trained entirely on
+synthetic LilyJAZZ-rendered images augmented with scan simulation, then fine-tuned on a
+small annotated set of real Real Book pages.
+This two-phase approach is a standard domain adaptation technique and is the practical
+solution to the data scarcity problem described in Section~\ref{sec:problem-formulation}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Scope}
+\label{sec:scope}
+
+The project is bounded by the following scope definition.
+
+\textbf{In scope:}
+\begin{itemize}
+    \item Monophonic (single-voice) melody lines in treble clef, as found in jazz lead
+          sheets.
+    \item Synthetic training data construction via LilyPond rendering of PrIMuS
+          excerpts in the LilyJAZZ engraving style.
+    \item Scan-simulation augmentation modelling noise, blur, perspective distortion,
+          ink bleed, and photometric variation.
+    \item Staff region detection as a preprocessing module.
+    \item Design, training, and evaluation of a CRNN-CTC model for single-staff
+          melody recognition.
+    \item Chord symbol extraction via an OCR-based module.
+    \item Quantitative evaluation using SER and qualitative error analysis.
+    \item Domain-gap analysis and fine-tuning on a small set of annotated Real Book
+          pages.
+    \item A FastAPI web service exposing the full pipeline as a REST endpoint.
+\end{itemize}
+
+\textbf{Out of scope:}
+\begin{itemize}
+    \item Polyphonic transcription or simultaneous multi-voice recognition.
+    \item Full-page layout analysis and reading-order recovery across multiple stave
+          systems beyond the per-staff processing implemented.
+    \item Handwritten scores (as opposed to printed or typeset notation).
+    \item Non-Western notation systems or extended contemporary notation.
+    \item Real-time or mobile-device deployment.
+    \item Training large-scale transformer models from scratch.
+    \item Multi-page PDF processing (currently limited to page~0 of any multi-page
+          document).
+    \item Tuplets, repeat barlines, voltas, and navigation marks (D.C., D.S., segno,
+          coda), which do not appear frequently enough in the in-scope repertoire to
+          justify the vocabulary and grammar extensions they would require.
+\end{itemize}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Document Structure}
+\label{sec:structure}
+
+The remainder of this document is organised as follows.
+
+Chapter~\ref{ch:soa} surveys the state of the art in OMR, covering the progression
+from heuristic modular pipelines through CRNN-CTC models to modern transformer-based
+end-to-end architectures, and reviews the available datasets and symbolic
+representations relevant to this work.
+
+Chapter~\ref{ch:mgmt} covers project management: the justification of the chosen
+architecture through comparative analysis, the work-breakdown structure and timeline,
+the budget and economic analysis, and the project's sustainability and ethical impact
+assessment.
+
+Chapter~\ref{ch:method} describes the technical methodology in full detail: the data
+generation and augmentation pipeline, the LMX vocabulary and token grammar, the
+CRNN-CTC architecture and training procedure, and the complete inference pipeline.
+
+Chapter~\ref{ch:results} presents experimental results: training curves, SER on the
+synthetic test set, ablation studies, qualitative error analysis by failure category,
+and domain-gap measurements with and without fine-tuning on real Real Book pages.
+
+Chapter~\ref{ch:sustain} revisits sustainability and ethical considerations in light of
+the completed work.
+
+Finally, Chapter~\ref{ch:conclusions} draws conclusions, reflects on the extent to
+which the stated objectives were achieved, and outlines directions for future work.

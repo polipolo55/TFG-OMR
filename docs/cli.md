@@ -3,48 +3,53 @@
 **Entry point:** `src/cli.py`
 **Run with:** `poetry run python src/cli.py <subcommand> [options]`
 
-All subcommands share a `--log-level` flag (DEBUG/INFO/WARNING, default INFO).
+All subcommands share a top-level `-v` / `--verbose` flag (enables DEBUG logging).
 
 ---
 
 ## render
 
-Re-render PrIMuS `.semantic` samples as LilyJAZZ PNGs with `.lmx` labels.
+Re-render PrIMuS `.semantic` samples as LilyJAZZ PNGs with inline `.lmx` labels.
 
 ```
-python src/cli.py render \
-  --source <primus-root>       # dir containing package_aa/, package_ab/, ...
-  --output <clean-dir>         # output root for rendered samples
-  [--dpi 200]                  # LilyPond render DPI
-  [--workers N]                # parallel processes (default: cpu_count-2)
-  [--limit N]                  # stop after N samples (debug)
+poetry run python src/cli.py render \
+  [--source data/raw/primus]          # dir containing package_aa/, package_ab/, …
+  [--output data/processed/primus/clean]
+  [--dpi 200]                         # LilyPond render resolution
+  [--workers N]                       # parallel processes (default: cpu_count-2)
+  [--limit N]                         # stop after N samples (smoke test)
+  [--force]                           # re-render even if PNG already exists
+  [--no-lmx]                          # skip inline LMX generation
 ```
 
 ---
 
 ## convert
 
-Convert `.semantic` files already in `--source` to `.lmx` (direct token remapping).
+Convert `.semantic` files to `.lmx` (direct token remapping, without re-rendering images).
 
 ```
-python src/cli.py convert \
-  --source <clean-dir>
+poetry run python src/cli.py convert \
+  [--source data/processed/primus/clean]
   [--workers N]
+  [--limit N]
+  [--verbose]
 ```
 
 ---
 
 ## augment
 
-Apply scan-simulation augmentation to clean PNGs, producing scanned copies.
+Apply scan-simulation augmentation to clean PNGs, writing distorted copies.
 
 ```
-python src/cli.py augment \
-  --source <clean-dir> \
-  --output <scanned-dir> \
-  [--copies 1]                 # augmented copies per original
-  [--seed 42]                  # reproducibility seed
+poetry run python src/cli.py augment \
+  [--source data/processed/primus/clean]
+  [--output data/processed/primus/scanned]
+  [--copies 1]     # augmented copies per original (default: 1)
+  [--seed 42]
   [--workers N]
+  [--limit N]
 ```
 
 ---
@@ -54,9 +59,9 @@ python src/cli.py augment \
 Build a vocabulary file from all `.lmx` files under `--data-dir`.
 
 ```
-python src/cli.py vocab \
-  --data-dir <clean-dir> \
-  --output <vocab-path>        # e.g. data/vocab/primus_lmx.txt
+poetry run python src/cli.py vocab \
+  [--data-dir data/processed/primus/clean]
+  [--output data/vocab/primus_lmx.txt]
   [--extra-data-dir <dir>]     # repeatable: add more .lmx sources
   [--workers N]
 ```
@@ -68,16 +73,16 @@ python src/cli.py vocab \
 Train the CRNN-CTC model.
 
 ```
-python src/cli.py train \
-  --data-dir <clean-dir> \
-  --scanned-dir <scanned-dir> \
-  --vocab-path <vocab-path> \
-  --model-dir <output-dir> \
+poetry run python src/cli.py train \
+  [--data-dir data/processed/primus/clean]
+  [--scanned-dir data/processed/primus/scanned]
+  [--vocab-path data/vocab/primus_lmx.txt]
+  [--model-dir models/]
   [--extra-data-dir <dir>]          # repeatable
   [--extra-scanned-dir <dir>]       # repeatable
-  [--finetune-data-dir <dir>]       # repeatable: injected into train only
+  [--finetune-data-dir <dir>]       # repeatable: injected into train split only
   [--finetune-scanned-dir <dir>]    # repeatable
-  [--checkpoint <path>]             # resume from checkpoint
+  [--resume [CHECKPOINT]]           # omit path to auto-detect latest checkpoint
   [--backbone resnet18|vgg]
   [--epochs 60]
   [--batch-size 16]
@@ -88,13 +93,20 @@ python src/cli.py train \
   [--rnn-layers 2]
   [--dropout 0.3]
   [--early-stopping-patience 12]
-  [--workers 10]
-  [--no-scanned]                    # disable scanned data
-  [--no-filter-rest-heavy]          # disable rest-heavy filter
-  [--no-filter-clefs]               # disable clef filter
-  [--no-filter-multi-staff]         # disable multi-staff filter
-  [--no-filter-non-leadsheet]       # disable non-leadsheet clef filter
-  [--no-filter-unusual-time]        # disable unusual time filter
+  [--num-workers 10]
+  [--img-height 128]
+  [--use-scanned | --no-use-scanned]
+  [--val-frac 0.10]
+  [--test-frac 0.10]
+  [--seed 42]
+  [--no-filter-rest-heavy]
+  [--no-filter-unwanted-clefs]
+  [--no-filter-multi-staff]
+  [--max-source-height 180]
+  [--rare-lmx-oversample 2]
+  [--rare-lmx-tokens tied:start,tied:stop]
+  [--strip-header-prob 0.4]    # 0 disables training-time header stripping
+  [--online-aug-prob 0.5]      # 0 disables online jitter
 ```
 
 ---
@@ -104,28 +116,27 @@ python src/cli.py train \
 Evaluate a checkpoint and report SER on val or test split.
 
 ```
-python src/cli.py evaluate \
+poetry run python src/cli.py evaluate \
   --checkpoint <model.pt> \
-  --data-dir <clean-dir> \
-  --scanned-dir <scanned-dir> \
-  --vocab-path <vocab-path> \
+  [--data-dir data/processed/primus/clean]
+  [--vocab-path data/vocab/primus_lmx.txt]
   [--split val|test]           # default: test
   [--beam-width 1]             # 1 = greedy; >1 = beam search
-  [--worst-n 20]               # print N worst samples
-  [--workers N]
+  [--per-sample]               # log per-sample SER (worst first)
+  [--num-workers 10]
 ```
 
 ---
 
 ## evaluate-ab
 
-Compare SER across multiple beam widths.
+Compare SER across multiple beam widths on the same split.
 
 ```
-python src/cli.py evaluate-ab \
+poetry run python src/cli.py evaluate-ab \
   --checkpoint <model.pt> \
-  --data-dir <clean-dir> \
-  --vocab-path <vocab-path> \
+  [--data-dir data/processed/primus/clean]
+  [--vocab-path data/vocab/primus_lmx.txt]
   [--beams 1,5,10]             # comma-separated beam widths
   [--split test]
 ```
@@ -139,11 +150,9 @@ Outputs a table: beam width → SER.
 Start the FastAPI web server.
 
 ```
-python src/cli.py api \
+poetry run python src/cli.py api \
   [--host 0.0.0.0] \
-  [--port 8000] \
-  [--checkpoint <model.pt>]    # override model path
-  [--vocab-path <vocab-path>]
+  [--port 8000]
 ```
 
 Visit `http://localhost:8000` for the upload UI. POST to `/api/omr/lead-sheet` for JSON.
@@ -152,18 +161,20 @@ Visit `http://localhost:8000` for the upload UI. POST to `/api/omr/lead-sheet` f
 
 ## pipeline
 
-Run all data preparation stages (render → convert → augment → vocab).
+Run all data preparation stages in sequence: render → convert → augment → vocab.
 
 ```
-python src/cli.py pipeline \
-  --raw-primus-dir <primus-root> \
-  --clean-dir <clean-dir> \
-  --scanned-dir <scanned-dir> \
-  --vocab-path <vocab-path> \
-  [--dpi 200] \
-  [--copies 1] \
-  [--seed 42] \
-  [--workers N] \
+poetry run python src/cli.py pipeline \
+  [--raw-primus-dir data/raw/primus]
+  [--clean-dir data/processed/primus/clean]
+  [--scanned-dir data/processed/primus/scanned]
+  [--vocab-path data/vocab/primus_lmx.txt]
+  [--render-dpi 200]
+  [--force-render]             # re-render even if PNG exists
+  [--augment-copies 1]
+  [--augment-seed 42]
+  [--extra-vocab-data-dir <dir>]    # repeatable: extra .lmx dirs for vocab
+  [--workers N]
   [--limit N]
 ```
 
@@ -171,15 +182,10 @@ python src/cli.py pipeline \
 
 ## pipeline-train
 
-Run full pipeline then immediately train.
+Run the full data pipeline and then immediately start training.
 
 ```
-python src/cli.py pipeline-train \
-  --raw-primus-dir <primus-root> \
-  --clean-dir <clean-dir> \
-  --scanned-dir <scanned-dir> \
-  --vocab-path <vocab-path> \
-  --model-dir <output-dir> \
+poetry run python src/cli.py pipeline-train \
   [all pipeline flags] \
   [all train flags]
 ```
@@ -207,8 +213,9 @@ poetry run python src/cli.py train \
   --scanned-dir data/processed/primus/scanned \
   --vocab-path data/vocab/primus_lmx.txt \
   --model-dir models/run1 \
-  --epochs 80
-# auto-detects models/run1/latest.pt and resumes
+  --epochs 80 \
+  --resume
+# --resume with no path auto-detects models/run1/latest_checkpoint.pt
 ```
 
 ### Quick evaluation
@@ -218,6 +225,16 @@ poetry run python src/cli.py evaluate \
   --data-dir data/processed/primus/clean \
   --vocab-path data/vocab/primus_lmx.txt \
   --split test --beam-width 10
+```
+
+### Smoke-test render pipeline (10 samples)
+```bash
+poetry run python src/cli.py pipeline \
+  --raw-primus-dir data/raw/primus \
+  --clean-dir /tmp/test_clean \
+  --scanned-dir /tmp/test_scanned \
+  --vocab-path /tmp/test_vocab.txt \
+  --limit 10
 ```
 
 ### Serve the web UI

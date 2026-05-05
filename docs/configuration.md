@@ -38,13 +38,16 @@ All training and data settings live in a single `Config` dataclass. It is popula
 | `filter_unusual_time` | True | Keep only jazz common time signatures |
 
 **Allowed time signatures** (when `filter_unusual_time=True`):
-`4/4`, `3/4`, `2/4`, `2/2`, `6/8`, `5/4`, `7/8`, `12/8`, `3/8`
+`4/4`, `3/4`, `2/4`, `2/2`, `6/8`, `6/4`, `5/4`, `12/8`
+
+These must stay in sync with `_COMMON_TIME_SIGS` in both `src/CRNN_CTC/dataset.py` and `src/omr_pipeline/grammar_fix.py`. If you add or remove a time signature from one, update the other immediately (Hard Constraint #5 in `CLAUDE.md`).
 
 ## Training Augmentation
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `strip_header_prob` | 0.4 | Probability of removing clef+key+time from image and label |
+| `strip_header_prob` | 0.4 | Probability of removing clef+key+time from image and label (training only) |
+| `online_aug_prob` | 0.5 | Probability of light per-sample jitter (brightness, noise, ±2 px shift) on top of the offline-augmented PNG (training only) |
 | `rare_lmx_oversample` | 2 | Oversampling factor for samples containing rare tokens |
 | `rare_lmx_tokens` | `("tied:start", "tied:stop")` | Tokens that trigger oversampling |
 

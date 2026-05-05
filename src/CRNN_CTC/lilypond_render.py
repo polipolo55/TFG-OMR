@@ -76,7 +76,8 @@ _PITCH_STEPS = set("ABCDEFG")
 _DURATIONS   = set(DUR_LY)
 
 LY_TEMPLATE = r"""
-\version "2.24.0"
+\version "2.26.0"
+{staff_size_directive}
 \include "lilyjazz.ily"
 \header {{ tagline = ##f }}
 \paper {{
@@ -93,7 +94,13 @@ LY_TEMPLATE = r"""
   \layout {{ \context {{ \Score \omit BarNumber }} }}
 }}
 """.strip()
-"""Default LilyPond template.  Use ``LY_TEMPLATE.format(music=...)``."""
+"""Default LilyPond template.
+
+Use ``LY_TEMPLATE.format(music=..., staff_size_directive="")`` for the default
+staff size (20pt), or pass ``staff_size_directive="#(set-global-staff-size 18)"``
+for a custom size — the directive must sit between ``\\version`` and
+``\\include "lilyjazz.ily"`` per the LilyJAZZ stylesheet's contract.
+"""
 
 
 # ── LMX tokens → LilyPond music body ──────────────────────────────────────────
@@ -381,8 +388,15 @@ def render_tokens(
     out_dir: Path | None = None,
     template: str = LY_TEMPLATE,
     dpi: int = 200,
+    staff_size_directive: str = "",
 ) -> np.ndarray | None:
-    """Render LMX tokens via LilyPond.  Returns cropped grayscale or *None*."""
+    """Render LMX tokens via LilyPond.  Returns cropped grayscale or *None*.
+
+    *staff_size_directive* is an optional Scheme line such as
+    ``"#(set-global-staff-size 18)"`` that is injected between ``\\version``
+    and ``\\include "lilyjazz.ily"``.  Empty string keeps LilyPond's default
+    (20 pt).  See ``LY_TEMPLATE`` for placement details.
+    """
     try:
         music = lmx_to_lilypond(tokens)
     except ValueError:
@@ -390,4 +404,9 @@ def render_tokens(
         return None
     if not music.strip():
         return None
-    return render_ly(template.format(music=music), name, out_dir=out_dir, dpi=dpi)
+    return render_ly(
+        template.format(music=music, staff_size_directive=staff_size_directive),
+        name,
+        out_dir=out_dir,
+        dpi=dpi,
+    )

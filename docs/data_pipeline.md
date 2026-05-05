@@ -18,6 +18,35 @@ PrIMuS packages live at `data/raw/primus/package_aa/`, `package_ab/`, etc.
 
 The original PrIMuS PNGs use Sibelius font. This stage re-renders every sample with **LilyJAZZ** to match the Real Book aesthetic that the model will face at inference time.
 
+**Per-sample render-time variations** (applied in `make_lily_source`):
+
+| Variation | Probability | Effect |
+|-----------|-------------|--------|
+| `\numericTimeSignature` | 0.5 | Forces "4/4"/"2/2" numeric vs LilyPond's default C / cut-time glyph |
+| `\accidentalStyle modern` | 0.5 | Adds cautionary accidentals (Real Book convention) vs LilyPond default |
+| `\autoBeamOff` | 0.15 | Unbeamed eighth/sixteenth notes vs default beat-grouped beaming |
+| `set-global-staff-size` | uniform over {17,18,19,20,21,22} | Varies note size and horizontal density |
+
+> **Variation tuning audit (2026):** `\autoBeamOff` was reduced from p=0.5 to p=0.15.
+> Real Book overwhelmingly beams its eighth notes; the previous setting gave half
+> of training samples an unbeamed style that does not match the inference domain.
+
+**Prerequisites — LilyJAZZ installation:**
+
+LilyJAZZ is a third-party font/stylesheet not bundled with LilyPond. It must be installed manually. Run these commands once after installing or upgrading LilyPond:
+
+```bash
+LILY_VER=$(lilypond --version 2>&1 | grep -oP '\d+\.\d+\.\d+' | head -1)
+LILY_SHARE="/usr/share/lilypond/$LILY_VER"
+git clone --depth=1 https://github.com/OpenLilyPondFonts/lilyjazz.git /tmp/lilyjazz
+sudo cp /tmp/lilyjazz/otf/*.otf "$LILY_SHARE/fonts/otf/"
+sudo cp /tmp/lilyjazz/svg/*.svg "$LILY_SHARE/fonts/svg/"
+sudo cp /tmp/lilyjazz/supplementary-files/**/*.otf "$LILY_SHARE/fonts/otf/"
+sudo cp /tmp/lilyjazz/stylesheet/*.ily "$LILY_SHARE/ly/"
+```
+
+**LilyPond ≥ 2.25 note:** The LilyJAZZ stylesheet uses `set-global-fonts` which was removed in LilyPond 2.25. The installed `lilyjazz.ily` must use the new `property-defaults.fonts.*` API. The patched file at `/usr/share/lilypond/<version>/ly/lilyjazz.ily` in this project's environment already applies this fix.
+
 **Per-sample steps:**
 1. Parse `.semantic` file (pitch, duration, clef, key, time)
 2. Normalize clefs: C1, C2, F3 → treble (G2), preserving absolute pitches via ledger lines
@@ -75,20 +104,37 @@ Bridges the synthetic-to-real domain gap by simulating real-world scanning artif
 
 | Transform | Purpose | Probability |
 |-----------|---------|------------|
-| ElasticTransform | page warping | 0.5 |
-| GridDistortion | grid bending | 0.4 |
-| OpticalDistortion | lens distortion | 0.35 |
-| Affine (rotation, shear, scale, translate) | slight misalignment | 0.6 |
-| GaussianBlur | focus blur | 0.5 |
-| Sharpen | over-sharpened scanner | 0.4 |
-| RandomToneCurve | exposure variation | 0.5 |
-| GaussNoise | sensor noise | 0.5 |
-| RandomBrightnessContrast | uneven illumination | 0.6 |
-| ImageCompression | JPEG artifacts | 0.4 |
+| ElasticTransform | page warping / staff curve | 0.82 |
+| GridDistortion | grid bending | 0.72 |
+| OpticalDistortion | lens distortion | 0.38 |
+| Affine (rotation ±4°, shear ±1.2°, scale 0.97–1.03, translate ±1.5%) | scan misalignment | 0.85 |
+| GaussianBlur (σ 0.2–1.1) | focus blur | 0.62 |
+| Sharpen | over-sharpened scanner | 0.48 |
+| RandomToneCurve | exposure variation | 0.72 |
+| GaussNoise | sensor noise | 0.78 |
+| RandomBrightnessContrast (brightness ±0.06, contrast 0.03–0.18) | uneven illumination | 0.70 |
+| ImageCompression (quality 72–92) | JPEG artifacts | 0.35 |
 
-**Post-augmentation steps** (outside albumentations):
-- `dilate_ink()` — morphological erosion simulating ink bleed
-- `add_vignette()` — darken edges (scanner shadow)
+**Post-augmentation steps** (outside albumentations, applied in order):
+- `dilate_ink()` — morphological erosion simulating ink bleed; 0/1/2 iterations chosen stochastically
+- `vary_staff_line_thickness()` — randomly thin or thicken staff lines (p=0.40)
+- `remap_tones()` — linear remap from pure white/black to paper-like [28, 245] range
+- `add_vignette()` — darken edges with a radial mask, jittered strength (p=0.55)
+- `add_uneven_illumination()` — directional brightness gradient from one edge, simulating phone scans / book-spine shadow (p=0.45)
+- `add_halftone_lines()` — faint horizontal scan-line banding, simulating photocopier artifacts (p=0.25)
+
+> **Augmentation overlap audit (2026):** `add_edge_shadow` was removed because
+> `add_uneven_illumination` covers the same domain (single-edge gradient) and
+> stacking both with `add_vignette` produced over-dark corners. `add_vignette`
+> was also changed from always-on to probabilistic, and `RandomBrightnessContrast`'s
+> negative bias was tightened from −0.10 to −0.06 to prevent over-darkening when
+> multiple lighting effects compose.
+
+**Online augmentation (training only).** On top of the offline-augmented PNG,
+`OMRDataset.__getitem__` applies a cheap per-sample jitter (brightness ±5%, contrast bias ±3%,
+gaussian noise σ ≈ 0.005–0.015, ±2 px horizontal shift) with probability `Config.online_aug_prob`
+(default 0.5). Without this, every epoch sees identical pixel grids and the model overfits the
+exact augmentations baked into `scanned/`. Cost is ~50 µs per sample.
 
 **Output:** `data/processed/primus/scanned/{sample_id}/{sample_id}.png`
 Labels (`.lmx`) are identical to clean — copied unchanged.

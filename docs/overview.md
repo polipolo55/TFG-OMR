@@ -58,7 +58,7 @@ Input (PDF / image bytes)
       "segments": [
         {
           "staff_bbox": [x, y, w, h],
-          "lmx_tokens": ["clef:G2", "key:0", "time:4:4", "pitch:C", "octave:5", ...],
+          "lmx_tokens": ["clef:G2", "key:fifths:0", "time", "beats:4", "beat-type:4", "pitch:C", "octave:5", ...],
           "chords": ["Cmaj7", "Am7", "Dm7", "G7"]
         }
       ]

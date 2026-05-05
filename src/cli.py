@@ -228,6 +228,8 @@ def _build_config_from_args(args: argparse.Namespace):
         "early_stopping_patience": "early_stopping_patience",
         "max_source_height": "max_source_height",
         "rare_lmx_oversample": "rare_lmx_oversample",
+        "strip_header_prob": "strip_header_prob",
+        "online_aug_prob": "online_aug_prob",
     }
     # Boolean filter flags use store_false with default=None (only
     # override when the user explicitly passes the --no-... flag)
@@ -690,6 +692,20 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Repeat training indices for samples containing rare LMX tokens "
              "(default: 2; 1 disables). Tokens: --rare-lmx-tokens.",
+    )
+    g_train.add_argument(
+        "--strip-header-prob",
+        type=float,
+        default=None,
+        help="Probability of stripping clef+key+time visual header during "
+             "training (default: 0.4; 0 disables).",
+    )
+    g_train.add_argument(
+        "--online-aug-prob",
+        type=float,
+        default=None,
+        help="Probability of applying lightweight online jitter (brightness, "
+             "noise, ±2 px shift) per training sample (default: 0.5; 0 disables).",
     )
     g_train.add_argument(
         "--rare-lmx-tokens",

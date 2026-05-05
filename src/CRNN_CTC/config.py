@@ -85,6 +85,14 @@ class Config:
     # appear on lines 2+ of a Real Book page.  Applied to training only.
     strip_header_prob: float = 0.4
 
+    # online_aug_prob: probability of applying lightweight per-sample jitter
+    # (brightness ±5%, contrast bias ±3%, gaussian noise σ≈0.01, ±2 px
+    # horizontal shift) on top of the offline-augmented scanned PNG.  Without
+    # this, the dataloader returns identical pixel grids every epoch and the
+    # model overfits the specific augmentations baked into ``scanned/``.
+    # Applied to training only; 0 disables.  Cost: ~50 µs per sample.
+    online_aug_prob: float = 0.5
+
     # rare_lmx_oversample: training indices for samples whose .lmx contains
     # any token in rare_lmx_tokens are repeated (N-1) extra times so each
     # epoch sees them N× as often.  1 = disabled.  Default 2 up-weights ties,

@@ -31,6 +31,9 @@ PAPER_DARK    = 28
 INK_DILATE_ITERATIONS = 1
 INK_DILATE_KERNEL     = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2))
 VIGNETTE_STRENGTH = 0.15
+VIGNETTE_PROB = 0.55  # vignette is now probabilistic to prevent the
+                       # darkening stack (vignette + uneven illum + RandomBrightness)
+                       # from compounding into pitch-black corners.
 
 def build_pipeline(seed: int | None = None) -> A.Compose:
     """Return an albumentations Compose pipeline for scan simulation."""
@@ -54,10 +57,10 @@ def build_pipeline(seed: int | None = None) -> A.Compose:
             A.RandomToneCurve(scale=0.12, p=0.72),
             A.GaussNoise(std_range=(0.012, 0.045), mean_range=(0.0, 0.0),
                          per_channel=False, p=0.78),
-            A.RandomBrightnessContrast(brightness_limit=(-0.10, 0.05),
+            A.RandomBrightnessContrast(brightness_limit=(-0.06, 0.06),
                                        contrast_limit=(0.03, 0.18),
-                                       p=0.86),
-            A.ImageCompression(quality_lower=72, quality_upper=92, p=0.35),
+                                       p=0.70),
+            A.ImageCompression(quality_range=(72, 92), p=0.35),
         ],
         seed=seed,
     )
@@ -86,8 +89,22 @@ def remap_tones(img_gray: np.ndarray) -> np.ndarray:
     return np.clip(out, 0, 255).astype(np.uint8)
 
 
-def add_vignette(img_gray: np.ndarray, strength: float = VIGNETTE_STRENGTH) -> np.ndarray:
-    """Darken corners by a radial mask."""
+def add_vignette(
+    img_gray: np.ndarray,
+    rng: random.Random,
+    strength: float = VIGNETTE_STRENGTH,
+    prob: float = VIGNETTE_PROB,
+) -> np.ndarray:
+    """Darken corners by a radial mask, with probability *prob*.
+
+    Now probabilistic: applies on a coin flip and uses a jittered strength so
+    images are not all darkened identically.  Combined with
+    ``add_uneven_illumination`` (which dims one full edge), this prevents the
+    over-dark corners that the always-on version produced.
+    """
+    if rng.random() > prob:
+        return img_gray
+    s = rng.uniform(strength * 0.6, strength * 1.4)
     h, w = img_gray.shape
     Y, X = np.ogrid[:h, :w]
     cx, cy = w / 2.0, h / 2.0
@@ -95,7 +112,7 @@ def add_vignette(img_gray: np.ndarray, strength: float = VIGNETTE_STRENGTH) -> n
     yn = (Y - cy) / cy
     dist = np.sqrt(xn ** 2 + yn ** 2)
     dist_norm = np.clip(dist / 1.414, 0.0, 1.0)
-    mask = 1.0 - strength * dist_norm ** 2
+    mask = 1.0 - s * dist_norm ** 2
     out = np.clip(img_gray.astype(np.float32) * mask, 0, 255).astype(np.uint8)
     return out
 
@@ -130,30 +147,6 @@ def vary_staff_line_thickness(
     result = np.where(diff > 0, np.clip(result + 60, 0, 255), result)
     result = np.where(diff < 0, np.clip(result - 60, 0, 255), result)
     return result.astype(np.uint8)
-
-
-def add_edge_shadow(
-    img_gray: np.ndarray,
-    rng: random.Random,
-    max_width: int = 20,
-) -> np.ndarray:
-    """Add a book-spine shadow on a random edge (mimics Real Book binding)."""
-    if rng.random() > 0.4:
-        return img_gray
-
-    h, w = img_gray.shape
-    shadow_w = rng.randint(5, max_width)
-    side = rng.choice(["left", "right"])
-
-    grad = np.linspace(0.7, 1.0, shadow_w).astype(np.float32)
-    if side == "left":
-        mask = np.ones((h, w), dtype=np.float32)
-        mask[:, :shadow_w] *= grad[np.newaxis, :]
-    else:
-        mask = np.ones((h, w), dtype=np.float32)
-        mask[:, -shadow_w:] *= grad[np.newaxis, ::-1]
-
-    return np.clip(img_gray.astype(np.float32) * mask, 0, 255).astype(np.uint8)
 
 
 def add_uneven_illumination(
@@ -226,9 +219,7 @@ def augment_sample(
     result = pipeline(image=img3)["image"]
     img = result[:, :, 0]
     img = remap_tones(img)
-    img = add_vignette(img)
-
-    img = add_edge_shadow(img, rng)
+    img = add_vignette(img, rng)
     img = add_uneven_illumination(img, rng)
     img = add_halftone_lines(img, rng)
 

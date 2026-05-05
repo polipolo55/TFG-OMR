@@ -63,8 +63,9 @@ Filters (`filter_rest_heavy`, `filter_non_leadsheet_clef`, etc.) are applied in
 to the data processing scripts.
 
 **5. `filter_unusual_time` and `grammar_fix.py` must agree on allowed time signatures.**
-The allowed set is defined in both places. If you add or remove a time signature from one,
-update the other immediately.
+The allowed set is `{4/4, 3/4, 2/4, 2/2, 6/8, 6/4, 5/4, 12/8}` and is defined in both
+`src/CRNN_CTC/dataset.py` (`_COMMON_TIME_SIGS`) and `src/omr_pipeline/grammar_fix.py`
+(`_COMMON_TIME_SIGS`). If you add or remove a time signature from one, update the other immediately.
 
 **6. Always use `poetry run` to execute Python.**
 The project uses Poetry for dependency isolation. Never run `python src/...` directly;
@@ -81,9 +82,10 @@ always `poetry run python src/...`.
   vocab building) use `multiprocessing`, not `concurrent.futures.ThreadPoolExecutor`. Python's
   GIL makes threads useless for compute-bound work.
 
-- **LMX accidentals are display-only.** An `acc:flat` token means "draw a flat sign on this note",
+- **LMX accidentals are display-only.** A `flat` token means "draw a flat sign on this note",
   not "this pitch is a half-step lower". The pitch is already encoded in `pitch:X`. Do not
-  infer pitch from accidental tokens.
+  infer pitch from accidental tokens. Accidental tokens are bare words: `flat`, `sharp`, `natural`
+  (no `acc:` prefix). They appear **after** the duration in the token stream.
 
 - **Clef normalization is lossy but intentional.** C1, C2, F3 clefs are converted to G2 (treble)
   during rendering. Pitches are preserved via ledger lines, but the clef identity is gone in the

@@ -243,19 +243,31 @@ def semantic_to_lily_music(semantic_path: Path) -> str:
     return " ".join(lily_tokens)
 
 
-def make_lily_source(music_body: str, numeric_time_prob: float = 0.5) -> str:
+def make_lily_source(
+    music_body: str,
+    numeric_time_prob: float = 0.5,
+    auto_beam_off_prob: float = 0.15,
+    staff_size_choices: tuple[int, ...] = (17, 18, 19, 20, 21, 22),
+) -> str:
     """Fill the shared LY_TEMPLATE with a music body string.
 
-    Randomly varies three notation styles that differ between LilyJAZZ renders
+    Randomly varies four notation styles that differ between LilyJAZZ renders
     and Real Book PDFs, while keeping LMX labels identical:
 
     * **Time signature** (prob 0.5): numeric "4/4" vs common-time "C".
+      LilyPond's default for ``\\time 4/4`` is the C glyph; ``\\numericTimeSignature``
+      forces "4/4".  We also force numeric for cut time → the C/ glyph variant
+      depends on this exact same flag.
     * **Accidental style** (prob 0.5): ``modern`` adds cautionary accidentals
       (reminders after ties, at bar boundaries) as Real Book does; ``default``
       omits them.
-    * **Beam grouping** (prob 0.5): ``\autoBeamOff`` forces unbeamed individual
-      flags — Real Book sometimes uses this style for sparse/rubato passages —
-      vs LilyPond's default beat-grouped beaming.
+    * **Beam grouping** (prob 0.15, *was 0.5*): ``\\autoBeamOff`` forces unbeamed
+      flags.  Real Book overwhelmingly beams its eighth/sixteenth notes; the
+      previous 0.5 probability gave the model 50% unbeamed training data which
+      doesn't match the inference-time domain.
+    * **Staff size** (uniform): ``\\set-global-staff-size`` varies note size and
+      density, exposing the model to a range of horizontal staff scales rather
+      than a single canonical render size.
     """
     cmds: list[str] = []
 
@@ -265,11 +277,19 @@ def make_lily_source(music_body: str, numeric_time_prob: float = 0.5) -> str:
     if random.random() < 0.5:
         cmds.append(r"\accidentalStyle modern")
 
-    if random.random() < 0.5:
+    if random.random() < auto_beam_off_prob:
         cmds.append(r"\autoBeamOff")
 
+    staff_size_directive = ""
+    if staff_size_choices:
+        size = random.choice(staff_size_choices)
+        staff_size_directive = f"#(set-global-staff-size {size})"
+
     prefix = " ".join(cmds) + " " if cmds else ""
-    return LY_TEMPLATE.format(music=prefix + music_body)
+    return LY_TEMPLATE.format(
+        music=prefix + music_body,
+        staff_size_directive=staff_size_directive,
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -47,6 +47,14 @@
 \fancyhead[R]{\small TFG -- Pol Casanovas Puig}
 \fancyfoot[C]{\thepage}
 
+% Target display height for “thin strip” music PNGs (match pitch staff at 0.82\textwidth).
+\newlength{\TFGmusicStaffDispHeight}
+\AtBeginDocument{%
+  \settoheight{\TFGmusicStaffDispHeight}{%
+    \includegraphics[width=0.82\textwidth]{figures/fig_staff_pitches}%
+  }%
+}
+
 % ==============================================================================
 \begin{document}
 % ==============================================================================

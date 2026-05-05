@@ -157,6 +157,22 @@ high A (A5) sits on the first ledger line above it.
 Jazz lead sheets use the treble clef exclusively, and this thesis targets the treble
 clef only (see Section~\ref{sec:scope}).
 
+Figure~\ref{fig:staff-pitches} illustrates the ascending C major scale from middle C
+(C4) to C5 on the treble staff.
+The leftmost note sits on a ledger line below the staff; successive notes step upward
+through the five-line grid, making the pitch--position correspondence explicit.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.82\textwidth]{figures/fig_staff_pitches}
+    \caption{The C major scale (C4--C5) on the treble staff, rendered in LilyJAZZ
+    notation.
+    Middle C (C4) sits on the first ledger line below the staff; the remaining notes
+    step upward through the lines and spaces, mapping each vertical position to a
+    distinct pitch.}
+    \label{fig:staff-pitches}
+\end{figure}
+
 \subsection{Pitch, Accidentals, and Key Signatures}
 
 Western tonal music divides the octave into twelve chromatic semitones.
@@ -207,6 +223,22 @@ dots rarely appear in jazz lead sheets.
 notes, with distinct graphical symbols for each value.
 A \term{whole-bar rest}---a filled rectangle hanging below a staff line---indicates that
 an entire measure is silent, regardless of the time signature.
+
+Figure~\ref{fig:note-durations} shows the seven standard note values side by side,
+together with dotted variants.
+The progressive reduction in note value is visually encoded by the head shape
+(open vs.\ filled), stem flags, and augmentation dot.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.82\textwidth,height=\TFGmusicStaffDispHeight,keepaspectratio]{figures/fig_note_durations}
+    \caption{Note duration values rendered in LilyJAZZ notation, from left to right:
+    whole, half, quarter, eighth, 16th, 32nd, dotted quarter, and dotted eighth.
+    The open notehead with no stem encodes the longest value (whole note); each
+    flag added to the stem halves the duration; an augmentation dot extends it by
+    half.}
+    \label{fig:note-durations}
+\end{figure}
 
 \subsection{Time Signatures and Measures}
 
@@ -260,27 +292,32 @@ markers such as repeat signs, section labels (\textit{A}, \textit{B},
 \textit{Bridge}), and tempo or style indications---though these are absent from many
 informal editions, including large parts of \textit{The Real Book}.
 
-Figure~\ref{fig:leadsheet-example} illustrates the key notation elements described
-above as they appear in a representative excerpt.
+Figure~\ref{fig:leadsheet-example} illustrates a clean synthetic rendering of a
+lead-sheet excerpt in the LilyJAZZ style used throughout this project, and
+Figure~\ref{fig:realbook-annotated} shows an actual page from \textit{The Real Book}
+with its key notation elements identified.
 
 \begin{figure}[htbp]
     \centering
-    \fbox{\parbox{0.82\textwidth}{%
-        \centering
-        \vspace{1.4cm}
-        {\small\textit{[Annotated lead-sheet excerpt: treble clef, key signature,
-        time signature, noteheads of varying duration, beams, augmentation dots,
-        accidentals, barlines, and chord symbols above the staff.]}}
-        \vspace{1.4cm}
-    }}
-    \caption{Representative jazz lead-sheet excerpt illustrating the principal notation
-    elements recognised by the system.
-    Key features include: the treble (G2) clef; a key signature indicating sharps or
-    flats; a time signature; noteheads with varying durations encoded through head
-    shape, stems, beams, and dots; barlines separating measures; individual accidentals;
-    and jazz chord symbols (\texttt{Cmaj7}, \texttt{Am7}, etc.)\ printed above the
-    staff.}
+    \includegraphics[width=0.82\textwidth]{figures/fig_leadsheet_excerpt}
+    \caption{A four-bar jazz lead-sheet excerpt in C major (4/4), rendered in
+    LilyJAZZ style---the same engraving used to generate the synthetic training
+    dataset.
+    Chord symbols above the staff (\texttt{Cmaj7}, \texttt{Am7}, \texttt{Dm7},
+    \texttt{G7}) encode the I--vi--ii--V harmonic progression; the melody line
+    encodes pitch through vertical position and duration through notehead shape
+    and stem.}
     \label{fig:leadsheet-example}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/fig_realbook_blank}
+    \caption{Excerpt from \textit{The Real Book} (``Black Orpheus'', L.\ Bonfá),
+    showing the hand-engraved notation the OMR system must transcribe:
+    a treble staff with key and time signatures, melody notes of varying
+    durations, and chord symbols written above the staff.}
+    \label{fig:realbook-annotated}
 \end{figure}
 
 % ─────────────────────────────────────────────────────────────────────────────

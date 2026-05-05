@@ -90,7 +90,11 @@ During inference (and fast evaluation):
 
 ## Beam Search Decoding
 
-Optional (CLI `--beam-width N`). Higher beam width increases accuracy at the cost of speed. Typical values: 1 (greedy), 5, 10.
+Greedy is the default everywhere (CLI `evaluate`, inference, API).  Beam
+search is opt-in via `--beam-width N` (CLI) or `OMR_BEAM_WIDTH=N` (inference
+env var).  Empirically, beam search yields little or no SER improvement on
+monophonic Real Book staves while costing ~N× the decode time, so keep the
+default unless you have evidence otherwise.
 
 ## Vocabulary
 
@@ -103,19 +107,27 @@ Index 2  →  <unk>     (OOV token)
 Index 3+ →  LMX tokens (alphabetically sorted)
 ```
 
-Example tokens:
+Example tokens (categories — see `docs/lmx_format.md` for the full grammar):
 ```
-acc:flat  acc:nat  acc:sharp
-clef:G2
-key:-1  key:0  key:1  ...
-measure
-octave:3  octave:4  octave:5  octave:6
+flat  natural  sharp                       # display-only accidentals
+clef:G2  clef:F4  clef:C3  ...              # only G2 reaches inference (others normalised)
+key:fifths:-7 ... key:fifths:0 ... key:fifths:7
+time  beats:2  beats:3  beats:4  beats:6  beats:12
+       beat-type:2  beat-type:4  beat-type:8
 pitch:A  pitch:B  pitch:C  pitch:D  pitch:E  pitch:F  pitch:G
-rest  rest:measure
+octave:0  octave:1 ... octave:8
+measure  rest  rest:measure
 tied:start  tied:stop
-time:2:2  time:3:4  time:4:4  ...
-whole  half  quarter  eighth  16th  32nd  64th
+whole  half  quarter  eighth  16th  32nd  64th  dot
 ```
+
+> **Note — dead output classes.** Some vocabulary entries (e.g. clefs other
+> than G2, time signatures outside the allowed set, octave 0–2/8, etc.) are
+> kept in the vocab so that legacy checkpoints continue to load, but they are
+> never produced by the data pipeline once filtering is on.  They are
+> effectively dead output classes; they cost a few unused logits per time
+> step and otherwise do no harm.  The grammar fixer rejects/normalises them
+> if the model ever predicts one.
 
 ## Key Configuration Parameters
 

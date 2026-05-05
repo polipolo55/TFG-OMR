@@ -32,7 +32,6 @@ import torch
 from torch import Tensor
 from torch.utils.data import Dataset
 
-from .lilypond_render import CLEF_IDS_NORMALIZE_TO_G2
 from .vocab import Vocabulary
 
 log = logging.getLogger(__name__)
@@ -65,16 +64,13 @@ def _train_indices_with_rare_oversample(
 
 
 # ---------------------------------------------------------------------------
-# Sample-quality filter
+# Domain filters
 # ---------------------------------------------------------------------------
-
-# Structural tokens that carry no pitched content
-_REST_STRUCTURAL = frozenset({"rest", "rest:measure", "measure"})
-
-# Raw LMX that still uses these clefs (e.g. old renders) is dropped.
-# Fresh ``generate_realbook`` + ``semantic_to_lmx`` emit ``clef:G2`` instead
-# (see ``CLEF_IDS_NORMALIZE_TO_G2`` in ``lilypond_render``).
-_CLEF_UNWANTED = frozenset(f"clef:{c}" for c in CLEF_IDS_NORMALIZE_TO_G2)
+#
+# These filters define the lead-sheet target domain — see
+# ``docs/overview.md`` → "Domain Specification".  They do not exist to clean
+# up "edge cases"; they are the contract of the system.
+#
 
 # Jazz lead-sheet target domain: only treble clef.
 # C3 (alto), C4 (tenor), G1 (French violin), F4 (bass) appear in orchestral
@@ -101,26 +97,12 @@ _COMMON_TIME_SIGS: frozenset[tuple[str, str]] = frozenset({
 def _is_degenerate(
     tokens: list[str],
     *,
-    filter_rest_heavy: bool = True,
-    filter_unwanted_clefs: bool = True,
     filter_non_leadsheet_clef: bool = False,
     filter_unusual_time: bool = False,
 ) -> bool:
-    """Return *True* if a sample should be excluded from training/evaluation.
+    """Return *True* if a sample falls outside the lead-sheet domain.
 
     Criteria:
-
-    rest-heavy
-        More than 80 % of tokens are structural (``rest``, ``rest:measure``,
-        ``measure``) *and* the sequence is longer than 50 tokens.  These are
-        multi-bar tacet passages whose image shows an uninformative long rest
-        — the CTC edit distance explodes and they contribute no signal.
-
-    unwanted-clefs
-        The sample's LMX still contains ``clef:C1``, ``clef:C2``, or ``clef:F3``
-        (legacy data).  Re-render and re-convert so those clefs are normalized
-        to ``clef:G2`` while keeping absolute pitches — then this filter no
-        longer removes them.
 
     non-leadsheet-clef
         Any clef token not in ``_CLEF_LEADSHEET`` (i.e. not ``clef:G2``).
@@ -135,9 +117,6 @@ def _is_degenerate(
     if not tokens:
         return True
 
-    if filter_unwanted_clefs and any(t in _CLEF_UNWANTED for t in tokens):
-        return True
-
     if filter_non_leadsheet_clef:
         for t in tokens:
             if t.startswith("clef:") and t not in _CLEF_LEADSHEET:
@@ -149,11 +128,6 @@ def _is_degenerate(
                 pair = (tokens[i + 1], tokens[i + 2])
                 if pair not in _COMMON_TIME_SIGS:
                     return True
-
-    if filter_rest_heavy and len(tokens) > 50:
-        n_structural = sum(1 for t in tokens if t in _REST_STRUCTURAL)
-        if n_structural / len(tokens) > 0.80:
-            return True
 
     return False
 
@@ -384,8 +358,6 @@ class OMRDataset(Dataset):
         img_height: int = 128,
         max_image_width: int = 0,
         scanned_dir: Path | str | None = None,
-        filter_rest_heavy: bool = True,
-        filter_unwanted_clefs: bool = True,
         filter_non_leadsheet_clef: bool = False,  # Config default: True
         filter_unusual_time: bool = False,         # Config default: True
         filter_multi_staff: bool = True,
@@ -419,18 +391,13 @@ class OMRDataset(Dataset):
         # Token-level filter + OOV scan in a single pass.  Each sample's .lmx
         # file is read exactly once instead of twice (filter pass + later OOV
         # pass) — halves init I/O for the 87k-sample corpus.
-        do_token_filter = (
-            filter_rest_heavy or filter_unwanted_clefs
-            or filter_non_leadsheet_clef or filter_unusual_time
-        )
+        do_token_filter = filter_non_leadsheet_clef or filter_unusual_time
         oov: dict[str, int] = {}
         after_token_filter: list[tuple[str, Path, Path]] = []
         for sid, png, lmx in raw_samples:
             tokens = _load_lmx_tokens(lmx)
             if do_token_filter and _is_degenerate(
                 tokens,
-                filter_rest_heavy=filter_rest_heavy,
-                filter_unwanted_clefs=filter_unwanted_clefs,
                 filter_non_leadsheet_clef=filter_non_leadsheet_clef,
                 filter_unusual_time=filter_unusual_time,
             ):
@@ -443,7 +410,7 @@ class OMRDataset(Dataset):
         n_removed = len(raw_samples) - len(after_token_filter)
         if do_token_filter and n_removed:
             log.info(
-                "Token filter removed %d degenerate/unwanted samples",
+                "Token filter removed %d out-of-domain samples",
                 n_removed,
             )
 
@@ -651,8 +618,6 @@ def make_splits(
     val_frac: float = 0.1,
     test_frac: float = 0.1,
     seed: int = 42,
-    filter_rest_heavy: bool = True,
-    filter_unwanted_clefs: bool = True,
     filter_non_leadsheet_clef: bool = False,  # Config default: True
     filter_unusual_time: bool = False,         # Config default: True
     filter_multi_staff: bool = True,
@@ -693,8 +658,6 @@ def make_splits(
         data_dir, vocab, img_height=img_height,
         max_image_width=max_image_width,
         scanned_dir=scanned_dir,
-        filter_rest_heavy=filter_rest_heavy,
-        filter_unwanted_clefs=filter_unwanted_clefs,
         filter_non_leadsheet_clef=filter_non_leadsheet_clef,
         filter_unusual_time=filter_unusual_time,
         filter_multi_staff=filter_multi_staff,

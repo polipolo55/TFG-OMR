@@ -41,20 +41,13 @@ class Config:
     test_frac: float = 0.10        # fraction held out for final test
 
     # ── Data filtering ────────────────────────────────────────────────────
-    # filter_rest_heavy: drop samples where >80% of tokens are structural
-    # rest/measure tokens and the total length exceeds 50.  These are
-    # multi-bar tacet passages from orchestral PrIMuS pieces — the image
-    # shows a long string of whole-measure rests, a rare pattern that is
-    # irrelevant for jazz lead sheets and inflates CTC edit distance.
-    filter_rest_heavy: bool = True
-    # filter_unwanted_clefs: drop samples containing C1, C2, or F3 clef tokens.
-    # C1/C2 (soprano / mezzo-soprano) are visually similar to tenor (C4) but
-    # shifted by one staff line — the model confuses them and the resulting
-    # pitch cascade accounts for ~9 000 substitution errors in Run 4.
-    # F3 (baritone) looks like the standard bass clef (F4) shifted one line up,
-    # causing the same cascade issue for bass-register samples.
-    # None of these clefs appear in jazz lead sheets.
-    filter_unwanted_clefs: bool = True
+    # The filters below define the lead-sheet domain (see
+    # ``docs/overview.md`` → "Domain Specification").  They are conceptually
+    # not "exclusions" but the contract of the system: monophonic + treble
+    # clef + single staff + jazz common-time meters.  Disabling them on a
+    # PrIMuS-trained run will not generalise the model — it only forces it
+    # to spend capacity on patterns that do not appear in the Real Book.
+    #
     # filter_multi_staff: drop images whose original height exceeds
     # max_source_height.  LilyPond occasionally wraps a long excerpt onto two
     # staff lines in a single PNG — the resulting image is ~2-3× taller than
@@ -95,10 +88,17 @@ class Config:
 
     # rare_lmx_oversample: training indices for samples whose .lmx contains
     # any token in rare_lmx_tokens are repeated (N-1) extra times so each
-    # epoch sees them N× as often.  1 = disabled.  Default 2 up-weights ties,
-    # which are visually subtle and often under-predicted on scans.
+    # epoch sees them N× as often.  1 = disabled.  Default 2 up-weights:
+    #
+    #   * ``tied:start`` / ``tied:stop`` — visually subtle, under-predicted on scans.
+    #   * ``key:fifths:0`` (C major) — under-represented in classical PrIMuS
+    #     (only ~0.05 % of corpus) but extremely common in the Real Book.
+    #     Without oversampling the model rarely sees C major during training
+    #     and tends to mis-predict the key signature on real C-major scans.
     rare_lmx_oversample: int = 2
-    rare_lmx_tokens: tuple[str, ...] = ("tied:start", "tied:stop")
+    rare_lmx_tokens: tuple[str, ...] = (
+        "tied:start", "tied:stop", "key:fifths:0",
+    )
 
     # filter_non_leadsheet_clef: drop samples containing any clef token except
     # clef:G2.  C3 (alto), C4 (tenor), G1 (French violin), and F4 (bass) appear

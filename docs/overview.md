@@ -18,12 +18,70 @@ TFG-OMR is an Optical Music Recognition (OMR) system specialized for **monophoni
 5. Validate and correct the recognized token sequence against the LMX grammar.
 6. Return a structured JSON with the full transcription, including staff positions and page images.
 
-## Domain Scope
+## Domain Specification
 
-- **Monophonic only** (single melodic line per staff, no polyphony)
-- **Jazz lead sheets** (treble clef, G2 / treble clef only)
-- **Common jazz meters:** 4/4, 3/4, 2/4, 2/2, 6/8, 5/4
-- **Real Book aesthetics:** LilyJAZZ-rendered synthetic training data
+This is the **contract of the system** — the precise definition of the
+lead-sheet sub-domain TFG-OMR is built for.  Inputs that match this
+specification are in scope; inputs outside it are not, and the system makes
+no quality guarantees on them.
+
+The domain is intentionally narrow.  The dataset filters (`filter_multi_staff`,
+`filter_non_leadsheet_clef`, `filter_unusual_time` in `OMRDataset`) and the
+inference-time grammar fixer (`src/omr_pipeline/grammar_fix.py`) are
+*expressions* of this contract — not a list of paranoid edge cases.  Disabling
+them does not produce a more general model; it only forces the CRNN to spend
+representational capacity on visual patterns that never appear in The Real
+Book.  See "Known Limitations" below for what falls *outside* the contract.
+
+### Inputs
+
+- **Document type.** PDF or raster image (PNG, JPEG, TIFF) of a monophonic
+  jazz lead sheet — typically a single page from The Real Book or an
+  equivalent fake-book.  Multi-page PDFs: only page 0 is processed today.
+- **Print quality.** Photocopy / phone-photo / clean PDF export are all in
+  scope.  The augmentation pipeline simulates realistic phone-scan noise,
+  uneven illumination, ink bleed, JPEG-style compression, and elastic warp.
+- **Resolution.** PDFs are rasterised at 300 DPI by default
+  (`OMR_PDF_DPI`, clamped 72–600).  Training renders use 200/250/300 DPI
+  with per-sample jitter, so the CRNN is robust to small DPI mismatches.
+
+### Music notation
+
+| Aspect | Contract |
+|--------|----------|
+| **Voicing** | Monophonic — one melody line per staff.  No polyphony, no piano grand-staff, no stem-down counterpoint. |
+| **Clef** | Treble (`clef:G2`) only.  C-clefs, F-clefs, G1 are out of scope. |
+| **Key signatures** | Any of `key:fifths:N` for `N ∈ [-7, +7]` (Cb major through C# major).  C major (`key:fifths:0`) is oversampled because PrIMuS underrepresents it severely (~0.05 % of corpus) while it dominates the Real Book. |
+| **Time signatures** | One of `{4/4, 3/4, 2/4, 2/2, 6/8, 6/4, 5/4, 12/8}`.  4/4 is overwhelmingly the common case.  Exotic meters (5/8, 7/8, 7/4, 9/8, 11/8, …) are out of scope. |
+| **Pitch range** | Octaves 3–7 inclusive (covers the standard treble range plus altissimo).  Octave 0–2 and 8 are accepted by the vocabulary but never produced by the model. |
+| **Note values** | `whole`, `half`, `quarter`, `eighth`, `16th`, `32nd`, `64th`, plus dotted variants via the `dot` token, plus ties (`tied:start` / `tied:stop`). |
+| **Rests** | `rest` (with a duration) and `rest:measure` (a whole-measure rest). |
+| **Accidentals** | `flat`, `sharp`, `natural` — display-only, the actual pitch is already encoded in the `pitch:X` / `octave:Y` pair.  Double accidentals (`double-sharp`, `flat-flat`) are out of scope. |
+| **Barlines** | Single barline only.  Repeats, voltas, double barlines, segno/coda/D.C./D.S. navigation marks are out of scope. |
+| **Tuplets** | Out of scope.  See "Known Limitations" below. |
+| **Slurs / articulations** | Out of scope. |
+
+### Chord symbols
+
+- **Position.** Above the staff, in the strip detected by
+  `staff_detect.py::_associate_chords`.
+- **Format.** Standard jazz chord shorthand: `ROOT [acc] [quality] [extension] [alterations]* [/BASS]`.  Examples: `Cmaj7`, `F#m7b5`, `D7#9`, `Bb6/9`, `Am7/D`.
+- **Root letters.** A through G, with optional flat (`b`) or sharp (`#`).
+- **OCR backend.** `contour` (default), `easyocr`, or `vlm` (gated by
+  `OMR_CHORD_BACKEND`).  Chord post-processing in
+  `src/omr_pipeline/chord_postprocess.py` rejects non-chord strings (page
+  numbers, tempo markings, lyrics).
+
+### Outputs
+
+Structured JSON with one entry per page, one segment per detected staff,
+each segment carrying:
+
+- `staff_bbox` — `[x, y, w, h]` in page-pixel coordinates.
+- `lmx_tokens` — flat token sequence after the grammar fixer.
+- `chords` — list of jazz chord strings.
+
+See the "Output Format" section below for the full schema.
 
 ## High-Level Architecture
 
@@ -109,3 +167,65 @@ latex_documents/gep/        GEP thesis-management deliverables
 - **Synthetic test SER:** ~1.17% (symbol error rate, token-level edit distance)
 - **Hardware target:** NVIDIA RTX 3060 (12 GB VRAM), batch size 16
 - **Training time:** ~60 epochs, early stopping at patience 12
+
+## Known Limitations and Out-of-Scope Notation
+
+The system is intentionally narrow: it targets monophonic Real-Book-style
+lead sheets in C, and a number of music-notation features are not handled.
+The list below is exhaustive as of 2026 and reflects deliberate
+simplifications, not bugs.  None of these affect typical Real Book scans.
+
+### Notation features not represented in the LMX vocabulary
+
+| Feature | Status | Why |
+|---------|--------|-----|
+| **Tuplets (triplets, quintuplets, …)** | **Not in vocab.** Renderer can produce them, but `semantic_to_lmx.py` flattens tuplet members to plain notes and the grammar fixer has no tuplet productions. | Adding tuplets requires a new bracket-token grammar (open/close + ratio), retraining vocab, and PrIMuS source filtering — too large for the current scope. The Real Book uses tuplets sparingly; expect occasional rhythmic misreads on triplet-heavy sections. |
+| **Slurs / phrasing arcs** | Not modelled. PrIMuS sources contain slur metadata that is dropped during semantic→LMX conversion. | Slurs span multiple notes and require a paired open/close token grammar.  Visually, phrasing rarely changes the symbolic transcription.  |
+| **Articulations (staccato, accent, tenuto, marcato, …)** | Not modelled. | Real Book sources almost never print articulations. |
+| **Repeat barlines, voltas, segno / coda / D.C. / D.S.** | Not modelled — barlines are unified into a single `measure` token, and navigation marks are dropped. | Real Books have these but they are out of scope; downstream (player) software must reconstruct form from the chord-symbol grid. |
+| **Double accidentals (`flat-flat`, `double-sharp`)** | Generated by the converter but stripped by the grammar fixer because they are absent from the training vocabulary. | True jazz lead sheets virtually never use double accidentals. |
+| **Time signatures outside `{4/4, 3/4, 2/4, 2/2, 6/8, 6/4, 5/4, 12/8}`** | Filtered out at dataset construction (`filter_unusual_time`) so the model never sees them.  Predictions outside this set are coerced to `4/4` by the grammar fixer. | These cover ~99 % of the Real Book.  Extending the set requires updating both the filter and `grammar_fix._COMMON_TIME_SIGS`. |
+| **Polyphony, multiple voices, chords on the staff** | Not supported — the model is trained monophonic-only and `filter_multi_staff` excludes any sample whose source PNG is taller than the configured threshold. | Lead sheets are by definition monophonic on the staff (chords are printed as text symbols above). |
+| **Clefs other than G2** | All non-G2 clefs are silently rewritten to G2 during rendering (lossy but intentional — see `CLAUDE.md`).  Predictions of F4/C-clefs at inference are coerced to G2. | Real Book uses treble clef exclusively. |
+
+### Vocabulary "dead output classes"
+
+The vocabulary file (`data/vocab/primus_lmx.txt`) contains a few tokens that
+are never produced once dataset filters are on (e.g. `clef:F4`, `clef:C3`,
+`octave:0`/`1`/`2`/`8`, exotic time-signature combinations).  They are kept
+so older checkpoints continue to load, but they cost a handful of unused
+logits per time step and do nothing else.  They will be removed the next
+time the vocabulary is rebuilt from scratch with `cli.py vocab`.
+
+### Augmentation effects not implemented
+
+The scan-simulation augmentation models distortion, blur, ink-bleed,
+compression, lighting gradients, and halftone banding, but does **not** model:
+
+- **Show-through / paper bleed-through** from the back side of a page.
+  This is visually noticeable on cheap photocopies but rare in the digital
+  Real Books typically used as input.
+- **Realistic page texture / fibre noise.** The remap-tones step uses a
+  uniform paper colour; no per-pixel paper grain is added.
+- **Coffee-stain / annotation noise.** Hand-written marks above or below
+  the staff are not synthesized; the model has not been trained to ignore them.
+
+These would each be useful for very rough phone-photographed scans but are
+not justified for the typical PDF input the system is designed for.
+
+### Inference-time caveats
+
+- **PDFs with text overlays** (e.g. exported from Sibelius with footers)
+  may produce spurious staves; staff detection only filters by line count.
+- **Very wide pages** (>2048 px after preprocessing) are clamped at the
+  configured `max_image_width`.  Re-render the PDF at lower DPI if a single
+  staff does not fit.
+- **Multi-page PDFs:** only page 0 is processed by `run_pipeline()` and the
+  API endpoint.  To transcribe additional pages today, call
+  `omr_pipeline.preprocess.load_pdf_page(..., page=N)` and the staff /
+  inference stages directly from a script — there is no batch multi-page CLI
+  yet.
+
+If you need any of the above, fork the project — none of these are simple
+add-ons, all require coordinated changes across vocabulary, dataset
+filtering, the grammar fixer, and (in some cases) the model itself.

@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import logging
 import multiprocessing
-from itertools import chain
 from pathlib import Path
 
 from tqdm import tqdm

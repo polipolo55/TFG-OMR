@@ -61,7 +61,11 @@ _COMMON_TIME_SIGS: frozenset[tuple[str, str]] = frozenset({
 })
 
 _OCTAVE_MIN = 3
-_OCTAVE_MAX = 6
+# Cap raised to 7 to accommodate jazz altissimo (a high B5/C6 in alto-sax
+# pitch is already an octave-7 sounding pitch; lead sheets occasionally
+# notate ledgered C7/D7 melodies).  Octaves above 7 are notational outliers
+# in The Real Book and almost always indicate model error.
+_OCTAVE_MAX = 7
 
 
 def _is_pitch(tok: str) -> bool:

@@ -58,9 +58,10 @@ If you must change `Config`, handle backward compatibility or document the break
 
 **4. Sample filtering happens at dataset construction, not in the data scripts.**
 `generate_realbook.py`, `semantic_to_lmx.py`, and `augment_scanned.py` write everything.
-Filters (`filter_rest_heavy`, `filter_non_leadsheet_clef`, etc.) are applied in
-`src/CRNN_CTC/dataset.py` via `Config` flags at training time. Do not add filtering logic
-to the data processing scripts.
+The three domain filters (`filter_multi_staff`, `filter_non_leadsheet_clef`,
+`filter_unusual_time`) are applied in `src/CRNN_CTC/dataset.py` via `Config` flags at
+training time.  See `docs/overview.md` → "Domain Specification" for the rationale.
+Do not add filtering logic to the data processing scripts.
 
 **5. `filter_unusual_time` and `grammar_fix.py` must agree on allowed time signatures.**
 The allowed set is `{4/4, 3/4, 2/4, 2/2, 6/8, 6/4, 5/4, 12/8}` and is defined in both
@@ -91,9 +92,9 @@ always `poetry run python src/...`.
   during rendering. Pitches are preserved via ledger lines, but the clef identity is gone in the
   LMX label. Do not try to recover the original clef.
 
-- **`filter_non_leadsheet_clef=True` is the strictest filter** — it removes everything except G2.
-  This subsumes `filter_unwanted_clefs`. Both exist for historical reasons; `filter_non_leadsheet_clef`
-  is what should be on in production configs.
+- **`filter_non_leadsheet_clef=True` is on by default** — it removes every clef except G2 (treble),
+  which is the only clef the Real Book uses.  Disabling it does not generalise the model;
+  it only forces it to spend capacity on visual patterns that never appear at inference.
 
 - **`strip_header_prob` applies to training only.** The header strip (clef + key + time removal)
   is a training augmentation. It never applies during validation, test evaluation, or inference.

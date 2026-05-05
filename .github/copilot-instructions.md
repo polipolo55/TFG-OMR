@@ -62,10 +62,12 @@ import style; style.apply()
 Use `style.C["<role>"]` for all explicit colours — never hardcode hex literals. Available roles: `primary`, `secondary`, `tertiary`, `highlight`, `primary_light`, `secondary_light`, `tertiary_light`, `highlight_light`, `neutral_dark`, `neutral_mid`, `neutral_light`.
 
 ### Data filtering in `OMRDataset`
-Three filters are applied before training (all enabled by default in `Config`):
-- **`filter_rest_heavy`** — drops samples where >80% of tokens are `rest/rest:measure/measure` AND total length >50 (orchestral tacet passages irrelevant to jazz).
-- **`filter_unwanted_clefs`** — drops samples with `clef:C1`, `clef:C2`, or `clef:F3` (not used in jazz, cause pitch-cascade substitution errors).
+Three filters are applied before training (all enabled by default in `Config`).
+They collectively realise the **lead-sheet domain spec** — see
+`docs/overview.md` → "Domain Specification" for the full rationale:
 - **`filter_multi_staff`** — drops images whose original height >180 px (LilyPond multi-staff wraps; single-staff images are 84–152 px).
+- **`filter_non_leadsheet_clef`** — drops any sample whose clef is not `clef:G2` (treble).  Real Book is treble-only.
+- **`filter_unusual_time`** — drops time signatures outside `{4/4, 3/4, 2/4, 2/2, 6/8, 6/4, 5/4, 12/8}` — the jazz common-time set.
 
 ### LMX annotation format
 `.lmx` files are space-separated token sequences. Example: `clef:G2 key:fifths:2 time:4/4 measure E4 quarter F#4 quarter G4 half measure`. Token index 0 = CTC blank, index 1 = pad; music tokens start at index 2.

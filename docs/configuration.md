@@ -27,15 +27,19 @@ All training and data settings live in a single `Config` dataclass. It is popula
 | `test_frac` | 0.10 | Fraction of data reserved for testing |
 | `use_scanned` | True | Include augmented images in training |
 
-## Sample Filtering
+## Domain Filters
+
+These three flags realise the **lead-sheet domain spec** at dataset-construction
+time.  See `docs/overview.md` → "Domain Specification" for the full rationale.
+Disabling them on a PrIMuS-trained run does not produce a more general model;
+it only spends model capacity on patterns the system will never encounter at
+inference.
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `filter_rest_heavy` | True | Drop samples where >80% of tokens are structural (rest, measure) and length >50 |
-| `filter_unwanted_clefs` | True | Drop samples with non-jazz clefs (C1, C2, F3, etc.) |
-| `filter_multi_staff` | True | Drop samples with original height >180 px |
-| `filter_non_leadsheet_clef` | True | Keep only G2 (treble) clef |
-| `filter_unusual_time` | True | Keep only jazz common time signatures |
+| `filter_multi_staff` | True | Drop samples with original PNG height >`max_source_height` (180 px).  Removes LilyPond renders that wrapped onto two staves. |
+| `filter_non_leadsheet_clef` | True | Keep only `clef:G2` (treble).  Drops alto/tenor/bass/French-violin clefs from orchestral PrIMuS sources. |
+| `filter_unusual_time` | True | Keep only the eight jazz common-time signatures listed below. |
 
 **Allowed time signatures** (when `filter_unusual_time=True`):
 `4/4`, `3/4`, `2/4`, `2/2`, `6/8`, `6/4`, `5/4`, `12/8`
@@ -49,7 +53,7 @@ These must stay in sync with `_COMMON_TIME_SIGS` in both `src/CRNN_CTC/dataset.p
 | `strip_header_prob` | 0.4 | Probability of removing clef+key+time from image and label (training only) |
 | `online_aug_prob` | 0.5 | Probability of light per-sample jitter (brightness, noise, ±2 px shift) on top of the offline-augmented PNG (training only) |
 | `rare_lmx_oversample` | 2 | Oversampling factor for samples containing rare tokens |
-| `rare_lmx_tokens` | `("tied:start", "tied:stop")` | Tokens that trigger oversampling |
+| `rare_lmx_tokens` | `("tied:start", "tied:stop", "key:fifths:0")` | Tokens that trigger oversampling.  C-major (`key:fifths:0`) is included because PrIMuS underrepresents it severely (~0.05 % of corpus) while the Real Book uses it constantly. |
 
 ## Model Architecture
 

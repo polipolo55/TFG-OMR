@@ -15,7 +15,6 @@ All colour names defined here are mirrored in docs/main/tfg.sty for LaTeX figure
 
 from __future__ import annotations
 
-import matplotlib.pyplot as plt
 import matplotlib as mpl
 
 # ── Palette ────────────────────────────────────────────────────────────────────

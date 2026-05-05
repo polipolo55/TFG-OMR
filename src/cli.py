@@ -45,8 +45,10 @@ for _p in (str(_SRC), str(_SRC.parent)):
 
 log = logging.getLogger("omr.cli")
 
-# Full pipeline defaults (render DPI matches generate_realbook / load_pdf_page)
-_FULL_RUN_RENDER_DPI = 200
+# Full pipeline defaults (render DPI list matches generate_realbook).
+# Multiple values trigger per-sample DPI jitter, which improves robustness
+# to scanner-resolution mismatch between training renders and real PDFs.
+_FULL_RUN_RENDER_DPI: tuple[int, ...] = (200, 250, 300)
 _FULL_RUN_AUGMENT_SEED = 42
 _FULL_RUN_AUGMENT_COPIES = 1  # scanned tree mirrors clean sample ids (one PNG per id)
 
@@ -126,7 +128,7 @@ def cmd_render(args: argparse.Namespace) -> None:
     argv: list[str] = [
         "--source", str(args.source),
         "--output", str(args.output),
-        "--dpi", str(args.dpi),
+        "--dpi", *(str(d) for d in args.dpi),
     ]
     if args.limit is not None:
         argv += ["--limit", str(args.limit)]
@@ -232,8 +234,8 @@ def _build_config_from_args(args: argparse.Namespace):
         "online_aug_prob": "online_aug_prob",
     }
     # Boolean filter flags use store_false with default=None (only
-    # override when the user explicitly passes the --no-... flag)
-    for bflag in ("filter_rest_heavy", "filter_unwanted_clefs", "filter_multi_staff"):
+    # override when the user explicitly passes the --no-... flag).
+    for bflag in ("filter_multi_staff",):
         val = getattr(args, bflag, None)
         if val is not None:
             overrides[bflag] = val
@@ -524,12 +526,6 @@ def _add_common_data_args(parser: argparse.ArgumentParser) -> None:
                    help="DataLoader workers (default: 10)")
     g.add_argument("--seed", type=int, default=None,
                    help="Random seed (default: 42)")
-    g.add_argument("--no-filter-rest-heavy", dest="filter_rest_heavy",
-                   action="store_false", default=None,
-                   help="Disable filtering of rest-heavy samples (default: enabled)")
-    g.add_argument("--no-filter-unwanted-clefs", dest="filter_unwanted_clefs",
-                   action="store_false", default=None,
-                   help="Disable filtering of C1/C2 clef samples (default: enabled)")
     g.add_argument("--no-filter-multi-staff", dest="filter_multi_staff",
                    action="store_false", default=None,
                    help="Disable filtering of multi-staff (tall) images (default: enabled)")
@@ -583,8 +579,11 @@ def build_parser() -> argparse.ArgumentParser:
                         default=Path("data/processed/primus/clean"),
                         help="Clean rendered dataset root "
                              "(default: data/processed/primus/clean)")
-    p_rend.add_argument("--dpi", type=int, default=200,
-                        help="Rendering resolution (default: 200)")
+    p_rend.add_argument("--dpi", type=int, nargs="+",
+                        default=[200, 250, 300],
+                        help="Rendering resolution(s).  Pass one int for a "
+                             "fixed DPI or several for per-sample uniform "
+                             "jitter (default: 200 250 300).")
     p_rend.add_argument("--limit", type=int, default=None,
                         help="Process at most N samples (for testing)")
     p_rend.add_argument("--workers", type=int, default=_get_default_workers(),
@@ -711,7 +710,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--rare-lmx-tokens",
         type=str,
         default=None,
-        help="Comma-separated LMX tokens to up-weight (default: tied:start,tied:stop). "
+        help="Comma-separated LMX tokens to up-weight (default: tied:start,tied:stop,key:fifths:0). "
              "Pass empty string to disable token-based oversampling.",
     )
     g_train.add_argument(
@@ -800,8 +799,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Extra directory to scan for .lmx when building vocab (repeatable), "
              "e.g. an additional realbook_primus package.",
     )
-    p_pipe.add_argument("--render-dpi", type=int, default=_FULL_RUN_RENDER_DPI,
-                        help=f"LilyPond render DPI (default: {_FULL_RUN_RENDER_DPI})")
+    p_pipe.add_argument(
+        "--render-dpi", type=int, nargs="+",
+        default=list(_FULL_RUN_RENDER_DPI),
+        help=(
+            "LilyPond render DPI(s).  Pass one int for a fixed DPI or several "
+            "for per-sample uniform jitter (default: %s)."
+            % " ".join(str(d) for d in _FULL_RUN_RENDER_DPI)
+        ),
+    )
     p_pipe.add_argument(
         "--force-render",
         action="store_true",
@@ -845,7 +851,15 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Extra .lmx roots for vocab (repeatable); same as pipeline.",
     )
-    p_ptrain.add_argument("--render-dpi", type=int, default=_FULL_RUN_RENDER_DPI)
+    p_ptrain.add_argument(
+        "--render-dpi", type=int, nargs="+",
+        default=list(_FULL_RUN_RENDER_DPI),
+        help=(
+            "LilyPond render DPI(s); same semantics as `pipeline --render-dpi` "
+            "(default: %s)."
+            % " ".join(str(d) for d in _FULL_RUN_RENDER_DPI)
+        ),
+    )
     p_ptrain.add_argument(
         "--force-render",
         action="store_true",
@@ -899,12 +913,6 @@ def build_parser() -> argparse.ArgumentParser:
                         help="DataLoader workers (default: 10)")
     g_data.add_argument("--seed", type=int, default=None,
                         help="Random seed (default: 42)")
-    g_data.add_argument("--no-filter-rest-heavy", dest="filter_rest_heavy",
-                        action="store_false", default=None,
-                        help="Disable filtering of rest-heavy samples (default: enabled)")
-    g_data.add_argument("--no-filter-unwanted-clefs", dest="filter_unwanted_clefs",
-                        action="store_false", default=None,
-                        help="Disable filtering of C1/C2 clef samples (default: enabled)")
     g_data.add_argument("--no-filter-multi-staff", dest="filter_multi_staff",
                         action="store_false", default=None,
                         help="Disable filtering of multi-staff (tall) images (default: enabled)")

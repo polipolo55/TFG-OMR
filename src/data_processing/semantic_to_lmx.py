@@ -32,7 +32,6 @@ import multiprocessing
 import os
 import re
 import sys
-from functools import partial
 from pathlib import Path
 
 from tqdm import tqdm

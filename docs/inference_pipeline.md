@@ -15,7 +15,8 @@ bytes / Path / ndarray
   load_image()         → grayscale uint8
         │
         ▼ (if PDF)
-  load_pdf_page()      → rasterize at 150 DPI via PyMuPDF
+  load_pdf_page()      → rasterize via PyMuPDF at pdf_load_dpi()
+                        (env OMR_PDF_DPI, default 300)
         │
         ▼
   binarize()           CLAHE → Otsu threshold → binary
@@ -102,8 +103,8 @@ class System:
 **Width clamping:** Images wider than `max_image_width=2048` px are clamped to avoid OOM errors.
 
 **Decoding modes:**
-- **Greedy** (default): argmax per time step, collapse duplicates, remove blank
-- **Beam search** (`OMR_BEAM_WIDTH` env var or CLI `--beam-width`): higher accuracy, slower
+- **Greedy** (default, also when `OMR_BEAM_WIDTH` is unset): argmax per time step, collapse duplicates, remove blank.  Greedy is fast and ~as accurate as beam search on monophonic Real Book staves.
+- **Beam search** (`OMR_BEAM_WIDTH=N` env var with N>1, or CLI `--beam-width N`): slightly higher accuracy on dense passages, but slower (~N× slower in the worst case).
 
 **Optional tiling** (env `OMR_ENABLE_TILING=1`): splits wide images into 50%-overlapping tiles (~850 px), processes separately, merges sequences. Legacy feature, not recommended by default.
 
@@ -141,10 +142,10 @@ The CRNN may produce malformed token sequences (missing durations, wrong acciden
 **Validation rules:**
 - Notes must appear in order: `pitch` → `octave` → duration → optional dot/acc/tie
 - Rests must have a duration
-- Accidentals only after pitch + octave
-- Octaves restricted to [3, 6]
-- Time signature beats/types within allowed set
-- Clef must be G2
+- Accidentals only after pitch + octave (`flat` / `sharp` / `natural` — double accidentals are not in the LMX vocabulary)
+- Octaves restricted to [3, 7] (covers Real Book altissimo without leaving room for outliers)
+- Time signature beats/types within the allowed set (see `docs/configuration.md`)
+- Clef must be G2 (other clefs are silently rewritten)
 
 **Barline regularization:**
 - Counts cumulative beats
@@ -164,11 +165,13 @@ Invalid tokens are discarded (not replaced); partial notes are dropped entirely.
         {
           "staff_bbox": [x, y, w, h],
           "lmx_tokens": [
-            "clef:G2", "key:0", "time:4:4",
+            "clef:G2",
+            "key:fifths:0",
+            "time", "beats:4", "beat-type:4",
             "pitch:C", "octave:5", "quarter",
             "pitch:E", "octave:5", "quarter",
             "measure",
-            ...
+            "..."
           ],
           "chords": ["Cmaj7", "Am7", "Dm7", "G7"]
         }
@@ -192,8 +195,9 @@ On error:
 
 ## Environment Variables
 
-| Variable | Effect |
-|----------|--------|
-| `OMR_ENABLE_TILING=1` | Enable legacy tiling mode |
-| `OMR_BEAM_WIDTH=10` | Override beam width |
-| `OMR_CHORD_BACKEND=vlm` | Use VLM for chord OCR |
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `OMR_PDF_DPI` | `300` | PyMuPDF rasterisation DPI for PDFs (clamped 72–600). |
+| `OMR_BEAM_WIDTH` | `1` (greedy) | CTC beam width.  Set to >1 to enable beam search. |
+| `OMR_ENABLE_TILING` | unset | Set `=1` to enable legacy tiling mode (rarely useful). |
+| `OMR_CHORD_BACKEND` | `contour` | `contour` / `easyocr` / `vlm` for the chord OCR backend. |

@@ -39,15 +39,22 @@ Applied before splits. Filters are flags on `Config`:
 
 | Flag | What gets removed |
 |------|------------------|
-| `filter_rest_heavy` | >80% structural tokens and sequence length >50 |
-| `filter_unwanted_clefs` | C-clef, F3, G1 families (non-jazz) |
-| `filter_multi_staff` | images taller than 180 px (grand staff) |
+| `filter_multi_staff` | images taller than 180 px (LilyPond two-line wraps) |
 | `filter_non_leadsheet_clef` | any clef that is not G2 (treble) |
 | `filter_unusual_time` | time signatures not in jazz common set |
 
+These three flags collectively realise the lead-sheet domain spec — see
+`docs/overview.md` → "Domain Specification" for the full rationale.
+
 ### Rare Token Oversampling
 
-Samples containing `tied:start` / `tied:stop` (visually subtle, underrepresented) are duplicated `rare_lmx_oversample` times (default: 2×) in the training index only.
+Samples whose `.lmx` contains any token in `Config.rare_lmx_tokens` are
+duplicated `rare_lmx_oversample` times (default: 2×) in the training index
+only.  The default set up-weights:
+
+- `tied:start` / `tied:stop` — visually subtle, under-predicted on real scans.
+- `key:fifths:0` (C major) — under-represented in PrIMuS (~0.05 % of corpus)
+  but extremely common in the Real Book.
 
 ### Image Preprocessing (at load time)
 

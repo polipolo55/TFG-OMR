@@ -182,11 +182,9 @@ Filtering is not applied during pipeline stages but during dataset construction 
 
 | Filter | Condition | Rationale |
 |--------|-----------|-----------|
-| `filter_rest_heavy` | >80% structural tokens and len>50 | orchestral tacet, absent in jazz |
-| `filter_unwanted_clefs` | C1, C2, F3, C3, C4, F4, G1 | not used in jazz lead sheets |
-| `filter_multi_staff` | original height > 180 px | removes polyphonic/grand-staff samples |
-| `filter_non_leadsheet_clef` | not G2 (treble) | strict domain focus |
-| `filter_unusual_time` | non-jazz meters | keeps 4/4, 3/4, 2/4, 2/2, 6/8, 5/4 |
+| `filter_multi_staff` | original height > 180 px | removes LilyPond two-line wraps |
+| `filter_non_leadsheet_clef` | not G2 (treble) | lead-sheet domain — see `docs/overview.md` |
+| `filter_unusual_time` | non-jazz meters | keeps 4/4, 3/4, 2/4, 2/2, 6/8, 6/4, 5/4, 12/8 |
 
 ## Dataset Directories
 

@@ -43,7 +43,7 @@ from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader
 
 from .config import Config
-from .dataset import OMRDataset, collate_fn, make_splits
+from .dataset import collate_fn, make_splits
 from .evaluate import compute_ser_batch, greedy_decode
 from .model import CRNN
 from .vocab import Vocabulary
@@ -266,8 +266,6 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
         val_frac=cfg.val_frac,
         test_frac=cfg.test_frac,
         seed=cfg.seed,
-        filter_rest_heavy=cfg.filter_rest_heavy,
-        filter_unwanted_clefs=cfg.filter_unwanted_clefs,
         filter_non_leadsheet_clef=cfg.filter_non_leadsheet_clef,
         filter_unusual_time=cfg.filter_unusual_time,
         filter_multi_staff=cfg.filter_multi_staff,

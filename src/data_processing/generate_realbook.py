@@ -299,12 +299,20 @@ def make_lily_source(
 def process_sample(
     sample_dir: Path,
     output_dir: Path,
-    dpi: int = 200,
+    dpi: int | tuple[int, ...] = 200,
     force: bool = False,
     with_lmx: bool = True,
 ) -> bool:
     """
     Process one PrIMuS sample directory.
+
+    ``dpi`` can be a single integer (constant render resolution) or a tuple
+    of integers; in the latter case one is picked uniformly at random for
+    this sample.  Per-sample DPI jitter exposes the CRNN to slightly
+    different staff-line spacings, kerning, and anti-aliasing patterns,
+    which improves robustness on real scans whose effective resolution
+    rarely matches the training default exactly.
+
     Returns True on success, False on failure.
     """
     sample_id    = sample_dir.name
@@ -333,11 +341,13 @@ def process_sample(
 
     ly_source = make_lily_source(music_body)
 
+    sample_dpi = random.choice(dpi) if isinstance(dpi, (list, tuple)) else int(dpi)
+
     # Render in a temp directory, then move outputs
     with tempfile.TemporaryDirectory(prefix="realbook_") as tmp:
         tmp_dir = Path(tmp)
         # Timeout is 15 seconds by default in run_lilypond, we can bump it to 30 for safety
-        png_path = run_lilypond(ly_source, sample_id, tmp_dir, dpi=dpi, timeout=30)
+        png_path = run_lilypond(ly_source, sample_id, tmp_dir, dpi=sample_dpi, timeout=30)
         if png_path is None:
             return f"LilyPond render failed or timed out for {sample_id}"
 
@@ -406,8 +416,13 @@ def main() -> None:
     parser.add_argument(
         "--dpi",
         type=int,
-        default=200,
-        help="Rendering resolution (default: 200)",
+        nargs="+",
+        default=[200, 250, 300],
+        help=(
+            "Rendering resolution(s).  Pass a single int for a fixed DPI "
+            "(e.g. --dpi 200) or several ints for per-sample uniform jitter "
+            "(e.g. --dpi 200 250 300).  Default: 200 250 300."
+        ),
     )
     parser.add_argument(
         "--workers",
@@ -464,7 +479,10 @@ def main() -> None:
         error_log.unlink()
 
     ok = fail = 0
-    _worker = partial(process_sample, output_dir=args.output, dpi=args.dpi,
+    dpi_arg: int | tuple[int, ...] = (
+        args.dpi[0] if len(args.dpi) == 1 else tuple(args.dpi)
+    )
+    _worker = partial(process_sample, output_dir=args.output, dpi=dpi_arg,
                       force=args.force, with_lmx=not args.no_lmx)
     
     with multiprocessing.Pool(processes=args.workers) as pool:

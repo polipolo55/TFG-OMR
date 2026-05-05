@@ -153,14 +153,18 @@ def add_uneven_illumination(
     img_gray: np.ndarray,
     rng: random.Random,
     max_strength: float = 0.25,
+    force: bool = False,
 ) -> np.ndarray:
     """Directional lighting gradient from one edge (phone scan / book-spine shadow).
 
     The existing vignette darkens corners symmetrically; real book photos have
     a directional gradient — spine shadow on the left, hand shadow on the right,
     or backlight from above.
+
+    When called from ``augment_sample`` the gating roll is done by the caller
+    so we expose ``force=True`` to skip the local probability check.
     """
-    if rng.random() > 0.45:
+    if not force and rng.random() > 0.45:
         return img_gray
     h, w = img_gray.shape
     strength = rng.uniform(0.10, max_strength)
@@ -219,8 +223,18 @@ def augment_sample(
     result = pipeline(image=img3)["image"]
     img = result[:, :, 0]
     img = remap_tones(img)
-    img = add_vignette(img, rng)
-    img = add_uneven_illumination(img, rng)
+
+    # Vignette and uneven illumination both darken parts of the image and
+    # visually overlap — stacking them produced excessively dim corners.  Make
+    # them mutually exclusive: one roll picks vignette, uneven illumination,
+    # or neither.  Marginal probabilities (~0.50 vignette, ~0.35 uneven, 0.15
+    # neither) preserve the variety of the previous independent rolls without
+    # the double-darkening tail.
+    lighting_roll = rng.random()
+    if lighting_roll < 0.50:
+        img = add_vignette(img, rng, prob=1.0)
+    elif lighting_roll < 0.85:
+        img = add_uneven_illumination(img, rng, force=True)
     img = add_halftone_lines(img, rng)
 
     dst_png.parent.mkdir(parents=True, exist_ok=True)

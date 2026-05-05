@@ -42,10 +42,11 @@ CLEF_LY: dict[str, str] = {
 }
 """Map PrIMuS / LMX clef identifiers to LilyPond clef names."""
 
-# Same IDs as ``filter_unwanted_clefs`` in ``CRNN_CTC.dataset`` — soprano /
-# mezzo / varbaritone clefs that are rare in jazz and confuse the CRNN.
-# ``generate_realbook`` / ``semantic_to_lmx`` map these to G2 so PNG and LMX
-# stay matched (absolute pitches unchanged; LilyPond uses ledger lines).
+# Soprano (C1) / mezzo-soprano (C2) / baritone (F3) clefs are rare in jazz
+# and visually similar to common clefs (one staff-line shift), which makes
+# the CRNN confuse them with C4 / F4.  ``generate_realbook`` /
+# ``semantic_to_lmx`` rewrite them to G2 so PNG and LMX stay matched
+# (absolute pitches unchanged; LilyPond uses ledger lines).
 CLEF_IDS_NORMALIZE_TO_G2: frozenset[str] = frozenset({"C1", "C2", "F3"})
 
 

@@ -230,8 +230,14 @@ def _prepare_tile(img: np.ndarray, img_height: int, max_width: int) -> tuple[Ten
 # ---------------------------------------------------------------------------
 
 def _env_beam_width() -> int:
-    """Read OMR_BEAM_WIDTH at call time so the API/process can change it without reload."""
-    return max(1, int(os.environ.get("OMR_BEAM_WIDTH", "5")))
+    """Read OMR_BEAM_WIDTH at call time so the API/process can change it without reload.
+
+    Default is 1 (greedy) to match the documented default and the
+    ``evaluate``/CLI behavior, and because greedy is much faster with no
+    measurable accuracy loss on monophonic Real Book staves.  Set
+    ``OMR_BEAM_WIDTH`` to enable beam search at inference time.
+    """
+    return max(1, int(os.environ.get("OMR_BEAM_WIDTH", "1")))
 
 
 def recognize_music(

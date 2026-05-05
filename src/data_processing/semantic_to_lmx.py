@@ -134,6 +134,7 @@ def semantic_to_lmx_tokens(
 
     # State
     key_altered: set[str] = set()  # steps altered by current key sig
+    key_emitted: bool = False      # guard: emit key:fifths:0 if no explicit key seen
     pending_tie_stop: bool = False
     in_multirest: bool = False  # suppress barline after multirest
 
@@ -165,9 +166,16 @@ def semantic_to_lmx_tokens(
                     continue
                 key_altered = _key_altered_steps(fifths)
                 out.append(f"key:fifths:{fifths}")
+                key_emitted = True
 
             # ── Time signature ────────────────────────────────────────────
             elif tok.startswith("timeSignature-"):
+                # PrIMuS omits the keySignature token for C major (no accidentals).
+                # Inject key:fifths:0 here so the label matches the rendered image,
+                # which always shows a (blank) key signature area.
+                if not key_emitted:
+                    out.append("key:fifths:0")
+                    key_emitted = True
                 ts_str = tok[14:]
                 if ts_str == "C":
                     out.extend(["time", "beats:4", "beat-type:4"])

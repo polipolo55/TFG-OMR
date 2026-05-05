@@ -21,7 +21,8 @@
 \usepackage{enumitem}
 \usepackage{xcolor}
 \usepackage{siunitx}
-
+\usepackage{musixtex}              
+\usepackage{lilyglyphs}
 % Project style (palette, captions, link colours)
 \usepackage{tfg}
 
@@ -137,6 +138,10 @@ Despite decades of research, automated transcription of real-world scores remain
 \textbf{Domain specificity.} General-purpose OMR tools are optimised for classical full-score notation. Jazz lead sheets use a different engraving style---often emulating handwritten notation, with larger noteheads, jazz-specific articulation marks, and chord symbols above the staff---for which no labelled corpus is publicly available.
 
 This thesis addresses these three issues jointly: by generating a synthetic training corpus in the jazz style, applying scan-simulation augmentation, and fine-tuning on a small set of manually annotated Real Book pages, the aim is to produce a system that works on the actual scanned documents that musicians encounter in practice.
+
+\section{Musical Notation Fundamentals}
+
+\textit{[TODO: Brief primer on staff notation, treble clef, and monophonic melody representation. Explain how pitch is encoded vertically on the staff and how note duration is determined by head shape, stem, beams, and dots. Introduce time signatures, measures, and chord symbols above the staff. Include an annotated figure of a simple Real Book lead sheet excerpt to ground readers unfamiliar with jazz notation.]}
 
 \section{Objectives}
 

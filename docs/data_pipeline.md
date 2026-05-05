@@ -91,6 +91,8 @@ TIE       := "tied:start" … "tied:stop"
 - Natural signs emitted when canceling key-signature accidentals
 - Duration aliases normalized to canonical LMX names
 
+**C major implicit key fix:** PrIMuS omits the `keySignature-` token for C major (no accidentals = default). The converter detects this and injects `key:fifths:0` before the time signature so every sample has an explicit key label. Without this, ~45% of training images (which visually show a blank key area) would have no `key:fifths:0` supervision and the model could never learn to predict it.
+
 **Output:** `.lmx` files co-located with clean PNGs
 
 ## Stage 3 — Augment: Scan Simulation

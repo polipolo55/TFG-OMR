@@ -246,6 +246,10 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     use_amp = device.type == "cuda"
+    if use_amp:
+        # Ampere+ TensorFloat-32: faster matmul on RTX 30xx with negligible accuracy impact
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
     log.info("Device: %s | AMP: %s", device, use_amp)
 
     # ── Run directory (unique per training run) ────────────────────────────
@@ -295,6 +299,7 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
         collate_fn=collate_fn,
         pin_memory=True,
         persistent_workers=cfg.num_workers > 0,
+        drop_last=True,
     )
     val_loader = DataLoader(
         val_ds,
@@ -322,7 +327,17 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
 
     # ── Optimiser & scheduler ──────────────────────────────────────────────
     criterion = nn.CTCLoss(blank=vocab.blank_idx, zero_infinity=True)
-    optimiser = AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+    try:
+        optimiser = AdamW(
+            model.parameters(),
+            lr=cfg.lr,
+            weight_decay=cfg.weight_decay,
+            fused=use_amp,
+        )
+    except (TypeError, RuntimeError):
+        optimiser = AdamW(
+            model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay
+        )
 
     # ── Resume from checkpoint (if requested) ──────────────────────────────
     start_epoch = 1

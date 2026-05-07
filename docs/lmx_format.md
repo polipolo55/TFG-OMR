@@ -21,10 +21,10 @@ NOTE      :=  "pitch:" <A-G>
               DURATION
               DOT*
               [ACCIDENTAL]
-              [TIE_START]
+              [TIE_STOP]
+              [FERMATA]
 
-REST      :=  "rest" DURATION DOT*
-            | "rest:measure"          # full-bar rest
+REST      :=  "rest" DURATION DOT* [FERMATA]
 
 DURATION  :=  "breve" | "whole" | "half" | "quarter"
             | "eighth" | "16th" | "32nd" | "64th" | "longa"
@@ -34,7 +34,16 @@ DOT       :=  "dot"
 ACCIDENTAL :=  "flat" | "sharp" | "natural"
 
 TIE       :=  "tied:start" … "tied:stop"  # wraps a note sequence
+
+FERMATA   :=  "fermata"   # held-note marker; attaches to the *previous* note/rest
 ```
+
+> **Note.** `rest:measure` (a single token for a whole-measure rest) is
+> understood by the LilyPond renderer (`lilypond_render.py`) so that
+> grammar-fixed predictions can be re-rendered if needed, but **the
+> training corpus never contains it** — `semantic_to_lmx.py` always emits
+> a regular `rest` + duration. Treat it as a renderer-only token; the model
+> will never produce it.
 
 > **Important:** KEY, TIME, and ACCIDENTAL use a different format than MusicXML or older project versions.
 > - Key is `key:fifths:-3`, not `key:-3`.
@@ -112,6 +121,7 @@ measure clef:G2 key:fifths:3 time beats:3 beat-type:4 pitch:A octave:4 quarter d
 8. Octaves outside [3, 6] are clamped to that range by the grammar fixer
 9. Clef is normalised to `clef:G2` (only treble supported in the jazz lead-sheet domain)
 10. Time signatures not in the common jazz set are rejected; the previous system's time is propagated instead
+11. `fermata` is only valid immediately after a note or rest's full token sequence (pitch+octave+duration[+dot…+accidental][+tied:stop]); stray fermatas are dropped
 
 ## Accidental Display Rules
 
@@ -159,6 +169,7 @@ breve
 clef:G2
 dot
 eighth
+fermata
 flat
 half
 key:fifths:-1
@@ -180,13 +191,19 @@ pitch:B
 pitch:G
 quarter
 rest
-rest:measure
 sharp
 tied:start
 tied:stop
 time
 whole
 ```
+
+Note: the actual vocabulary file at `data/vocab/primus_lmx.txt` (77 tokens) is
+the empirical token set produced by `vocab` over the PrIMuS corpus. It does
+**not** include `key:fifths:-7` (Cb major never appears in PrIMuS) or
+`rest:measure` (the converter never emits it). It does include a few "dead
+output classes" like `clef:F4`, `clef:C3`, `octave:0`/`1`/`2`/`8` that survive
+from older runs — see `docs/overview.md` → "Vocabulary dead output classes".
 
 Special indices (hardcoded, not in file):
 - `0` → `<blank>` (CTC blank)

@@ -69,29 +69,34 @@ sudo cp /tmp/lilyjazz/stylesheet/*.ily "$LILY_SHARE/ly/"
 
 Produces the ground-truth label files (`.lmx`) for CRNN training. Conversion is direct (no intermediate MusicXML), token-by-token.
 
-**LMX grammar:**
+**LMX grammar** (canonical definition lives in `docs/lmx_format.md`; this is the
+shape produced by `semantic_to_lmx.py`):
+
 ```
 SEQUENCE  := HEADER ELEMENT* (BARLINE ELEMENT*)*
 HEADER    := "measure" [CLEF] [KEY] [TIME]
 BARLINE   := "measure" [KEY] [TIME]
 CLEF      := "clef:G2"
-KEY       := "key:" <fifths>
-TIME      := "time:" <num> ":" <denom>
+KEY       := "key:fifths:" <fifths>
+TIME      := "time" "beats:" <num> "beat-type:" <den>     # three tokens
 ELEMENT   := NOTE | REST
-NOTE      := "pitch:" <A-G> "octave:" <0-8> DURATION [DOT]* [ACCIDENTAL] [TIE]
-REST      := "rest" DURATION [DOT]*
+NOTE      := "pitch:" <A-G> "octave:" <0-8> DURATION DOT* [ACCIDENTAL] [TIE_STOP] [FERMATA]
+REST      := "rest" DURATION DOT* [FERMATA]
 DURATION  := "whole"|"half"|"quarter"|"eighth"|"16th"|"32nd"|"64th"|"breve"|"longa"
-ACCIDENTAL:= "acc:sharp"|"acc:flat"|"acc:nat"
+ACCIDENTAL:= "flat" | "sharp" | "natural"           # bare words, no acc: prefix
 TIE       := "tied:start" … "tied:stop"
+FERMATA   := "fermata"                              # attaches to previous note/rest
 ```
 
 **Key conversions:**
-- PrIMuS pitch strings (e.g., `Bb5`) → LMX tokens (`pitch:B octave:5 acc:flat`)
+- PrIMuS pitch strings (e.g., `Bb5`) → LMX tokens (`pitch:B octave:5 quarter flat`).
+  The accidental token is **bare** (`flat`, not `acc:flat`) and appears **after**
+  the duration, not as part of the pitch.
 - Accidental display computed from semantic pitch spelling + key signature context
 - Natural signs emitted when canceling key-signature accidentals
 - Duration aliases normalized to canonical LMX names
 
-**C major implicit key fix:** PrIMuS omits the `keySignature-` token for C major (no accidentals = default). The converter detects this and injects `key:fifths:0` before the time signature so every sample has an explicit key label. Without this, ~45% of training images (which visually show a blank key area) would have no `key:fifths:0` supervision and the model could never learn to predict it.
+**C major implicit key fix:** PrIMuS omits the `keySignature-` token for C major (no accidentals = default). The converter detects this and injects `key:fifths:0` before the time signature so every sample has an explicit key label. Without this, ~22.6% of training images (19,778 / 87,677 samples — those in C major, which visually show a blank key area) would have no `key:fifths:0` supervision and the model could never learn to predict it.
 
 **Output:** `.lmx` files co-located with clean PNGs
 

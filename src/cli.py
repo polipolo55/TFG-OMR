@@ -346,6 +346,7 @@ def cmd_evaluate(args: argparse.Namespace) -> None:
         split=args.split,
         per_sample=args.per_sample,
         beam_width=getattr(args, "beam_width", 1) or 1,
+        report_melodic=getattr(args, "melodic", False),
     )
     print(f"SER ({args.split}): {ser:.4f}")
 
@@ -743,6 +744,9 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Log per-sample SER (worst first)")
     p_eval.add_argument("--beam-width", type=int, default=1,
                         help="Beam search width (1=greedy, default: 1)")
+    p_eval.add_argument("--melodic", action="store_true",
+                        help="Also report melodic SER (measure / tied:* "
+                             "tokens stripped) alongside aggregate SER.")
     _add_common_data_args(p_eval)
     _add_model_args(p_eval)
     p_eval.set_defaults(func=cmd_evaluate)

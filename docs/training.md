@@ -173,3 +173,10 @@ poetry run python src/cli.py evaluate-ab \
 ```
 SER = total_edit_distance / total_ground_truth_length
 ```
+
+A complementary **melodic SER** (`evaluate --melodic` / `melodic_ser` in
+`evaluate.py`) is computed on the same edit distance after stripping
+`measure`, `tied:start`, `tied:stop`.  On the current PrIMuS test split
+this metric is roughly 7× lower than aggregate SER because barlines and
+ties dominate the error budget; it is the better headline number for
+"how often does the model get the actual notes right".

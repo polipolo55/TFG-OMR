@@ -51,11 +51,11 @@ Book.  See "Known Limitations" below for what falls *outside* the contract.
 |--------|----------|
 | **Voicing** | Monophonic — one melody line per staff.  No polyphony, no piano grand-staff, no stem-down counterpoint. |
 | **Clef** | Treble (`clef:G2`) only.  C-clefs, F-clefs, G1 are out of scope. |
-| **Key signatures** | Any of `key:fifths:N` for `N ∈ [-7, +7]` (Cb major through C# major).  C major (`key:fifths:0`) is oversampled because PrIMuS underrepresents it severely (~0.05 % of corpus) while it dominates the Real Book. |
+| **Key signatures** | Any of `key:fifths:N` for `N ∈ [-6, +7]` (Gb major through C# major).  Cb major (`-7`) is the one nominal major key absent from PrIMuS and from the trained vocabulary — extremely rare in the Real Book, so this is not a practical limitation.  C major (`key:fifths:0`) is the most common class after the converter's implicit-key fix (~22 % of corpus). |
 | **Time signatures** | One of `{4/4, 3/4, 2/4, 2/2, 6/8, 6/4, 5/4, 12/8}`.  4/4 is overwhelmingly the common case.  Exotic meters (5/8, 7/8, 7/4, 9/8, 11/8, …) are out of scope. |
 | **Pitch range** | Octaves 3–7 inclusive (covers the standard treble range plus altissimo).  Octave 0–2 and 8 are accepted by the vocabulary but never produced by the model. |
 | **Note values** | `whole`, `half`, `quarter`, `eighth`, `16th`, `32nd`, `64th`, plus dotted variants via the `dot` token, plus ties (`tied:start` / `tied:stop`). |
-| **Rests** | `rest` (with a duration) and `rest:measure` (a whole-measure rest). |
+| **Rests** | `rest` (with a duration token).  `rest:measure` is defined in the grammar but never emitted by the converter — whole-measure rests are encoded as a regular `rest whole` pair. |
 | **Accidentals** | `flat`, `sharp`, `natural` — display-only, the actual pitch is already encoded in the `pitch:X` / `octave:Y` pair.  Double accidentals (`double-sharp`, `flat-flat`) are out of scope. |
 | **Barlines** | Single barline only.  Repeats, voltas, double barlines, segno/coda/D.C./D.S. navigation marks are out of scope. |
 | **Tuplets** | Out of scope.  See "Known Limitations" below. |
@@ -164,9 +164,22 @@ latex_documents/gep/        GEP thesis-management deliverables
 
 ## Performance
 
-- **Synthetic test SER:** ~1.17% (symbol error rate, token-level edit distance)
-- **Hardware target:** NVIDIA RTX 3060 (12 GB VRAM), batch size 16
+Held-out test split (4 604 samples), greedy CTC decoding, latest checkpoint
+(`models/latest/best_model.pt`, epoch 37):
+
+- **Aggregate SER:** 1.28 % (scanned), 1.19 % (clean) — token-level edit distance.
+- **Melodic SER:** 0.18 % (scanned), 0.11 % (clean) — same metric with `measure`
+  and tie tokens stripped, isolating actual pitch/duration/accidental errors.
+- **Perfect transcriptions:** 71 % (scanned), 73 % (clean).
+- **Error breakdown:** ≈74 % of all edits are barline (`measure`) tokens and
+  ≈13 % are ties — together these structural tokens account for ~87 % of edits.
+  Pitch/octave/duration error rates are each well below 0.15 %.
+- **Beam search** (width 5) yields ≤ 1 edit/1000 SER improvement at ~6× decode
+  cost; greedy is the recommended default.
+- **Hardware target:** NVIDIA RTX 3060 (12 GB VRAM), batch size 16–24
 - **Training time:** ~60 epochs, early stopping at patience 12
+
+Reproduce: `poetry run python scripts/evaluate_full.py --checkpoint models/latest/best_model.pt --split test --both-splits`
 
 ## Known Limitations and Out-of-Scope Notation
 

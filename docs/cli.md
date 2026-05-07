@@ -123,8 +123,15 @@ poetry run python src/cli.py evaluate \
   [--split val|test]           # default: test
   [--beam-width 1]             # 1 = greedy; >1 = beam search
   [--per-sample]               # log per-sample SER (worst first)
+  [--melodic]                  # also report melodic SER (structural tokens stripped)
   [--num-workers 10]
 ```
+
+The `--melodic` flag computes a second SER after stripping `measure`,
+`tied:start`, and `tied:stop` from both reference and prediction.  On
+this corpus the bulk of edits are structural (≈ 87 % barlines + ties),
+so the melodic figure is a much better measure of the model's actual
+musical recognition ability.
 
 ---
 

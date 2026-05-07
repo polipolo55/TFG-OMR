@@ -116,7 +116,7 @@ time  beats:2  beats:3  beats:4  beats:6  beats:12
        beat-type:2  beat-type:4  beat-type:8
 pitch:A  pitch:B  pitch:C  pitch:D  pitch:E  pitch:F  pitch:G
 octave:0  octave:1 ... octave:8
-measure  rest  rest:measure
+measure  rest
 tied:start  tied:stop
 whole  half  quarter  eighth  16th  32nd  64th  dot
 ```

@@ -280,6 +280,7 @@ def evaluate(
     split: str = "test",
     per_sample: bool = False,
     beam_width: int = 1,
+    report_melodic: bool = False,
 ) -> float:
     """Load a checkpoint, run inference on the requested split, report SER.
 
@@ -293,11 +294,17 @@ def evaluate(
         Which split to evaluate: ``"test"`` (default), ``"val"``, or ``"train"``.
     per_sample : bool
         If True, log SER for each individual sample.
+    report_melodic : bool
+        If True, additionally compute and log the **melodic SER** —
+        token-level edit distance after stripping ``measure``,
+        ``tied:start``, ``tied:stop``.  Useful because the bulk of CTC errors
+        on this corpus are barlines and ties; the melodic figure isolates
+        actual pitch / duration / accidental mistakes.
 
     Returns
     -------
     float
-        Aggregate SER on the requested split.
+        Aggregate SER on the requested split (melodic SER is logged only).
     """
     decode_fn = (
         lambda lp, ol, v: beam_search_decode(lp, ol, v, beam_width)
@@ -369,6 +376,8 @@ def evaluate(
     # ── Inference ──────────────────────────────────────────────────────────
     total_edit = 0
     total_len = 0
+    total_mel_edit = 0
+    total_mel_len = 0
     sample_results: list[tuple[str, float, list[str], list[str]]] = []
 
     for batch in loader:
@@ -395,6 +404,12 @@ def evaluate(
             total_edit += ed
             total_len += len(ref)
 
+            if report_melodic:
+                mel_hyp = _strip_structural(preds[i])
+                mel_ref = _strip_structural(ref)
+                total_mel_edit += _edit_distance(mel_hyp, mel_ref)
+                total_mel_len += len(mel_ref)
+
             if per_sample:
                 sample_results.append((sids[i], ser, preds[i], ref))
 
@@ -410,4 +425,11 @@ def evaluate(
 
     log.info("Aggregate SER on '%s': %.4f  (%d edits / %d symbols)",
              split, aggregate_ser, total_edit, total_len)
+    if report_melodic:
+        mel_ser = total_mel_edit / max(total_mel_len, 1)
+        log.info(
+            "Melodic SER on '%s': %.4f  (%d edits / %d melodic symbols, "
+            "structural tokens stripped)",
+            split, mel_ser, total_mel_edit, total_mel_len,
+        )
     return aggregate_ser

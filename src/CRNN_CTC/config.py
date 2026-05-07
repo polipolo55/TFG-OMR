@@ -96,9 +96,9 @@ class Config:
     # ``semantic_to_lmx.py`` did not emit it for samples with no explicit
     # ``keySignature-`` token, leaving only 8 C-major training labels.
     # That bug is now fixed — the converter always injects ``key:fifths:0``
-    # when no key is specified, so ~45 % of the corpus is C major and no
-    # oversampling is needed or desired (adding it back would make C major
-    # ~59 % of the virtual training set).
+    # when no key is specified, so ~22.6 % of the corpus is C major (19,778
+    # of 87,677 samples) and no oversampling is needed or desired (adding it
+    # back would make C major ~31 % of the virtual training set).
     rare_lmx_oversample: int = 2
     rare_lmx_tokens: tuple[str, ...] = (
         "tied:start", "tied:stop",

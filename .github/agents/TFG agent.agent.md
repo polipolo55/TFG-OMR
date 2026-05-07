@@ -58,11 +58,8 @@ src/
 notebooks/
   01_simple_baseline.ipynb    # morphological baseline, fully implemented
   simple_baseline.pdf         # exported PDF of the baseline notebook
-  02_evaluate_model.ipynb     # (legacy) early CRNN evaluation notebook
-  02_evaluate_model.pdf       # exported PDF
-  03_evaluate_phase2.ipynb    # current CRNN evaluation notebook: Run 4 results, error analysis, real-world PDF test
-  03_evaluate_phase2.pdf      # exported PDF of Run 4 evaluation
-  04_pipeline_walkthrough.ipynb  # full pipeline walkthrough for thesis director meeting (2026-03-09)
+  02_evaluate_model.ipynb     # CRNN evaluation: aggregate/melodic SER, error breakdown, prediction rendering
+  03_pipeline_walkthrough.ipynb  # full pipeline walkthrough for thesis director meeting (2026-03-09)
 data/
   camera_primus/     # CameraPrimus: typeset PNGs + distorted JPGs (paired)
   primus/            # PrIMuS: agnostic/semantic annotated monophonic staff lines

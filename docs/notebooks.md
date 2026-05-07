@@ -8,21 +8,14 @@ Early baseline experiments. Establishes initial SER before full training pipelin
 
 ## 02_evaluate_model.ipynb
 
-Post-training evaluation on the test set.
-- Per-sample SER distribution
-- Worst-performing samples (rendered for inspection)
-- Confusion matrix on common token types
+Post-training evaluation on the test set (Phase 5 model, epoch 46, val_SER=1.29%).
+- Aggregate SER + melodic SER on clean and scanned test splits
+- SER vs. beam width comparison (greedy vs. beam=5/10)
+- Per-sample error distribution and worst-performing samples
 - Error breakdown by token category (pitch, duration, accidental, structural)
+- LilyPond rendering of model predictions for visual inspection
 
-## 03_evaluate_phase2.ipynb
-
-Phase 2 comparative analysis.
-- SER vs. beam width curves
-- Tiling on/off comparison
-- Clean vs. scanned test set comparison
-- Training loss/SER curves over epochs
-
-## 04_pipeline_walkthrough.ipynb
+## 03_pipeline_walkthrough.ipynb
 
 End-to-end demonstration.
 1. Load a Real Book page image

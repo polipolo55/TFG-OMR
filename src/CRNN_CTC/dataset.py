@@ -618,8 +618,8 @@ def make_splits(
     val_frac: float = 0.1,
     test_frac: float = 0.1,
     seed: int = 42,
-    filter_non_leadsheet_clef: bool = False,  # Config default: True
-    filter_unusual_time: bool = False,         # Config default: True
+    filter_non_leadsheet_clef: bool = True,
+    filter_unusual_time: bool = True,
     filter_multi_staff: bool = True,
     max_source_height: int = 180,
     extra_data_dirs: list[Path] | None = None,

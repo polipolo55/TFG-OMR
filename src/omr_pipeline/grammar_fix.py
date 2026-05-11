@@ -132,6 +132,7 @@ def _parse_and_repair(tokens: list[str], force_clef: bool) -> list[str]:
                 out.append(_LEAD_SHEET_CLEF if force_clef else tokens[i])
                 i += 1
             elif not seen_header:
+                # Insert synthetic clef — no input token consumed, so i stays.
                 out.append(_LEAD_SHEET_CLEF)
 
             if i < n and _is_key(tokens[i]):
@@ -227,7 +228,8 @@ def _parse_and_repair(tokens: list[str], force_clef: bool) -> list[str]:
                 oval = max(_OCTAVE_MIN, min(_OCTAVE_MAX, oval))
                 octave_tok = f"octave:{oval}"
             except ValueError:
-                pass
+                log.debug("Malformed octave token %r — clamping to %d", octave_tok, _OCTAVE_MIN)
+                octave_tok = f"octave:{_OCTAVE_MIN}"
 
             # Emit the note
             out.append(tok)          # pitch:X
@@ -327,8 +329,12 @@ def _propagate_key(
 
     if first_key_idx is None:
         if global_key is not None:
+            # Default to after the first measure token; advance to after clef
+            # if one is present (normal case after _parse_and_repair).
             insert_after = 0
             for j, tok in enumerate(tokens):
+                if tok == "measure":
+                    insert_after = j + 1
                 if _is_clef(tok):
                     insert_after = j + 1
                     break
@@ -370,14 +376,37 @@ def _propagate_time(
         The possibly-modified token list and the time signature that should
         be forwarded to the next system.
     """
-    # Find existing time signature in this system
+    # Find time signature in the header only (before the second 'measure').
+    # Scanning the full sequence would mistake a mid-sequence time change for
+    # the header time sig and skip the global-time injection.
+    local_time_idx: int | None = None
+    local_time: tuple[str, str, str] | None = None
+    measure_count = 0
     for i, tok in enumerate(tokens):
+        if tok == "measure":
+            measure_count += 1
+            if measure_count >= 2:
+                break
         if tok == "time" and i + 2 < len(tokens):
             if _is_beats(tokens[i + 1]) and _is_beat_type(tokens[i + 2]):
                 local_time = (tok, tokens[i + 1], tokens[i + 2])
-                return tokens, local_time
+                local_time_idx = i
+                break
 
-    # No time signature found — inject the global one if available
+    # Found a local time signature
+    if local_time is not None:
+        # If a global is already established, override the local with the global
+        # (Real Book pages keep the same time sig across all staves; the first
+        # detected one is authoritative).  Mirrors _propagate_key behaviour.
+        if global_time is not None and local_time != global_time:
+            tokens = list(tokens)
+            tokens[local_time_idx] = global_time[0]
+            tokens[local_time_idx + 1] = global_time[1]
+            tokens[local_time_idx + 2] = global_time[2]
+            return tokens, global_time
+        return tokens, local_time
+
+    # No local time signature — inject the global one if available
     if global_time is None:
         return tokens, None
 

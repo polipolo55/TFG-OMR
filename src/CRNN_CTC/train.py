@@ -458,6 +458,7 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
                 "val_ser": val_ser,
                 "patience_counter": patience_counter,
                 "config": cfg,
+                "vocab_size": len(vocab),
             },
             run_dir / "latest_checkpoint.pt",
         )

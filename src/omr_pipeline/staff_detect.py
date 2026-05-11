@@ -249,15 +249,23 @@ def _build_systems(
         music_x0 = max(0, staff.x_start - pad_x)
         music_x1 = min(W, staff.x_end + pad_x)
 
-        # Chord band: only the last few staff-spaces above this staff (not whole page top)
+        # Chord band: the gap between the previous system's music crop and this
+        # staff's first line.  Chord symbols sit in this gap, often very close
+        # to (or inside the margin of) the top staff line.
+        #
+        # chord_y1 = staff.top  (not music_y0) so symbols in the margin zone
+        # above line-1 are captured.  The first system uses a shallow cap so
+        # the page title / composer header is excluded.
         if idx > 0:
             prev = staves[idx - 1]
             prev_bottom = min(H, prev.bottom + int(prev.staff_space * stem_margin))
+            chord_y0 = prev_bottom
         else:
             prev_bottom = 0
-        max_chord_depth = max(int(staff.staff_space * 8), 56)
-        chord_y0 = max(prev_bottom, music_y0 - max_chord_depth)
-        chord_y1 = music_y0
+            # First system: look at most 5 staff-spaces above the staff so
+            # page titles are excluded (they are typically farther up).
+            chord_y0 = max(0, staff.top - max(int(staff.staff_space * 5), 60))
+        chord_y1 = staff.top  # extend to the actual first staff line
 
         music_gray = grayscale[music_y0:music_y1, music_x0:music_x1]
         music_bin = (binary[music_y0:music_y1, music_x0:music_x1] > 0).astype(np.uint8)
@@ -278,11 +286,11 @@ def _build_systems(
                     row_run = _bottommost_ink_row_run(rows_ink)
                     if row_run is not None:
                         r0, r1 = row_run
-                        ry0 = max(chord_y0, chord_y0 + r0 - 3)
-                        ry1 = min(chord_y1, chord_y0 + r1 + 4)
+                        ry0 = max(chord_y0, chord_y0 + r0 - 10)
+                        ry1 = min(chord_y1, chord_y0 + r1 + 12)
                     else:
-                        ry0 = max(chord_y0, chord_y0 + int(np.where(rows_ink)[0][0]) - 3)
-                        ry1 = min(chord_y1, chord_y0 + int(np.where(rows_ink)[0][-1]) + 4)
+                        ry0 = max(chord_y0, chord_y0 + int(np.where(rows_ink)[0][0]) - 10)
+                        ry1 = min(chord_y1, chord_y0 + int(np.where(rows_ink)[0][-1]) + 12)
                     chord_bbox = (cx0, ry0, cx1 - cx0, ry1 - ry0)
                     chord_gray = grayscale[ry0:ry1, cx0:cx1]
                     chord_bin = (binary[ry0:ry1, cx0:cx1] > 0).astype(np.uint8)

@@ -1,38 +1,43 @@
 % fig_leadsheet_excerpt.ly
-% A four-bar jazz lead sheet excerpt in C major (4/4), showing the canonical
-% I–vi–ii–V chord progression (Cmaj7 – Am7 – Dm7 – G7) with a melody above.
-% Rendered in LilyJAZZ style to match the project's training data aesthetic.
+% Four-bar jazz lead sheet excerpt in C major (4/4).
+% I–vi–ii–V chord progression: Cmaj7 – Am7 – Dm7 – G7.
+% Melody mixes quarter and eighth notes; all pitches stay within the five-line staff
+% (E4–D5), so no ledger lines appear above the staff.
+% LilyJAZZ engraving style.
 
 \version "2.26.0"
 #(set-global-staff-size 18)
 \include "lilyjazz.ily"
 \header { tagline = ##f }
+
 \paper {
   indent        = 10\mm
   ragged-right  = ##t
+  paper-width   = 200\mm
+  paper-height  = 42\mm
   top-margin    = 6\mm
-  bottom-margin = 8\mm
-  left-margin   = 8\mm
-  right-margin  = 8\mm
-  line-width    = 170\mm
+  bottom-margin = 6\mm
+  left-margin   = 15\mm
+  right-margin  = 15\mm
 }
 
 harmonies = \chordmode {
   c1:maj7  a1:m7  d1:m7  g1:7
 }
 
-melody = \relative c'' {
+% Melody: all notes E4–D5, quarter + eighth mix.
+% Bar 1 – Cmaj7: stepwise approach to C5 with rhythmic lift
+% Bar 2 – Am7:   descend through chord tones back to E4
+% Bar 3 – Dm7:   arch up to A4 then step back down
+% Bar 4 – G7:    rise to D5 on a half-note landing
+melody = \relative c' {
   \clef treble
   \key c \major
   \time 4/4
-  % Bar 1 — Cmaj7: G5 E5 D5 C5
-  g'4 e d c |
-  % Bar 2 — Am7: E5 C5 B4 A4
-  e4 c b a |
-  % Bar 3 — Dm7: D5 F5 E5 D5
-  d4 f e d |
-  % Bar 4 — G7: G4 B4 D5 G5
-  g,4 b d g
+  e8 g a4 c b8 a |
+  c4 b8 a g4 e |
+  f4 a g8 f e4 |
+  g4 b d2
   \bar "|."
 }
 

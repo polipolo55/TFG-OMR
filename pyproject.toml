@@ -22,7 +22,8 @@ dependencies = [
     "fastapi (>=0.115.0,<1.0.0)",
     "uvicorn (>=0.32.0,<1.0.0)",
     "python-multipart (>=0.0.17,<1.0.0)",
-    "easyocr (>=1.7.0,<2.0.0)"
+    "easyocr (>=1.7.0,<2.0.0)",
+    "python-dotenv (>=1.2.2,<2.0.0)"
 ]
 
 

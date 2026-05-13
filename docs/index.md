@@ -70,12 +70,12 @@ src/
 │   ├── preprocess.py            Binarize, deskew (CLAHE + Otsu + projection)
 │   ├── staff_detect.py          Morphological staff line detection
 │   ├── inference.py             CRNN batch inference + CTC decode
-│   ├── ocr_chords.py            Chord symbol OCR (contour/EasyOCR/VLM)
+│   ├── chord_recognizer.py      Chord symbol OCR (CRNN-CTC, character-level)
 │   ├── grammar_fix.py           Stateful LMX token validator
 │   └── chord_postprocess.py     Jazz chord grammar cleanup
 │
 └── api/
-    └── main.py                  FastAPI: GET /, POST /api/omr/lead-sheet
+    └── main.py                  FastAPI: GET /, POST /api/omr/lead-sheet, /labeler endpoints
 ```
 
 ## Key Design Decisions

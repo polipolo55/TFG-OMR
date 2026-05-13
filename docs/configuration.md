@@ -87,7 +87,7 @@ These override inference behavior without touching the Config dataclass:
 |----------|--------|
 | `OMR_ENABLE_TILING=1` | Enable legacy tiling mode in inference |
 | `OMR_BEAM_WIDTH=N` | Override CTC beam width (default: 1 = greedy) |
-| `OMR_CHORD_BACKEND=contour\|easyocr\|vlm` | Chord OCR backend |
+| `OMR_CHORD_CHECKPOINT=<path>` | Path to chord CRNN checkpoint (default: `models/chord/latest/best_model.pt`) |
 
 ## Example: Custom Training Config
 

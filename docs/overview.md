@@ -67,8 +67,10 @@ Book.  See "Known Limitations" below for what falls *outside* the contract.
   `staff_detect.py::_associate_chords`.
 - **Format.** Standard jazz chord shorthand: `ROOT [acc] [quality] [extension] [alterations]* [/BASS]`.  Examples: `Cmaj7`, `F#m7b5`, `D7#9`, `Bb6/9`, `Am7/D`.
 - **Root letters.** A through G, with optional flat (`b`) or sharp (`#`).
-- **OCR backend.** `contour` (default), `easyocr`, or `vlm` (gated by
-  `OMR_CHORD_BACKEND`).  Chord post-processing in
+- **OCR backend.** A dedicated CRNN trained on synthetic Real Book-style chord
+  strips (LilyJAZZ font).  Character-level CTC output; fine-tuned on hand-labeled
+  real strips.  Checkpoint at `models/chord/latest/best_model.pt`, overridable
+  via `OMR_CHORD_CHECKPOINT`.  Chord post-processing in
   `src/omr_pipeline/chord_postprocess.py` rejects non-chord strings (page
   numbers, tempo markings, lyrics).
 
@@ -98,7 +100,7 @@ Input (PDF / image bytes)
         │                                      │
         │                              [Grammar Fix]  LMX validator
         │
-        └──── [Chord OCR] ──────────── EasyOCR → chord tokens
+        └──── [Chord OCR] ──────────── Chord CRNN → chord tokens
                                                │
                                        [Chord Postprocess] grammar cleanup
         │
@@ -134,7 +136,7 @@ Input (PDF / image bytes)
 | Image processing | OpenCV, albumentations |
 | Music rendering | LilyPond + LilyJAZZ font |
 | PDF handling | PyMuPDF (fitz) |
-| Chord OCR | EasyOCR |
+| Chord OCR | Custom CRNN-CTC (ResNet18, LilyJAZZ-trained, fine-tuned on real strips) |
 | Web API | FastAPI + Uvicorn |
 | Data augmentation | albumentations |
 | Package manager | Poetry |
@@ -143,20 +145,58 @@ Input (PDF / image bytes)
 
 ```
 src/
-├── cli.py                  unified CLI (9 subcommands)
-├── style.py                matplotlib theme
-├── CRNN_CTC/               model, training, vocab, evaluation
-├── data_processing/        dataset generation and augmentation
-├── omr_pipeline/           full inference pipeline
-└── api/                    FastAPI web server
+├── cli.py                      unified CLI (9 subcommands)
+├── style.py                    matplotlib theme
+├── CRNN_CTC/                   model, training, vocab, evaluation
+│   ├── model.py                CRNN-CTC architecture (ResNet18 / VGG backbone)
+│   ├── vocab.py                Vocabulary: blank=0, pad=1, unk=2, tokens 3+
+│   ├── dataset.py / config.py  PrIMuS OMR dataset + Config dataclass
+│   ├── train.py / evaluate.py  OMR training loop and evaluation
+│   ├── chord_dataset.py        Synthetic chord-strip dataset + augmentation
+│   ├── chord_train.py          Chord CRNN training from scratch
+│   └── chord_finetune.py       Fine-tune chord CRNN on real labeled strips
+├── data_processing/            dataset generation and augmentation
+│   ├── generate_realbook.py    PrIMuS → LilyJAZZ render
+│   ├── semantic_to_lmx.py      PrIMuS .semantic → LMX labels
+│   ├── augment_scanned.py      scan-simulation augmentation
+│   ├── chord_render.py         Synthetic chord strip renderer (LilyJAZZ)
+│   ├── generate_chord_crops.py Bulk chord strip generation for CRNN training
+│   └── extract_real_chord_strips.py  Extract + pre-label strips from real PDFs
+├── omr_pipeline/               full inference pipeline
+│   ├── pipeline.py             run_pipeline() entry point
+│   ├── preprocess.py           load / binarize / deskew
+│   ├── staff_detect.py         morphology → 5-line clusters + chord strip crop
+│   ├── inference.py            CRNN-CTC music recognition
+│   ├── chord_recognizer.py     CRNN chord OCR (recognize_chords_crnn)
+│   ├── chord_postprocess.py    jazz-chord grammar filter
+│   └── grammar_fix.py          LMX token sequence validator
+└── api/                        FastAPI web server
 
 data/
 ├── raw/primus/             PrIMuS dataset packages
-└── processed/primus/
-    ├── clean/              rendered LilyJAZZ PNGs + .lmx labels
-    └── scanned/            augmented (distorted) copies
+├── processed/primus/
+│   ├── clean/              rendered LilyJAZZ PNGs + .lmx labels
+│   └── scanned/            augmented (distorted) copies
+├── chord_synth/            synthetic chord-strip images + CSV labels
+│   ├── train/  val/        split folders
+│   └── train_labels.csv  val_labels.csv
+├── chord_real/             real Real Book chord strips for fine-tuning
+│   ├── strips/             cropped PNG images from real PDF pages
+│   └── labels.jsonl        hand-corrected labels (status: pending/done/skip)
+└── vocab/
+    ├── primus_lmx.txt      OMR vocabulary (~270 tokens)
+    └── chord.txt           Chord CRNN vocabulary (26 character tokens)
 
-models/latest/best_model.pt best checkpoint
+models/
+├── latest/best_model.pt    OMR CRNN checkpoint (latest)
+└── chord/
+    ├── latest/             → symlink to latest chord run/finetune dir
+    └── finetune_*/         fine-tune checkpoints with training_log.csv
+
+static/
+├── index.html              Lead-sheet upload UI
+└── chord_labeler.html      Chord strip hand-labeling UI
+
 scripts/                    standalone utilities
 notebooks/                  Jupyter evaluation notebooks
 latex_documents/gep/        GEP thesis-management deliverables

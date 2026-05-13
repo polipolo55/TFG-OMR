@@ -215,3 +215,153 @@ data/processed/primus/
 
 - `scripts/validate_lmx_pairs.py` — Sanity-check that every `.png` has a matching `.lmx`
 - `scripts/audit_lmx_corpus.py` — Corpus statistics (token frequencies, sample counts per filter)
+
+---
+
+## Chord CRNN Data Pipeline
+
+The chord OCR system uses its own independent data pipeline, separate from the PrIMuS OMR pipeline above.  It produces a character-level CRNN trained to read jazz chord symbols from Real Book scans.
+
+### Chord Vocabulary
+
+**File:** `data/vocab/chord.txt` — 26 character tokens (no blank/pad/unk — those are injected at indices 0/1/2 by `Vocabulary`).
+
+| Category | Characters |
+|----------|-----------|
+| Root letters | `A B C D E F G` |
+| Accidentals | `# b` |
+| Separators | ` ` (space), `/` |
+| Quality letters | `a d i j m s u` (spell `dim`, `maj`, `sus`) |
+| Special quality | `- + ø` |
+| Numbers | `1 3 6 7 9` |
+
+Notable absences: `2`, `4`, `5`, `8`, `l`, `t`, `°`.
+- `sus4` → `sus` after `4` is dropped; both align with the `sus` training label.
+- `alt` cannot be represented; label `G7alt` as `G7`.
+- `°` is not in vocab; always use `dim` / `dim7`.
+- `5` is not in vocab; `-7b5` and `m7b5` are canonicalized to `ø` by `RealChordDataset._canon()` before the vocab filter, so half-dim labels survive.
+
+### Stage 1 — Synthetic Data Generation
+
+**Files:** `src/data_processing/chord_render.py`, `src/data_processing/generate_chord_crops.py`
+
+`chord_render.py` defines the full set of chord quality specs (`QUALITIES`) and root
+weights (`ROOTS`).  It is the **single source of truth** for chord notation conventions
+on the training side — both `visual_quality` strings and LilyPond rendering live here.
+
+| Quality | Visual label | Sampling weight |
+|---------|-------------|----------------|
+| Major triad | `` (empty) | 30 |
+| Dominant 7 | `7` | 35 |
+| Minor 7 | `-7` | 35 |
+| Major 7 | `maj7` | 28 |
+| Minor triad | `-` | 12 |
+| Half-dim | `ø` | 8 |
+| … | … | … |
+
+`generate_chord_crops.py` generates strips of 1–5 sampled chords per image, rendered
+with LilyJAZZ font, with Albumentations augmentation + synthetic Real Book clutter
+(`_add_realbook_clutter`: binder-hole shadow, staff-line bleed, slash repeat marks).
+
+```bash
+# Generate 12 000 train + 1 200 val strips:
+cd src && poetry run python -m data_processing.generate_chord_crops \
+    --output ../data/chord_synth --train 12000 --val 1200
+```
+
+**Output:**
+```
+data/chord_synth/
+    train/          PNG strips
+    val/            PNG strips
+    train_labels.csv
+    val_labels.csv
+```
+
+### Stage 2 — Train Chord CRNN from Scratch
+
+**File:** `src/CRNN_CTC/chord_train.py`
+
+Same CRNN-CTC architecture as the OMR model (ResNet18 backbone, 2-layer BiLSTM), but
+with a 29-token character vocabulary instead of the ~270-token LMX vocabulary.
+
+```bash
+cd src && poetry run python -m CRNN_CTC.chord_train \
+    --synth-dir ../data/chord_synth \
+    --model-dir ../models/chord \
+    --epochs 60
+```
+
+Checkpoint saved to `models/chord/run_TIMESTAMP/best_model.pt`.
+
+### Stage 3 — Extract Real Strips and Pre-Label
+
+**File:** `src/data_processing/extract_real_chord_strips.py`
+
+Extracts chord-strip crops from real Real Book PDF pages using the same staff
+detection pipeline as inference, then pre-labels them with the current chord CRNN
+so the human reviewer can correct rather than type from scratch.
+
+```bash
+poetry run python src/data_processing/extract_real_chord_strips.py \
+    --pdf data/real_book/full_realbook.pdf \
+    --output data/chord_real \
+    --page-step 10
+```
+
+Appends records to `data/chord_real/labels.jsonl`:
+```json
+{"filename": "page0030_staff2.png", "predicted": "G-7 C7 Fmaj7", "label": null, "status": "pending"}
+```
+
+**Resume support:** pages already present in `labels.jsonl` are skipped automatically.
+
+### Stage 4 — Hand Labeling
+
+Start the API server and open `http://localhost:8000/labeler` in a browser.
+
+**Keyboard shortcuts:** `Enter` = save & next · `Esc` = skip · `Tab` = restore CRNN prediction · `Shift+Tab` = clear.
+
+**Labeling conventions:**
+
+| What you see | Label as |
+|-------------|---------|
+| `Fmaj7` | `Fmaj7` |
+| `G-7` or `Gm7` | `G-7` |
+| `Bø` or `Bm7b5` or `B-7b5` | `Bø` (or `Bm7b5` / `B-7b5` — auto-converted to `Bø`) |
+| `Cdim` or `C°` | `Cdim` (never `°`) |
+| `G7alt` or `G7alt.` | `G7` (alt not in vocab) |
+| `A7(11)` | `A711` (drop parens) |
+| Multiple chords | space-separated: `Fmaj7 G-7 C7` |
+| No chords visible | click **Skip** |
+
+### Stage 5 — Fine-Tune on Real Strips
+
+**File:** `src/CRNN_CTC/chord_finetune.py`
+
+Fine-tunes the synthetic checkpoint on hand-labeled real strips mixed with synthetic
+data to prevent catastrophic forgetting of rare chord types.
+
+```bash
+cd src && poetry run python -m CRNN_CTC.chord_finetune \
+    --checkpoint ../models/chord/latest/best_model.pt \
+    --real-strips-dir ../data/chord_real/strips \
+    --real-labels ../data/chord_real/labels.jsonl \
+    --synth-dir ../data/chord_synth \
+    --model-dir ../models/chord \
+    --epochs 20 --synth-weight 0.4 --lr 2e-4
+```
+
+Key `--model-dir ../models/chord` must be passed explicitly when running from `src/`
+to avoid the checkpoint being written to `src/models/chord/` instead.
+
+**Label canonicalization** (`RealChordDataset._canon()`):
+- `m7b5` / `-7b5` / `min7b5` → `ø`
+- `Cm7` → `C-7` (minor written with `m`)
+- Characters not in the chord vocabulary are silently dropped
+- Whitespace collapsed
+
+**Weighted sampling:** real strips weight 1.0, synthetic weight `--synth-weight` (default 0.4).
+Epoch sample count ≈ `n_real + synth_weight × n_synth`.
+
+Checkpoint saved to `models/chord/finetune_TIMESTAMP/best_model.pt`; `models/chord/latest` symlink updated.

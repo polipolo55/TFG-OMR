@@ -120,11 +120,53 @@ provides a drag-and-drop interface that shows:
 
 | Variable | Default | Effect |
 |----------|---------|--------|
-| `OMR_CHECKPOINT` | `models/latest/best_model.pt` | Path to checkpoint file. Absolute or relative to project root. |
-| `OMR_CHORD_BACKEND` | `contour` | Chord OCR backend: `contour` (default), `easyocr`, or `vlm`. |
+| `OMR_CHECKPOINT` | `models/latest/best_model.pt` | Path to music CRNN checkpoint. Absolute or relative to project root. |
+| `OMR_CHORD_CHECKPOINT` | `models/chord/latest/best_model.pt` | Path to chord CRNN checkpoint. Absolute or relative to project root. |
 | `OMR_PDF_DPI` | `300` | DPI for PyMuPDF PDF rasterisation (72–600). |
-| `OMR_BEAM_WIDTH` | `1` (greedy) | CTC beam width for CRNN decoding. |
+| `OMR_BEAM_WIDTH` | `1` (greedy) | CTC beam width for music CRNN decoding. |
 | `OMR_DEBUG_DIR` | _(unset)_ | If set, intermediate crops (music strips, chord strips) are saved here. |
+
+## Chord Strip Labeling Endpoints
+
+These endpoints power `static/chord_labeler.html`, the hand-labeling UI used to
+build fine-tuning data for the chord CRNN.  Data is stored in
+`data/chord_real/labels.jsonl` (one JSON record per line).
+
+### `GET /labeler`
+
+Serves `static/chord_labeler.html`.
+
+### `GET /api/labeler/stats`
+
+Returns label counts by status.
+
+```json
+{"done": 292, "skip": 603, "pending": 0, "total": 895}
+```
+
+### `GET /api/labeler/next`
+
+Returns the next record with `status == "pending"`, or `404` if none remain.
+
+```json
+{"filename": "page0030_staff2.png", "predicted": "G-7 C7 Fmaj7", "label": null, "status": "pending"}
+```
+
+### `GET /api/labeler/strip/{filename}`
+
+Serves the chord-strip PNG from `data/chord_real/strips/`.  Rejects paths containing `/` or `..`.
+
+### `POST /api/labeler/save`
+
+Persist a label or skip decision.
+
+**Request body:**
+```json
+{"filename": "page0030_staff2.png", "label": "G-7 C7 Fmaj7", "status": "done"}
+```
+`status` must be `"done"` or `"skip"`.  `label` may be `null` when skipping.
+
+**Response:** `{"ok": true}`
 
 ## Integration Notes
 

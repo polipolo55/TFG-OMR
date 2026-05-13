@@ -110,28 +110,57 @@ class System:
 
 ## Stage 4 — Chord OCR
 
-**File:** `src/omr_pipeline/ocr_chords.py`
+**File:** `src/omr_pipeline/chord_recognizer.py`
 
-Processes `System.chord_img` (the strip above the staff).
+Processes `System.chord_image` (the strip above the staff) with a dedicated
+CRNN-CTC model trained on synthetic Real Book-style chord images.
 
-**Default backend: `contour`**
-1. Ensure light background (auto-invert if mean < 128)
-2. Upscale to min height 200 px
-3. CLAHE (clipLimit=3.0, tileGridSize=4×4) + unsharp mask
-4. Connected-component isolation — finds individual symbols
-5. Per-component EasyOCR → string
+**Inference steps:**
+1. Trim leading columns with high ink density (binder-hole shadow removal — up to 10 % of strip width, ≥ 50 % ink density threshold)
+2. Resize strip to training height (64 px), preserving aspect ratio; clamp to `max_image_width=2048`
+3. Per-image zero-mean / unit-variance normalization
+4. Right-pad batch to common width
+5. CRNN forward pass → log-probabilities
+6. Greedy CTC decode → character sequence
+7. `<unk>` tokens (from clutter the synthetic model never saw) treated as word separators
+8. `clean_chord_line()` from `chord_postprocess.py` validates against the jazz chord grammar, dropping non-chord fragments
+9. Single-root false-positives (`"B"`, `"Eb"`, etc. with no quality/extension) filtered out
 
-**Alternative backends:**
-- `easyocr` — whole-strip EasyOCR (less accurate on multi-symbol strips)
-- `vlm` — vision-language model (GPT-4o / Gemini) for complex/ambiguous chords
+**Chord vocabulary** (character-level, 26 content tokens + blank/pad/unk):
+
+| Category | Characters |
+|----------|-----------|
+| Roots | `A B C D E F G` |
+| Accidentals | `# b` |
+| Separators / bass | ` ` (space), `/` |
+| Quality / extension | `- + ø` ; `d i m` → `dim` ; `m a j` → `maj` ; `s u` → `sus` |
+| Numbers | `1 3 6 7 9` |
+
+**Chord notation conventions** (Real Book style):
+
+| Symbol | Meaning |
+|--------|---------|
+| `-` | minor (e.g. `G-7`) |
+| `maj` | major 7 (e.g. `Fmaj7`) |
+| `ø` | half-diminished (e.g. `Bø`) |
+| `dim` / `dim7` | diminished (e.g. `Cdim7`) |
+| `+` | augmented (e.g. `C+7`) |
+| `/` | slash bass (e.g. `Fmaj7/A`) |
+
+**Model checkpoint resolution** (in priority order):
+1. `OMR_CHORD_CHECKPOINT` env var
+2. `<project_root>/models/chord/latest/best_model.pt`
+
+If no checkpoint is found, chord recognition is skipped silently and `chords` is `[]` for every segment.
+
+**Model caching:** loaded once per process and reused for all subsequent calls.
 
 **Chord postprocessing** (`src/omr_pipeline/chord_postprocess.py`):
-- Corrects common OCR confusions: `majl→maj7`, `susl→sus4`, trailing `0→o`
 - Validates against jazz chord grammar:
   ```
   ROOT [ACC] [QUALITY] [EXTEN] [ALT]* [SLASH]
   ```
-- Rejects non-chord tokens (numbers, punctuation, page numbers)
+- Rejects non-chord tokens (numbers, punctuation, page numbers, tempo markings)
 
 ## Stage 5 — Grammar Fixing
 
@@ -198,6 +227,6 @@ On error:
 | Variable | Default | Effect |
 |----------|---------|--------|
 | `OMR_PDF_DPI` | `300` | PyMuPDF rasterisation DPI for PDFs (clamped 72–600). |
-| `OMR_BEAM_WIDTH` | `1` (greedy) | CTC beam width.  Set to >1 to enable beam search. |
+| `OMR_BEAM_WIDTH` | `1` (greedy) | CTC beam width for music CRNN.  Set to >1 to enable beam search. |
 | `OMR_ENABLE_TILING` | unset | Set `=1` to enable legacy tiling mode (rarely useful). |
-| `OMR_CHORD_BACKEND` | `contour` | `contour` / `easyocr` / `vlm` for the chord OCR backend. |
+| `OMR_CHORD_CHECKPOINT` | `models/chord/latest/best_model.pt` | Path to the chord CRNN checkpoint. Absolute or project-root-relative. |

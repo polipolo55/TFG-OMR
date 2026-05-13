@@ -106,9 +106,14 @@ class Vocabulary:
 
     @classmethod
     def from_file(cls, path: str | Path) -> "Vocabulary":
-        """Load vocabulary from a text file (one token per line)."""
+        """Load vocabulary from a text file (one token per line).
+
+        Lines are preserved verbatim (no ``strip``) so single-character
+        whitespace tokens — used by the character-level chord vocabulary —
+        survive the round-trip.  Empty lines are skipped.
+        """
         path = Path(path)
-        tokens = [line.strip() for line in path.read_text().splitlines() if line.strip()]
+        tokens = [line for line in path.read_text().splitlines() if line]
         return cls(tokens)
 
     def save(self, path: str | Path) -> None:

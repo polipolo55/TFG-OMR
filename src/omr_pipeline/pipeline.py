@@ -25,7 +25,7 @@ import numpy as np
 from .preprocess import load_image, load_pdf_page, pdf_load_dpi, preprocess_page
 from .staff_detect import System, detect_systems
 from .inference import recognize_music
-from .ocr_chords import recognize_chords
+from .chord_recognizer import recognize_chords_crnn
 from .grammar_fix import fix_sequence
 
 log = logging.getLogger(__name__)
@@ -90,7 +90,7 @@ def _process_systems(
     _save_debug(music_imgs, chord_imgs)
 
     music_preds = recognize_music(music_imgs, checkpoint_path)
-    chord_preds = recognize_chords(chord_imgs)
+    chord_preds = recognize_chords_crnn(chord_imgs)
 
     # LMX grammar correction with cross-system key + time propagation
     global_key: str | None = None

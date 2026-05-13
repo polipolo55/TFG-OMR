@@ -15,15 +15,19 @@ from dotenv import load_dotenv
 # Resolve project root early so load_dotenv can find .env
 _SRC = Path(__file__).resolve().parent.parent
 _ROOT = _SRC.parent
-load_dotenv(_ROOT / ".env")  # no-op if file absent
+load_dotenv(_ROOT / ".env", override=True)  # .env wins over shell env
 
 for p in (str(_SRC), str(_ROOT)):
     if p not in sys.path:
         sys.path.insert(0, p)
 
+import json
+from threading import Lock
+
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
+from pydantic import BaseModel
 
 from omr_pipeline.pipeline import run_pipeline
 
@@ -114,6 +118,96 @@ async def process_lead_sheet(
     if result.get("error") and not result.get("pages"):
         raise HTTPException(422, result["error"])
     return result
+
+
+# ---------------------------------------------------------------------------
+# Chord-strip labeling endpoints (used by static/chord_labeler.html)
+# ---------------------------------------------------------------------------
+
+_LABELER_ROOT = _ROOT / "data" / "chord_real"
+_LABELS_PATH = _LABELER_ROOT / "labels.jsonl"
+_STRIPS_DIR = _LABELER_ROOT / "strips"
+_labels_lock = Lock()
+
+
+def _load_labels() -> list[dict]:
+    if not _LABELS_PATH.exists():
+        return []
+    with open(_LABELS_PATH, encoding="utf-8") as f:
+        return [json.loads(line) for line in f if line.strip()]
+
+
+def _save_labels(records: list[dict]) -> None:
+    tmp = _LABELS_PATH.with_suffix(".jsonl.tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        for r in records:
+            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+    tmp.replace(_LABELS_PATH)
+
+
+class SaveRequest(BaseModel):
+    filename: str
+    label: str | None = None
+    status: str  # "done" | "skip"
+
+
+@app.get("/labeler")
+async def labeler_page():
+    """Serve the chord-labeling UI."""
+    page = _STATIC / "chord_labeler.html"
+    if not page.exists():
+        raise HTTPException(404, "chord_labeler.html missing")
+    return FileResponse(page)
+
+
+@app.get("/api/labeler/stats")
+async def labeler_stats():
+    """Return counts of labels by status."""
+    with _labels_lock:
+        records = _load_labels()
+    counts = {"done": 0, "skip": 0, "pending": 0, "total": len(records)}
+    for r in records:
+        counts[r.get("status", "pending")] = counts.get(r.get("status", "pending"), 0) + 1
+    return counts
+
+
+@app.get("/api/labeler/next")
+async def labeler_next():
+    """Return the next pending strip, or 404 if none remain."""
+    with _labels_lock:
+        records = _load_labels()
+    for r in records:
+        if r.get("status") == "pending":
+            return r
+    raise HTTPException(404, "No pending strips")
+
+
+@app.get("/api/labeler/strip/{filename}")
+async def labeler_strip(filename: str):
+    """Serve a chord-strip PNG by filename."""
+    # Defensive filename check (prevent path traversal)
+    if "/" in filename or ".." in filename:
+        raise HTTPException(400, "Invalid filename")
+    path = _STRIPS_DIR / filename
+    if not path.exists():
+        raise HTTPException(404, "Strip not found")
+    return FileResponse(path, media_type="image/png")
+
+
+@app.post("/api/labeler/save")
+async def labeler_save(req: SaveRequest):
+    """Persist a label / skip decision for one strip."""
+    if req.status not in ("done", "skip"):
+        raise HTTPException(400, "status must be 'done' or 'skip'")
+    with _labels_lock:
+        records = _load_labels()
+        for r in records:
+            if r["filename"] == req.filename:
+                r["label"] = req.label
+                r["status"] = req.status
+                _save_labels(records)
+                return {"ok": True}
+    raise HTTPException(404, "Filename not in labels.jsonl")
 
 
 if __name__ == "__main__":

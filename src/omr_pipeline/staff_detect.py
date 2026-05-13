@@ -200,30 +200,6 @@ def _refine_x_bounds(staves: list[Staff], binary: np.ndarray) -> None:
 # Building systems (chord + music region pairs)
 # ---------------------------------------------------------------------------
 
-def _bottommost_ink_row_run(rows_ink: np.ndarray) -> tuple[int, int] | None:
-    """Largest vertical run of rows with ink; prefer the run closest to the staff (bottom of band)."""
-    h = len(rows_ink)
-    if h == 0:
-        return None
-    best: tuple[int, int, int] | None = None  # (start, end, score) score = end index
-    i = 0
-    while i < h:
-        if not rows_ink[i]:
-            i += 1
-            continue
-        j = i
-        while j < h and rows_ink[j]:
-            j += 1
-        # Prefer runs nearer bottom (chord symbols sit just above the staff)
-        score = j
-        if best is None or score > best[2]:
-            best = (i, j, score)
-        i = j
-    if best is None:
-        return None
-    return best[0], best[1]
-
-
 def _build_systems(
     staves: list[Staff],
     grayscale: np.ndarray,
@@ -261,39 +237,27 @@ def _build_systems(
             prev_bottom = min(H, prev.bottom + int(prev.staff_space * stem_margin))
             chord_y0 = prev_bottom
         else:
-            prev_bottom = 0
-            # First system: look at most 5 staff-spaces above the staff so
-            # page titles are excluded (they are typically farther up).
-            chord_y0 = max(0, staff.top - max(int(staff.staff_space * 5), 60))
-        chord_y1 = staff.top  # extend to the actual first staff line
+            # First system: look up to 7 staff-spaces above.  Chord text sits
+            # ~3-4 spaces above the staff; the page title is typically 10+
+            # spaces away so this cap excludes it.
+            chord_y0 = max(0, staff.top - max(int(staff.staff_space * 7), 80))
+        chord_y1 = staff.top
 
         music_gray = grayscale[music_y0:music_y1, music_x0:music_x1]
         music_bin = (binary[music_y0:music_y1, music_x0:music_x1] > 0).astype(np.uint8)
 
-        # Chord crop — ink in band, keep bottom-most row cluster (chord row)
+        # Chord crop — take the full inter-system band bounded by the music
+        # x-extent.  EasyOCR's own detector finds text anywhere in the band,
+        # which is more robust than trying to pick a row-cluster here (cluster
+        # detection is defeated by binder holes and page borders).
         chord_bbox = None
         chord_gray = None
         chord_bin = None
 
         if chord_y1 - chord_y0 >= chord_min_h:
-            band = binary[chord_y0:chord_y1, :]
-            if np.any(band > 0):
-                cols_ink = np.any(band > 0, axis=0)
-                rows_ink = np.any(band > 0, axis=1)
-                if np.any(cols_ink) and np.any(rows_ink):
-                    cx0 = max(0, int(np.where(cols_ink)[0][0]) - 3)
-                    cx1 = min(W, int(np.where(cols_ink)[0][-1]) + 4)
-                    row_run = _bottommost_ink_row_run(rows_ink)
-                    if row_run is not None:
-                        r0, r1 = row_run
-                        ry0 = max(chord_y0, chord_y0 + r0 - 10)
-                        ry1 = min(chord_y1, chord_y0 + r1 + 12)
-                    else:
-                        ry0 = max(chord_y0, chord_y0 + int(np.where(rows_ink)[0][0]) - 10)
-                        ry1 = min(chord_y1, chord_y0 + int(np.where(rows_ink)[0][-1]) + 12)
-                    chord_bbox = (cx0, ry0, cx1 - cx0, ry1 - ry0)
-                    chord_gray = grayscale[ry0:ry1, cx0:cx1]
-                    chord_bin = (binary[ry0:ry1, cx0:cx1] > 0).astype(np.uint8)
+            chord_gray = grayscale[chord_y0:chord_y1, music_x0:music_x1]
+            chord_bin = (binary[chord_y0:chord_y1, music_x0:music_x1] > 0).astype(np.uint8)
+            chord_bbox = (music_x0, chord_y0, music_x1 - music_x0, chord_y1 - chord_y0)
 
         systems.append(System(
             staff=staff,

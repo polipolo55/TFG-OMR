@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Real Book chord labeler</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", monospace;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px;
+      background: #f8f9fa;
+      color: #222;
+    }
+    h1 { margin: 0 0 4px 0; font-size: 22px; }
+    .sub { color: #666; font-size: 14px; margin-bottom: 16px; }
+
+    .progress {
+      background: #fff;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin-bottom: 14px;
+      font-size: 14px;
+      color: #555;
+    }
+    .progress .bar {
+      height: 6px;
+      background: #eaecef;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .progress .bar > div {
+      height: 100%;
+      background: #2da44e;
+      transition: width 0.2s;
+    }
+
+    .strip-card {
+      background: #fff;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+    .strip-card img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      background: #fafafa;
+      border: 1px solid #eaecef;
+      padding: 6px;
+      border-radius: 3px;
+    }
+    .strip-meta { font-size: 12px; color: #888; margin-top: 6px; }
+
+    .input-row { display: flex; gap: 8px; align-items: center; }
+    input[type="text"] {
+      flex: 1;
+      font: 22px/1.2 -apple-system, monospace;
+      padding: 10px 12px;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      background: #fff;
+    }
+    input[type="text"]:focus { outline: 2px solid #0969da; outline-offset: -1px; }
+
+    .pred-hint {
+      font-size: 13px;
+      color: #57606a;
+      margin-top: 6px;
+      font-family: monospace;
+    }
+    .pred-hint code { background: #eaecef; padding: 1px 6px; border-radius: 3px; }
+
+    button {
+      padding: 8px 14px;
+      font-size: 14px;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      background: #f6f8fa;
+      cursor: pointer;
+    }
+    button:hover { background: #eaecef; }
+    .btn-primary { background: #2da44e; color: white; border-color: #2da44e; }
+    .btn-primary:hover { background: #2c974b; }
+    .btn-warn { background: #ffebe6; border-color: #cf222e; color: #82071e; }
+
+    .button-row { display: flex; gap: 8px; margin-top: 12px; }
+    .keymap { color: #888; font-size: 12px; margin-top: 10px; }
+    .keymap kbd {
+      background: #eaecef;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: inherit;
+      font-size: 11px;
+    }
+    .done { text-align: center; padding: 60px; color: #2da44e; font-size: 24px; }
+  </style>
+</head>
+<body>
+  <h1>Real Book chord labeler</h1>
+  <div class="sub">
+    Correct the predicted label for each chord strip.
+    Use Real Book conventions:
+    <code>-</code> for minor (G-7),
+    <code>maj</code> for major 7 (Fmaj7),
+    <code>ø</code> for half-dim,
+    <code>dim</code> for full-dim,
+    <code>+</code> for aug,
+    space between chords.
+    Leave empty if no chord text is visible.
+  </div>
+
+  <div id="progress" class="progress">
+    Loading…
+    <div class="bar"><div id="progress-bar" style="width:0"></div></div>
+  </div>
+
+  <div id="strip" class="strip-card" style="display:none">
+    <img id="strip-img" src="" alt="chord strip" />
+    <div class="strip-meta" id="filename"></div>
+  </div>
+
+  <div id="input-area" style="display:none">
+    <div class="input-row">
+      <input id="label-input" type="text" placeholder="e.g.  Fmaj7  G7  ..." spellcheck="false" autocomplete="off" />
+    </div>
+    <div class="pred-hint">CRNN suggestion: <code id="pred-text">—</code></div>
+    <div class="button-row">
+      <button class="btn-primary" onclick="save()">Save &amp; next</button>
+      <button onclick="restorePrediction()">Restore suggestion</button>
+      <button onclick="clearLabel()">Clear</button>
+      <button class="btn-warn" onclick="skip()">Skip (no chords / garbage)</button>
+    </div>
+    <div class="keymap">
+      <kbd>Enter</kbd> save · <kbd>Esc</kbd> skip · <kbd>Tab</kbd> restore prediction · <kbd>Shift</kbd>+<kbd>Tab</kbd> clear
+    </div>
+  </div>
+
+  <div id="done" class="done" style="display:none">
+    🎉 All strips labeled or skipped.
+  </div>
+
+  <script>
+    let current = null;
+
+    async function refreshStats() {
+      const r = await fetch('/api/labeler/stats');
+      const s = await r.json();
+      const labeled = s.done + s.skip;
+      const pct = s.total ? (100 * labeled / s.total) : 0;
+      document.getElementById('progress').firstChild.textContent =
+        `${s.done} labeled · ${s.skip} skipped · ${s.pending} remaining · ${s.total} total`;
+      document.getElementById('progress-bar').style.width = pct.toFixed(1) + '%';
+    }
+
+    async function loadNext() {
+      const r = await fetch('/api/labeler/next');
+      if (r.status === 404) {
+        current = null;
+        document.getElementById('strip').style.display = 'none';
+        document.getElementById('input-area').style.display = 'none';
+        document.getElementById('done').style.display = 'block';
+        await refreshStats();
+        return;
+      }
+      current = await r.json();
+      document.getElementById('strip').style.display = 'block';
+      document.getElementById('input-area').style.display = 'block';
+      document.getElementById('done').style.display = 'none';
+      document.getElementById('strip-img').src = '/api/labeler/strip/' + encodeURIComponent(current.filename);
+      document.getElementById('filename').textContent = current.filename;
+      document.getElementById('pred-text').textContent = current.predicted || '(none)';
+
+      const input = document.getElementById('label-input');
+      input.value = current.predicted || '';
+      input.focus();
+      input.select();
+      await refreshStats();
+    }
+
+    async function save() {
+      if (!current) return;
+      const label = document.getElementById('label-input').value.trim();
+      await fetch('/api/labeler/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({filename: current.filename, label, status: 'done'}),
+      });
+      loadNext();
+    }
+
+    async function skip() {
+      if (!current) return;
+      await fetch('/api/labeler/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({filename: current.filename, label: null, status: 'skip'}),
+      });
+      loadNext();
+    }
+
+    function restorePrediction() {
+      if (current) {
+        document.getElementById('label-input').value = current.predicted || '';
+        document.getElementById('label-input').focus();
+      }
+    }
+
+    function clearLabel() {
+      document.getElementById('label-input').value = '';
+      document.getElementById('label-input').focus();
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); save(); }
+      else if (e.key === 'Escape') { e.preventDefault(); skip(); }
+      else if (e.key === 'Tab') {
+        e.preventDefault();
+        if (e.shiftKey) clearLabel(); else restorePrediction();
+      }
+    });
+
+    loadNext();
+  </script>
+</body>
+</html>

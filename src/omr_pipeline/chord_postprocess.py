@@ -29,15 +29,31 @@ import re
 
 # Applied before tokenisation.  Order matters — longer first.
 _CHAR_REPAIRS: list[tuple[re.Pattern, str]] = [
-    # 'majl' → 'maj7'  (l is a very common EasyOCR digit-1/7 confusion)
+    # ------------------------------------------------------------------ #
+    # Handwritten Real Book digit/letter confusions (EasyOCR on cursive)  #
+    # ------------------------------------------------------------------ #
+    # Leading '6' → 'G'  ("6-7" → "G-7", "6b7" → "Gb7")
+    # Only at true word-start (not inside a chord like "C6" or "Cmaj6").
+    (re.compile(r'(?<![A-Za-z0-9])6(?=[A-Ga-g#b\-+]|$)'), 'G'),
+    # Leading '8' → 'B'  ("87" → "B7", "89" → "B9")
+    (re.compile(r'(?<![A-Za-z0-9])8(?=[A-Za-z7b#]|$)'), 'B'),
+    # 'mio' / 'mj' / 'mjj' / 'mii' / 'moj' → 'maj'  (cursive 'a' misread as o/i/j)
+    (re.compile(r'm(?:io|j+|ii|oj)(?=\d|\b)'), 'maj'),
+    # ------------------------------------------------------------------ #
+    # Generic OCR confusion fixes                                         #
+    # ------------------------------------------------------------------ #
+    # 'majl' → 'maj7'  (l ↔ 1 ↔ 7 confusion, specific maj case first)
     (re.compile(r'(?<=maj)l\b'), '7'),
-    # 'susl' or 'sus4' normalise
+    # Any trailing 'l' after a chord character → '7'
+    # Covers "G-l"→"G-7", "Gbl"→"Gb7", "Ebl"→"Eb7"
+    (re.compile(r'(?<=[A-Za-z0-9#b\-+])l\b'), '7'),
+    # 'susl' → 'sus4'
     (re.compile(r'susl\b'), 'sus4'),
-    # Trailing '0' after a chord letter → 'o'  (dim circle, e.g. "Co" → diminished)
+    # Trailing '0' after a chord letter → 'o'  (dim circle)
     (re.compile(r'(?<=[A-Ga-g#b])0\b'), 'o'),
-    # '|' → '1' (pipe character often misread as 1)
+    # '|' → '1'
     (re.compile(r'\|'), '1'),
-    # Remove stray bar-line characters
+    # Remove stray bar-line / bracket characters
     (re.compile(r'[\[\]{}\\]'), ''),
 ]
 
@@ -165,7 +181,8 @@ def clean_chord_line(raw_ocr: str) -> str:
 
         if _looks_like_chord(tok):
             normed = _normalise_token(tok)
-            if normed:
+            # Skip consecutive duplicates (can arise from overlapping OCR segments)
+            if normed and (not cleaned or cleaned[-1] != normed):
                 cleaned.append(normed)
         # else: drop the token (it's noise)
 

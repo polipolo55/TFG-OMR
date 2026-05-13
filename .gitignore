@@ -67,3 +67,6 @@ notebooks/*.pdf
 # Package-specific temp folders
 _minted*/
 pythontex-files-*/
+
+
+.env

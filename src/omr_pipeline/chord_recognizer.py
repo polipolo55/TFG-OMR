@@ -142,6 +142,7 @@ def _trim_binder_hole(img: np.ndarray) -> np.ndarray:
     return img
 
 
+
 def _preprocess_strip(
     img: np.ndarray, img_height: int, max_width: int
 ) -> tuple[Tensor, int]:

@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Real Book music labeler</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", monospace;
+      max-width: 1300px;
+      margin: 0 auto;
+      padding: 24px;
+      background: #f8f9fa;
+      color: #222;
+    }
+    h1 { margin: 0 0 4px 0; font-size: 22px; }
+    .sub { color: #666; font-size: 13px; margin-bottom: 16px; line-height: 1.5; }
+
+    .progress {
+      background: #fff;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin-bottom: 14px;
+      font-size: 14px;
+      color: #555;
+    }
+    .progress .bar {
+      height: 6px;
+      background: #eaecef;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .progress .bar > div {
+      height: 100%;
+      background: #2da44e;
+      transition: width 0.2s;
+    }
+
+    /* Two-column layout: images left, editor right */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    .panel {
+      background: #fff;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      padding: 14px;
+    }
+    .panel-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #57606a;
+      margin: 0 0 8px 0;
+    }
+    .panel img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      background: #fafafa;
+      border: 1px solid #eaecef;
+      border-radius: 3px;
+    }
+    .render-placeholder {
+      min-height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #888;
+      font-size: 13px;
+      background: #f6f8fa;
+      border: 1px dashed #d0d7de;
+      border-radius: 3px;
+    }
+
+    .strip-meta { font-size: 12px; color: #888; margin-top: 6px; }
+
+    /* Right panel: editor */
+    .editor-panel {
+      background: #fff;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      padding: 14px;
+    }
+    .editor-panel .panel-title { margin: 0 0 8px 0; }
+
+    textarea {
+      width: 100%;
+      font: 13px/1.5 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      padding: 10px;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      background: #fff;
+      resize: vertical;
+      min-height: 120px;
+    }
+    textarea:focus { outline: 2px solid #0969da; outline-offset: -1px; }
+
+    .pred-hint {
+      font-size: 12px;
+      color: #57606a;
+      margin: 6px 0 10px 0;
+      font-family: monospace;
+    }
+    .pred-hint code {
+      display: block;
+      background: #eaecef;
+      padding: 4px 8px;
+      border-radius: 3px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 60px;
+      overflow-y: auto;
+      font-size: 11px;
+    }
+
+    .button-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    button {
+      padding: 8px 14px;
+      font-size: 14px;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      background: #f6f8fa;
+      cursor: pointer;
+    }
+    button:hover { background: #eaecef; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: #2da44e; color: white; border-color: #2da44e; }
+    .btn-primary:hover { background: #2c974b; }
+    .btn-preview { background: #0969da; color: white; border-color: #0969da; }
+    .btn-preview:hover { background: #0860ca; }
+    .btn-warn { background: #ffebe6; border-color: #cf222e; color: #82071e; }
+
+    .quick-edit {
+      margin-top: 10px;
+      padding: 10px;
+      background: #f6f8fa;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+    }
+    .quick-edit-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #57606a;
+      margin-bottom: 6px;
+    }
+    .quick-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+      align-items: center;
+    }
+    .quick-row:last-child { margin-bottom: 0; }
+    .quick-row > span.tag {
+      font-size: 11px;
+      color: #57606a;
+      min-width: 70px;
+    }
+    button.btn-quick {
+      padding: 4px 10px;
+      font-size: 12px;
+      font-family: monospace;
+    }
+    button.btn-strip {
+      background: #fff8c5;
+      border-color: #d4a72c;
+    }
+    button.btn-strip:hover { background: #f5e9a3; }
+
+    .keymap { color: #888; font-size: 12px; margin-top: 10px; }
+    .keymap kbd {
+      background: #eaecef;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: inherit;
+      font-size: 11px;
+    }
+
+    .done { text-align: center; padding: 60px; color: #2da44e; font-size: 24px; }
+    .error-msg { color: #cf222e; font-size: 13px; margin-top: 6px; }
+
+    #render-status {
+      font-size: 12px;
+      color: #57606a;
+      margin-top: 6px;
+      min-height: 18px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Real Book music labeler</h1>
+  <div class="sub">
+    Correct the LMX token sequence for each staff crop. Edit the tokens in the
+    text area, then click <strong>Preview</strong> to render with LilyPond and
+    verify your correction looks right. Common fix: change
+    <code>key:fifths:0</code> to the correct key (e.g. <code>key:fifths:-1</code>
+    for F major / one flat).
+  </div>
+
+  <div id="progress" class="progress">
+    Loading…
+    <div class="bar"><div id="progress-bar" style="width:0"></div></div>
+  </div>
+
+  <div id="main" style="display:none">
+    <div class="main-grid">
+      <!-- Left: original staff crop -->
+      <div class="panel">
+        <div class="panel-title">Original scan crop</div>
+        <img id="strip-img" src="" alt="staff crop" />
+        <div class="strip-meta" id="filename"></div>
+      </div>
+
+      <!-- Right: LilyPond render of current LMX -->
+      <div class="panel">
+        <div class="panel-title">LilyPond render (current LMX)</div>
+        <div id="render-area">
+          <div class="render-placeholder" id="render-placeholder">
+            Click Preview to render
+          </div>
+          <img id="render-img" src="" alt="LilyPond render" style="display:none" />
+        </div>
+        <div id="render-status"></div>
+        <div id="render-error" class="error-msg"></div>
+      </div>
+    </div>
+
+    <!-- LMX editor -->
+    <div class="editor-panel">
+      <div class="panel-title">LMX tokens — edit to correct</div>
+      <textarea id="lmx-input" spellcheck="false" autocomplete="off" autocorrect="off"
+                autocapitalize="off"></textarea>
+      <div class="pred-hint">Original prediction: <code id="pred-text">—</code></div>
+
+      <div class="quick-edit">
+        <div class="quick-edit-label">
+          Quick edits — for continuation staves with no visible header, strip the time signature (and optionally key+clef)
+        </div>
+        <div class="quick-row">
+          <span class="tag">Strip:</span>
+          <button class="btn-quick btn-strip" onclick="stripTime()">Remove time</button>
+          <button class="btn-quick btn-strip" onclick="stripHeader()">Remove all header</button>
+          <button class="btn-quick btn-strip" onclick="stripKey()">Remove key only</button>
+        </div>
+        <div class="quick-row">
+          <span class="tag">Set key:</span>
+          <button class="btn-quick" onclick="setKey(0)">C</button>
+          <button class="btn-quick" onclick="setKey(-1)">F (♭)</button>
+          <button class="btn-quick" onclick="setKey(-2)">B♭ (♭♭)</button>
+          <button class="btn-quick" onclick="setKey(-3)">E♭ (3♭)</button>
+          <button class="btn-quick" onclick="setKey(-4)">A♭ (4♭)</button>
+          <button class="btn-quick" onclick="setKey(-5)">D♭ (5♭)</button>
+          <button class="btn-quick" onclick="setKey(1)">G (♯)</button>
+          <button class="btn-quick" onclick="setKey(2)">D (2♯)</button>
+        </div>
+        <div class="quick-row">
+          <span class="tag">Set time:</span>
+          <button class="btn-quick" onclick="setTime(4,4)">4/4</button>
+          <button class="btn-quick" onclick="setTime(2,2)">2/2 (cut)</button>
+          <button class="btn-quick" onclick="setTime(3,4)">3/4</button>
+          <button class="btn-quick" onclick="setTime(2,4)">2/4</button>
+          <button class="btn-quick" onclick="setTime(6,8)">6/8</button>
+          <button class="btn-quick" onclick="setTime(12,8)">12/8</button>
+        </div>
+      </div>
+
+      <div class="button-row">
+        <button class="btn-primary" onclick="save()">Save &amp; next</button>
+        <button class="btn-preview" onclick="preview()">Preview (LilyPond)</button>
+        <button onclick="restorePrediction()">Restore original</button>
+        <button onclick="clearLabel()">Clear</button>
+        <button class="btn-warn" onclick="skip()">Skip (garbage / illegible)</button>
+      </div>
+      <div class="keymap">
+        <kbd>Ctrl+Enter</kbd> save ·
+        <kbd>Ctrl+P</kbd> preview ·
+        <kbd>Esc</kbd> skip ·
+        <kbd>Tab</kbd> restore original ·
+        <kbd>Shift</kbd>+<kbd>Tab</kbd> clear
+      </div>
+    </div>
+  </div>
+
+  <div id="done" class="done" style="display:none">
+    All strips labeled or skipped.
+  </div>
+
+  <script>
+    let current = null;
+    let renderInFlight = false;
+
+    async function refreshStats() {
+      const r = await fetch('/api/music-labeler/stats');
+      const s = await r.json();
+      const labeled = s.done + s.skip;
+      const pct = s.total ? (100 * labeled / s.total) : 0;
+      document.getElementById('progress').firstChild.textContent =
+        `${s.done} labeled · ${s.skip} skipped · ${s.pending} remaining · ${s.total} total`;
+      document.getElementById('progress-bar').style.width = pct.toFixed(1) + '%';
+    }
+
+    async function loadNext() {
+      const r = await fetch('/api/music-labeler/next');
+      if (r.status === 404) {
+        current = null;
+        document.getElementById('main').style.display = 'none';
+        document.getElementById('done').style.display = 'block';
+        await refreshStats();
+        return;
+      }
+      current = await r.json();
+
+      document.getElementById('main').style.display = 'block';
+      document.getElementById('done').style.display = 'none';
+
+      document.getElementById('strip-img').src =
+        '/api/music-labeler/strip/' + encodeURIComponent(current.filename);
+      document.getElementById('filename').textContent = current.filename;
+      document.getElementById('pred-text').textContent = current.predicted || '(none)';
+
+      const ta = document.getElementById('lmx-input');
+      ta.value = current.predicted || '';
+      ta.focus();
+
+      // Reset render panel
+      document.getElementById('render-img').style.display = 'none';
+      document.getElementById('render-placeholder').style.display = 'flex';
+      document.getElementById('render-status').textContent = '';
+      document.getElementById('render-error').textContent = '';
+
+      await refreshStats();
+
+      // Auto-preview if there's a prediction to show
+      if (current.predicted && current.predicted.trim()) {
+        preview();
+      }
+    }
+
+    async function preview() {
+      if (renderInFlight) return;
+      const lmx = document.getElementById('lmx-input').value.trim();
+      if (!lmx) {
+        document.getElementById('render-error').textContent = 'No LMX tokens to render.';
+        return;
+      }
+
+      renderInFlight = true;
+      const status = document.getElementById('render-status');
+      const errDiv = document.getElementById('render-error');
+      status.textContent = 'Rendering…';
+      errDiv.textContent = '';
+
+      try {
+        const resp = await fetch('/api/music-labeler/render', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({lmx}),
+        });
+        if (!resp.ok) {
+          const detail = await resp.json().catch(() => ({}));
+          errDiv.textContent = 'Render failed: ' + (detail.detail || resp.status);
+          status.textContent = '';
+          return;
+        }
+        const {image} = await resp.json();
+        const img = document.getElementById('render-img');
+        img.src = image;
+        img.style.display = 'block';
+        document.getElementById('render-placeholder').style.display = 'none';
+        status.textContent = 'Rendered.';
+      } catch (e) {
+        errDiv.textContent = 'Network error: ' + e.message;
+        status.textContent = '';
+      } finally {
+        renderInFlight = false;
+      }
+    }
+
+    async function save() {
+      if (!current) return;
+      const label = document.getElementById('lmx-input').value.trim();
+      await fetch('/api/music-labeler/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({filename: current.filename, label: label || null, status: 'done'}),
+      });
+      loadNext();
+    }
+
+    async function skip() {
+      if (!current) return;
+      await fetch('/api/music-labeler/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({filename: current.filename, label: null, status: 'skip'}),
+      });
+      loadNext();
+    }
+
+    function restorePrediction() {
+      if (current) {
+        document.getElementById('lmx-input').value = current.predicted || '';
+        document.getElementById('lmx-input').focus();
+      }
+    }
+
+    function clearLabel() {
+      document.getElementById('lmx-input').value = '';
+      document.getElementById('lmx-input').focus();
+    }
+
+    // --- Token-level quick edits ---
+    // The LMX grammar puts header tokens (clef, key, time) immediately after
+    // every "measure" token in the header position. The strip/set helpers
+    // operate on the leading "measure" header only — they do not touch any
+    // mid-sequence time/key changes.
+
+    function _tokens() {
+      return document.getElementById('lmx-input').value.split(/\s+/).filter(Boolean);
+    }
+
+    function _setTokens(toks) {
+      document.getElementById('lmx-input').value = toks.join(' ');
+      document.getElementById('lmx-input').focus();
+    }
+
+    function stripTime() {
+      // Remove "time" + "beats:X" + "beat-type:X" from the leading header
+      const toks = _tokens();
+      const out = [];
+      for (let i = 0; i < toks.length; i++) {
+        if (toks[i] === 'time') {
+          // skip 'time' and the following beats/beat-type tokens (up to 2 ahead)
+          let j = i + 1;
+          if (j < toks.length && toks[j].startsWith('beats:')) j++;
+          if (j < toks.length && toks[j].startsWith('beat-type:')) j++;
+          i = j - 1;
+          continue;
+        }
+        out.push(toks[i]);
+      }
+      _setTokens(out);
+    }
+
+    function stripKey() {
+      const toks = _tokens().filter(t => !t.startsWith('key:fifths:'));
+      _setTokens(toks);
+    }
+
+    function stripHeader() {
+      // Remove clef:X, key:fifths:N, and time beats:M beat-type:M from leading header
+      const toks = _tokens();
+      const out = [];
+      for (let i = 0; i < toks.length; i++) {
+        const t = toks[i];
+        if (t.startsWith('clef:') || t.startsWith('key:fifths:')) continue;
+        if (t === 'time') {
+          let j = i + 1;
+          if (j < toks.length && toks[j].startsWith('beats:')) j++;
+          if (j < toks.length && toks[j].startsWith('beat-type:')) j++;
+          i = j - 1;
+          continue;
+        }
+        out.push(t);
+      }
+      _setTokens(out);
+    }
+
+    function setKey(fifths) {
+      // Replace existing key:fifths:N or insert one after the leading measure (and clef if present)
+      const toks = _tokens();
+      const newKey = `key:fifths:${fifths}`;
+      const existingIdx = toks.findIndex(t => t.startsWith('key:fifths:'));
+      if (existingIdx >= 0) {
+        toks[existingIdx] = newKey;
+        _setTokens(toks);
+        return;
+      }
+      // No existing key — insert after measure (and after clef if present)
+      let insertIdx = 0;
+      if (toks[0] === 'measure') insertIdx = 1;
+      if (insertIdx < toks.length && toks[insertIdx].startsWith('clef:')) insertIdx++;
+      toks.splice(insertIdx, 0, newKey);
+      _setTokens(toks);
+    }
+
+    function setTime(beats, beatType) {
+      // Replace existing time signature or insert one after key/clef in the leading header
+      const toks = _tokens();
+      const existingIdx = toks.findIndex(t => t === 'time');
+      if (existingIdx >= 0) {
+        toks[existingIdx + 1] = `beats:${beats}`;
+        toks[existingIdx + 2] = `beat-type:${beatType}`;
+        _setTokens(toks);
+        return;
+      }
+      // Insert after the last header token (measure / clef / key) in the first header block
+      let insertIdx = 0;
+      if (toks[0] === 'measure') insertIdx = 1;
+      if (insertIdx < toks.length && toks[insertIdx].startsWith('clef:')) insertIdx++;
+      if (insertIdx < toks.length && toks[insertIdx].startsWith('key:fifths:')) insertIdx++;
+      toks.splice(insertIdx, 0, 'time', `beats:${beats}`, `beat-type:${beatType}`);
+      _setTokens(toks);
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); save(); }
+      else if (e.key === 'p' && e.ctrlKey) { e.preventDefault(); preview(); }
+      else if (e.key === 'Escape') { e.preventDefault(); skip(); }
+      else if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey) {
+        // Only intercept Tab when the textarea is NOT focused (to not break indentation)
+        if (document.activeElement.id !== 'lmx-input') {
+          e.preventDefault();
+          if (e.shiftKey) clearLabel(); else restorePrediction();
+        }
+      }
+    });
+
+    loadNext();
+  </script>
+</body>
+</html>

@@ -204,7 +204,7 @@ def _build_systems(
     staves: list[Staff],
     grayscale: np.ndarray,
     binary: np.ndarray,
-    stem_margin: float = 2.2,
+    stem_margin: float = 1.8,
     chord_min_h: int = 10,
 ) -> list[System]:
     """Pair each staff with the chord-text region above it.

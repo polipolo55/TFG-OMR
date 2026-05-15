@@ -344,11 +344,10 @@ def _propagate_key(
         return tokens, None
 
     local_key = tokens[first_key_idx]
-    if global_key is not None and local_key != global_key:
-        tokens = list(tokens)
-        tokens[first_key_idx] = global_key
-        return tokens, global_key
-
+    # Local key takes priority — each Real Book staff prints its own key
+    # signature, so a locally-detected key is more reliable than a global
+    # carried forward from a previous (possibly wrong) detection.
+    # The local key becomes the new global for staves that follow without one.
     return tokens, local_key
 
 

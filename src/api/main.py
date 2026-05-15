@@ -210,6 +210,123 @@ async def labeler_save(req: SaveRequest):
     raise HTTPException(404, "Filename not in labels.jsonl")
 
 
+# ---------------------------------------------------------------------------
+# Music-strip labeling endpoints (used by static/music_labeler.html)
+# ---------------------------------------------------------------------------
+
+_MUSIC_LABELER_ROOT = _ROOT / "data" / "music_real"
+_MUSIC_LABELS_PATH = _MUSIC_LABELER_ROOT / "labels.jsonl"
+_MUSIC_STRIPS_DIR = _MUSIC_LABELER_ROOT / "strips"
+_music_labels_lock = Lock()
+
+
+def _load_music_labels() -> list[dict]:
+    if not _MUSIC_LABELS_PATH.exists():
+        return []
+    with open(_MUSIC_LABELS_PATH, encoding="utf-8") as f:
+        return [json.loads(line) for line in f if line.strip()]
+
+
+def _save_music_labels(records: list[dict]) -> None:
+    tmp = _MUSIC_LABELS_PATH.with_suffix(".jsonl.tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        for r in records:
+            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+    tmp.replace(_MUSIC_LABELS_PATH)
+
+
+class MusicSaveRequest(BaseModel):
+    filename: str
+    label: str | None = None
+    status: str  # "done" | "skip"
+
+
+class RenderRequest(BaseModel):
+    lmx: str
+
+
+@app.get("/music-labeler")
+async def music_labeler_page():
+    """Serve the music-strip labeling UI."""
+    page = _STATIC / "music_labeler.html"
+    if not page.exists():
+        raise HTTPException(404, "music_labeler.html missing")
+    return FileResponse(page)
+
+
+@app.get("/api/music-labeler/stats")
+async def music_labeler_stats():
+    with _music_labels_lock:
+        records = _load_music_labels()
+    counts = {"done": 0, "skip": 0, "pending": 0, "total": len(records)}
+    for r in records:
+        s = r.get("status", "pending")
+        counts[s] = counts.get(s, 0) + 1
+    return counts
+
+
+@app.get("/api/music-labeler/next")
+async def music_labeler_next():
+    """Return the next pending strip, or 404 if none remain."""
+    with _music_labels_lock:
+        records = _load_music_labels()
+    for r in records:
+        if r.get("status") == "pending":
+            return r
+    raise HTTPException(404, "No pending strips")
+
+
+@app.get("/api/music-labeler/strip/{filename}")
+async def music_labeler_strip(filename: str):
+    if "/" in filename or ".." in filename:
+        raise HTTPException(400, "Invalid filename")
+    path = _MUSIC_STRIPS_DIR / filename
+    if not path.exists():
+        raise HTTPException(404, "Strip not found")
+    return FileResponse(path, media_type="image/png")
+
+
+@app.post("/api/music-labeler/render")
+async def music_labeler_render(req: RenderRequest):
+    """Render an LMX token string with LilyPond; return PNG as base64 data URL."""
+    import base64
+    import cv2 as _cv2
+    try:
+        from CRNN_CTC.lilypond_render import render_tokens
+    except ImportError:
+        raise HTTPException(500, "lilypond_render not available")
+
+    tokens = req.lmx.split()
+    if not tokens:
+        raise HTTPException(422, "Empty LMX string")
+
+    arr = render_tokens(tokens)
+    if arr is None:
+        raise HTTPException(422, "LilyPond render failed — check token syntax")
+
+    ok, buf = _cv2.imencode(".png", arr)
+    if not ok:
+        raise HTTPException(500, "PNG encode failed")
+
+    data_url = "data:image/png;base64," + base64.b64encode(buf.tobytes()).decode()
+    return {"image": data_url}
+
+
+@app.post("/api/music-labeler/save")
+async def music_labeler_save(req: MusicSaveRequest):
+    if req.status not in ("done", "skip"):
+        raise HTTPException(400, "status must be 'done' or 'skip'")
+    with _music_labels_lock:
+        records = _load_music_labels()
+        for r in records:
+            if r["filename"] == req.filename:
+                r["label"] = req.label
+                r["status"] = req.status
+                _save_music_labels(records)
+                return {"ok": True}
+    raise HTTPException(404, "Filename not in labels.jsonl")
+
+
 if __name__ == "__main__":
     import uvicorn
     logging.basicConfig(level=logging.INFO)

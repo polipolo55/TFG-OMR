@@ -1,0 +1,415 @@
+\chapter{Results and Evaluation}
+\label{ch:results}
+
+This chapter reports the quantitative and qualitative results of the
+training and evaluation procedures described in
+Chapters~\ref{ch:design} and \ref{ch:impl}.
+Section~\ref{sec:res-training} presents the training trajectory of the
+synthetic-data baseline.
+Section~\ref{sec:res-ser} reports aggregate Symbol Error Rate on the
+held-out synthetic test split and analyses the distribution of
+per-sample errors.
+Section~\ref{sec:res-errors} decomposes the errors by edit operation
+and by token category, showing that the residual error budget is
+dominated by structural tokens (barlines and ties) rather than by
+pitch or duration mistakes.
+Section~\ref{sec:res-qualitative} shows qualitative examples drawn
+from the perfect and near-median tails of the SER distribution.
+Section~\ref{sec:res-domaingap} addresses the synthetic-to-real
+domain gap and the effect of the fine-tuning stage on real Real Book
+pages.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Training Trajectory}
+\label{sec:res-training}
+
+The default configuration of Table~\ref{tab:hyperparams} was trained
+on the union of the clean LilyJAZZ and scan-augmented PrIMuS corpora,
+yielding approximately \num{60000} training samples after the three
+domain filters of Section~\ref{sec:design-data}.
+Figure~\ref{fig:training-curves} shows the trajectory of the CTC loss
+on both train and validation splits and the corresponding validation
+SER over the run that produced the checkpoint used for all subsequent
+evaluation.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/fig_training_curves}
+    \caption{Training trajectory of the synthetic-data baseline.
+    \textbf{Left:} CTC loss on the train (blue) and validation
+    (orange) splits over the 49 epochs that ran before early stopping
+    triggered at patience 12.
+    The train loss continues to decrease while the validation loss
+    plateaus near \num{0.06}, indicating a small but bounded
+    overfit margin.
+    \textbf{Right:} validation Symbol Error Rate over the same
+    epochs.
+    The curve drops sharply from $\approx \SI{12}{\percent}$ to
+    below \SI{2}{\percent} within ten epochs and converges to
+    $\approx \SI{1.3}{\percent}$.
+    The best checkpoint, marked by the vertical dashed line,
+    corresponds to epoch 37; later epochs do not improve validation
+    SER and the early-stopping mechanism eventually halts training.}
+    \label{fig:training-curves}
+\end{figure}
+
+Two observations are worth highlighting.
+First, validation SER converges much faster than the loss curve
+suggests: by epoch 10 it is already below \SI{2}{\percent}, and the
+remaining 27 epochs of useful training produce a further reduction of
+only $\approx 0.7$ percentage points.
+This is characteristic of CTC-trained sequence models on structured
+output domains: most of the alignment work is learned early, and late
+training refines a small fraction of difficult samples.
+Second, the train/val loss gap remains small throughout training; the
+combination of weight decay (\num{1e-4}), inter-LSTM dropout
+(\num{0.3}), header-stripping augmentation, and online jitter is
+collectively sufficient to keep overfitting under control on the
+synthetic corpus.
+The model selected for all subsequent evaluation is the epoch-37
+checkpoint, saved as \code{models/latest/best\_model.pt}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Aggregate Symbol Error Rate}
+\label{sec:res-ser}
+
+Evaluation is performed on the held-out test split (\num{4604} samples
+drawn from the union of clean and scan-augmented images) using greedy
+CTC decoding.
+Aggregate SER, computed as the sum of edit distances divided by the
+sum of ground-truth lengths, is \SI{1.28}{\percent} on the scanned
+test split and \SI{1.19}{\percent} on the clean test split.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/fig_ser_distribution}
+    \caption{Per-sample SER distribution on the scanned test split,
+    overlaid with its empirical CDF.
+    The aggregate SER of \num{0.0128} is dominated by a long but
+    thin right tail of high-error samples; the bulk of the
+    distribution sits at zero.
+    Approximately \SI{71}{\percent} of test samples are transcribed
+    with zero edits and \SI{95}{\percent} fall below SER \num{0.05}.}
+    \label{fig:ser-distribution}
+\end{figure}
+
+Figure~\ref{fig:ser-distribution} shows the per-sample SER
+distribution.
+The aggregate value understates how often the model is exactly
+correct: the modal outcome is a perfect transcription, with
+$\approx \SI{71}{\percent}$ of samples having SER \num{0}, and the
+empirical CDF reaches \num{0.95} at SER \num{0.05}.
+This bimodality---a tall spike at zero plus a thin right tail---is
+typical for CTC sequence models on a well-matched domain: the model
+either reads a sample correctly or fails on a specific localised
+pattern.
+The samples in the right tail are analysed qualitatively in
+Section~\ref{sec:res-qualitative}.
+
+A complementary \term{melodic SER} metric is computed on the same edit
+distance after stripping the \code{measure} and the two tie tokens.
+On this metric, the same checkpoint achieves $\approx \SI{0.18}{\percent}$
+on the scanned split and $\approx \SI{0.11}{\percent}$ on the clean
+split---roughly an order of magnitude lower than the aggregate SER.
+The motivation for reporting both numbers becomes clear once the
+error budget is decomposed by token category, the subject of the
+next section.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Error Decomposition}
+\label{sec:res-errors}
+
+\subsection{Edit-operation breakdown}
+
+The aggregate edit count over the test split decomposes into three
+categories: \term{deletions} (a reference token is absent from the
+prediction), \term{insertions} (a predicted token is absent from the
+reference), and \term{substitutions} (a reference token is replaced
+by a different predicted token).
+Figure~\ref{fig:edit-dist} shows the distribution.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.55\textwidth]{figures/fig_error_pie}
+    \caption{Distribution of edit operations over the scanned test
+    split.
+    Deletions and insertions together account for $\approx \SI{95}{\percent}$
+    of the edit budget; substitutions are a small minority.
+    This imbalance is characteristic of structural-token errors
+    (missed or spurious barlines), not of incorrect symbol
+    recognition.}
+    \label{fig:edit-dist}
+\end{figure}
+
+Substitutions are by far the rarest error type at \SI{5.4}{\percent}
+of the edit budget---an encouraging finding, because substitutions
+are precisely the errors that affect musical \textit{content}.
+Deletions and insertions together account for over \SI{94}{\percent}
+of edits; as the next subsection shows, the overwhelming majority of
+those concern the \code{measure} token.
+
+\subsection{Per-token breakdown}
+
+Figure~\ref{fig:common-edits} shows the top-15 substitutions,
+deletions, and insertions by frequency.
+The picture is unambiguous: \code{measure} dominates both deletions
+($\approx \num{1600}$ occurrences, an order of magnitude above the
+next-most-deleted token) and insertions ($\approx \num{1050}$).
+Tie tokens (\code{tied:start} and \code{tied:stop}) follow in second
+place for both categories, contributing roughly \num{150} each.
+Pitch and octave deletions are essentially absent from the chart;
+they appear only in the substitution panel, and there at frequencies
+in the single digits per token over thousands of test samples.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/fig_top_token_errors}
+    \caption{Top-15 token-level edit operations on the scanned test
+    split.
+    \textbf{Left:} most frequent substitutions, dominated by duration
+    confusions ($16{\rm th} \leftrightarrow 32{\rm nd}$,
+    $\rm{eighth} \leftrightarrow 16{\rm th}$).
+    \textbf{Middle:} most frequent deletions, dominated by missed
+    \code{measure} tokens (over \num{1600} occurrences).
+    \textbf{Right:} most frequent insertions, again dominated by
+    spurious \code{measure} tokens.
+    The two structural categories (\code{measure} and the tie tokens)
+    together account for approximately \SI{87}{\percent} of the
+    edit budget.}
+    \label{fig:common-edits}
+\end{figure}
+
+Two consequences follow.
+First, the design choice to handle barline regularisation in the
+deterministic grammar fixer (Section~\ref{sec:design-grammar}) rather
+than at the model level is validated by these numbers: barline
+boundaries are an intrinsically ambiguous quantity for a model
+without explicit beat tracking, and the cleanest place to enforce
+them is the post-processor that knows the time signature.
+Second, the substitutions that do occur are almost entirely confined
+to duration confusions between visually similar values
+($16{\rm th} \leftrightarrow 32{\rm nd}$,
+$\rm{eighth} \leftrightarrow 16{\rm th}$,
+$\rm{quarter} \leftrightarrow \rm{eighth}$).
+Pitch substitutions (e.g.\ $\rm{pitch:A} \to \rm{pitch:C}$) and
+octave substitutions (e.g.\ $\rm{octave:5} \to \rm{octave:6}$) exist
+but with single-digit counts over the full test split.
+The model is therefore reading pitches and octaves essentially
+perfectly; the residual error budget is structural and rhythmic, not
+melodic.
+
+\subsection{SER versus sequence length}
+
+A natural question is whether long sequences accumulate more errors
+than short ones, since CTC time-step budget is proportional to
+image width and there is no \textit{a priori} guarantee that long
+samples remain in alignment.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/fig_ser_vs_length}
+    \caption{Per-sample SER as a function of ground-truth sequence
+    length on the scanned test split.
+    Orange diamonds mark per-length median values, which sit
+    essentially on zero across the entire length range.
+    The blue cloud above the baseline shows the long-tail samples
+    whose SER lies above the per-length median; there is a mild
+    increase in tail thickness around \num{120}-token sequences but
+    no systematic divergence at long lengths.
+    The CTC alignment remains robust over the full range of
+    sequence lengths in the corpus.}
+    \label{fig:ser-vs-length}
+\end{figure}
+
+Figure~\ref{fig:ser-vs-length} shows that the median per-sample SER
+is essentially zero across the full range of sequence lengths in the
+corpus (\num{20} to \num{140} tokens).
+The distribution of tail samples broadens slightly at the longest
+lengths, but the model does not exhibit the catastrophic alignment
+breakdown that CTC can occasionally produce when the input is too
+short for the target.
+This confirms that the $W/4$ width-compression factor of the CNN
+backbone (Section~\ref{sec:design-model}) is appropriate for the
+sequence lengths the system encounters.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Qualitative Examples}
+\label{sec:res-qualitative}
+
+This section shows representative predictions drawn from the perfect
+and near-median tails of the SER distribution.
+Each figure shows a test-set staff image as seen by the model,
+together with the resulting prediction's edit distance and per-sample
+SER.
+
+Each of the two examples below pairs the \term{input} image presented
+to the model---a scan-augmented LilyJAZZ render from the held-out
+test split---with a clean LilyPond \term{rendering of the predicted
+LMX sequence}.
+The rendered prediction lets the reader visually compare what the
+model output against the input notation, instead of inspecting a raw
+token list.
+
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/fig_qual_perfect_input}
+        \caption{Input: scan-augmented staff image presented to the
+        model.}
+        \label{fig:qual-perfect-input}
+    \end{subfigure}\\[0.6em]
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/fig_qual_perfect_rendered}
+        \caption{LilyPond rendering of the predicted LMX sequence.}
+        \label{fig:qual-perfect-pred}
+    \end{subfigure}
+    \caption{A representative perfect prediction on the scanned test
+    split: edit distance \num{0}, SER \num{0}.
+    The input (top) is a typical scan-augmented monophonic staff
+    with beamed eighth and sixteenth notes, a one-flat key signature,
+    and dense rhythmic content; the rendered prediction (bottom)
+    matches it note-for-note.
+    Approximately \SI{71}{\percent} of test samples fall in this
+    category.}
+    \label{fig:qual-perfect}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/fig_qual_median_input}
+        \caption{Input: scan-augmented staff image with two sharps.}
+        \label{fig:qual-median-input}
+    \end{subfigure}\\[0.6em]
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/fig_qual_median_rendered}
+        \caption{LilyPond rendering of the predicted LMX sequence.}
+        \label{fig:qual-median-pred}
+    \end{subfigure}
+    \caption{A representative near-median prediction with edit
+    distance \num{2} and SER \num{0.038}.
+    Errors at this level typically consist of one or two missed or
+    extra structural tokens (barlines or ties) and leave the melodic
+    content intact: in the example above, the pitches and durations
+    are reproduced correctly, but the rendered prediction inserts a
+    spurious barline within the third measure of the input.}
+    \label{fig:qual-median}
+\end{figure}
+
+The visual quality of these two examples is representative of the
+input regime the system was designed for: the augmentation pipeline
+produces images that look like phone photographs of moderately worn
+print, and the model recovers the underlying notation cleanly in
+both cases.
+
+\todo{Add a worst-case example from the right tail of the SER
+distribution, with a brief failure-mode caption explaining what the
+model got wrong and why.}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Model Weight Distribution}
+\label{sec:res-weights}
+
+A diagnostic useful when comparing trained checkpoints is the
+marginal distribution of the model's weights at convergence.
+Figure~\ref{fig:weight-dist} shows the distributions of the four
+principal parameter groups of the epoch-37 checkpoint: the
+classifier (final linear layer), the convolutional and
+batch-normalisation weights of the ResNet backbone, the LSTM
+weights, and the biases.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/fig_weight_distributions}
+    \caption{Marginal weight distributions of the four principal
+    parameter groups of the trained CRNN at epoch 37.
+    All four are close to centred Gaussian with standard
+    deviations in the $[0.17, 0.28]$ range; AdamW's
+    \num{1e-4} weight decay keeps the magnitudes bounded.
+    The small spikes near $\pm 1$ in the \code{fc} panel are an
+    artefact of the classifier saturating on the CTC blank class
+    and the most frequent token.
+    Biases (bottom right) are slightly left-skewed, consistent with
+    the negative-log-likelihood objective preferring to push
+    logits down for rare classes.}
+    \label{fig:weight-dist}
+\end{figure}
+
+All four groups are close to centred Gaussian with standard
+deviations between \num{0.17} and \num{0.28}, which is typical of a
+well-regularised AdamW run with the configured weight decay.
+The maximum magnitudes annotated in each panel sit between
+\num{1.07} and \num{2.64}; no parameter has grown to the
+exploding-gradient regime that the \num{5.0} gradient-norm clip is
+intended to prevent.
+The classifier panel shows two small concentration spikes near
+$\pm 1$, which correspond to the \code{<blank>} logit and the
+\code{measure} logit---the two most frequently emitted classes
+saturating against the soft bound that AdamW's regularisation
+imposes.
+This is a benign artefact and does not affect inference.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{The Synthetic-to-Real Domain Gap}
+\label{sec:res-domaingap}
+
+The numbers reported above are all measured on the held-out
+\textit{synthetic} test split.
+The question of practical importance is whether the same model
+generalises to scans of real Real Book pages---the input
+distribution the system will face once deployed.
+
+\todo{Quantitative zero-shot evaluation on the hand-annotated Real
+Book set: SER on real scans \textit{before} fine-tuning, broken down
+by the same token categories as the synthetic evaluation above.
+A bar chart comparing the four major error categories on synthetic
+versus real input would make the gap visible at a glance.}
+
+\subsection{Fine-tuning results}
+
+\todo{Quantitative comparison of the same model \textit{after}
+fine-tuning on the small hand-labelled Real Book set: SER on the
+same real test pages, with the synthetic-test SER reported alongside
+as a non-regression check.
+A second bar chart comparing pre-fine-tune SER, post-fine-tune SER
+on real pages, and the synthetic-test SER would close the loop on
+the principal experimental question of this thesis.}
+
+\subsection{Qualitative inference on a complete Real Book page}
+
+\todo{One full-page inference example: a Real Book scan with detected
+staff bounding boxes overlaid, the predicted LMX token sequence
+beneath each staff, and the recognised chord symbols above.
+A figure of this kind functions as the project's headline
+qualitative result.}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Summary}
+\label{sec:res-summary}
+
+The synthetic-data baseline trained from scratch achieves an
+aggregate Symbol Error Rate of \SI{1.28}{\percent} on the
+scan-augmented test split and \SI{1.19}{\percent} on the clean
+split, with $\approx \SI{71}{\percent}$ of samples transcribed
+perfectly.
+The residual error budget is dominated by structural tokens
+(\code{measure} and the two tie tokens), which together account for
+$\approx \SI{87}{\percent}$ of all edits;
+pitch and octave errors are negligible.
+The melodic Symbol Error Rate---measured on the same edit distance
+after removing the structural tokens---is approximately
+\SI{0.18}{\percent}, an order of magnitude lower than the
+aggregate.
+These numbers, combined with the deterministic grammar fixer that
+reconstructs barline boundaries from the time signature, place the
+synthetic baseline within the operating range required for
+downstream musical applications.
+The remaining experimental question---whether the domain gap to real
+Real Book scans can be closed by fine-tuning on a small hand-labelled
+set---is the subject of the \code{\textbackslash todo} placeholders
+in Section~\ref{sec:res-domaingap}, which will be completed as
+those experiments conclude.

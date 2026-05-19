@@ -1,0 +1,382 @@
+\documentclass[11pt, a4paper]{article}
+
+% --- PACKAGES ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage[margin=2.5cm]{geometry}
+\setlength{\headheight}{13.6pt}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{caption}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{csquotes}
+\usepackage{enumitem}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{eurosym}
+\usepackage{siunitx}
+\usepackage{pgfgantt}
+\usepackage{pdflscape}
+\usepackage{amssymb}
+
+% --- HEADER & FOOTER ---
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{Optical Music Recognition for jazz lead sheets}
+\fancyhead[R]{Progress Review Milestone}
+\fancyfoot[C]{\thepage}
+
+% --- LINKS ---
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    filecolor=magenta,
+    urlcolor=blue,
+    citecolor=blue,
+}
+
+% --- GANTT COLORS ---
+\definecolor{gpDone}{HTML}{2E7D32}
+\definecolor{gpInProgress}{HTML}{E65100}
+\definecolor{gpPending}{HTML}{1565C0}
+\definecolor{gpMilestone}{HTML}{D32F2F}
+
+\begin{document}
+
+% ==========================================
+% TITLE PAGE
+% ==========================================
+
+\begin{titlepage}
+    \centering
+
+    \vspace*{2cm}
+
+    {\LARGE\bfseries OPTICAL MUSIC RECOGNITION FOR JAZZ LEAD SHEETS:\ A CRNN-CTC APPROACH FOR MONOPHONIC LINES \par}
+
+    \vspace{2cm}
+
+    {\Large\bfseries Progress Review Milestone \par}
+
+    \vspace{2cm}
+
+    {\large\bfseries POL CASANOVAS PUIG \par}
+
+    \vspace{1.5cm}
+
+    {\small Thesis supervisor \par}
+    {\small MANEL FRIGOLA BOURLON (Department of Automatic Control, ESAII) \par}
+
+    \vspace{0.5cm}
+
+    {\small Degree \par}
+    {\small Bachelor's Degree in Informatics Engineering (Computing) \par}
+
+    \vfill
+
+    {\small\bfseries Facultat d'Inform\`atica de Barcelona (FIB) \par}
+
+    \vspace{0.2cm}
+
+    {\small\bfseries Universitat Polit\`ecnica de Catalunya (UPC) -- BarcelonaTech \par}
+
+    \vspace{0.8cm}
+    {\small May 2026 \par}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ==========================================
+\section{Introduction}
+\label{sec:intro}
+
+This document is the Progress Review of the Bachelor's Thesis \textit{Optical Music Recognition for Jazz Lead Sheets: A CRNN--CTC Approach for Monophonic Lines}, developed under the Computing specialty at FIB--UPC and supervised by Manel Frigola Bourlon (ESAII). It reports the project status at the deadline (21 May 2026) and the plan to defence in June 2026.
+
+The thesis builds an end-to-end OMR system that takes a PDF or image of a jazz lead sheet (Real Book style) and produces a structured transcription of the melody and chord symbols. The core is a CRNN--CTC trained on a synthetic LilyJAZZ corpus derived from PrIMuS, with scan-simulation augmentation and a fine-tuning stage on hand-labelled Real Book pages. The document follows the three sections required by FIB: fulfilment (\S\ref{sec:fulfilment}), adjustments (\S\ref{sec:adjustments}), and remaining plan (\S\ref{sec:remaining}).
+
+% ==========================================
+\section{Fulfilment of the Work Plan and Objectives}
+\label{sec:fulfilment}
+
+\subsection{Project Context and Re-Framing}
+The GEP framed the project as a proof-of-concept CRNN--CTC for monophonic jazz lead sheets within the TFG timeframe. During implementation, the scope was refined into an explicit \textit{lead-sheet domain spec} (treble clef only; eight common time signatures; pitch octaves 3--7; monophonic staff; ties; barlines; rests; jazz chord symbols). Vocabulary, dataset filters, grammar fixer, and augmentation tuning all derive from this specification rather than from case-by-case patches.
+
+\subsection{Specific Objectives: Status at the Review Date}
+Table~\ref{tab:obj-status} reports the status of each specific objective as defined in the GEP final deliverable.
+
+\begin{table}[h!]
+    \centering
+    \caption{Status of the specific objectives at the Progress Review date.}
+    \label{tab:obj-status}
+    \renewcommand{\arraystretch}{1.2}
+    \small
+    \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{6.5cm} c >{\raggedright\arraybackslash}X}
+        \toprule
+        \textbf{Specific objective (from GEP)} & \textbf{Status} & \textbf{Evidence} \\
+        \midrule
+        Survey the state of the art (modular, CRNN--CTC, transformers) and justify architectural choices. & Completed & Survey integrated in main thesis; architectural justification consistent with GEP. \\
+        \midrule
+        Build a baseline pipeline and a CRNN--CTC model for comparison. & Completed (re-scoped) & Classical pipeline implemented for staff detection only; full-symbol baseline de-scoped (see \S\ref{sec:adjustments}). \\
+        \midrule
+        Construct a training and evaluation dataset using synthetic rendering and augmentation. & Completed & PrIMuS to LilyJAZZ rendering; LMX encoder; albumentations scan-simulation; 87\,677 paired samples; $\approx$270-token vocabulary. \\
+        \midrule
+        Evaluate model quality with SER and qualitative error analysis. & Completed & Test SER 1.28\,\% (scanned) / 1.19\,\% (clean); melodic SER 0.18\,\% / 0.11\,\%; 71--73\,\% perfectly transcribed; per-token error breakdown produced. \\
+        \midrule
+        Release a reproducible code and configuration workflow. & Completed & Unified \texttt{cli.py} (nine subcommands); Poetry environment; \texttt{docs/} reference; \texttt{Config} serialised inside every checkpoint. \\
+        \midrule
+        Build a complete inference pipeline (PDF intake, staff detection, melody recognition, grammar fixing, chord OCR) returning structured JSON. & Completed & Five-stage pipeline live; FastAPI exposes a REST endpoint and a browser UI. \\
+        \midrule
+        Quantify the synthetic-to-real domain gap and reduce it via fine-tuning on Real Book pages. & In progress & Two melody fine-tune cycles done; chord CRNN fine-tuned on hand-labelled strips (last checkpoint 13 May 2026); final per-page real evaluation still pending (see \S\ref{sec:remaining}). \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\subsection{Quantitative Headline Results}
+The current best checkpoint (\texttt{models/latest/best\_model.pt}, epoch~37, ResNet-18 backbone) achieves, on the held-out test split of 4\,604 samples with greedy CTC decoding:
+
+\begin{itemize}
+    \item Aggregate SER: \textbf{1.28\,\%} on the scanned (augmented) split, \textbf{1.19\,\%} on the clean split.
+    \item Melodic SER (after stripping \texttt{measure}, \texttt{tied:start}, \texttt{tied:stop}): \textbf{0.18\,\%} (scanned), \textbf{0.11\,\%} (clean).
+    \item Perfect-transcription rate: \textbf{71\,\%} (scanned), \textbf{73\,\%} (clean).
+    \item Error budget: $\approx$74\,\% of edits are barline (\texttt{measure}) tokens and $\approx$13\,\% are ties, together $\approx$87\,\%. Pitch, octave, and duration error rates are each well below 0.15\,\%.
+    \item Beam search (width 5) yields only $\leq$\,1 edit per 1000 SER improvement at roughly 6$\times$ decoding cost; greedy is the recommended default and the one used for headline numbers.
+\end{itemize}
+
+These figures meet and exceed the implicit target set in the GEP (a CRNN--CTC clearly out-performing the classical CV baseline). The relative weight of structural tokens in the residual error budget is itself a useful finding and is discussed in the results chapter of the main thesis.
+
+\subsection{Methodology and Rigour}
+The iterative-incremental methodology from the GEP (two-week cycles, evidence-based replanning, traceability, reproducibility, quantitative control) was followed throughout:
+
+\begin{itemize}
+    \item \textbf{Iterative loop.} Five full data--train--evaluate cycles, each producing a checkpoint under \texttt{models/run\_*}: cycles 1--3 addressed convergence and vocabulary stability, cycle 4 introduced the augmentation upgrade, cycle 5 integrated rare-token oversampling and header-stripping augmentation.
+    \item \textbf{Traceability and reproducibility.} Every checkpoint is paired with a serialised \texttt{Config} and a \texttt{training\_log.csv}; the full workflow is script-driven through \texttt{cli.py}.
+    \item \textbf{Quantitative control.} SER on the validation split drives early stopping; reporting aggregate and melodic SER separately exposed that residual errors are dominated by structural tokens rather than pitch/duration mistakes.
+    \item \textbf{Corrective loop.} The most consequential corrections (filter set, vocabulary cleanup, rare-token oversampling, augmentation overlap audit) were enacted at cycle boundaries.
+\end{itemize}
+
+\subsection{Analysis of Alternative Solutions}
+The GEP comparison (traditional modular, CRNN--CTC, transformer end-to-end) holds. Two implementation-time refinements strengthen the original justification:
+
+\begin{itemize}
+    \item \textbf{Backbone.} A custom VGG-style stack was replaced mid-project by ResNet-18, which removed training instability under mixed precision and gave lower validation SER for the same compute. VGG is retained only for backward compatibility with old checkpoints.
+    \item \textbf{Chord recognition.} The GEP assumed a generic OCR engine (EasyOCR / Tesseract); tests on Real Book strips showed systematic hallucination on jazz notation (slash basses, \texttt{m7b5}, \texttt{maj7}, \texttt{$\varnothing$}). The pathway was rebuilt as a dedicated character-level CRNN--CTC trained on synthetic LilyJAZZ strips and fine-tuned on hand-labelled real strips, reusing the same training and evaluation harness as the melody model.
+\end{itemize}
+
+\subsection{Integration of Knowledge}
+The work combines computer vision (preprocessing, morphological staff detection, projection-profile deskewing, augmentation), deep learning (CRNN, CTC, mixed precision, OneCycleLR, beam vs.\ greedy decoding), music theory and notation (LMX vocabulary, clef/key handling, jazz chord symbology, Real Book engraving), and systems engineering (FastAPI service, hand-labelling UI, Poetry environment, multiprocessing data generation).
+
+A creative cross-domain choice is the use of LilyJAZZ as the synthetic engraving target. Most OMR work trains on classical fonts (Sibelius, default LilyPond), which produces brittle models on Real Book pages. Training directly on LilyJAZZ aligns the synthetic distribution with the inference distribution at no extra cost and is the principal reason the model transfers well after only light fine-tuning.
+
+\subsection{Applicable Laws and Regulations}
+The project does not process personal data and is not subject to GDPR. The PrIMuS dataset is used under its academic-use licence (cited, not redistributed). LilyPond and LilyJAZZ are GNU GPL; the Python stack (PyTorch, OpenCV, albumentations, FastAPI, PyMuPDF) is used under permissive licences tracked in the Poetry lockfile. Real Book pages are kept as a local, non-distributed evaluation set under the educational-use provisions of Spanish copyright law (Ley de Propiedad Intelectual, art.~32); only cropped chord strips paired with text labels are released.
+
+\subsection{Commitment, Initiative, and Decision-Making}
+Work has progressed steadily throughout the academic year, with biweekly supervisor meetings and weekly self-directed sprints. Two decisions illustrate the initiative taken: (i)~when EasyOCR was found to mis-read chord symbols, the chord pathway was rebuilt from scratch as a CRNN--CTC, including a hand-labelling UI (a non-trivial extension outside the GEP plan, but necessary for the chord sub-problem to actually be solved); (ii)~when aggregate SER was found to be dominated by barline and tie tokens, a complementary \textit{melodic SER} metric was introduced to isolate the pitch/duration error rate that end users actually care about.
+
+Obstacles overcome include: a LilyPond~2.25 API change (\texttt{set-global-fonts} removed) that broke the LilyJAZZ stylesheet, patched locally; CTC alignment instability when compressed image width fell below the label length, fixed by \texttt{zero\_infinity=True} and a tighter multi-staff filter; and augmentation over-darkening from stacking three lighting effects, fixed by an explicit overlap audit.
+
+% ==========================================
+\section{Adjustments to the Plan and their Justification}
+\label{sec:adjustments}
+
+Execution has followed the GEP plan closely in architecture, methodology, and scope. Four substantive adjustments are documented below; none alter the core objectives and all preserve the 509\,h budget.
+
+\subsection{Adjustment 1: Chord OCR Pathway Re-Design}
+\textbf{Plan vs.\ change.} The GEP described chord extraction as a generic OCR step (EasyOCR / Tesseract). The pathway was rebuilt as a dedicated character-level CRNN--CTC: synthetic LilyJAZZ chord-strip renderer, training script reusing the melody CRNN, real-strip extractor with pre-labels, a browser hand-labelling UI, a fine-tuning script with weighted sampling, and a grammar-aware post-processor.
+
+\textbf{Justification.} EasyOCR mis-read chord symbols systematically (slash basses as fractions, \texttt{maj7}~$\rightarrow$~\texttt{moj7}, \texttt{$\varnothing$} unknown) because it is trained on Latin text, not jazz notation. Reusing the existing CRNN training infrastructure was the lowest-cost path to a working chord recogniser.
+
+\textbf{Impact.} Roughly $+35$\,h, absorbed by the T5.3 buffer (20\,h) and under-spent literature survey hours.
+
+\subsection{Adjustment 2: Backbone Migration from VGG to ResNet-18}
+\textbf{Plan vs.\ change.} The GEP did not pin a CNN backbone. An initial VGG-style stack plateaued at $\approx$3\,\% validation SER with mixed-precision instability; migration to ResNet-18 gave roughly $2\times$ faster convergence and stable AMP training. ResNet-18 is now the default; VGG is kept only for old-checkpoint compatibility.
+
+\textbf{Impact.} Absorbed within T3.1/T3.2; no schedule slippage.
+
+\subsection{Adjustment 3: Hand-Labelling Tooling}
+\textbf{Plan vs.\ change.} The GEP envisaged real-page fine-tuning but did not detail the labelling workflow. A browser UI (\texttt{chord\_labeler.html}, \texttt{music\_labeler.html}) was built into the FastAPI service: it pre-fills the model's prediction, supports keyboard shortcuts (Enter/Esc/Tab/Shift+Tab), tracks a resumable JSONL ledger, and canonicalises chord-spelling variants (\texttt{Cm7}~$\rightarrow$~\texttt{C-7}, \texttt{m7b5}~$\rightarrow$~\texttt{$\varnothing$}).
+
+\textbf{Impact.} $\approx$+10\,h of UI work, recovered by the labelling speed-up.
+
+\subsection{Adjustment 4: Symbol-Level Modular Baseline De-Scoped}
+\textbf{Plan vs.\ change.} T1.3 was framed as a full classical symbolic baseline. It was scoped down to a morphological staff detector (reused as Stage~2 of inference) plus a qualitative discussion of error propagation. A full classical symbol classifier would have cost 40--50\,h against an outcome the literature already predicts will lose to the CRNN.
+
+\textbf{Impact.} $-15$\,h on WP1, redirected to the chord pathway.
+
+\subsection{Overall Effect on Plan and Budget}
+The four adjustments redistribute $\approx$45\,h without changing the total budget (509\,h) or the strategic objectives (Table~\ref{tab:effort-deltas}).
+
+\begin{table}[h!]
+    \centering
+    \caption{Effort re-allocation across work packages (hours).}
+    \label{tab:effort-deltas}
+    \renewcommand{\arraystretch}{1.15}
+    \small
+    \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{6cm} r r r}
+        \toprule
+        \textbf{Work package} & \textbf{GEP plan} & \textbf{Revised} & \textbf{Delta} \\
+        \midrule
+        WP1 Literature \& baseline                  & 78  & 63  & $-15$ \\
+        WP2 Dataset construction                    & 73  & 73  & $0$   \\
+        WP3 CRNN--CTC development                   & 75  & 80  & $+5$  \\
+        WP4 Iterative refinement (incl. chord CRNN) & 68  & 95  & $+27$ \\
+        WP5 Final evaluation and defence            & 85  & 68  & $-17$ \\
+        WP0 Project management (unchanged)          & 130 & 130 & $0$   \\
+        \midrule
+        \textbf{Total}                              & \textbf{509} & \textbf{509} & \textbf{0} \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+The economic budget (\EUR{}16\,097.16, dominated by personnel time) and the sustainability matrix ($\approx$57.5\,kWh, $\approx$13.2\,kg~CO\textsubscript{2}eq with the Spanish electricity factor) are unchanged. Actual GPU consumption sits within the projected envelope: five melody training runs and two melody fine-tune cycles, plus three chord training runs and two chord fine-tune cycles, on a single RTX~3060 (12\,GB).
+
+% ==========================================
+\section{Work Plan for Completing the Thesis}
+\label{sec:remaining}
+
+Approximately five weeks separate the Progress Review deadline (21 May 2026) from the ordinary-period defence in June 2026. Engineering is substantially complete; the remaining effort is predominantly write-up and consolidation.
+
+\subsection{Outstanding Engineering Tasks}
+The following technical items remain open:
+
+\begin{description}[style=nextline, nosep, leftmargin=1.2cm]
+    \item[E1 -- Final melody fine-tune on Real Book staves (8 h)]
+    Run the fine-tune cycle using the full hand-labelled real-staff set; produce the final checkpoint and update \texttt{models/latest}.
+
+    \item[E2 -- Per-page evaluation on real Real Book pages (8 h)]
+    Generate a held-out test of $\approx$30 real Real Book pages with hand-labelled ground truth; report aggregate SER, melodic SER, perfect-page rate, and per-failure-mode breakdown.
+
+    \item[E3 -- Final chord-pathway evaluation (4 h)]
+    Re-evaluate the fine-tuned chord CRNN on a held-out set of real strips; compare with the synthetic-only baseline; report character-level and string-level accuracy.
+
+    \item[E4 -- Final ablations cleanup (4 h)]
+    Wrap up ablation tables: backbone choice, rare-token oversampling, header-stripping augmentation, online jitter.
+\end{description}
+
+\subsection{Documentation and Write-Up Tasks}
+The bulk of the remaining effort is the thesis manuscript itself. The current draft has a near-final introduction and state-of-the-art chapter; the remaining chapters are skeleton headings with TODO markers.
+
+\begin{description}[style=nextline, nosep, leftmargin=1.2cm]
+    \item[W1 -- Methodology chapter (18 h)]
+    Data pipeline (rendering, LMX encoding, augmentation), model architecture (ResNet-18 backbone, asymmetric strides, CTC), training loop (AdamW + OneCycleLR + AMP), inference pipeline (five-stage flow, grammar fixer).
+
+    \item[W2 -- Results chapter (12 h)]
+    SER tables, training curves, error breakdown, domain-gap measurements, fine-tuning effect.
+
+    \item[W3 -- Management chapter integration (4 h)]
+    Compress GEP material to the main-thesis voice; include the deltas reported in Section~\ref{sec:adjustments} of this review.
+
+    \item[W4 -- Sustainability chapter (3 h)]
+    Carry over and update the sustainability section from the GEP report, with measured (rather than estimated) energy figures where available.
+
+    \item[W5 -- Conclusions and future work (5 h)]
+    Synthesise findings, discuss limitations, outline polyphony / multi-page / handwritten extensions.
+
+    \item[W6 -- Front matter and revision pass (5 h)]
+    Abstracts (English/Catalan/Spanish are drafted), revise figures, consistency pass, bibliography sweep.
+\end{description}
+
+\subsection{Defence Preparation}
+\begin{description}[style=nextline, nosep, leftmargin=1.2cm]
+    \item[D1 -- Slides (6 h)]
+    20--25 slides; live demo of the FastAPI service on a phone-photographed Real Book page.
+
+    \item[D2 -- Rehearsal and expected questions (4 h)]
+\end{description}
+
+\subsection{Updated Schedule}
+Figure~\ref{fig:remaining-gantt} shows the weekly plan for the remaining five weeks. Engineering work concludes in week~22; writing dominates weeks~22--25; defence preparation occupies week~25.
+
+\begin{landscape}
+\begin{figure}[p]
+    \centering
+    \begin{ganttchart}[
+        hgrid,
+        vgrid={dotted},
+        x unit=2.8cm,
+        y unit title=0.55cm,
+        y unit chart=0.4cm,
+        title height=1,
+        title label font=\scriptsize,
+        bar label font=\scriptsize,
+        bar height=0.6,
+        group label font=\scriptsize\bfseries,
+        milestone label font=\scriptsize\bfseries,
+    ]{1}{5}
+        \gantttitle{Week 22}{1}
+        \gantttitle{Week 23}{1}
+        \gantttitle{Week 24}{1}
+        \gantttitle{Week 25}{1}
+        \gantttitle{Week 26}{1} \\
+        \gantttitle{19--25 May}{1}
+        \gantttitle{26 May--1 Jun}{1}
+        \gantttitle{2--8 Jun}{1}
+        \gantttitle{9--15 Jun}{1}
+        \gantttitle{16+ Jun}{1} \\
+
+        \ganttgroup[group/.append style={fill=gpInProgress!30}]{Engineering}{1}{2} \\
+        \ganttbar[bar/.append style={fill=gpInProgress!60}]{E1 Melody fine-tune}{1}{1} \\
+        \ganttbar[bar/.append style={fill=gpInProgress!60}]{E2 Real-page eval}{1}{2} \\
+        \ganttbar[bar/.append style={fill=gpInProgress!60}]{E3 Chord eval}{1}{1} \\
+        \ganttbar[bar/.append style={fill=gpInProgress!60}]{E4 Ablations}{2}{2} \\
+
+        \ganttgroup[group/.append style={fill=gpPending!30}]{Write-up}{1}{4} \\
+        \ganttbar[bar/.append style={fill=gpPending!60}]{W1 Methodology}{1}{2} \\
+        \ganttbar[bar/.append style={fill=gpPending!60}]{W2 Results}{2}{3} \\
+        \ganttbar[bar/.append style={fill=gpPending!60}]{W3 Management}{3}{3} \\
+        \ganttbar[bar/.append style={fill=gpPending!60}]{W4 Sustainability}{3}{3} \\
+        \ganttbar[bar/.append style={fill=gpPending!60}]{W5 Conclusions}{3}{4} \\
+        \ganttbar[bar/.append style={fill=gpPending!60}]{W6 Revision pass}{4}{4} \\
+
+        \ganttgroup[group/.append style={fill=gpDone!30}]{Defence}{4}{5} \\
+        \ganttbar[bar/.append style={fill=gpDone!60}]{D1 Slides}{4}{5} \\
+        \ganttbar[bar/.append style={fill=gpDone!60}]{D2 Rehearsal}{5}{5} \\
+        \ganttmilestone[milestone/.append style={fill=gpMilestone}]{Defence}{5} \\
+    \end{ganttchart}
+    \caption{Updated work plan for weeks 22--26 (May--June 2026). Engineering items conclude in week~23; the write-up dominates weeks~22--25; defence preparation is concentrated in weeks~25--26.}
+    \label{fig:remaining-gantt}
+\end{figure}
+\end{landscape}
+
+\subsection{Effort Summary}
+Table~\ref{tab:remaining-effort} summarises the remaining effort: 81\,h across engineering, write-up, and defence. This sits comfortably within a five-week budget of $\approx$20\,h/week.
+
+\begin{table}[h!]
+    \centering
+    \caption{Remaining effort by area.}
+    \label{tab:remaining-effort}
+    \renewcommand{\arraystretch}{1.15}
+    \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}X r}
+        \toprule
+        \textbf{Area} & \textbf{Hours} \\
+        \midrule
+        Engineering (E1--E4)        & 24 \\
+        Write-up (W1--W6)           & 47 \\
+        Defence preparation (D1--D2) & 10 \\
+        \midrule
+        \textbf{Total remaining}    & \textbf{81} \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\subsection{Residual Risks}
+Three residual risks remain:
+
+\begin{itemize}
+    \item \textbf{R1 -- Real-page SER lags synthetic numbers.} The gap would be reported honestly (melodic SER is the user-relevant metric) and the limitations chapter expanded. Additional fine-tune cycles ($\approx$4\,h GPU each) can be triggered if needed.
+    \item \textbf{R2 -- Write-up overrun.} 47\,h in four weeks is feasible but tight. The GEP supplies $\approx$30\,\% of the management chapter in reusable form; \texttt{docs/} provides the technical scaffold for the methodology chapter.
+    \item \textbf{R3 -- Defence rehearsal compression.} Slide drafting starts in week~24 in parallel with the conclusions chapter, so rehearsal in week~25 starts from a first-pass deck.
+\end{itemize}
+
+% ==========================================
+\section{Conclusion}
+\label{sec:conclusion}
+
+The project is on track for defence in June 2026. The core technical objective (a CRNN--CTC for monophonic jazz lead sheets, integrated into an end-to-end pipeline with chord recognition) has been met with measurable margin over the implicit GEP target: 1.28\,\% aggregate SER and 0.18\,\% melodic SER on the scanned test split. The four documented plan adjustments re-allocate effort without altering scope or budget; they reflect engineering responses to empirical evidence rather than departures from the GEP methodology. Remaining work is principally documentation and defence preparation, both on schedule.
+
+\end{document}

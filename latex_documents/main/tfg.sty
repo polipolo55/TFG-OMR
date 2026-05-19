@@ -60,7 +60,9 @@
 \newcommand{\tfgheadrule}{\arrayrulecolor{tfgPrimary}\toprule\arrayrulecolor{black}}
 
 % ── Inline emphasis ────────────────────────────────────────────────────────────
-\newcommand{\code}[1]{\texttt{\color{tfgSecondary}#1}}
+% Orange (tfgSecondary) is reserved for \todo and unresolved work.
+% \code is plain monospace -- the typography alone signals "identifier".
+\newcommand{\code}[1]{\texttt{#1}}
 \newcommand{\term}[1]{\textit{#1}}      % first use of a term
 \newcommand{\important}[1]{\textbf{\color{tfgHighlight}#1}}
 

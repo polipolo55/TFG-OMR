@@ -280,7 +280,7 @@ Chord symbols are typeset as free-form text---not as graphical notation symbols-
 their recognition requires optical character recognition (OCR) rather than the
 staff-pattern recognition applied to the melody line.
 This distinction motivates the two-stream architecture described in
-Chapter~\ref{ch:method}.
+Chapter~\ref{ch:design}.
 
 \subsection{The Lead-Sheet Format}
 
@@ -460,7 +460,7 @@ repairs structurally ill-formed outputs;
 (5)~\textit{Chord OCR} extracts chord symbols from the strip above each staff and
 post-processes them.
 The outputs of stages 4 and 5 are merged into the structured JSON format described in
-Chapter~\ref{ch:method}.
+Chapter~\ref{ch:impl}.
 
 The training strategy also deserves mention.
 In the absence of labelled real-world data, the model is first trained entirely on
@@ -525,9 +525,16 @@ architecture through comparative analysis, the work-breakdown structure and time
 the budget and economic analysis, and the project's sustainability and ethical impact
 assessment.
 
-Chapter~\ref{ch:method} describes the technical methodology in full detail: the data
-generation and augmentation pipeline, the LMX vocabulary and token grammar, the
-CRNN-CTC architecture and training procedure, and the complete inference pipeline.
+Chapter~\ref{ch:design} describes the conceptual design of the system: the
+pipeline decomposition, the data strategy, the LMX output representation and
+vocabulary, the CRNN--CTC architectural choices, the two-stream approach for
+melody and chord recognition, the training strategy, and the evaluation
+design.
+
+Chapter~\ref{ch:impl} describes the implementation: the technology stack, the
+repository structure, the data and augmentation pipeline, the model and
+training loop, the chord OCR network, the inference pipeline, the CLI and
+web service, and the mechanisms used to keep the experiments reproducible.
 
 Chapter~\ref{ch:results} presents experimental results: training curves, SER on the
 synthetic test set, ablation studies, qualitative error analysis by failure category,

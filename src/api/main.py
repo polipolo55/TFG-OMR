@@ -243,6 +243,10 @@ class MusicSaveRequest(BaseModel):
 
 class RenderRequest(BaseModel):
     lmx: str
+    # Optional layout-only time signature for continuation staves whose
+    # label has no `time` token. Example: "3/4", "2/2", "6/8".
+    # When the LMX already contains a time token, this is ignored.
+    render_time: str | None = None
 
 
 @app.get("/music-labeler")
@@ -300,7 +304,15 @@ async def music_labeler_render(req: RenderRequest):
     if not tokens:
         raise HTTPException(422, "Empty LMX string")
 
-    arr = render_tokens(tokens)
+    render_time_hint: tuple[int, int] | None = None
+    if req.render_time:
+        try:
+            b_str, bt_str = req.render_time.split("/", 1)
+            render_time_hint = (int(b_str), int(bt_str))
+        except (ValueError, AttributeError):
+            raise HTTPException(400, f"Bad render_time {req.render_time!r}; expected 'beats/beat-type' e.g. '3/4'")
+
+    arr = render_tokens(tokens, render_time_hint=render_time_hint)
     if arr is None:
         raise HTTPException(422, "LilyPond render failed — check token syntax")
 

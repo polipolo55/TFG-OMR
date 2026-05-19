@@ -106,16 +106,53 @@ for a custom size — the directive must sit between ``\\version`` and
 
 # ── LMX tokens → LilyPond music body ──────────────────────────────────────────
 
-def lmx_to_lilypond(tokens: list[str]) -> str:
+def lmx_to_lilypond(
+    tokens: list[str],
+    render_time_hint: tuple[int, int] | None = None,
+) -> str:
     """Convert a list of LMX tokens to a LilyPond music body string.
+
+    If the token sequence does not contain a ``clef:``, ``key:fifths:``, or
+    ``time`` token, an ``\\omit`` directive is emitted for the corresponding
+    staff element so the rendered preview matches the LMX content (rather
+    than falling back to LilyPond's defaults — treble clef, no key, 4/4).
+    This is essential for previewing continuation-staff labels in the
+    labeling UI.
+
+    Parameters
+    ----------
+    render_time_hint
+        Optional ``(beats, beat_type)`` used as a layout-only time signature
+        when the token sequence has no ``time`` token. LilyPond uses it for
+        bar grouping while ``\\omit Staff.TimeSignature`` keeps it invisible
+        in the rendered output. This lets the labeling UI preview a
+        continuation staff in its song's actual meter (3/4, cut time, …)
+        without contaminating the saved label.
 
     Raises :class:`ValueError` for unknown clefs or key signatures so that
     data-quality problems surface immediately rather than being silently
     papered over.
     """
+    # Pre-scan: which header tokens are present? Drives \omit directives below.
+    has_clef = any(t.startswith("clef:") for t in tokens)
+    has_key  = any(t.startswith("key:fifths:") for t in tokens)
+    has_time = "time" in tokens
+
     key_sharps: set[str] = set()
     key_flats:  set[str] = set()
     lily: list[str] = []
+    if not has_clef:
+        lily.append(r"\omit Staff.Clef")
+    if not has_key:
+        lily.append(r"\omit Staff.KeySignature")
+    if not has_time:
+        lily.append(r"\omit Staff.TimeSignature")
+        if render_time_hint is not None:
+            b, bt = render_time_hint
+            # Layout-only directive: bars group correctly even though the
+            # \omit above keeps the time signature hidden in the engraving.
+            lily.append(rf"\time {b}/{bt}")
+
     beats_val: str | None = None
     beat_type_val: str | None = None
     pending: dict | None = None
@@ -390,6 +427,7 @@ def render_tokens(
     template: str = LY_TEMPLATE,
     dpi: int = 200,
     staff_size_directive: str = "",
+    render_time_hint: tuple[int, int] | None = None,
 ) -> np.ndarray | None:
     """Render LMX tokens via LilyPond.  Returns cropped grayscale or *None*.
 
@@ -397,9 +435,12 @@ def render_tokens(
     ``"#(set-global-staff-size 18)"`` that is injected between ``\\version``
     and ``\\include "lilyjazz.ily"``.  Empty string keeps LilyPond's default
     (20 pt).  See ``LY_TEMPLATE`` for placement details.
+
+    *render_time_hint* is forwarded to ``lmx_to_lilypond`` — see that
+    function's docstring.
     """
     try:
-        music = lmx_to_lilypond(tokens)
+        music = lmx_to_lilypond(tokens, render_time_hint=render_time_hint)
     except ValueError:
         log.debug("lmx_to_lilypond failed for %s", name, exc_info=True)
         return None

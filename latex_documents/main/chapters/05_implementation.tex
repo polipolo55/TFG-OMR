@@ -1,0 +1,604 @@
+\chapter{Implementation}
+\label{ch:impl}
+
+This chapter describes how the design presented in
+Chapter~\ref{ch:design} is realised in code: the libraries chosen at
+each layer, the structure of the project repository, the concrete
+configuration values used, and the engineering decisions taken to keep
+the system reproducible and within the compute budget of a single
+consumer GPU.
+The chapter is deliberately separate from the design chapter so that
+the conceptual architecture can be read independently of any particular
+library or framework choice.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Technology Stack}
+\label{sec:impl-stack}
+
+Table~\ref{tab:tech-stack} lists the principal libraries used in each
+layer of the system.
+The selection criterion in every case was the smallest, most
+widely-used library compatible with the design constraints; no
+component was chosen for novelty.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Layer} & \textbf{Library} & \textbf{Role} \\
+\midrule
+Deep learning            & PyTorch 2.10+        & Model, loss, optimiser, mixed-precision training. \\
+CNN backbone             & \code{torchvision}  & ResNet18 weights and module definition. \\
+Image processing         & OpenCV               & Binarisation, deskewing, morphological staff detection. \\
+PDF rasterisation        & PyMuPDF (\code{fitz}) & Render PDF pages to grayscale arrays at configurable DPI. \\
+Music rendering          & LilyPond + LilyJAZZ  & Generate training PNGs from PrIMuS semantic files. \\
+Data augmentation        & \code{albumentations} & Scan-simulation transform pipeline. \\
+Numerics                 & NumPy                & Tensor / array interop. \\
+Web service              & FastAPI + Uvicorn    & REST API exposing the inference pipeline. \\
+Package manager          & Poetry               & Dependency isolation, deterministic environment. \\
+\bottomrule
+\end{tabularx}
+\caption{Principal libraries used in each layer of the system.
+Versions are pinned in \code{pyproject.toml}; Poetry produces a
+reproducible virtual environment across machines.}
+\label{tab:tech-stack}
+\end{table}
+
+The runtime target is a single NVIDIA RTX~3060 with 12\,GB of VRAM,
+which is the hardware available to the author for the duration of the
+thesis.
+All architectural choices in Chapter~\ref{ch:design} were taken with
+this budget in mind; the implementation does not require multi-GPU
+support, distributed training, or specialised cloud infrastructure.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Repository Structure}
+\label{sec:impl-repo}
+
+The project source tree is organised by responsibility rather than by
+file type.
+
+\begin{quote}\small
+\begin{verbatim}
+src/
+  cli.py                      unified CLI (9 subcommands)
+  CRNN_CTC/                   model, training, vocab, evaluation
+    model.py                  CRNN-CTC architecture
+    vocab.py                  Vocabulary with fixed blank/pad/unk
+    dataset.py, config.py     PrIMuS dataset + Config dataclass
+    train.py, evaluate.py     training loop and evaluation
+    chord_dataset.py          synthetic chord-strip dataset
+    chord_train.py            chord CRNN training from scratch
+    chord_finetune.py         fine-tune chord CRNN on real strips
+  data_processing/            dataset generation and augmentation
+    generate_realbook.py      PrIMuS -> LilyJAZZ render
+    semantic_to_lmx.py        PrIMuS .semantic -> LMX label
+    augment_scanned.py        scan-simulation augmentation
+    chord_render.py           synthetic chord-strip renderer
+    generate_chord_crops.py   bulk chord-strip generation
+    extract_real_chord_strips.py    pre-label strips from PDFs
+  omr_pipeline/               inference pipeline
+    pipeline.py               run_pipeline() entry point
+    preprocess.py             load / binarise / deskew
+    staff_detect.py           morphology -> 5-line clusters
+    inference.py              CRNN-CTC music recognition
+    chord_recognizer.py       chord OCR
+    chord_postprocess.py      jazz-chord grammar filter
+    grammar_fix.py            LMX token sequence validator
+  api/                        FastAPI web server
+\end{verbatim}
+\end{quote}
+
+Three structural principles are enforced.
+First, all music-notation mapping tables (clef IDs, key-signature
+encodings, duration tokens) live in a single module
+(\code{CRNN\_CTC/lilypond\_render.py}) and are imported by every other
+module that needs them; this prevents the rendering pipeline and the
+label converter from drifting out of sync.
+Second, the inference pipeline (\code{omr\_pipeline/}) has no
+dependencies on the training code beyond the \code{Vocabulary} and
+\code{CRNN} classes; it can be deployed without the training tree.
+Third, the CLI module (\code{cli.py}) is the only entry point: every
+multi-step operation (data generation, training, evaluation, vocab
+building) is exposed as a CLI subcommand, with the same flags and
+defaults across operations.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Data Pipeline Implementation}
+\label{sec:impl-data}
+
+The data pipeline is implemented as four CLI subcommands run in
+sequence: \code{render}, \code{convert}, \code{augment}, and
+\code{vocab}.
+A wrapper subcommand (\code{pipeline}) runs all four with a shared set
+of paths.
+Every stage uses the Python \code{multiprocessing} module for CPU
+parallelism, with the worker pool size set by a CLI flag (default 8).
+The Python global interpreter lock makes threading useless for these
+CPU-bound stages.
+
+\subsection{Render: PrIMuS to LilyJAZZ}
+
+The \code{render} subcommand walks the PrIMuS package directories,
+parses each \code{.semantic} file, normalises the clef to G2 if needed
+(preserving absolute pitches by writing them at the equivalent
+treble-clef position), constructs a LilyPond source file, and invokes
+the \code{lilypond} subprocess at 200\,DPI.
+The output PNG is auto-cropped to remove white margins.
+
+The LilyJAZZ font stylesheet is not bundled with LilyPond and must be
+installed manually into the LilyPond \code{share} directory before
+rendering can begin; the installation script is documented in
+\code{docs/data\_pipeline.md} and the project assumes its presence at
+runtime.
+
+\subsection{Convert: PrIMuS \texttt{.semantic} to LMX}
+
+The \code{convert} subcommand parses each \code{.semantic} file
+token-by-token, computes the display-accidental rules described in
+Section~\ref{sec:lmx-format} from the pitch spelling and the active
+key signature, and emits an LMX label file co-located with the
+rendered PNG.
+The conversion is direct: no intermediate MusicXML is produced.
+A non-obvious aspect of the implementation is the \term{implicit-key
+fix}: PrIMuS omits the \code{keySignature-} token entirely for C major
+samples, but the model must learn to predict \code{key:fifths:0}
+whenever the staff has no accidentals.
+The converter detects this case and injects the C-major key token
+before the time signature, ensuring that every training sample has an
+explicit key label.
+
+\subsection{Augment: scan simulation}
+
+The \code{augment} subcommand applies the
+\code{albumentations}~\cite{AlbumentationsFastFlexible} transform
+pipeline to every clean image and writes the result to a parallel
+directory.
+The transforms are listed in Table~\ref{tab:aug-pipeline}; their
+probabilities and parameter ranges were tuned against a sample of real
+Real Book scans.
+After the \code{albumentations} pipeline, four additional non-library
+operations are applied in order: morphological ink dilation, staff-line
+thickness variation, paper-tone remapping, and one of a vignette,
+uneven-illumination gradient, or halftone-banding overlay.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Transform} & \textbf{Probability} & \textbf{Range / purpose} \\
+\midrule
+\code{ElasticTransform}     & 0.82 & page warping, staff curvature \\
+\code{GridDistortion}       & 0.72 & grid bending \\
+\code{OpticalDistortion}    & 0.38 & lens distortion \\
+\code{Affine}               & 0.85 & rotation $\pm 4^\circ$, shear $\pm 1.2^\circ$, scale $0.97$--$1.03$ \\
+\code{GaussianBlur}         & 0.62 & $\sigma \in [0.2, 1.1]$ \\
+\code{Sharpen}              & 0.48 & oversharpened-scanner simulation \\
+\code{RandomToneCurve}      & 0.72 & exposure variation \\
+\code{GaussNoise}           & 0.78 & sensor noise \\
+\code{RandomBrightnessContrast} & 0.70 & brightness $\pm 0.06$, contrast $0.03$--$0.18$ \\
+\code{ImageCompression}     & 0.35 & JPEG quality $72$--$92$ \\
+\bottomrule
+\end{tabularx}
+\caption{The \code{albumentations} transform pipeline applied during
+the \code{augment} stage.  Probabilities and parameter ranges are
+calibrated against a sample of real Real Book scans.}
+\label{tab:aug-pipeline}
+\end{table}
+
+A second, lighter augmentation layer is applied online during training
+inside the \code{Dataset.\_\_getitem\_\_} method: per-sample brightness
+and contrast jitter, low-amplitude noise, and a small horizontal
+translation, each with probability \num{0.5}.
+Without this online jitter the model overfits to the exact pixel
+realisations that the offline pipeline produced.
+The online cost is approximately \SI{50}{\micro\second} per sample,
+small enough to be absorbed by the data loader's worker processes.
+
+\subsection{Vocab: build the token index}
+
+The \code{vocab} subcommand scans every \code{.lmx} file in the
+training corpus, collects the set of unique tokens, sorts them
+alphabetically, and writes them to a plain-text file with one token per
+line.
+The three special tokens (blank, pad, unk) are not written to the file;
+they are injected at indices 0, 1, and 2 by the \code{Vocabulary} class
+at load time.
+The full pitch and octave ranges are reserved in the vocabulary even if
+some entries are absent from the corpus, so that the model's softmax
+output has a stable shape across data-pipeline reruns.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Model Implementation}
+\label{sec:impl-model}
+
+\subsection{Module structure}
+
+The model is implemented as three PyTorch \code{nn.Module} subclasses:
+a CNN backbone, a recurrent stack, and a thin linear projection head.
+The \code{CRNN} class composes them and exposes a single
+\code{forward(images, image\_widths)} method that returns log-softmax
+probabilities ready for the CTC loss.
+
+\subsection{ResNet18 backbone modifications}
+
+The torchvision ResNet18 is used as a starting point but with two
+critical modifications.
+First, the first convolutional layer is replaced to accept
+single-channel input rather than three-channel RGB; pre-trained weights
+for this layer are recomputed by averaging the RGB weights along the
+input channel axis.
+Second, the strides of three convolutional stages are made asymmetric
+so that the height dimension is compressed eight times more aggressively
+than the width dimension:
+
+\begin{quote}\small
+\begin{verbatim}
+conv1     stride (2, 1)
+maxpool   stride (2, 2)
+layer1    stride (1, 1)
+layer2    stride (2, 2)
+layer3    stride (2, 1)
+layer4    stride (2, 1)
+AdaptiveAvgPool2d -> output height 1
+\end{verbatim}
+\end{quote}
+
+The cumulative effect is an input of shape $(B, 1, 128, W)$ producing
+an output of shape $(B, 512, 1, W/4)$.
+The height dimension is squeezed before the recurrent stack so the
+input to the BiLSTM is $(W/4, B, 512)$.
+A consequence of these asymmetric strides is that the time axis (width)
+is preserved with only a $4\times$ compression while the height
+collapses to a single feature vector; this is exactly what the CTC time
+axis needs.
+
+\subsection{Bidirectional LSTM}
+
+The recurrent stack is a two-layer bidirectional \code{nn.LSTM} with
+256 hidden units per direction, dropout of \num{0.3} between layers,
+and the standard PyTorch packed-sequence handling for variable-width
+batches.
+The output is projected to the vocabulary size by an \code{nn.Linear}
+followed by \code{log\_softmax} along the vocabulary dimension; this is
+the input shape required by \code{nn.CTCLoss}.
+
+\subsection{CTC loss configuration}
+
+The CTC loss is constructed with \code{blank=0} and
+\code{zero\_infinity=True}.
+The latter is essential: it silently zeroes the loss contribution of
+samples whose label length exceeds their effective input length
+($W/4$), which would otherwise cause a NaN-inducing infinity.
+On the in-scope corpus this masking is virtually never triggered
+because the multi-staff filter (Section~\ref{sec:design-data}) removes
+the samples most at risk; \code{zero\_infinity} is a safety net rather
+than a routine code path.
+
+\subsection{Training loop}
+
+The training loop is a single-process, single-GPU implementation built
+on PyTorch's standard primitives.
+Each epoch performs the following:
+
+\begin{enumerate}
+    \item Iterate over the training \code{DataLoader} with
+          \code{num\_workers=10}; each batch is a dictionary of
+          right-padded image tensor, packed label tensor, label lengths,
+          and image widths.
+    \item Forward pass through the CRNN inside an \code{autocast}
+          context for mixed-precision training; CTC loss is computed
+          in single precision.
+    \item Backward pass via the \code{GradScaler}'s scaled-loss path;
+          gradient norm clipped at \num{5.0} to stabilise the LSTM.
+    \item Optimiser step (\code{AdamW}, peak learning rate
+          $1{\times}10^{-3}$, weight decay $1{\times}10^{-4}$).
+    \item Scheduler step (\code{OneCycleLR}, single-cycle cosine
+          annealing, warm-up fraction \num{0.08}).
+    \item Validation pass at end of epoch: greedy CTC decode on the
+          full validation set, SER computed against ground truth, best
+          checkpoint saved if SER improved.
+    \item Append the epoch's metrics to \code{training\_log.csv} in
+          the model directory.
+    \item Stop if SER has not improved for 12 consecutive epochs
+          (early stopping).
+\end{enumerate}
+
+\subsection{Hyperparameter summary}
+
+Table~\ref{tab:hyperparams} lists every hyperparameter used by the
+default training configuration.
+All defaults are encoded in the \code{Config} dataclass and serialised
+to \code{config.json} at training start.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{l l l}
+\toprule
+\textbf{Hyperparameter} & \textbf{Default} & \textbf{Notes} \\
+\midrule
+\code{img\_height}              & 128                   & fixed; image is resized to this height \\
+\code{max\_image\_width}        & 2048                  & wider images are clamped \\
+\code{backbone}                 & \code{resnet18}       & VGG retained for legacy checkpoints \\
+\code{rnn\_hidden}              & 256                   & per direction \\
+\code{rnn\_layers}              & 2                     & BiLSTM depth \\
+\code{dropout}                  & 0.3                   & between LSTM layers \\
+\code{batch\_size}              & 16                    & fits in 12\,GB at \code{img\_height=128} \\
+\code{lr}                       & $1{\times}10^{-3}$    & OneCycleLR peak \\
+\code{weight\_decay}            & $1{\times}10^{-4}$    & AdamW \\
+\code{warmup\_frac}             & 0.08                  & of total steps \\
+\code{max\_grad\_norm}          & 5.0                   & gradient clipping \\
+\code{epochs}                   & 60                    & maximum, with early stopping \\
+\code{early\_stopping\_patience} & 12                   & epochs without val SER improvement \\
+\code{val\_frac}                & 0.10                  & validation split fraction \\
+\code{test\_frac}               & 0.10                  & test split fraction \\
+\code{strip\_header\_prob}      & 0.40                  & header-strip augmentation rate (training only) \\
+\code{online\_aug\_prob}        & 0.50                  & in-loader jitter rate (training only) \\
+\code{rare\_lmx\_oversample}    & 2                     & multiplier for samples with tie tokens \\
+\code{num\_workers}             & 10                    & DataLoader worker processes \\
+\bottomrule
+\end{tabular}
+\caption{Default hyperparameters of the \code{Config} dataclass.
+Every value is overridable via a CLI flag; the entire \code{Config} is
+serialised alongside the checkpoint so that evaluation always uses the
+same settings as training.}
+\label{tab:hyperparams}
+\end{table}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Chord OCR Implementation}
+\label{sec:impl-chord}
+
+The chord recognition network reuses the CRNN--CTC machinery of the
+melody network but is trained on a different data stream with a
+different vocabulary.
+
+\subsection{Synthetic chord-strip generation}
+
+The \code{chord\_render} module defines the canonical set of chord
+qualities (major, minor, dominant 7, major 7, half-diminished,
+diminished, augmented, suspended) with sampling weights derived from
+the empirical frequency of each quality in the Real Book.
+The \code{generate\_chord\_crops} script renders strips of one to five
+chords each, in the LilyJAZZ font, at the same DPI as the staff
+renders, then applies an \code{albumentations} pipeline tuned for the
+visual conditions of the chord strip (smaller scale, less geometric
+distortion, more colour-channel jitter) and an additional
+``Real Book clutter'' overlay that adds artefacts such as binder-hole
+shadows, staff-line bleed-through from the staff below the chord strip,
+and occasional slash-repeat marks.
+
+Twelve thousand training strips and twelve hundred validation strips
+are generated for the default configuration; the chord training script
+consumes them via a CSV manifest.
+
+\subsection{Chord network architecture}
+
+The chord network is the same ResNet18 + BiLSTM + linear-projection
+stack as the melody network, but with a 29-class output (26 character
+tokens plus blank, pad, unk).
+The input image is resized to 64 pixels in height (half the staff
+height) before being fed to the network; this is the height to which
+the chord strip is resampled at inference time as well.
+
+\subsection{Fine-tuning on hand-labelled strips}
+
+The synthetic chord network is fine-tuned on a small set of real chord
+strips extracted from Real Book pages and manually labelled.
+Extraction reuses the staff-detection module of the inference pipeline:
+chord strips are cropped from the region directly above each detected
+staff, and the synthetic chord model is run on each strip to provide a
+first-pass label that the human reviewer corrects rather than typing
+from scratch.
+Labels are stored in a JSON Lines file with a \code{status} field that
+allows the labeller to skip strips that contain no chords or are too
+degraded to read.
+
+Fine-tuning mixes real and synthetic strips with a weighted sampler:
+real strips carry weight 1.0, synthetic strips weight 0.4.
+The synthetic admixture prevents catastrophic forgetting of rare chord
+qualities under-represented in the small real set.
+Labels go through a \term{canonicalisation} step before the
+vocabulary filter: \code{m7b5} is rewritten to the \code{ø} glyph,
+\code{Cm7} to \code{C-7}, and characters not in the chord vocabulary
+are dropped silently.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Inference Pipeline Implementation}
+\label{sec:impl-inference}
+
+The inference pipeline is a single function, \code{run\_pipeline},
+that accepts the raw bytes of a PDF or image plus the original filename
+and returns a structured JSON dictionary.
+It is called both by the CLI \code{infer} subcommand and by the FastAPI
+endpoint described in Section~\ref{sec:impl-api}.
+
+\subsection{Preprocessing}
+
+PDFs are rasterised with PyMuPDF at the DPI specified by
+\code{OMR\_PDF\_DPI} (default 300, clamped to $[72, 600]$).
+The current implementation processes only page 0 of multi-page PDFs;
+multi-page batching is left to future work.
+Raster images are loaded directly via OpenCV.
+Binarisation uses Contrast Limited Adaptive Histogram Equalisation
+(CLAHE) followed by Otsu thresholding; this combination is more robust
+to uneven scanner illumination than plain Otsu on the raw image.
+Deskewing tests a range of rotation angles and selects the angle that
+maximises the variance of the horizontal projection profile (sharper
+row peaks correspond to better-aligned staves).
+
+\subsection{Staff detection}
+
+Staff detection is a classical morphological pipeline: a wide
+horizontal opening kernel extracts staff-line candidates, row centroids
+are computed and merged across closely-spaced rows to handle thick
+lines, and the centroids are clustered into groups of five consecutive
+nearly-equispaced lines.
+For each cluster, the system emits a \code{System} record containing
+the staff image, the strip of pixels above it (where chord symbols
+live, vertical span computed as the gap to the previous staff), and the
+bounding box on the page.
+
+This stage is deliberately not a neural network: classical morphology
+is fast, deterministic, and accurate enough on the well-formatted Real
+Book input.
+A future revision could replace it with a learned segmenter, but the
+current implementation has not been the bottleneck of any failure mode
+observed during evaluation.
+
+\subsection{Music recognition}
+
+Each \code{System} is fed through the staff-aware normalisation
+(resize to 128\,px height, centre the staff vertically inside the
+frame, per-image zero-mean and unit-variance), then batched and passed
+to the CRNN.
+The model is loaded once per process and cached in module scope; the
+checkpoint path is resolved from
+\code{models/latest/best\_model.pt} or from the \code{OMR\_CHECKPOINT}
+environment variable.
+
+Decoding is greedy by default: argmax over the vocabulary dimension at
+each time step, collapse consecutive duplicates, remove blank.
+Beam search can be enabled by setting \code{OMR\_BEAM\_WIDTH=N} or
+passing \code{--beam-width N} to the CLI; empirically, beam search
+yields fewer than one edit per thousand SER improvement on monophonic
+input, so greedy is the recommended default.
+
+\subsection{Chord recognition}
+
+The chord strip from each system is trimmed at its left edge to remove
+binder-hole shadows (up to \SI{10}{\percent} of strip width, controlled
+by a column-wise ink-density threshold), resized to the chord network's
+training height, batched, and decoded.
+\code{<unk>} tokens emitted by the network when it encounters clutter
+that the synthetic training set never saw are treated as word
+separators rather than character errors.
+The decoded character string is then passed to a jazz-chord grammar
+filter that validates against \code{ROOT [ACC] [QUALITY] [EXTEN]
+[ALT]* [SLASH]} and drops fragments that do not match (page numbers,
+tempo markings, stray lyrics).
+Single-character predictions consisting of a root letter only (no
+quality, no extension) are also dropped as likely false positives.
+
+\subsection{Grammar fixer}
+
+The grammar fixer is a stateful walker over the raw token list.
+It tracks the current measure's accumulated beat count against the
+active time signature, the current key signature, and the in-progress
+note (whether a pitch has been emitted that is awaiting an octave or
+duration).
+Rules are applied as the walker encounters each token:
+
+\begin{itemize}
+    \item A pitch token starts a new note; the walker waits for an
+          octave token and then a duration token before committing the
+          note to the output stream.
+    \item A duration token without a preceding pitch is rejected.
+    \item A duration appearing after another duration (a malformed
+          sequence) ends the prior note prematurely.
+    \item An accidental appearing before the duration is reordered to
+          appear after.
+    \item Octaves outside $[3, 6]$ are clamped to that range.
+    \item Clefs other than \code{clef:G2} are rewritten.
+    \item Time signatures outside the eight-element allowed set are
+          rejected, and the prior measure's time signature is
+          propagated.
+    \item \code{tied:stop} tokens are kept only if a matching
+          \code{tied:start} appeared earlier in the same tie window.
+\end{itemize}
+
+The walker emits a normalised LMX token list that satisfies the grammar
+specified in Section~\ref{sec:lmx-format}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Command-Line Interface}
+\label{sec:impl-cli}
+
+The CLI is the unified entry point for every operation that the system
+performs offline.
+It is implemented as a single \code{argparse} dispatcher in
+\code{src/cli.py} with the subcommands listed in
+Table~\ref{tab:cli-subcommands}.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{l X}
+\toprule
+\textbf{Subcommand} & \textbf{Purpose} \\
+\midrule
+\code{render}         & Render PrIMuS \code{.semantic} files to LilyJAZZ PNGs. \\
+\code{convert}        & Convert PrIMuS \code{.semantic} files to LMX labels. \\
+\code{augment}        & Apply scan-simulation augmentation to clean PNGs. \\
+\code{vocab}          & Build the LMX vocabulary file from a corpus. \\
+\code{pipeline}       & Run \code{render} + \code{convert} + \code{augment} + \code{vocab}. \\
+\code{train}          & Train the CRNN on a prepared dataset. \\
+\code{evaluate}       & Evaluate a checkpoint and report SER. \\
+\code{evaluate-ab}    & Compare beam widths on the same checkpoint. \\
+\code{infer}          & Run the full inference pipeline on a PDF or image. \\
+\code{api}            & Launch the FastAPI server. \\
+\bottomrule
+\end{tabularx}
+\caption{CLI subcommands exposed by \code{src/cli.py}.
+Every subcommand prints a self-contained help text when invoked with
+\code{--help}.}
+\label{tab:cli-subcommands}
+\end{table}
+
+CLI flags map one-to-one onto fields of the \code{Config} dataclass for
+training and evaluation subcommands, so a flag added to \code{Config}
+becomes a flag of the corresponding subcommand without further
+plumbing.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Web Service}
+\label{sec:impl-api}
+
+The system exposes a FastAPI web service that wraps
+\code{run\_pipeline} as a REST endpoint.
+The service accepts a multipart file upload (PDF or image) and returns
+the JSON dictionary produced by the pipeline.
+Two additional endpoints support hand-labelling of chord strips
+(\code{/labeler} and its supporting API routes), used during the
+chord-network fine-tuning workflow.
+
+A minimal HTML upload UI is served at the root path; it accepts a
+file, displays the rendered page with detected staff bounding boxes
+overlaid, and shows the recognised LMX token sequence and chord list
+for each segment.
+The UI is not the principal deliverable of the thesis; it is a
+debugging aid that doubles as a demonstration interface.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Reproducibility}
+\label{sec:impl-reproducibility}
+
+Three mechanisms together guarantee that any experiment reported in
+Chapter~\ref{ch:results} can be reproduced exactly.
+
+\textbf{Deterministic dataset splits.}
+The \code{make\_splits} function partitions samples by hashing the
+sample identifier and bucketing the hash modulo a fixed denominator.
+The same sample always falls into the same split across runs and across
+machines.
+
+\textbf{Embedded configuration.}
+Every checkpoint contains a JSON-serialised copy of the \code{Config}
+dataclass that produced it.
+At evaluation or inference time the embedded config is loaded ahead of
+the model weights, so that the data filters, image dimensions, and
+hyperparameters are exactly those used during training.
+A consequence is that adding, renaming, or removing a field of
+\code{Config} breaks backward compatibility with existing checkpoints,
+which is documented as Hard Constraint~3 of the project's
+\code{CLAUDE.md} contributor guide.
+
+\textbf{Pinned dependencies.}
+Poetry's \code{poetry.lock} file pins every dependency to an exact
+version, including transitive dependencies.
+The project environment is reproducible across machines with a single
+\code{poetry install} command.
+The lock file is committed to version control alongside the source.

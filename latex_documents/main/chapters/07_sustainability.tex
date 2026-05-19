@@ -1,0 +1,432 @@
+\chapter{Sustainability and Social Commitment}
+\label{ch:sustain}
+
+This chapter records the sustainability dimension of the project,
+following the matrix and reflection framework set out in the FIB
+GEP sustainability guide~\cite{gepSustainabilityReport2018}.
+Section~\ref{sec:sust-selfassessment} reports the self-assessment
+that opened the project; Section~\ref{sec:sust-matrix} fills the
+three-dimensional sustainability matrix (economic, environmental,
+and social) at the project's design-and-development stage and at
+its anticipated useful life; Section~\ref{sec:sust-commitment}
+records the ethical position and open-science commitments adopted;
+and Section~\ref{sec:sust-final} revisits the assessment in light
+of the completed work.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Self-Assessment Summary}
+\label{sec:sust-selfassessment}
+
+After completing the GEP sustainability questionnaire, my strongest
+area was identified as the \textbf{economic} dimension of software
+projects, especially cost estimation, trade-off analysis, and
+management control.
+I am comfortable reasoning about whether a technical decision is
+financially realistic within a constrained project, and about how
+planning choices affect viability and long-term maintenance cost.
+The questionnaire also showed a medium level in social reflection:
+I generally consider accessibility and user benefit, but I still
+tend to prioritise technical performance first and social impact
+second when under time pressure.
+
+The weakest area was the \textbf{environmental} lifecycle
+perspective.
+Before this project, I mainly associated environmental impact with
+direct energy consumption during model training.
+The reflection process made me consider additional factors that I
+had not previously analysed in depth: the hardware manufacturing
+footprint, end-of-life device management, and the difference
+between one-time experimentation and sustained deployment impact.
+I also realised that selecting lighter architectures is not only a
+computational decision but also an environmental one---a point
+explicitly reflected in the architectural justification of
+Section~\ref{sec:mgmt-justification}.
+
+Three concrete improvement commitments emerged for the remainder
+of the project.
+
+\textit{First}, energy-related impact should be quantified wherever
+possible rather than asserted qualitatively.
+The energy estimate of Section~\ref{sec:sust-environmental} is the
+result of this commitment: it is computed from the actual GPU
+hours consumed by the training runs, multiplied by the rated
+power draw of the workstation and converted to CO\textsubscript{2}
+using the official Spanish emission
+factor~\cite{reeInformeSistemaElectrico2024,mitecoFactorEmision2025}.
+This is a coarse calculation but it is grounded in measurable
+quantities rather than in adjectives.
+
+\textit{Second}, architecture choices should be justified with both
+performance and efficiency criteria.
+The comparison table in Section~\ref{sec:mgmt-justification}
+includes ``computational feasibility'' and ``data requirements''
+as first-class criteria alongside accuracy, which is the direct
+operationalisation of this commitment.
+The decision to retain ResNet18 as the CNN backbone---rather than
+a larger ResNet50 or a vision transformer---is in part an
+environmental decision: the smaller backbone trains faster, fits
+on consumer hardware, and reaches saturation accuracy on the
+monophonic target.
+
+\textit{Third}, the discussion of who benefits from the resulting
+tool, and under what limitations, must be explicit rather than
+implicit.
+This commitment shapes the social-dimension discussion in
+Section~\ref{sec:sust-social} and the ethical-position statement
+in Section~\ref{sec:sust-commitment}: both name specific
+beneficiary groups (musicians, educators, archivists,
+researchers) and specific limitations (monophonic contract,
+treble-clef-only inputs, residual SER profile) rather than
+appealing to vague ``users'' and ``edge cases''.
+
+The questionnaire was useful because it transformed sustainability
+from a formal reporting requirement into a design constraint that
+guides technical decisions throughout the project lifecycle.
+It also strengthened my personal competency for future
+professional work: I now see project quality as a balance between
+technical success, economic feasibility, environmental
+responsibility, and social value, and each of those four facets
+needs to be reflected somewhere in the project plan rather than
+treated as a downstream addendum.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Sustainability Matrix}
+\label{sec:sust-matrix}
+
+Table~\ref{tab:sustainability-matrix} summarises the
+three-dimensional sustainability matrix as used in the GEP
+framework.
+The remainder of this section discusses each dimension in turn,
+identifying the principal cost or benefit (PPP, ``the project as
+designed and developed'') and the useful-life perspective (the
+impact once the system is in service).
+
+\begin{table}[h!]
+    \centering
+    \caption{Sustainability matrix for the project.
+    PPP refers to the design-and-development stage; the useful-life
+    column refers to deployment and downstream impact.}
+    \label{tab:sustainability-matrix}
+    \renewcommand{\arraystretch}{1.2}
+    \scriptsize
+    \begin{tabularx}{\linewidth}{>{\raggedright}p{2.3cm} >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X}
+        \toprule
+        \textbf{Dimension} & \textbf{PPP (design and development)} & \textbf{Useful life (deployment and impact)} \\
+        \midrule
+        Economic
+            & Total project budget of \EUR{}16\,097.16, with explicit contingency and incidentals.
+              The main cost driver is specialised engineering time.
+            & Open-source release and fast local inference can reduce recurrent transcription cost compared with manual copying and commercial OMR tools. \\
+        Environmental
+            & Estimated energy use of $\approx 57.5$\,kWh for the full project, mitigated by mixed-precision training, early stopping, and the reuse of existing
+              hardware~\cite{reeInformeSistemaElectrico2024,mitecoFactorEmision2025}.
+            & One-time training cost is amortised over repeated inference; local execution reduces cloud dependency for common use cases. \\
+        Social
+            & The project strengthens the author's personal technical competencies and promotes responsible data and software practices.
+            & Potential beneficiaries include musicians, educators, archivists, and researchers through improved accessibility, searchability, and preservation of music documents. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\subsection{Economic dimension}
+\label{sec:sust-economic}
+
+\textbf{PPP (design and development).}
+The total project cost is estimated at \EUR{}16\,097.16
+(Section~\ref{sec:mgmt-budget}), dominated by specialised
+engineering time at roughly \SI{85}{\percent} of the total.
+This profile is typical of a research-intensive software
+project: hardware and tooling are commodity items whose
+amortised share of the budget is small compared with the labour
+required to design, train, and evaluate the model.
+The remaining cost components---general overheads, the risk-driven
+incidentals, and the contingency reserve---together account for
+the remaining fifteen per cent and are justified by the
+risk-register exercise of
+Section~\ref{sec:mgmt-risks}.
+
+\textbf{Useful life and state of the art.}
+The current alternatives for lead-sheet digitisation are manual
+transcription and general-purpose OMR tools, and the project's
+economic improvement must be evaluated against both.
+Manual transcription is expensive in recurrent cost (a trained
+musician's time, at conservatory or freelance rates) and in
+turnaround time (typically of the order of minutes to tens of
+minutes per page, depending on density and clarity).
+General-purpose OMR tools---both commercial (SmartScore,
+PhotoScore, SharpEye) and open-source (Audiveris)---reduce the
+recurrent cost but require substantial correction effort on the
+jazz-specific notation studied here, because their internal
+heuristics are tuned for classical engraving styles
+(Section~\ref{sec:soa-classical}).
+A specialised CRNN--CTC model targeted at the Real Book
+engraving style reduces the correction workload further, on the
+class of input it was trained for, and eliminates the licence
+costs that the commercial alternatives charge per seat.
+
+\textbf{Improvement contribution.}
+The principal economic improvement is not zero-cost digitisation
+but a \textit{lower cost per corrected page} after deployment.
+A user of the system still has to verify and correct the output
+manually for any application that depends on note-perfect
+transcription, but the per-page correction time is reduced
+because the model handles the bulk of the symbol recognition
+correctly (Chapter~\ref{ch:results}).
+A second improvement is research reproducibility: the open-source
+release of the code, the training scripts, and the trained model
+weights lowers the entry cost for future OMR research targeting
+the same or adjacent domains, because the synthetic data pipeline
+and the CRNN--CTC training stack do not have to be rebuilt from
+scratch.
+
+\subsection{Environmental dimension}
+\label{sec:sust-environmental}
+
+\textbf{PPP (design and development).}
+The project's estimated energy consumption is approximately
+\SI{57.5}{\kilo\watt\hour}, derived from the rated power draw of
+the development workstation (a desktop with an NVIDIA RTX~3060
+GPU and a typical full-system draw of \SI{250}{\watt} during
+training) multiplied by the estimated cumulative training and
+data-generation time over the project's twenty-one-week schedule.
+At the Spanish electricity emission factor of approximately
+\SI{0.23}{\kilo\gram\per\kilo\watt\hour} of CO\textsubscript{2}
+reported by Red El\'ectrica de Espa\~na and
+MITECO~\cite{reeInformeSistemaElectrico2024,mitecoFactorEmision2025},
+this corresponds to roughly \SI{13.2}{\kilo\gram} of
+CO\textsubscript{2} emitted during the project's execution.
+The estimate is coarse but is grounded in measurable quantities
+rather than rules of thumb.
+
+The dominant contributor to the total is GPU training time.
+Inference, dataset generation, and development sessions away from
+the GPU contribute much less per hour because they do not engage
+the high-power-draw components of the workstation.
+This concentration of environmental impact in a single activity
+makes the impact tractable: optimising training has substantially
+more environmental leverage than optimising the rest of the
+workflow.
+
+\textbf{Minimisation plan.}
+Four mitigations together keep the training-time energy cost
+within the estimated envelope.
+First, the architecture choice (Section~\ref{sec:design-model})
+favours a \textit{lightweight} backbone, ResNet18, over the
+heavier alternatives that would yield only marginal accuracy
+gains on monophonic input;
+Section~\ref{sec:mgmt-justification} makes this trade-off
+explicit.
+Second, \textit{mixed-precision training} via PyTorch's
+\code{torch.amp} reduces both VRAM occupancy and the cycle time
+per training step, which translates directly into fewer
+GPU-hours per converged model.
+Third, \textit{early stopping} with a twelve-epoch patience halts
+training once the validation SER stops improving, avoiding the
+common pattern of running for a fixed number of epochs ``to be
+safe''.
+Fourth, the project \textit{reuses existing hardware} rather than
+provisioning new equipment specifically for the thesis; the
+embodied energy of manufacturing a new workstation would dwarf
+the operational energy of the project by an order of magnitude.
+
+Data generation and training are also organised in batches to
+avoid redundant runs: the dataset is fixed before model training
+begins, so that data-pipeline iteration and model iteration do
+not compound in cost.
+Each significant training run is logged and its CSV summary
+retained, which makes it possible to identify and avoid
+duplicate experiments in later sprints.
+
+\textbf{Useful life and improvement contribution.}
+Once trained, inference has a low marginal energy cost compared
+with retraining: a single page transcription completes in
+seconds on consumer hardware and consumes a small fraction of a
+watt-hour of energy.
+The energy break-even point of the project---the number of
+inference invocations at which the operational energy of inference
+equals the one-time training cost---is therefore high enough that
+the trained model can be regarded as an amortised asset.
+Sharing the trained weights and the training scripts spreads the
+one-time training cost across multiple downstream users and
+multiple academic iterations, so that the per-application share
+of the project's environmental footprint shrinks as the model is
+re-used.
+
+\subsection{Social dimension}
+\label{sec:sust-social}
+
+\textbf{PPP (design and development).}
+In personal-development terms the project strengthens
+competencies in three areas relevant to the author's future
+professional work: machine-learning engineering (architecture
+design, training-loop implementation, evaluation methodology),
+project planning (work-breakdown structures, sprint cadence,
+budget management), and scientific communication (technical
+writing, figure-driven argument, and the citation discipline
+required by a thesis-length document).
+The project also reinforces ethical awareness about the
+limitations and failure modes of automated transcription:
+working through the residual-error analysis of
+Chapter~\ref{ch:results} produces a much more concrete picture
+of what the model gets right and wrong than a single aggregate
+metric can convey.
+
+\textbf{Useful life and real need.}
+There is a real demand for digitising lead sheets used in music
+education and performance, and the system is built specifically
+to serve that demand on a notation style (Real Book engraving)
+that is widely used and poorly served by existing tools.
+
+For \textit{musicians}, the downstream applications include
+automatic transposition to a different key (essential for
+B$\flat$, E$\flat$, and F transposing instruments),
+MIDI playback for practice and accompaniment, and integration
+with practice apps that depend on a symbolic representation of
+the score.
+For \textit{teachers}, the value is in producing digital
+materials that can be edited, transposed, and annotated for
+specific pedagogical purposes without re-typesetting the entire
+piece by hand.
+For \textit{archivists}, OMR is a precondition for making large
+paper collections searchable: a scanned PDF is preserved but not
+discoverable, whereas a symbolic representation can be queried
+melodically, harmonically, or rhythmically.
+For \textit{researchers}, especially in music information
+retrieval and computational musicology, a symbolic version of a
+large jazz corpus enables statistical and structural analyses
+that simply cannot be performed on raster images.
+
+Across all four groups, the project can improve quality of life
+in two related ways: by reducing the repetitive manual work
+required to convert paper notation to a machine-readable form,
+and by facilitating the long-term preservation of music content
+that currently exists only as paper or low-resolution scanned
+PDF.
+
+\textbf{Boundaries.}
+Social value depends on transparent communication of the
+system's current limitations.
+Four limitations are particularly important to name explicitly.
+The \textit{monophonic-only contract}
+(Section~\ref{sec:design-data}) means the model is not designed
+to transcribe piano scores, choral parts, or any input with more
+than one simultaneous voice on the staff.
+The \textit{Real-Book-specific engraving style} means the model's
+accuracy on other engraving styles---classical Sibelius output,
+historical editions, handwritten manuscripts---is not the
+accuracy reported in Chapter~\ref{ch:results} and would have to
+be measured separately.
+The \textit{treble-clef-only assumption} excludes any input on
+F or C clefs, which is acceptable for lead sheets but
+disqualifying for full scores.
+The \textit{residual error rate} reported in
+Chapter~\ref{ch:results}, while small in aggregate, is not zero;
+applications that depend on note-perfect transcription must
+include a human verification step.
+Overpromising the system in scenarios outside the validated
+scope would erode rather than enhance its social value, and
+would also expose the system's users to downstream costs they
+have not been warned about.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Commitment and Ethical Position}
+\label{sec:sust-commitment}
+
+The project's ethical position aligns with the open-science
+commitments of the GEP sustainability framework, and is recorded
+here as five concrete practices rather than a single statement of
+principle.
+
+\textit{Open source release.}
+The source code is released under a permissive open-source
+licence and is tracked in a public Git repository.
+Every experiment in the thesis can be reproduced from a clean
+clone using a pinned-dependency environment managed by Poetry
+(Section~\ref{sec:impl-reproducibility}), and the trained model
+weights are distributed alongside the code.
+This commitment matters because OMR systems often disappear into
+private repositories that cannot be inspected or extended; making
+the implementation public is the most direct contribution the
+project can make to the surrounding research community.
+
+\textit{Documented evaluation protocol.}
+The metric protocol used in Chapter~\ref{ch:results} is documented
+in full, including the definition of the aggregate Symbol Error
+Rate, the melodic SER that strips structural tokens, and the
+category-level error breakdown that decomposes edits into
+substitutions, insertions, and deletions per token class.
+Future work can therefore replicate the present evaluation
+exactly, or extend it with additional metrics, without having to
+guess at how the present numbers were computed.
+
+\textit{Licence-respecting use of third-party data.}
+All third-party data used in the project is consumed in
+accordance with its licence.
+PrIMuS, the synthetic-supervision source, is publicly distributed
+for research use~\cite{PrIMuSDataset} and is used here unmodified.
+The author's own scans of the Real Book are used only for
+fine-tuning and evaluation in a strictly academic context; the
+trained weights cannot be redistributed in a form that recovers
+the underlying copyrighted material.
+
+\textit{No personal data, no safety-critical decisions.}
+The system does not process personal data at any stage---input
+images are music notation, output sequences are symbolic
+representations of that notation---and it is not deployed for
+safety-critical automated decision-making.
+This narrows the ethical surface of the project to its
+intellectual-property dimension and to its honesty about its
+capabilities, which is the subject of the next practice.
+
+\textit{Documented limitations.}
+The known limitations of the system---the monophonic contract,
+the treble-clef-only assumption, the eight allowed time
+signatures, and the residual SER profile---are documented
+prominently in the project's \code{README}, in the project
+overview documentation, and in the present thesis
+(Sections~\ref{sec:scope} and \ref{sec:sust-social}).
+Future users of the model can therefore evaluate in advance
+whether the system is suitable for their use case rather than
+discovering its limitations through failure in production.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Final Reflection}
+\label{sec:sust-final}
+
+Revisiting the sustainability assessment at the end of the project,
+two updates are worth recording.
+
+First, the \textbf{environmental} estimate of $\approx 57.5$\,kWh
+made at the planning stage is consistent with the executed
+training profile: the final checkpoint converged in
+\num{37} epochs (Section~\ref{sec:res-training}) and the full
+training run including ablations fits within the planned envelope.
+Mixed-precision training was the single most effective mitigation:
+it reduced VRAM usage enough that the entire pipeline runs on a
+consumer GPU, avoiding the cloud-rental scenario reserved as the
+worst-case fallback in the incidentals table
+(Table~\ref{tab:incidentals}).
+
+Second, the \textbf{social} value of the system depends on the
+deployment surface, not just on its accuracy in isolation.
+The FastAPI web service of Section~\ref{sec:impl-api} packages
+the inference pipeline behind a single REST endpoint with no
+GPU requirement on the client side, which is precisely the
+deployment shape that makes the tool accessible to musicians,
+educators, and archivists who do not have local ML expertise.
+This shape was a planned design decision, but its sustainability
+significance only becomes visible once the technical work is
+complete: a model with the same accuracy and no accessible
+deployment surface would have substantially less social impact
+regardless of its training-time efficiency.
+
+A residual concern, recorded here for completeness rather than as
+an unresolved issue, is the \textbf{lifecycle} of the trained model
+weights themselves.
+Model files have a finite useful life---they become obsolete as
+new architectures are released, as datasets evolve, and as the
+target notation style drifts.
+Publishing the training scripts alongside the weights is the
+standard mitigation: it ensures that the cost of training a
+replacement model can be paid once and then redistributed, rather
+than being repeated independently by each successor project.

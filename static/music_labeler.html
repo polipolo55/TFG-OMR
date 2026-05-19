@@ -176,6 +176,31 @@
     }
     button.btn-strip:hover { background: #f5e9a3; }
 
+    .render-context {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed #d0d7de;
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      align-items: center;
+      font-size: 12px;
+    }
+    .render-context .tag { color: #57606a; font-size: 11px; }
+    .render-context .ctx-hint {
+      color: #888;
+      font-size: 11px;
+      flex-basis: 100%;
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+    button.btn-ctx { background: #fff; }
+    button.btn-ctx.active {
+      background: #0969da;
+      color: #fff;
+      border-color: #0969da;
+    }
+
     .keymap { color: #888; font-size: 12px; margin-top: 10px; }
     .keymap kbd {
       background: #eaecef;
@@ -231,6 +256,18 @@
         </div>
         <div id="render-status"></div>
         <div id="render-error" class="error-msg"></div>
+        <div class="render-context">
+          <span class="tag">Render bar layout in:</span>
+          <button class="btn-quick btn-ctx" data-ctx="auto" onclick="setRenderCtx('auto', this)">auto (4/4)</button>
+          <button class="btn-quick btn-ctx" data-ctx="3/4" onclick="setRenderCtx('3/4', this)">3/4</button>
+          <button class="btn-quick btn-ctx" data-ctx="2/2" onclick="setRenderCtx('2/2', this)">2/2 (cut)</button>
+          <button class="btn-quick btn-ctx" data-ctx="2/4" onclick="setRenderCtx('2/4', this)">2/4</button>
+          <button class="btn-quick btn-ctx" data-ctx="6/8" onclick="setRenderCtx('6/8', this)">6/8</button>
+          <button class="btn-quick btn-ctx" data-ctx="12/8" onclick="setRenderCtx('12/8', this)">12/8</button>
+          <span class="ctx-hint">
+            Layout only — does not change the saved label. Used when the LMX has no time token (continuation staves) so bars group correctly.
+          </span>
+        </div>
       </div>
     </div>
 
@@ -297,6 +334,24 @@
   <script>
     let current = null;
     let renderInFlight = false;
+    // Render-only layout time signature (e.g. "3/4" or "2/2").
+    // Persists across strips so labeling all staves of a 3/4 song doesn't
+    // require re-selecting on every strip. "auto" means no hint sent.
+    let renderCtx = localStorage.getItem('musicLabeler.renderCtx') || 'auto';
+
+    function setRenderCtx(ctx, btn) {
+      renderCtx = ctx;
+      localStorage.setItem('musicLabeler.renderCtx', ctx);
+      document.querySelectorAll('.btn-ctx').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      else {
+        const found = document.querySelector(`.btn-ctx[data-ctx="${ctx}"]`);
+        if (found) found.classList.add('active');
+      }
+      // Re-render to reflect the new context (if there's already a render shown)
+      const img = document.getElementById('render-img');
+      if (img.style.display !== 'none') preview();
+    }
 
     async function refreshStats() {
       const r = await fetch('/api/music-labeler/stats');
@@ -360,10 +415,12 @@
       errDiv.textContent = '';
 
       try {
+        const body = {lmx};
+        if (renderCtx && renderCtx !== 'auto') body.render_time = renderCtx;
         const resp = await fetch('/api/music-labeler/render', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({lmx}),
+          body: JSON.stringify(body),
         });
         if (!resp.ok) {
           const detail = await resp.json().catch(() => ({}));
@@ -525,6 +582,8 @@
       }
     });
 
+    // Highlight the currently-selected render context on startup
+    setRenderCtx(renderCtx);
     loadNext();
   </script>
 </body>

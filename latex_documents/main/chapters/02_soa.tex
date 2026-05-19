@@ -1,20 +1,283 @@
 \chapter{State of the Art}
 \label{ch:soa}
 
-\section{Historical Approaches}
+OMR has evolved through three broadly distinguishable generations: the
+heuristic modular pipelines that defined the field from the 1990s through
+the early 2010s; the convolutional--recurrent sequence models trained with
+Connectionist Temporal Classification (CRNN--CTC) that arose with deep
+learning; and the most recent end-to-end transformer architectures, which
+scale to polyphonic and full-page input at the cost of substantially
+larger labelled corpora.
+This chapter surveys those paradigms, reviews the principal datasets and
+symbolic output representations used in the literature, and finally
+positions this thesis with respect to recent work that targets jazz lead
+sheets specifically.
+The two published surveys of the
+field~\cite{calvoZaragozaUnderstandingOMR2020,shatriOPTICALMUSICRECOGNITION}
+serve as the structural backbone for the discussion.
 
-\todo{Traditional heuristic/rule-based pipelines; staff detection/removal; why OpenCV
-morphology was insufficient.}
+% ─────────────────────────────────────────────────────────────────────────────
+\section{The Classical OMR Pipeline}
+\label{sec:soa-classical}
 
-\section{Deep Learning Paradigm: CRNN and CTC}
+Until the mid-2010s, almost every OMR system was a modular pipeline of four
+sequential stages: image preprocessing (binarisation, deskewing); staff-line
+detection and removal; segmentation and classification of the musical
+primitives left behind once the staff lines have been erased; and semantic
+reconstruction, in which the recognised primitives are assembled into a
+structured score~\cite{calvoZaragozaUnderstandingOMR2020}.
+The second stage was historically the most studied because every subsequent
+step depended on it.
+Dalitz et al.~\cite{dalitzComparativeStudyStaff2008} compared the principal
+families of staff-removal algorithms and contributed a skeletonisation-based
+method; the \term{CVC-MUSCIMA} corpus~\cite{fornesCVCMUSCIMAGroundTruth2012}
+was constructed expressly to benchmark this stage.
 
-\todo{CRNN as visual encoder + sequence model; CTC alignment; why it fits
-left-to-right monophonic lines.}
+\term{Audiveris}~\cite{audiverisAudiveris} is the most widely deployed
+open-source modular OMR engine.
+Its processing chain combines morphological operations for staff and beam
+handling, template matching for fixed-shape symbols, a small convolutional
+classifier for ambiguous glyphs, and external OCR for lyrics, exporting
+MusicXML~4.
+The dominant commercial systems---SmartScore, PhotoScore, and
+SharpEye---follow the same general decomposition but are
+proprietary~\cite{calvoZaragozaUnderstandingOMR2020}.
 
-\section{Modern End-to-End Architectures}
+Two structural weaknesses limit the modular approach for the input class
+targeted in this thesis.
+First, errors accumulate irreversibly across stages: a single missed staff
+line corrupts every downstream pitch assignment for that staff, and a
+mis-segmented chord symbol cannot be recovered by modules that have already
+committed to a different reading.
+Second, the visual heuristics that drive each module are tuned for classical
+engraving styles; the rounded noteheads, loosely-spaced beams, and
+hand-lettered chord symbols characteristic of \textit{The Real Book} fall
+outside the operating envelope of the morphological filters those pipelines
+rely on.
+This motivates the move to learning-based, end-to-end recognition.
 
-\todo{Transformer-based OMR (Sheet Music Transformer, LEGATO, etc.) and trade-offs.}
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Deep Learning Paradigm: CRNN with CTC}
+\label{sec:soa-crnn}
 
-\section{Output Representations}
+The deep-learning era of OMR begins with Calvo-Zaragoza and
+Rizo~\cite{calvoZaragozaEndToEndNeural2018}, who in 2018 applied to
+single-staff music the CRNN--CTC architecture that had recently become
+standard for scene-text and handwritten-text recognition.
+The model treats a staff image as a sequence of vertical strips, extracts
+local visual features through a convolutional backbone, contextualises them
+with a bidirectional recurrent network, and decodes the resulting per-frame
+distribution into a token sequence using the CTC alignment---eliminating
+the need for per-symbol segmentation.
 
-\todo{LMX, **kern, agnostic vs.\ semantic; why LMX linearisation is used here.}
+Alongside the architecture, Calvo-Zaragoza and Rizo released the
+\term{PrIMuS} corpus~\cite{PrIMuSDataset}: 87\,678 real-music monophonic
+incipits sourced from the RISM library and distributed in five
+representations, including two purpose-built token formats.
+The \term{agnostic} encoding lists visual primitives without musical
+interpretation; the \term{semantic} encoding lists musical events such as
+\code{note-C4\_eighth} or \code{keySignature-DM} directly.
+The CRNN--CTC architecture trained on this corpus achieves Symbol Error
+Rates near \SI{1}{\percent} on the agnostic encoding and the low single
+digits on the semantic encoding, establishing the de facto baseline for
+monophonic OMR.
+A follow-up release---Camera-PrIMuS~\cite{calvoZaragozaCameraPrimus2018}---augments
+the same incipits with synthetic photographic distortion and demonstrates
+that the same network retains useful accuracy on phone-captured real-world
+inputs.
+This is the precise template that the present thesis follows.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{End-to-End Transformer Architectures}
+\label{sec:soa-transformer}
+
+From 2024 onward the OMR community has converged on attentional
+encoder--decoder transformers for tasks that exceed the scope of monophonic
+single-staff recognition.
+The \term{Sheet Music Transformer}
+(SMT)~\cite{riosVilaSheetMusicTransformer2024} was the first fully
+transformer-based image-to-sequence OMR system to address polyphonic
+transcription end-to-end: a vision-transformer encoder produces a flattened
+patch sequence which a stacked decoder autoregressively maps to the
+linearised target representation, dispensing with CTC entirely.
+\term{SMT++}~\cite{riosVilaSMTPlusPlus2024} extends the approach to
+full-page pianoform input and currently defines the state of the art on
+that task.
+\term{LEGATO}~\cite{yangLEGATO2025}---released in mid-2025---takes the
+trend further with a vision-LLM backbone, an ABC-notation decoder, and over
+214\,000 typeset pages of pretraining, reporting absolute error reductions
+of \SI{47}{\percent}--\SI{68}{\percent} over previous state of the art on
+hard typeset benchmarks.
+
+These architectures, however, demand resources that exceed the budget of
+a Bachelor's thesis.
+For a strictly monophonic target domain---where the CRNN--CTC baseline
+already attains sub-percent SER and the headroom for further gain is in
+domain robustness rather than model capacity---CRNN--CTC remains the right
+point on the cost/capability curve.
+The quantitative justification of this choice is developed in
+Chapter~\ref{ch:mgmt}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Datasets for OMR Training}
+\label{sec:soa-datasets}
+
+The choice of architecture is inseparable from the choice of training
+corpus.
+Table~\ref{tab:omr-datasets} summarises the principal labelled corpora
+available to the field as of 2026.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{l l r l X}
+\toprule
+\textbf{Dataset} & \textbf{Type} & \textbf{Size} & \textbf{Labels} & \textbf{Use} \\
+\midrule
+PrIMuS~\cite{PrIMuSDataset}            & Monophonic, typeset      & 87\,678 incipits      & agnostic / semantic / MEI & Monophonic CRNN--CTC training \\
+Camera-PrIMuS~\cite{calvoZaragozaCameraPrimus2018} & Monophonic, distorted    & 87\,678 incipits      & same as PrIMuS            & Domain-robustness training \\
+DeepScoresV2~\cite{tuggenerDeepScoresV22020}       & Polyphonic, typeset      & 255\,385 pages, $\sim$151\,M symbols & per-symbol bboxes + masks & Music object detection \\
+CVC-MUSCIMA~\cite{fornesCVCMUSCIMAGroundTruth2012} & Polyphonic, handwritten & 1\,000 pages         & staff-removal masks       & Staff removal / writer ID \\
+MUSCIMA++~\cite{hajicMuscimaPP2017}                 & Polyphonic, handwritten & 140 pages, $\sim$91\,k symbols & MuNG notation graph       & Symbol+relation recognition \\
+DoReMi~\cite{shatriDoReMi2021}                      & Polyphonic, typeset (Dorico) & $\sim$6\,432 pages, $\sim$1\,M objects & MusicXML + MuNG-style     & Universal OMR research \\
+OLiMPiC~\cite{mayerPracticalEndToEnd2024}           & Pianoform, typeset+scan  & $\sim$17\,945 synth + 2\,931 scanned & MusicXML / LMX            & End-to-end pianoform OMR \\
+\bottomrule
+\end{tabularx}
+\caption{Principal labelled corpora used in modern OMR research.
+PrIMuS is the only one specifically designed for monophonic single-staff
+training; it is the foundation of the synthetic dataset constructed in
+this work.}
+\label{tab:omr-datasets}
+\end{table}
+
+Two observations shape the data strategy of this thesis.
+First, none of these corpora captures the LilyJAZZ-style engraving of
+\textit{The Real Book}, and none labels chord symbols as first-class
+objects; the only directly comparable corpus emerged contemporaneously
+with this work~\cite{martinezSevillaJazzLeadSheets2025} and remains too
+small to train a CRNN--CTC model from scratch.
+Second, every recent end-to-end system---SMT, SMT++, OLIMPIC, LEGATO, and
+Camera-PrIMuS itself---follows the same recipe of synthetic pretraining
+followed by fine-tuning on a small annotated target set.
+This is the recipe applied here.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Symbolic Output Representations}
+\label{sec:soa-representations}
+
+The output of an OMR system is a symbolic description of the score; the
+choice of representation shapes both the modelling architecture and the
+achievable error rate.
+\textbf{MusicXML} is the de facto interchange standard between notation
+editors and preserves polyphony, layout, lyrics, and chord symbols
+losslessly, but its verbosity inflates sequence length and vocabulary size
+when fed to a sequence model.
+\textbf{MEI} is even more expressive but inherits the same penalty.
+\textbf{Humdrum} \code{**kern} and \textbf{ABC notation} are far more
+compact and are used as targets of recent
+transformer-based work~\cite{riosVilaSheetMusicTransformer2024,yangLEGATO2025},
+at the cost of reduced expressiveness for complex multi-voice layout.
+The PrIMuS \textbf{agnostic} and \textbf{semantic} formats are compact and
+CTC-friendly but interoperate only with the PrIMuS ecosystem.
+
+\textbf{LMX} (Linearised MusicXML), introduced by
+Mayer et al.~\cite{mayerPracticalEndToEnd2024}, depth-first-traverses the
+MusicXML tree and emits one whitespace-separated token per leaf event.
+It is round-trippable to MusicXML with minimal information loss,
+substantially more compact than the parent format, and was designed
+specifically as a CRNN- and transformer-friendly target; the OLIMPIC
+reference implementation provides a Python \code{Linearizer}/\code{Delinearizer}
+pair that converts between the two representations directly.
+
+This work adopts LMX with a project-specific grammar that drops features
+outside the jazz lead-sheet domain (tuplets, slurs, articulations, double
+accidentals, non-treble clefs); the full grammar is described in
+Section~\ref{sec:lmx-format}.
+LMX was preferred over the PrIMuS native formats because it round-trips
+losslessly to MusicXML---the format expected by downstream music
+applications---and because using the same representation as the OLIMPIC
+reference work~\cite{mayerPracticalEndToEnd2024} keeps the present results
+directly comparable.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Evaluation Metrics}
+\label{sec:soa-metrics}
+
+\textbf{Symbol Error Rate} (SER) is the de facto evaluation metric for
+sequence-based OMR.
+It is defined as the Levenshtein edit distance between the predicted and
+the reference token sequences, normalised by the reference
+length~\cite{SymbolErrorRate}, mirroring the Word Error Rate of automatic
+speech recognition.
+Its principal weaknesses, flagged by both Shatri and
+Fazekas~\cite{shatriOPTICALMUSICRECOGNITION} and by Hajič et
+al.~\cite{hajicOMRMetricsEvaluation2019}, are that all token-level edits
+count equally regardless of musical significance and that SER values
+depend on the chosen tokenisation, so they are not directly comparable
+across encodings.
+
+Two recent metrics partially address these shortcomings.
+\textbf{TEDn} (normalised tree edit distance on the parsed MusicXML tree)
+weights structural errors appropriately and is the primary metric in
+OLIMPIC and SMT++.
+\textbf{OMR-NED}~\cite{martinezSevillaOMRNED2025} extends SER with
+per-element categories so that error distribution---not only error
+rate---is legible from the metric itself.
+This thesis reports SER as the primary metric for backward comparability
+and complements it with a category-level error breakdown in
+Chapter~\ref{ch:results}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{OMR for Jazz Lead Sheets}
+\label{sec:soa-jazz}
+
+Despite the cultural importance of jazz fake-books, OMR of jazz lead sheets
+received almost no dedicated attention in the published literature before
+2025.
+Both major surveys~\cite{calvoZaragozaUnderstandingOMR2020,shatriOPTICALMUSICRECOGNITION}
+list chord-symbol handling among the gaps in the field, and no
+general-purpose OMR engine treats chord symbols as a first-class output
+class.
+
+The earliest dedicated work is an undergraduate honours thesis at
+UCF~\cite{reedHonorsLeadSheets2018}, which built a non-deep modular
+pipeline for chord-symbol recognition on printed and handwritten lead
+sheets and used the recovered chord progressions to attempt
+formal-structure reconstruction.
+The closest published precedent is
+\textbf{Martínez-Sevilla et al.~\cite{martinezSevillaJazzLeadSheets2025}},
+presented at ISMIR 2025 and roughly contemporaneous with the final stages
+of this thesis.
+That work introduces a 293-sheet dataset of \textit{handwritten} jazz lead
+sheets with \code{**kern} and MusicXML ground truth, and trains a
+transformer-decoder model with symbolic-aware tokenisation, pretrained on
+synthetic data and fine-tuned on the handwritten target set.
+
+The present work differs in input domain (printed and scanned Real Book
+pages versus fully handwritten sheets), in architecture (CRNN--CTC versus
+transformer decoder), in chord handling (a two-stream design with
+independent staff and chord networks merged in post-processing versus a
+unified single-stream model), and in output format
+(LMX versus \code{**kern}).
+The two systems are thus complementary points in the design space, and
+both contribute training corpora, models, and evaluation protocols that
+future work can compare and combine.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Summary}
+\label{sec:soa-summary}
+
+Modular pipelines remain useful for full-page typeset classical scores but
+do not generalise to the visual and semantic peculiarities of jazz lead
+sheets.
+End-to-end deep models---CRNN--CTC for monophonic input, transformers for
+polyphonic and full-page input---now define the methodological frontier
+and converge on a common recipe of synthetic pretraining followed by
+fine-tuning on a small annotated target set.
+Symbolic output formats have moved toward MusicXML-linear encodings
+(prominently LMX), and evaluation practice is gradually shifting from raw
+SER toward structurally aware metrics.
+Jazz lead-sheet OMR remained essentially open until 2025; this thesis and
+the concurrent ISMIR 2025
+work~\cite{martinezSevillaJazzLeadSheets2025} represent the first two
+focused attempts to fill that niche.

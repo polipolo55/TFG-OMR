@@ -26,6 +26,12 @@
 \usepackage{enumitem}
 \usepackage{xcolor}
 \usepackage{siunitx}
+\usepackage{eurosym}
+\usepackage{multirow}
+
+% ── Management chapter (Gantt + landscape figure) ──────────────────────────────
+\usepackage{pgfgantt}
+\usepackage{pdflscape}
 
 % ── Bibliography (must come before tfg.sty which loads hyperref) ───────────────
 \usepackage[style=ieee, sorting=none]{biblatex}
@@ -98,10 +104,11 @@
 \input{chapters/01_introduction}
 \input{chapters/02_soa}
 \input{chapters/03_management}
-\input{chapters/04_methodology}
-\input{chapters/05_results}
-\input{chapters/06_sustainability}
-\input{chapters/07_conclusions}
+\input{chapters/04_design}
+\input{chapters/05_implementation}
+\input{chapters/06_results}
+\input{chapters/07_sustainability}
+\input{chapters/08_conclusions}
 
 % ── Bibliography ───────────────────────────────────────────────────────────────
 \cleardoublepage

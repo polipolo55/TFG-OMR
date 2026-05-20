@@ -40,11 +40,24 @@
 % ── Project style (colours, captions, hyperref) ────────────────────────────────
 \usepackage{tfg}
 
+% ── Cross-references (must come after hyperref, which tfg.sty loads) ──────────
+\usepackage[capitalize, nameinlink]{cleveref}
+
 % ── TODO helper ────────────────────────────────────────────────────────────────
 % Usage: \todo{What needs to be written here.}
 \newcommand{\todo}[1]{%
   \textcolor{orange}{\bfseries [TODO\ifx&#1&\else: \textit{#1}\fi]}%
 }
+
+% ── Table style helpers ────────────────────────────────────────────────────────
+% Shared by every table in the thesis.
+%   - \tfgrowsep: light gray horizontal rule between data rows. Keeps rows
+%     visually separated when cells wrap onto multiple lines, without the
+%     visual heaviness of a full \midrule.
+%   - L: left-aligned, top-anchored, wrapping X column for tabularx — used for
+%     long-text columns that need to break across lines.
+\newcommand{\tfgrowsep}{\arrayrulecolor{black!25}\midrule\arrayrulecolor{black}}
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
 
 % ── Headers & footers ──────────────────────────────────────────────────────────
 \pagestyle{fancy}

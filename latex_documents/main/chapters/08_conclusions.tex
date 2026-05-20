@@ -1,11 +1,36 @@
 \chapter{Conclusions and Future Work}
 \label{ch:conclusions}
 
+\todo{EXPAND: conclusions should restate (1) what was achieved
+against the objectives in Chapter~\ref{ch:intro} \S``Objectives'',
+(2) headline numerical results from Chapter~\ref{ch:results}
+(use Table~\ref{tab:results-headline} as the single source of
+numbers; do not re-quote SER values verbatim from \S~Summary),
+(3) lessons learned, and (4) one paragraph on personal growth and
+scope management.  The Future Work bullets below are placeholders;
+expand each into one or two sentences situating the proposed
+extension against the present limitations.}
+
 \section{Conclusions}
 
-\todo{Key achievements; framing as Seq2Seq; synthetic SER; domain-gap fine-tuning.}
+\todo{Key achievements; framing as Seq2Seq; synthetic SER (cite
+Table~\ref{tab:results-headline}); domain-gap fine-tuning.
+Do not paste sentences from Chapter~\ref{ch:intro} motivation or
+Chapter~\ref{ch:results} summary---paraphrase tightly.}
 
 \section{Future Lines of Research}
 
-\todo{Full-page transcription (layout analysis / YOLO), polyphony, broader vocab,
-transformers.}
+\todo{Expand each bullet into one or two sentences:}
+\begin{itemize}
+    \item Full-page transcription via layout analysis (YOLO or
+          DETR-style detectors) replacing the current
+          morphology-based staff detector.
+    \item Polyphony and multi-voice support, requiring a richer
+          LMX grammar and a redesigned dataset filter.
+    \item Broader vocabulary: tuplets, slurs, articulations, and
+          double accidentals (see Chapter~\ref{ch:design}
+          \S``Output Representation'').
+    \item Transformer-based end-to-end architectures
+          (Section~\ref{sec:soa-transformer}) as a replacement for
+          the CRNN--CTC stack, contingent on data scale.
+\end{itemize}

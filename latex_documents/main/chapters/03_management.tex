@@ -107,17 +107,19 @@ one that locks the line of research into a single configuration.
     Symbols denote relative suitability: \textbf{++} excellent,
     \textbf{+} good, \textbf{--} poor, \textbf{-{}-} very poor.}
     \label{tab:alt-comparison}
-    \renewcommand{\arraystretch}{1.15}
-    \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{4.2cm} c c c}
+    \small
+    \setlength{\tabcolsep}{5pt}
+    \renewcommand{\arraystretch}{1.35}
+    \begin{tabularx}{\linewidth}{@{} >{\raggedright\arraybackslash}p{4.2cm} c c c @{}}
         \toprule
         \textbf{Criterion} & \textbf{Traditional pipeline} & \textbf{CRNN--CTC} & \textbf{Transformer} \\
         \midrule
-        Monophonic line accuracy           & --  & +  & ++ \\
-        Computational feasibility          & ++ & +  & -{}- \\
-        Data requirements                  & ++ & +  & -{}- \\
-        Implementation complexity          & +  & +  & -{}- \\
-        Reproducibility in TFG timeline    & +  & ++ & --  \\
-        Extension potential (future work)  & -- & +  & ++ \\
+        Monophonic line accuracy          & --  & +  & ++ \\ \tfgrowsep
+        Computational feasibility         & ++  & +  & -{}- \\ \tfgrowsep
+        Data requirements                 & ++  & +  & -{}- \\ \tfgrowsep
+        Implementation complexity         & +   & +  & -{}- \\ \tfgrowsep
+        Reproducibility in TFG timeline   & +   & ++ & -- \\ \tfgrowsep
+        Extension potential (future work) & --  & +  & ++ \\
         \bottomrule
     \end{tabularx}
 \end{table}
@@ -138,14 +140,19 @@ are compared in Chapter~\ref{ch:results}.
 
 \subsection{Chosen alternative}
 
-The selected architecture is a \textbf{CRNN--CTC model trained for
-monophonic line transcription}; its design is the subject of
+The selected architecture is a \textbf{two-stream CRNN--CTC system}
+in which a music CRNN--CTC transcribes the monophonic staff line and
+a second, independently trained CRNN--CTC performs OCR on the chord
+strip above the staff; its design is the subject of
 Chapter~\ref{ch:design} and its implementation of
 Chapter~\ref{ch:impl}.
 The decision balances modelling capacity against feasibility: the
 model is lighter than transformer alternatives, has strong prior
 art in OMR datasets, and supports robust sequence prediction
 without requiring per-symbol segmentation of the input image.
+Splitting the chord recogniser into a separate network keeps both
+vocabularies small and lets each branch be trained and debugged
+independently.
 
 Three concrete consequences follow from this choice.
 First, the training corpus can be built entirely from a single
@@ -153,9 +160,9 @@ public dataset (PrIMuS) re-rendered in the target engraving style,
 which keeps the data-acquisition cost within the budget allocated
 for the thesis.
 Second, the output representation can be a compact flat token
-sequence (LMX, Section~\ref{sec:lmx-format}), avoiding the
-verbose-XML output that transformer-decoder architectures
-typically produce.
+sequence (LMX, Section~\ref{sec:lmx-format}) consumed by both the
+music and the chord branches, avoiding the verbose-XML output that
+transformer-decoder architectures typically produce.
 Third, the model's training time on a consumer GPU is short enough
 (of the order of a day per full run) that several training
 iterations per sprint are realistic; this is what makes the
@@ -270,10 +277,12 @@ The plan spans 21 weeks (February--June 2026), organised into five
 sprint-aligned work packages (WP1--WP5) plus a transversal
 management work package (WP0) that runs in parallel throughout the
 project.
-Execution control uses \textbf{fixed two-week sprints} for
-inspection and adaptation: backlog priorities, risks, and effort
-estimates are reviewed at each sprint boundary and may be revised
-in either direction.
+Execution control uses \textbf{fixed four-week sprints} aligned
+with the work packages (each WP1--WP4 is one sprint; WP5 closes
+the project over five weeks), with a biweekly supervisor check-in
+inside each sprint.
+Backlog priorities, risks, and effort estimates are reviewed at
+every sprint boundary and may be revised in either direction.
 
 The six work packages have the following internal logic.
 
@@ -437,9 +446,9 @@ the developer is otherwise idle.
 \subsection{Gantt chart}
 
 Figure~\ref{fig:gantt} shows the full 21-week timeline.
-The chart is grouped by work package for readability, but
-planning control is performed at the sprint level with a fixed
-two-week cadence and an inspection/adaptation checkpoint at every
+The chart is grouped by work package for readability; planning
+control is performed at the sprint level with a fixed four-week
+cadence and an inspection/adaptation checkpoint at every
 boundary.
 Sprint reviews are marked as red diamonds (M1 through M4),
 together with the final defence at week 21 (M5).
@@ -653,38 +662,39 @@ Section~\ref{sec:mgmt-control}.
     impact.
     L/I are likelihood and impact, rated L/M/H.}
     \label{tab:risk-register}
-    \renewcommand{\arraystretch}{1.15}
     \scriptsize
-    \begin{tabularx}{\linewidth}{>{\raggedright}p{2.4cm} c >{\raggedright}p{3.6cm} >{\raggedright}p{2.7cm} >{\raggedright\arraybackslash}p{2.0cm}}
+    \setlength{\tabcolsep}{5pt}
+    \renewcommand{\arraystretch}{1.35}
+    \begin{tabularx}{\linewidth}{@{} c >{\raggedright\arraybackslash}p{2.2cm} c >{\raggedright\arraybackslash}p{3.4cm} >{\raggedright\arraybackslash}p{2.5cm} >{\raggedright\arraybackslash}p{1.9cm} @{}}
         \toprule
-        \textbf{Risk} & \textbf{L/I} & \textbf{Alternative plan} & \textbf{Schedule impact} & \textbf{Extra resources} \\
+        \textbf{ID} & \textbf{Risk} & \textbf{L/I} & \textbf{Alternative plan} & \textbf{Schedule impact} & \textbf{Extra resources} \\
         \midrule
-        Limited ground-truth data on real Real Book pages
+        R1 & Limited ground-truth data on real Real Book pages
             & H/H
             & Fall back to synthetic / typeset sources and strengthen the augmentation pipeline.
             & Reallocate up to 10\,h.
-            & None. \\
-        Staff-detection errors propagating downstream
+            & None. \\ \tfgrowsep
+        R2 & Staff-detection errors propagating downstream
             & M/M
             & Use manually cropped staff regions for critical evaluations.
             & Shift hours from T5.3 to T5.4.
-            & None. \\
-        Output-encoding design complexity (LMX vocabulary)
+            & None. \\ \tfgrowsep
+        R3 & Output-encoding design complexity (LMX vocabulary)
             & M/M
             & Start from a minimal vocabulary and extend incrementally after stable runs.
             & Up to 6\,h redesign.
-            & None. \\
-        Model underfitting or CTC misalignment
+            & None. \\ \tfgrowsep
+        R4 & Model underfitting or CTC misalignment
             & M/H
             & Simplify vocabulary, retrain with cleaned subsets, adjust image scale.
             & Up to 10\,h from buffer.
-            & Additional GPU time. \\
-        Scope creep toward polyphony
+            & Additional GPU time. \\ \tfgrowsep
+        R5 & Scope creep toward polyphony
             & M/H
             & Restrict extension to feasibility discussion only.
             & Recover up to 18\,h.
-            & None. \\
-        Computational resource constraints
+            & None. \\ \tfgrowsep
+        R6 & Computational resource constraints
             & L--M/M
             & Reduce model/data size or rent a short cloud-GPU window.
             & Up to 5\,h setup.
@@ -692,6 +702,14 @@ Section~\ref{sec:mgmt-control}.
         \bottomrule
     \end{tabularx}
 \end{table}
+
+\begin{figure}[ht]
+  \centering
+  \fbox{\parbox[c][6cm][c]{0.6\textwidth}{\centering \todo{FIGURE: 3$\times$3 likelihood/impact matrix plotting R1--R6 of Table~\ref{tab:risk-register}. Axes: Likelihood (L/M/H) horizontal, Impact (L/M/H) vertical. Cells colour-coded green/yellow/red.}}}
+  \caption{Risk-impact matrix locating each of the six register
+  entries on the likelihood/impact plane.}
+  \label{fig:risk-matrix}
+\end{figure}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Economic Management}
@@ -701,24 +719,21 @@ Section~\ref{sec:mgmt-control}.
 
 The budget follows the standard software-project cost framework
 taught in the FIB GEP module~\cite{gepModule24EconomicManagement}
-and is organised into four components.
-\textit{Human resources by activity} captures the bulk of the
-cost in a research-intensive software project and is itemised
-against the task structure of
-Section~\ref{sec:mgmt-planning}.
-\textit{General costs} cover the hardware amortisation, the
-overhead share of electricity and connectivity, and the
-software-licence costs (zero in this project, since the entire
-toolchain is open source).
-\textit{Incidentals} translate the risk-register entries into
-weighted monetary impact: each risk's contingency action is
-costed at its full value and multiplied by the risk's
-likelihood, yielding an expected-value contribution to the
-budget.
-A \textit{contingency reserve} of fifteen per cent of the
-baseline (human resources plus general costs) sits on top of the
-itemised entries to absorb the residual uncertainty that the
-risk register cannot enumerate explicitly.
+and is organised into four components: \textit{human resources by
+activity}, itemised against the task structure of
+Section~\ref{sec:mgmt-planning}; \textit{general costs}, covering
+hardware amortisation, electricity and connectivity overheads, and
+software-licence costs (zero, since the entire toolchain is open
+source); \textit{incidentals}, which translate each risk's
+contingency action into an expected-value contribution (full cost
+$\times$ likelihood); and a \textit{contingency reserve} of fifteen
+per cent of the baseline (human resources plus general costs) for
+the residual uncertainty that the risk register cannot enumerate
+explicitly.
+The wider sustainability framing of this budget---useful life,
+break-even, and the economic-impact assessment proper---is
+deferred to Section~\ref{sec:sust-economic}, which uses the
+totals derived here as its inputs.
 
 \subsection{Human resources}
 
@@ -734,38 +749,44 @@ an employer actually incurs, which is the figure relevant for
 project budgeting.
 The hourly rate is then derived from the loaded annual cost
 assuming a working year of 1\,760 hours
-(220 working days, 8 hours per day, after holidays).
+(220 working days, 8 hours per day, after holidays), as prescribed
+by the FIB GEP economic-management
+module~\cite{gepModule24EconomicManagement}.
 
 \begin{table}[h!]
     \centering
     \caption{Roles considered for the project and their loaded
     hourly rates.}
     \label{tab:roles-cost}
-    \renewcommand{\arraystretch}{1.1}
-    \begin{tabularx}{\linewidth}{l r r r}
+    \small
+    \setlength{\tabcolsep}{5pt}
+    \renewcommand{\arraystretch}{1.35}
+    \begin{tabularx}{\linewidth}{@{} l r r r @{}}
         \toprule
         \textbf{Role} & \textbf{Gross (\EUR{}/year)} & \textbf{Loaded (\EUR{}/year)} & \textbf{\EUR{}/h} \\
         \midrule
-        Project Manager   & 38\,000 & 51\,300 & 29.15 \\
-        Research Analyst  & 33\,000 & 44\,550 & 25.31 \\
-        ML Engineer       & 36\,000 & 48\,600 & 27.61 \\
+        Project Manager   & 38\,000 & 51\,300 & 29.15 \\ \tfgrowsep
+        Research Analyst  & 33\,000 & 44\,550 & 25.31 \\ \tfgrowsep
+        ML Engineer       & 36\,000 & 48\,600 & 27.61 \\ \tfgrowsep
         Technical Writer  & 30\,000 & 40\,500 & 23.01 \\
         \bottomrule
     \end{tabularx}
 \end{table}
 
 Since the project is executed by a single person who carries out
-all four roles, a blended loaded rate of \EUR{}26.75/h is used
-for planning-level allocation.
-The blended rate is the unweighted mean of the four role rates;
-it is appropriate for a project with no clean separation of role
-hours at the task level---most tasks combine analytical,
-engineering, and writing work in proportions that vary across
-the schedule.
-Applying the blended rate to the 509-hour total of
-Table~\ref{tab:task-summary} yields a total human-resources cost
-of \EUR{}13\,615.57, distributed across work packages as shown
-in Table~\ref{tab:hr-budget}.
+all four roles, each task in Table~\ref{tab:task-summary} is costed
+at the loaded rate of the role that predominantly performs it
+(for example, T0.5 supervisor meetings and the GEP tasks at the
+Project Manager rate, the literature survey and error analysis at
+the Research Analyst rate, the model and pipeline work at the ML
+Engineer rate, and the thesis-writing tasks at the Technical
+Writer rate).
+Summing across roles produces a project-weighted blended rate of
+\EUR{}26.75/h on the 509-hour total, which differs slightly from
+the unweighted mean of the four rates (\EUR{}26.27/h) because the
+project's hour mix is not uniform across roles.
+The resulting total of \EUR{}13\,615.57 is distributed across work
+packages as shown in Table~\ref{tab:hr-budget}.
 This figure dominates the budget: roughly \SI{85}{\percent} of
 the project cost is engineering time, which is the expected
 profile for a research-intensive software project where tooling
@@ -775,16 +796,18 @@ and hardware are commodity items.
     \centering
     \caption{Human-resources budget by work package.}
     \label{tab:hr-budget}
-    \renewcommand{\arraystretch}{1.05}
-    \begin{tabularx}{\linewidth}{c >{\raggedright\arraybackslash}X r r}
+    \small
+    \setlength{\tabcolsep}{5pt}
+    \renewcommand{\arraystretch}{1.35}
+    \begin{tabularx}{\linewidth}{@{} c L r r @{}}
         \toprule
         \textbf{WP} & \textbf{Work package} & \textbf{Hours} & \textbf{Cost (\EUR{})} \\
         \midrule
-        WP0 & Project management              & 130 & 3\,482.50 \\
-        WP1 & Literature review and baseline  & 78  & 2\,066.20 \\
-        WP2 & Dataset construction            & 73  & 1\,992.55 \\
-        WP3 & CRNN--CTC development           & 75  & 2\,075.37 \\
-        WP4 & Iterative refinement            & 68  & 1\,859.10 \\
+        WP0 & Project management              & 130 & 3\,482.50 \\ \tfgrowsep
+        WP1 & Literature review and baseline  & 78  & 2\,066.20 \\ \tfgrowsep
+        WP2 & Dataset construction            & 73  & 1\,992.55 \\ \tfgrowsep
+        WP3 & CRNN--CTC development           & 75  & 2\,075.37 \\ \tfgrowsep
+        WP4 & Iterative refinement            & 68  & 1\,859.10 \\ \tfgrowsep
         WP5 & Final evaluation and defence    & 85  & 2\,139.85 \\
         \midrule
         & \textbf{TOTAL human resources}      & \textbf{509} & \textbf{13\,615.57} \\
@@ -794,20 +817,18 @@ and hardware are commodity items.
 
 \subsection{General costs, contingency, and incidentals}
 
-\textit{General costs} cover the share of fixed assets and
-overheads attributable to the 21 weeks of the project.
-Hardware amortisation is computed on the workstation, monitor,
-and peripherals at a four-year linear amortisation rate,
-prorated for the project duration.
-Software licences contribute zero: every component of the
-toolchain (Python, PyTorch, OpenCV, LilyPond, PyMuPDF,
-albumentations, FastAPI, Poetry) is open source and freely
-redistributable.
-Overheads cover electricity and internet connectivity for the
-duration of the project; the figure is conservative and assumes
+\textit{General costs} (Table~\ref{tab:general-costs}) cover the
+share of fixed assets and overheads attributable to the 21 weeks
+of the project: hardware amortisation on the workstation, monitor,
+and peripherals at a four-year linear rate prorated for the
+project duration; software licences (zero, since the entire
+toolchain---Python, PyTorch, OpenCV, LilyPond, PyMuPDF,
+albumentations, FastAPI, Poetry---is open source); and overheads
+covering electricity and internet connectivity, derived from the
+workstation's average power draw and the Spanish domestic-tariff
+rate~\cite{reeInformeSistemaElectrico2024} on the assumption that
 the workstation is dedicated to the thesis for an average of
 twenty hours per week.
-Table~\ref{tab:general-costs} summarises the totals.
 
 \textit{Contingency reserve.}
 A contingency reserve of \SI{15}{\percent} is applied over the
@@ -842,13 +863,15 @@ data-cleaning cycles incur direct monetary cost.
     \centering
     \caption{General costs.}
     \label{tab:general-costs}
-    \renewcommand{\arraystretch}{1.1}
-    \begin{tabularx}{\linewidth}{X r}
+    \small
+    \setlength{\tabcolsep}{5pt}
+    \renewcommand{\arraystretch}{1.35}
+    \begin{tabularx}{\linewidth}{@{} L r @{}}
         \toprule
         \textbf{Item} & \textbf{Cost (\EUR{})} \\
         \midrule
-        Hardware amortisation (desktop, monitor, peripherals) & 125.69 \\
-        Software licences (open-source stack)                  & 0.00 \\
+        Hardware amortisation (desktop, monitor, peripherals)  & 125.69 \\ \tfgrowsep
+        Software licences (open-source stack)                  & 0.00 \\ \tfgrowsep
         Overheads (electricity + internet)                     & 125.00 \\
         \midrule
         \textbf{TOTAL general costs}                           & \textbf{250.69} \\
@@ -862,15 +885,16 @@ data-cleaning cycles incur direct monetary cost.
     Each entry is the cost of activating the corresponding
     alternative plan, weighted by the risk's likelihood.}
     \label{tab:incidentals}
-    \renewcommand{\arraystretch}{1.1}
-    \scriptsize
-    \begin{tabularx}{\linewidth}{>{\raggedright}p{1.0cm} >{\raggedright}p{4.6cm} r r r}
+    \small
+    \setlength{\tabcolsep}{5pt}
+    \renewcommand{\arraystretch}{1.35}
+    \begin{tabularx}{\linewidth}{@{} >{\raggedright\arraybackslash}p{1.0cm} L r r r @{}}
         \toprule
         \textbf{Risk} & \textbf{Contingency action} & \textbf{Full cost (\EUR{})} & \textbf{Prob.} & \textbf{Weighted (\EUR{})} \\
         \midrule
-        R1 & Additional data cleaning and augmentation cycle    & 276.10 & 25\,\% & 69.03 \\
-        R3 & Retraining cycle with simplified vocabulary        & 276.10 & 20\,\% & 55.22 \\
-        R4 & Temporary cloud-GPU rental and setup               & 178.05 & 15\,\% & 26.71 \\
+        R1 & Additional data cleaning and augmentation cycle    & 276.10 & 25\,\% & 69.03 \\ \tfgrowsep
+        R4 & Retraining cycle with simplified vocabulary        & 276.10 & 20\,\% & 55.22 \\ \tfgrowsep
+        R6 & Temporary cloud-GPU rental and setup               & 178.05 & 15\,\% & 26.71 \\ \tfgrowsep
         R5 & Scope reduction in extension task                  & 0.00   & 30\,\% & 0.00  \\
         \midrule
         \multicolumn{4}{r}{\textbf{TOTAL incidentals}}          & \textbf{150.96} \\
@@ -884,14 +908,16 @@ data-cleaning cycles incur direct monetary cost.
     \centering
     \caption{Total project budget.}
     \label{tab:total-budget}
-    \renewcommand{\arraystretch}{1.2}
-    \begin{tabularx}{\linewidth}{X r}
+    \small
+    \setlength{\tabcolsep}{5pt}
+    \renewcommand{\arraystretch}{1.35}
+    \begin{tabularx}{\linewidth}{@{} L r @{}}
         \toprule
         \textbf{Budget component} & \textbf{Cost (\EUR{})} \\
         \midrule
-        Human resources       & 13\,615.57 \\
-        General costs         & 250.69 \\
-        Contingency (15\,\%)  & 2\,079.94 \\
+        Human resources       & 13\,615.57 \\ \tfgrowsep
+        General costs         & 250.69 \\ \tfgrowsep
+        Contingency (15\,\%)  & 2\,079.94 \\ \tfgrowsep
         Incidentals           & 150.96 \\
         \midrule
         \textbf{TOTAL project budget} & \textbf{16\,097.16} \\

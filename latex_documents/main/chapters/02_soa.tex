@@ -130,17 +130,19 @@ available to the field as of 2026.
 \begin{table}[htbp]
 \centering
 \small
-\begin{tabularx}{\textwidth}{l l r l X}
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabularx}{\textwidth}{@{} l L L L L @{}}
 \toprule
 \textbf{Dataset} & \textbf{Type} & \textbf{Size} & \textbf{Labels} & \textbf{Use} \\
 \midrule
-PrIMuS~\cite{PrIMuSDataset}            & Monophonic, typeset      & 87\,678 incipits      & agnostic / semantic / MEI & Monophonic CRNN--CTC training \\
-Camera-PrIMuS~\cite{calvoZaragozaCameraPrimus2018} & Monophonic, distorted    & 87\,678 incipits      & same as PrIMuS            & Domain-robustness training \\
-DeepScoresV2~\cite{tuggenerDeepScoresV22020}       & Polyphonic, typeset      & 255\,385 pages, $\sim$151\,M symbols & per-symbol bboxes + masks & Music object detection \\
-CVC-MUSCIMA~\cite{fornesCVCMUSCIMAGroundTruth2012} & Polyphonic, handwritten & 1\,000 pages         & staff-removal masks       & Staff removal / writer ID \\
-MUSCIMA++~\cite{hajicMuscimaPP2017}                 & Polyphonic, handwritten & 140 pages, $\sim$91\,k symbols & MuNG notation graph       & Symbol+relation recognition \\
-DoReMi~\cite{shatriDoReMi2021}                      & Polyphonic, typeset (Dorico) & $\sim$6\,432 pages, $\sim$1\,M objects & MusicXML + MuNG-style     & Universal OMR research \\
-OLiMPiC~\cite{mayerPracticalEndToEnd2024}           & Pianoform, typeset+scan  & $\sim$17\,945 synth + 2\,931 scanned & MusicXML / LMX            & End-to-end pianoform OMR \\
+PrIMuS~\cite{PrIMuSDataset}                       & Monophonic, typeset           & 87\,678 incipits                       & agnostic / semantic / MEI  & Monophonic CRNN--CTC training \\ \tfgrowsep
+Camera-PrIMuS~\cite{calvoZaragozaCameraPrimus2018} & Monophonic, distorted        & 87\,678 incipits                       & same as PrIMuS             & Domain-robustness training \\ \tfgrowsep
+DeepScoresV2~\cite{tuggenerDeepScoresV22020}      & Polyphonic, typeset           & 255\,385 pages, $\sim$151\,M symbols   & per-symbol bboxes + masks  & Music object detection \\ \tfgrowsep
+CVC-MUSCIMA~\cite{fornesCVCMUSCIMAGroundTruth2012} & Polyphonic, handwritten      & 1\,000 pages                           & staff-removal masks        & Staff removal / writer ID \\ \tfgrowsep
+MUSCIMA++~\cite{hajicMuscimaPP2017}               & Polyphonic, handwritten       & 140 pages, $\sim$91\,k symbols         & MuNG notation graph        & Symbol + relation recognition \\ \tfgrowsep
+DoReMi~\cite{shatriDoReMi2021}                    & Polyphonic, typeset (Dorico)  & $\sim$6\,432 pages, $\sim$1\,M objects & MusicXML + MuNG-style      & Universal OMR research \\ \tfgrowsep
+OLiMPiC~\cite{mayerPracticalEndToEnd2024}         & Pianoform, typeset + scan     & $\sim$17\,945 synth, 2\,931 scanned    & MusicXML / LMX             & End-to-end pianoform OMR \\
 \bottomrule
 \end{tabularx}
 \caption{Principal labelled corpora used in modern OMR research.

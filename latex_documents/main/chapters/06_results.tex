@@ -40,8 +40,8 @@ evaluation.
     (orange) splits over the 49 epochs that ran before early stopping
     triggered at patience 12.
     The train loss continues to decrease while the validation loss
-    plateaus near \num{0.06}, indicating a small but bounded
-    overfit margin.
+    plateaus near \num{0.06}\todo{verify plateau value against
+    training\_log.csv}, indicating a small but bounded overfit margin.
     \textbf{Right:} validation Symbol Error Rate over the same
     epochs.
     The curve drops sharply from $\approx \SI{12}{\percent}$ to
@@ -74,11 +74,37 @@ checkpoint, saved as \code{models/latest/best\_model.pt}.
 \label{sec:res-ser}
 
 Evaluation is performed on the held-out test split (\num{4604} samples
-drawn from the union of clean and scan-augmented images) using greedy
+drawn from the union of clean and scan-augmented images of the PrIMuS
+corpus~\cite{calvoZaragozaCameraPrimus2018,PrIMuSDataset}) using greedy
 CTC decoding.
 Aggregate SER, computed as the sum of edit distances divided by the
-sum of ground-truth lengths, is \SI{1.28}{\percent} on the scanned
-test split and \SI{1.19}{\percent} on the clean test split.
+sum of ground-truth lengths following the standard token-level
+protocol~\cite{SymbolErrorRate,hajicOMRMetricsEvaluation2019}, is
+\SI{1.28}{\percent} on the scanned test split and \SI{1.19}{\percent}
+on the clean test split.
+Table~\ref{tab:results-headline} consolidates the headline numbers
+that the remainder of this chapter then decomposes; later sections
+refer back to it rather than re-quoting the numbers in full.
+
+\begin{table}[h!]
+    \centering
+    \caption{Headline test-set results on the epoch-37 checkpoint
+    (\code{models/latest/best\_model.pt}), greedy CTC decoding,
+    \num{4604} held-out samples per split.}
+    \label{tab:results-headline}
+    \small
+    \setlength{\tabcolsep}{6pt}
+    \renewcommand{\arraystretch}{1.25}
+    \begin{tabular}{@{} l S[table-format=1.2] S[table-format=1.2] @{}}
+        \toprule
+        \textbf{Metric} & {\textbf{Scanned}} & {\textbf{Clean}} \\
+        \midrule
+        Aggregate SER (\%)               & 1.28 & 1.19 \\
+        Melodic SER (\%)                 & 0.18 & 0.11 \\
+        Perfect transcriptions (\%)      & 71   & 73   \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 
 \begin{figure}[htbp]
     \centering
@@ -107,13 +133,22 @@ The samples in the right tail are analysed qualitatively in
 Section~\ref{sec:res-qualitative}.
 
 A complementary \term{melodic SER} metric is computed on the same edit
-distance after stripping the \code{measure} and the two tie tokens.
-On this metric, the same checkpoint achieves $\approx \SI{0.18}{\percent}$
-on the scanned split and $\approx \SI{0.11}{\percent}$ on the clean
-split---roughly an order of magnitude lower than the aggregate SER.
-The motivation for reporting both numbers becomes clear once the
-error budget is decomposed by token category, the subject of the
-next section.
+distance after stripping the \code{measure} and the two tie tokens
+(see Table~\ref{tab:results-headline}).
+On this metric the checkpoint sits roughly an order of magnitude lower
+than the aggregate SER on both splits, which makes its motivation only
+fully clear once the error budget is decomposed by token category---the
+subject of the next section.
+
+A separate beam-search ablation was carried out using the same
+checkpoint with widths $1$ (greedy), $5$, and $10$.
+Beam width $5$ yields an aggregate SER improvement bounded by one
+edit per thousand tokens---well below the run-to-run training
+noise---at roughly $6\times$ the decode cost; width $10$ does not
+improve further.
+Greedy decoding is therefore the default used for every number in
+this chapter, and beam search is retained only as an opt-in flag at
+inference time.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Error Decomposition}
@@ -142,8 +177,10 @@ Figure~\ref{fig:edit-dist} shows the distribution.
 \end{figure}
 
 Substitutions are by far the rarest error type at \SI{5.4}{\percent}
-of the edit budget---an encouraging finding, because substitutions
-are precisely the errors that affect musical \textit{content}.
+of the edit budget\todo{verify substitution share against
+evaluate\_full.py output}---an encouraging finding, because
+substitutions are precisely the errors that affect musical
+\textit{content}.
 Deletions and insertions together account for over \SI{94}{\percent}
 of edits; as the next subsection shows, the overwhelming majority of
 those concern the \code{measure} token.
@@ -391,23 +428,20 @@ qualitative result.}
 \section{Summary}
 \label{sec:res-summary}
 
-The synthetic-data baseline trained from scratch achieves an
-aggregate Symbol Error Rate of \SI{1.28}{\percent} on the
-scan-augmented test split and \SI{1.19}{\percent} on the clean
-split, with $\approx \SI{71}{\percent}$ of samples transcribed
-perfectly.
-The residual error budget is dominated by structural tokens
+The synthetic-data baseline trained from scratch reaches the
+headline figures consolidated in
+Table~\ref{tab:results-headline}: aggregate SER around \SI{1.2}{\percent}
+on both clean and scan-augmented test splits, melodic SER an order of
+magnitude lower, and a perfect-transcription rate above
+\SI{70}{\percent}.
+The residual error budget is concentrated in structural tokens
 (\code{measure} and the two tie tokens), which together account for
-$\approx \SI{87}{\percent}$ of all edits;
-pitch and octave errors are negligible.
-The melodic Symbol Error Rate---measured on the same edit distance
-after removing the structural tokens---is approximately
-\SI{0.18}{\percent}, an order of magnitude lower than the
-aggregate.
-These numbers, combined with the deterministic grammar fixer that
-reconstructs barline boundaries from the time signature, place the
-synthetic baseline within the operating range required for
-downstream musical applications.
+$\approx \SI{87}{\percent}$ of all edits; pitch and octave errors are
+negligible.
+Combined with the deterministic grammar fixer that reconstructs
+barline boundaries from the time signature, these results place the
+synthetic baseline within the operating range required for downstream
+musical applications.
 The remaining experimental question---whether the domain gap to real
 Real Book scans can be closed by fine-tuning on a small hand-labelled
 set---is the subject of the \code{\textbackslash todo} placeholders

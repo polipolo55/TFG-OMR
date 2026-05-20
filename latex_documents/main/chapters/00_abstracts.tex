@@ -13,8 +13,9 @@ El sistema es basa en una xarxa neuronal recurrent convolucional amb pèrdua CTC
 (\term{CRNN-CTC}), entrenada sobre dades sintètiques generades a partir del conjunt
 PrIMuS. Per reduir la diferència entre imatges sintètiques i escaneigs reals, s'aplica
 una etapa d'augmentació que simula artefactes fotogràfics habituals. El model s'avalua
-amb la \term{Taxa d'Error de Símbols} (SER), assolint un \textbf{1,17\%} al conjunt de
-prova sintètic, i un ajust fi sobre pàgines reals del Real Book millora el rendiment
+amb la \term{Taxa d'Error de Símbols} (SER), assolint un \textbf{1{,}19\%} sobre el
+conjunt de prova sintètic net i un \textbf{1{,}28\%} sobre la versió simulada com a
+escanejada, i un ajust fi sobre pàgines reals del Real Book millora el rendiment
 sobre imatges fora de domini.
 
 El sistema complet integra detecció de pentagrames, reconeixement de melodia, extracció
@@ -38,8 +39,9 @@ El sistema se basa en una red neuronal recurrente convolucional con pérdida CTC
 (\term{CRNN-CTC}), entrenada sobre datos sintéticos generados a partir del conjunto
 PrIMuS. Para reducir la brecha entre imágenes sintéticas y escáneres reales, se aplica
 una etapa de aumento que simula artefactos fotográficos habituales. El modelo se evalúa
-con la \term{Tasa de Error de Símbolos} (SER), alcanzando un \textbf{1,17\%} en el
-conjunto de prueba sintético, y un ajuste fino sobre páginas reales del Real Book mejora
+con la \term{Tasa de Error de Símbolos} (SER), alcanzando un \textbf{1{,}19\%} sobre el
+conjunto de prueba sintético limpio y un \textbf{1{,}28\%} sobre la versión simulada
+como escaneada, y un ajuste fino sobre páginas reales del Real Book mejora
 el rendimiento sobre imágenes fuera de dominio.
 
 El sistema completo integra detección de pentagramas, reconocimiento de melodía,
@@ -63,9 +65,10 @@ The system is built around a \term{Convolutional Recurrent Neural Network with
 Connectionist Temporal Classification} loss (CRNN-CTC), trained on synthetic data
 derived from the PrIMuS dataset. To bridge the gap between clean synthetic renderings
 and real scans, an augmentation stage simulates common photographic artefacts.
-Evaluated using the \term{Symbol Error Rate} (SER), the model achieves \textbf{1.17\%}
-on the synthetic test set, and a fine-tuning stage on real Real Book pages further
-improves performance on out-of-domain images.
+Evaluated using the \term{Symbol Error Rate} (SER), the model achieves \textbf{1.19\%}
+on the clean synthetic test set and \textbf{1.28\%} on its scan-simulated counterpart,
+and a fine-tuning stage on real Real Book pages further improves performance on
+out-of-domain images.
 
 The full inference pipeline integrates staff detection, melody recognition, chord symbol
 extraction, and a grammar correction stage, accepting PDF or image input. This work

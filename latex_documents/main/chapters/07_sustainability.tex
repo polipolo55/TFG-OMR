@@ -107,20 +107,21 @@ impact once the system is in service).
     PPP refers to the design-and-development stage; the useful-life
     column refers to deployment and downstream impact.}
     \label{tab:sustainability-matrix}
-    \renewcommand{\arraystretch}{1.2}
-    \scriptsize
-    \begin{tabularx}{\linewidth}{>{\raggedright}p{2.3cm} >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X}
+    \small
+    \setlength{\tabcolsep}{5pt}
+    \renewcommand{\arraystretch}{1.35}
+    \begin{tabularx}{\linewidth}{@{} >{\raggedright\arraybackslash}p{2.3cm} L L @{}}
         \toprule
         \textbf{Dimension} & \textbf{PPP (design and development)} & \textbf{Useful life (deployment and impact)} \\
         \midrule
         Economic
             & Total project budget of \EUR{}16\,097.16, with explicit contingency and incidentals.
               The main cost driver is specialised engineering time.
-            & Open-source release and fast local inference can reduce recurrent transcription cost compared with manual copying and commercial OMR tools. \\
+            & Open-source release and fast local inference can reduce recurrent transcription cost compared with manual copying and commercial OMR tools. \\ \tfgrowsep
         Environmental
             & Estimated energy use of $\approx 57.5$\,kWh for the full project, mitigated by mixed-precision training, early stopping, and the reuse of existing
               hardware~\cite{reeInformeSistemaElectrico2024,mitecoFactorEmision2025}.
-            & One-time training cost is amortised over repeated inference; local execution reduces cloud dependency for common use cases. \\
+            & One-time training cost is amortised over repeated inference; local execution reduces cloud dependency for common use cases. \\ \tfgrowsep
         Social
             & The project strengthens the author's personal technical competencies and promotes responsible data and software practices.
             & Potential beneficiaries include musicians, educators, archivists, and researchers through improved accessibility, searchability, and preservation of music documents. \\

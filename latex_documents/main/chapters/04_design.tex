@@ -273,16 +273,35 @@ hyperparameters in conceptual terms.
 The implementation details---PyTorch module structure, exact stride
 table, optimiser state---live in Chapter~\ref{ch:impl}.
 
+\begin{figure}[ht]
+  \centering
+  \fbox{\parbox[c][6cm][c]{0.8\textwidth}{\centering \todo{FIGURE: CRNN--CTC block
+  diagram. Input staff image $(B,1,128,W)$ $\to$ CNN backbone $\to$
+  feature map $(B,C,1,W/4)$ $\to$ squeeze-height + transpose $\to$
+  BiLSTM $\times$ 2 $\to$ linear projection to vocabulary $\to$
+  log-softmax $\to$ CTC.}}}
+  \caption{Block diagram of the CRNN--CTC melody recogniser.
+  The CNN compresses height to one while preserving width up to a $4\times$
+  factor; the resulting feature sequence is consumed left-to-right by
+  the BiLSTM and decoded by CTC.}
+  \label{fig:crnn-arch}
+\end{figure}
+
 \subsection{Why CRNN--CTC}
 
 A single staff from a jazz lead sheet is read strictly left to right and
 produces a variable-length sequence of tokens that is shorter than the
 image is wide.
-This matches the data assumptions of CTC exactly:
+This matches the data assumptions of CTC\todo{ref? Graves et al.\ 2006
+``Connectionist Temporal Classification'' --- not in references.bib} exactly:
 the loss learns the alignment between an input feature sequence and a
 shorter output token sequence without per-frame supervision, and it
 tolerates the two-dimensional context (relative vertical position on
 the staff) needed to disambiguate pitch from notehead shape.
+End-to-end CRNN--CTC has been the dominant architecture for monophonic
+OMR since \textcite{calvoZaragozaEndToEndNeural2018} and remains the
+strongest baseline for the present
+domain~\cite{calvoZaragozaCameraPrimus2018,mayerPracticalEndToEnd2024}.
 A convolutional backbone provides translation-invariant feature
 extraction along the staff width; a bidirectional recurrent layer
 captures the local dependencies needed to interpret accidentals, dots,
@@ -295,13 +314,14 @@ are not justified for monophonic input
 
 \subsection{Backbone choice}
 
-Two backbones are supported.
-The default is a modified ResNet18 with asymmetric strides that compress
-the height dimension aggressively while preserving width, leaving the
-horizontal dimension as the CTC time axis.
-The alternative is a five-block VGG-style stack kept for backward
-compatibility with earlier checkpoints; it converges more slowly and is
-no longer used for new experiments.
+The default backbone is a modified
+ResNet18\todo{ref? He et al.\ 2016 ``Deep Residual Learning'' --- not in
+references.bib} with asymmetric strides that compress the height
+dimension aggressively while preserving width, leaving the horizontal
+dimension as the CTC time axis.
+A five-block VGG-style stack is retained as a legacy alternative for
+backward compatibility with earlier checkpoints; it converges more
+slowly and is not used for new experiments.
 ResNet18 was preferred for three reasons: its residual connections give
 the gradient a direct path through the network and accelerate
 convergence; its pre-trained weights from ImageNet provide a reasonable
@@ -327,7 +347,9 @@ adjacent notes even on densely-engraved staves.
 
 \subsection{Recurrent layer}
 
-The convolutional features are fed to a stacked bidirectional LSTM.
+The convolutional features are fed to a stacked bidirectional
+LSTM\todo{ref? Hochreiter \& Schmidhuber 1997 ``Long Short-Term Memory''
+--- not in references.bib}.
 Two layers are used, with 256 hidden units per direction; this gives
 the model bidirectional context over the entire staff while keeping
 parameter count modest.
@@ -497,7 +519,7 @@ Its responsibilities are:
           clef other than \code{clef:G2} is rewritten to \code{clef:G2};
           time signatures outside the allowed eight-element set are
           rejected;
-    \item clamp predicted octaves to the in-domain range $[3, 6]$,
+    \item clamp predicted octaves to the in-domain range $[3, 7]$,
           preventing rare misreads from producing unreachable pitches;
     \item count cumulative beats per measure against the active time
           signature and insert implicit barlines when the count

@@ -1,8 +1,13 @@
 % fig_staff_pitches.ly
-% C major scale C4–C5 on the treble staff.
-% Ghost voice at C5 (omit NoteHead+Stem) carries all pitch labels — every note
-% at the same staff position → every label at exactly the same height above staff.
-% "ledger line" annotation below C4 only.  LilyJAZZ engraving.
+% C major scale C4–C5 on the treble staff with pitch labels above each note.
+% Design notes:
+%   - \textLengthOn gives each label its own horizontal column → no overlap and
+%     no zigzag from collision avoidance.
+%   - \override TextScript.staff-padding fixes the Y of all upper labels at one
+%     height, regardless of notehead position.
+%   - ragged-right = ##f spreads the eight notes across the full paper width.
+%   - The "ledger line" annotation hangs well below the stems (\once padding)
+%     so it never overlaps stems of D4–G4. LilyJAZZ engraving throughout.
 
 \version "2.26.0"
 \include "lilyjazz.ily"
@@ -11,48 +16,45 @@
 
 \paper {
   indent        = 0
-  ragged-right  = ##t
-  paper-width   = 92\mm
-  top-margin    = 6\mm
-  bottom-margin = 9\mm
-  left-margin   = 6\mm
-  right-margin  = 6\mm
-  paper-height  = 62\mm
+  ragged-right  = ##f
+  paper-width   = 150\mm
+  top-margin    = 8\mm
+  bottom-margin = 16\mm
+  left-margin   = 8\mm
+  right-margin  = 8\mm
+  paper-height  = 65\mm
 }
 
 \score {
-  \new Staff {
-    <<
-      % Visible C major scale C4–C5, stems down to keep clear of labels above
-      \new Voice {
-        \clef treble
-        \key c \major
-        \time 8/4
-        \omit Staff.TimeSignature
-        \stemDown
-        \relative c' {
-          c4_\markup { \sans \fontsize #-3 "ledger line" }
-          d4 e4 f4 g4 a4 b4 c4
-          \bar "|."
-        }
-      }
-      % Ghost voice: all notes at C5 — identical position → identical label height
-      \new Voice {
-        \omit NoteHead
-        \omit Stem
-        \omit Flag
-        \relative c'' {
-          c4^\markup { \sans \bold \fontsize #-1 "C4" }
-          c4^\markup { \sans \bold \fontsize #-1 "D4" }
-          c4^\markup { \sans \bold \fontsize #-1 "E4" }
-          c4^\markup { \sans \bold \fontsize #-1 "F4" }
-          c4^\markup { \sans \bold \fontsize #-1 "G4" }
-          c4^\markup { \sans \bold \fontsize #-1 "A4" }
-          c4^\markup { \sans \bold \fontsize #-1 "B4" }
-          c4^\markup { \sans \bold \fontsize #-1 "C5" }
-        }
-      }
-    >>
+  \new Staff \with {
+    \omit TimeSignature
+  } {
+    \clef treble
+    \key c \major
+    \time 8/4
+    \stemDown
+    \textLengthOn
+    \override TextScript.staff-padding = #2.5
+    \override TextScript.outside-staff-priority = ##f
+    \override Staff.LedgerLineSpanner.thickness = #1.6
+    \override Staff.LedgerLineSpanner.length-fraction = #0.6
+    \relative c' {
+      % "ledger line" annotation: pushed below the stem area via staff-padding=7,
+      % and \with-dimensions-from \null makes it zero-width so it does not widen
+      % the C4 column.
+      c4 ^\markup { \sans \bold "C4" }
+         -\tweak staff-padding #7
+         _\markup \with-dimensions-from \null
+                  { \sans \italic \fontsize #-1.5 "ledger line" }
+      d4 ^\markup { \sans \bold "D4" }
+      e4 ^\markup { \sans \bold "E4" }
+      f4 ^\markup { \sans \bold "F4" }
+      g4 ^\markup { \sans \bold "G4" }
+      a4 ^\markup { \sans \bold "A4" }
+      b4 ^\markup { \sans \bold "B4" }
+      c4 ^\markup { \sans \bold "C5" }
+      \bar "|."
+    }
   }
   \layout {
     \context { \Score \omit BarNumber }

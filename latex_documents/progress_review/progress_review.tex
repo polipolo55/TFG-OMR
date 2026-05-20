@@ -104,10 +104,10 @@ The thesis builds an end-to-end OMR system that takes a PDF or image of a jazz l
 \label{sec:fulfilment}
 
 \subsection{Project Context and Re-Framing}
-The GEP framed the project as a proof-of-concept CRNN--CTC for monophonic jazz lead sheets within the TFG timeframe. During implementation, the scope was refined into an explicit \textit{lead-sheet domain spec} (treble clef only; eight common time signatures; pitch octaves 3--7; monophonic staff; ties; barlines; rests; jazz chord symbols). Vocabulary, dataset filters, grammar fixer, and augmentation tuning all derive from this specification rather than from case-by-case patches.
+During implementation, the GEP's proof-of-concept scope was refined into an explicit \textit{lead-sheet domain spec} (treble clef only; eight common time signatures; pitch octaves 3--7; monophonic staff; ties; barlines; rests; jazz chord symbols). Vocabulary, dataset filters, grammar fixer, and augmentation tuning all derive from this specification rather than from case-by-case patches.
 
 \subsection{Specific Objectives: Status at the Review Date}
-Table~\ref{tab:obj-status} reports the status of each specific objective as defined in the GEP final deliverable.
+Table~\ref{tab:obj-status} reports the status of each specific objective from the GEP.
 
 \begin{table}[h!]
     \centering
@@ -147,7 +147,7 @@ The current best checkpoint (\texttt{models/latest/best\_model.pt}, epoch~37, Re
     \item Beam search (width 5) yields only $\leq$\,1 edit per 1000 SER improvement at roughly 6$\times$ decoding cost; greedy is the recommended default and the one used for headline numbers.
 \end{itemize}
 
-These figures meet and exceed the implicit target set in the GEP (a CRNN--CTC clearly out-performing the classical CV baseline). The relative weight of structural tokens in the residual error budget is itself a useful finding and is discussed in the results chapter of the main thesis.
+These figures meet the implicit GEP target (a CRNN--CTC clearly out-performing the classical baseline). Crucially, residual errors are dominated by structural tokens rather than pitch/duration mistakes.
 
 \subsection{Methodology and Rigour}
 The iterative-incremental methodology from the GEP (two-week cycles, evidence-based replanning, traceability, reproducibility, quantitative control) was followed throughout:
@@ -155,17 +155,12 @@ The iterative-incremental methodology from the GEP (two-week cycles, evidence-ba
 \begin{itemize}
     \item \textbf{Iterative loop.} Five full data--train--evaluate cycles, each producing a checkpoint under \texttt{models/run\_*}: cycles 1--3 addressed convergence and vocabulary stability, cycle 4 introduced the augmentation upgrade, cycle 5 integrated rare-token oversampling and header-stripping augmentation.
     \item \textbf{Traceability and reproducibility.} Every checkpoint is paired with a serialised \texttt{Config} and a \texttt{training\_log.csv}; the full workflow is script-driven through \texttt{cli.py}.
-    \item \textbf{Quantitative control.} SER on the validation split drives early stopping; reporting aggregate and melodic SER separately exposed that residual errors are dominated by structural tokens rather than pitch/duration mistakes.
+    \item \textbf{Quantitative control.} SER on the validation split drives early stopping; aggregate and melodic SER are reported separately.
     \item \textbf{Corrective loop.} The most consequential corrections (filter set, vocabulary cleanup, rare-token oversampling, augmentation overlap audit) were enacted at cycle boundaries.
 \end{itemize}
 
 \subsection{Analysis of Alternative Solutions}
-The GEP comparison (traditional modular, CRNN--CTC, transformer end-to-end) holds. Two implementation-time refinements strengthen the original justification:
-
-\begin{itemize}
-    \item \textbf{Backbone.} A custom VGG-style stack was replaced mid-project by ResNet-18, which removed training instability under mixed precision and gave lower validation SER for the same compute. VGG is retained only for backward compatibility with old checkpoints.
-    \item \textbf{Chord recognition.} The GEP assumed a generic OCR engine (EasyOCR / Tesseract); tests on Real Book strips showed systematic hallucination on jazz notation (slash basses, \texttt{m7b5}, \texttt{maj7}, \texttt{$\varnothing$}). The pathway was rebuilt as a dedicated character-level CRNN--CTC trained on synthetic LilyJAZZ strips and fine-tuned on hand-labelled real strips, reusing the same training and evaluation harness as the melody model.
-\end{itemize}
+The GEP comparison (traditional modular, CRNN--CTC, transformer end-to-end) holds. Two implementation-time refinements strengthen the original justification: a backbone migration and a redesigned chord pathway. Both are described in detail in \S\ref{sec:adjustments}.
 
 \subsection{Integration of Knowledge}
 The work combines computer vision (preprocessing, morphological staff detection, projection-profile deskewing, augmentation), deep learning (CRNN, CTC, mixed precision, OneCycleLR, beam vs.\ greedy decoding), music theory and notation (LMX vocabulary, clef/key handling, jazz chord symbology, Real Book engraving), and systems engineering (FastAPI service, hand-labelling UI, Poetry environment, multiprocessing data generation).
@@ -176,7 +171,7 @@ A creative cross-domain choice is the use of LilyJAZZ as the synthetic engraving
 The project does not process personal data and is not subject to GDPR. The PrIMuS dataset is used under its academic-use licence (cited, not redistributed). LilyPond and LilyJAZZ are GNU GPL; the Python stack (PyTorch, OpenCV, albumentations, FastAPI, PyMuPDF) is used under permissive licences tracked in the Poetry lockfile. Real Book pages are kept as a local, non-distributed evaluation set under the educational-use provisions of Spanish copyright law (Ley de Propiedad Intelectual, art.~32); only cropped chord strips paired with text labels are released.
 
 \subsection{Commitment, Initiative, and Decision-Making}
-Work has progressed steadily throughout the academic year, with biweekly supervisor meetings and weekly self-directed sprints. Two decisions illustrate the initiative taken: (i)~when EasyOCR was found to mis-read chord symbols, the chord pathway was rebuilt from scratch as a CRNN--CTC, including a hand-labelling UI (a non-trivial extension outside the GEP plan, but necessary for the chord sub-problem to actually be solved); (ii)~when aggregate SER was found to be dominated by barline and tie tokens, a complementary \textit{melodic SER} metric was introduced to isolate the pitch/duration error rate that end users actually care about.
+Work has progressed steadily throughout the academic year, with biweekly supervisor meetings and weekly self-directed sprints. Initiative is reflected in the four documented plan adjustments (\S\ref{sec:adjustments}) and in the introduction of a complementary melodic SER metric, which isolates the pitch/duration error rate that end users actually care about.
 
 Obstacles overcome include: a LilyPond~2.25 API change (\texttt{set-global-fonts} removed) that broke the LilyJAZZ stylesheet, patched locally; CTC alignment instability when compressed image width fell below the label length, fixed by \texttt{zero\_infinity=True} and a tighter multi-staff filter; and augmentation over-darkening from stacking three lighting effects, fixed by an explicit overlap audit.
 
@@ -187,26 +182,16 @@ Obstacles overcome include: a LilyPond~2.25 API change (\texttt{set-global-fonts
 Execution has followed the GEP plan closely in architecture, methodology, and scope. Four substantive adjustments are documented below; none alter the core objectives and all preserve the 509\,h budget.
 
 \subsection{Adjustment 1: Chord OCR Pathway Re-Design}
-\textbf{Plan vs.\ change.} The GEP described chord extraction as a generic OCR step (EasyOCR / Tesseract). The pathway was rebuilt as a dedicated character-level CRNN--CTC: synthetic LilyJAZZ chord-strip renderer, training script reusing the melody CRNN, real-strip extractor with pre-labels, a browser hand-labelling UI, a fine-tuning script with weighted sampling, and a grammar-aware post-processor.
-
-\textbf{Justification.} EasyOCR mis-read chord symbols systematically (slash basses as fractions, \texttt{maj7}~$\rightarrow$~\texttt{moj7}, \texttt{$\varnothing$} unknown) because it is trained on Latin text, not jazz notation. Reusing the existing CRNN training infrastructure was the lowest-cost path to a working chord recogniser.
-
-\textbf{Impact.} Roughly $+35$\,h, absorbed by the T5.3 buffer (20\,h) and under-spent literature survey hours.
+The GEP described chord extraction as a generic OCR step (EasyOCR / Tesseract), but EasyOCR mis-read jazz notation systematically (slash basses as fractions, \texttt{maj7}~$\rightarrow$~\texttt{moj7}, \texttt{$\varnothing$} unknown) because it is trained on Latin text. The pathway was rebuilt as a dedicated character-level CRNN--CTC reusing the melody training infrastructure: synthetic LilyJAZZ strip renderer, training script, real-strip extractor with pre-labels, browser hand-labelling UI, fine-tuning with weighted sampling, and a grammar-aware post-processor. \textbf{Impact:} $\approx$+35\,h, absorbed by the T5.3 buffer and under-spent literature hours.
 
 \subsection{Adjustment 2: Backbone Migration from VGG to ResNet-18}
-\textbf{Plan vs.\ change.} The GEP did not pin a CNN backbone. An initial VGG-style stack plateaued at $\approx$3\,\% validation SER with mixed-precision instability; migration to ResNet-18 gave roughly $2\times$ faster convergence and stable AMP training. ResNet-18 is now the default; VGG is kept only for old-checkpoint compatibility.
-
-\textbf{Impact.} Absorbed within T3.1/T3.2; no schedule slippage.
+The GEP did not pin a CNN backbone. An initial VGG-style stack plateaued at $\approx$3\,\% validation SER with mixed-precision instability; migration to ResNet-18 gave roughly $2\times$ faster convergence and stable AMP training. ResNet-18 is now the default; VGG is kept only for old-checkpoint compatibility. \textbf{Impact:} absorbed within T3.1/T3.2; no schedule slippage.
 
 \subsection{Adjustment 3: Hand-Labelling Tooling}
-\textbf{Plan vs.\ change.} The GEP envisaged real-page fine-tuning but did not detail the labelling workflow. A browser UI (\texttt{chord\_labeler.html}, \texttt{music\_labeler.html}) was built into the FastAPI service: it pre-fills the model's prediction, supports keyboard shortcuts (Enter/Esc/Tab/Shift+Tab), tracks a resumable JSONL ledger, and canonicalises chord-spelling variants (\texttt{Cm7}~$\rightarrow$~\texttt{C-7}, \texttt{m7b5}~$\rightarrow$~\texttt{$\varnothing$}).
-
-\textbf{Impact.} $\approx$+10\,h of UI work, recovered by the labelling speed-up.
+A browser UI (\texttt{chord\_labeler.html}, \texttt{music\_labeler.html}) was built into the FastAPI service. It pre-fills the model's prediction, supports keyboard shortcuts, tracks a resumable JSONL ledger, and canonicalises chord-spelling variants (\texttt{Cm7}~$\rightarrow$~\texttt{C-7}, \texttt{m7b5}~$\rightarrow$~\texttt{$\varnothing$}). \textbf{Impact:} $\approx$+10\,h of UI work, recovered by the labelling speed-up.
 
 \subsection{Adjustment 4: Symbol-Level Modular Baseline De-Scoped}
-\textbf{Plan vs.\ change.} T1.3 was framed as a full classical symbolic baseline. It was scoped down to a morphological staff detector (reused as Stage~2 of inference) plus a qualitative discussion of error propagation. A full classical symbol classifier would have cost 40--50\,h against an outcome the literature already predicts will lose to the CRNN.
-
-\textbf{Impact.} $-15$\,h on WP1, redirected to the chord pathway.
+T1.3 (full classical symbolic baseline) was scoped down to its morphological staff detector (reused as Stage~2 of inference) plus a qualitative discussion of error propagation. A competitive classical symbol classifier would have cost 40--50\,h against an outcome the literature already predicts will lose to the CRNN. \textbf{Impact:} $-15$\,h on WP1, redirected to the chord pathway.
 
 \subsection{Overall Effect on Plan and Budget}
 The four adjustments redistribute $\approx$45\,h without changing the total budget (509\,h) or the strategic objectives (Table~\ref{tab:effort-deltas}).

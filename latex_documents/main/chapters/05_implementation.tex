@@ -24,19 +24,21 @@ component was chosen for novelty.
 \begin{table}[htbp]
 \centering
 \small
-\begin{tabularx}{\textwidth}{l l X}
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabularx}{\textwidth}{@{} l l L @{}}
 \toprule
 \textbf{Layer} & \textbf{Library} & \textbf{Role} \\
 \midrule
-Deep learning            & PyTorch 2.10+        & Model, loss, optimiser, mixed-precision training. \\
-CNN backbone             & \code{torchvision}  & ResNet18 weights and module definition. \\
-Image processing         & OpenCV               & Binarisation, deskewing, morphological staff detection. \\
-PDF rasterisation        & PyMuPDF (\code{fitz}) & Render PDF pages to grayscale arrays at configurable DPI. \\
-Music rendering          & LilyPond + LilyJAZZ  & Generate training PNGs from PrIMuS semantic files. \\
-Data augmentation        & \code{albumentations} & Scan-simulation transform pipeline. \\
-Numerics                 & NumPy                & Tensor / array interop. \\
-Web service              & FastAPI + Uvicorn    & REST API exposing the inference pipeline. \\
-Package manager          & Poetry               & Dependency isolation, deterministic environment. \\
+Deep learning            & PyTorch 2.10+         & Model, loss, optimiser, mixed-precision training. \\ \tfgrowsep
+CNN backbone             & \code{torchvision}    & ResNet18 weights and module definition. \\ \tfgrowsep
+Image processing         & OpenCV                & Binarisation, deskewing, morphological staff detection. \\ \tfgrowsep
+PDF rasterisation        & PyMuPDF (\code{fitz}) & Render PDF pages to grayscale arrays at configurable DPI. \\ \tfgrowsep
+Music rendering          & LilyPond + LilyJAZZ   & Generate training PNGs from PrIMuS semantic files. \\ \tfgrowsep
+Data augmentation        & \code{albumentations} & Scan-simulation transform pipeline. \\ \tfgrowsep
+Numerics                 & NumPy                 & Tensor / array interop. \\ \tfgrowsep
+Web service              & FastAPI + Uvicorn     & REST API exposing the inference pipeline. \\ \tfgrowsep
+Package manager          & Poetry                & Dependency isolation, deterministic environment. \\
 \bottomrule
 \end{tabularx}
 \caption{Principal libraries used in each layer of the system.
@@ -62,7 +64,7 @@ file type.
 \begin{quote}\small
 \begin{verbatim}
 src/
-  cli.py                      unified CLI (9 subcommands)
+  cli.py                      unified CLI (10 subcommands)
   CRNN_CTC/                   model, training, vocab, evaluation
     model.py                  CRNN-CTC architecture
     vocab.py                  Vocabulary with fixed blank/pad/unk
@@ -113,6 +115,19 @@ sequence: \code{render}, \code{convert}, \code{augment}, and
 \code{vocab}.
 A wrapper subcommand (\code{pipeline}) runs all four with a shared set
 of paths.
+
+\begin{figure}[ht]
+  \centering
+  \fbox{\parbox[c][5cm][c]{0.85\textwidth}{\centering \todo{FIGURE: Data
+  pipeline flow. PrIMuS package $\to$ \code{render} (LilyJAZZ PNG) $\to$
+  \code{convert} (LMX label) $\to$ \code{augment} (scanned copy with
+  \code{albumentations}) $\to$ \code{vocab} (token index). Train loader
+  consumes the (clean, scanned, .lmx) triples.}}}
+  \caption{Data pipeline: PrIMuS semantic files are re-rendered in
+  LilyJAZZ, converted to LMX labels, augmented to simulate scanned
+  conditions, and indexed into a vocabulary file.}
+  \label{fig:data-pipeline-impl}
+\end{figure}
 Every stage uses the Python \code{multiprocessing} module for CPU
 parallelism, with the worker pool size set by a CLI flag (default 8).
 The Python global interpreter lock makes threading useless for these
@@ -158,28 +173,34 @@ directory.
 The transforms are listed in Table~\ref{tab:aug-pipeline}; their
 probabilities and parameter ranges were tuned against a sample of real
 Real Book scans.
-After the \code{albumentations} pipeline, four additional non-library
-operations are applied in order: morphological ink dilation, staff-line
-thickness variation, paper-tone remapping, and one of a vignette,
-uneven-illumination gradient, or halftone-banding overlay.
+After the \code{albumentations} pipeline, six additional non-library
+operations are applied in order, each with an independent probability:
+morphological ink dilation (0/1/2 erosion iterations chosen
+stochastically), staff-line thickness variation ($p=0.40$),
+paper-tone remapping from pure white/black to a paper-like grey
+range, a radial vignette ($p=0.55$), a directional
+uneven-illumination gradient simulating a book-spine shadow
+($p=0.45$), and faint horizontal halftone banding ($p=0.25$).
 
 \begin{table}[htbp]
 \centering
 \small
-\begin{tabularx}{\textwidth}{l l X}
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabularx}{\textwidth}{@{} l c L @{}}
 \toprule
 \textbf{Transform} & \textbf{Probability} & \textbf{Range / purpose} \\
 \midrule
-\code{ElasticTransform}     & 0.82 & page warping, staff curvature \\
-\code{GridDistortion}       & 0.72 & grid bending \\
-\code{OpticalDistortion}    & 0.38 & lens distortion \\
-\code{Affine}               & 0.85 & rotation $\pm 4^\circ$, shear $\pm 1.2^\circ$, scale $0.97$--$1.03$ \\
-\code{GaussianBlur}         & 0.62 & $\sigma \in [0.2, 1.1]$ \\
-\code{Sharpen}              & 0.48 & oversharpened-scanner simulation \\
-\code{RandomToneCurve}      & 0.72 & exposure variation \\
-\code{GaussNoise}           & 0.78 & sensor noise \\
-\code{RandomBrightnessContrast} & 0.70 & brightness $\pm 0.06$, contrast $0.03$--$0.18$ \\
-\code{ImageCompression}     & 0.35 & JPEG quality $72$--$92$ \\
+\code{ElasticTransform}         & 0.82 & page warping, staff curvature \\ \tfgrowsep
+\code{GridDistortion}           & 0.72 & grid bending \\ \tfgrowsep
+\code{OpticalDistortion}        & 0.38 & lens distortion \\ \tfgrowsep
+\code{Affine}                   & 0.85 & rotation $\pm 4^\circ$, shear $\pm 1.2^\circ$, scale $0.97$--$1.03$ \\ \tfgrowsep
+\code{GaussianBlur}             & 0.62 & $\sigma \in [0.2, 1.1]$ \\ \tfgrowsep
+\code{Sharpen}                  & 0.48 & oversharpened-scanner simulation \\ \tfgrowsep
+\code{RandomToneCurve}          & 0.72 & exposure variation \\ \tfgrowsep
+\code{GaussNoise}               & 0.78 & sensor noise \\ \tfgrowsep
+\code{RandomBrightnessContrast} & 0.70 & brightness $\pm 0.06$, contrast $0.03$--$0.18$ \\ \tfgrowsep
+\code{ImageCompression}         & 0.35 & JPEG quality $72$--$92$ \\
 \bottomrule
 \end{tabularx}
 \caption{The \code{albumentations} transform pipeline applied during
@@ -187,6 +208,18 @@ the \code{augment} stage.  Probabilities and parameter ranges are
 calibrated against a sample of real Real Book scans.}
 \label{tab:aug-pipeline}
 \end{table}
+
+\begin{figure}[ht]
+  \centering
+  \fbox{\parbox[c][5cm][c]{0.85\textwidth}{\centering \todo{FIGURE:
+  Augmentation samples. Top row: one clean LilyJAZZ render. Bottom
+  row: four scanned-style augmented copies showing elastic warp,
+  blur+noise, uneven illumination, and JPEG compression
+  artefacts.}}}
+  \caption{One clean LilyJAZZ render and four scan-simulated copies
+  produced by the \code{augment} stage.}
+  \label{fig:augment-samples}
+\end{figure}
 
 A second, lighter augmentation layer is applied online during training
 inside the \code{Dataset.\_\_getitem\_\_} method: per-sample brightness
@@ -293,10 +326,14 @@ Each epoch performs the following:
           in single precision.
     \item Backward pass via the \code{GradScaler}'s scaled-loss path;
           gradient norm clipped at \num{5.0} to stabilise the LSTM.
-    \item Optimiser step (\code{AdamW}, peak learning rate
-          $1{\times}10^{-3}$, weight decay $1{\times}10^{-4}$).
-    \item Scheduler step (\code{OneCycleLR}, single-cycle cosine
-          annealing, warm-up fraction \num{0.08}).
+    \item Optimiser step (\code{AdamW}\todo{ref? Loshchilov \& Hutter
+          2019 ``Decoupled Weight Decay Regularization'' --- not in
+          references.bib}, peak learning rate $1{\times}10^{-3}$,
+          weight decay $1{\times}10^{-4}$).
+    \item Scheduler step (\code{OneCycleLR}\todo{ref? Smith 2018
+          ``Super-Convergence: Very Fast Training of Neural Networks
+          Using Large Learning Rates'' --- not in references.bib},
+          single-cycle cosine annealing, warm-up fraction \num{0.08}).
     \item Validation pass at end of epoch: greedy CTC decode on the
           full validation set, SER computed against ground truth, best
           checkpoint saved if SER improved.
@@ -316,31 +353,33 @@ to \code{config.json} at training start.
 \begin{table}[htbp]
 \centering
 \small
-\begin{tabular}{l l l}
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\textwidth}{@{} l l L @{}}
 \toprule
 \textbf{Hyperparameter} & \textbf{Default} & \textbf{Notes} \\
 \midrule
-\code{img\_height}              & 128                   & fixed; image is resized to this height \\
-\code{max\_image\_width}        & 2048                  & wider images are clamped \\
-\code{backbone}                 & \code{resnet18}       & VGG retained for legacy checkpoints \\
-\code{rnn\_hidden}              & 256                   & per direction \\
-\code{rnn\_layers}              & 2                     & BiLSTM depth \\
-\code{dropout}                  & 0.3                   & between LSTM layers \\
-\code{batch\_size}              & 16                    & fits in 12\,GB at \code{img\_height=128} \\
-\code{lr}                       & $1{\times}10^{-3}$    & OneCycleLR peak \\
-\code{weight\_decay}            & $1{\times}10^{-4}$    & AdamW \\
-\code{warmup\_frac}             & 0.08                  & of total steps \\
-\code{max\_grad\_norm}          & 5.0                   & gradient clipping \\
-\code{epochs}                   & 60                    & maximum, with early stopping \\
-\code{early\_stopping\_patience} & 12                   & epochs without val SER improvement \\
-\code{val\_frac}                & 0.10                  & validation split fraction \\
-\code{test\_frac}               & 0.10                  & test split fraction \\
-\code{strip\_header\_prob}      & 0.40                  & header-strip augmentation rate (training only) \\
-\code{online\_aug\_prob}        & 0.50                  & in-loader jitter rate (training only) \\
-\code{rare\_lmx\_oversample}    & 2                     & multiplier for samples with tie tokens \\
-\code{num\_workers}             & 10                    & DataLoader worker processes \\
+\code{img\_height}               & 128                & fixed; image is resized to this height \\ \tfgrowsep
+\code{max\_image\_width}         & 2048               & wider images are clamped \\ \tfgrowsep
+\code{backbone}                  & \code{resnet18}    & VGG retained for legacy checkpoints \\ \tfgrowsep
+\code{rnn\_hidden}               & 256                & per direction \\ \tfgrowsep
+\code{rnn\_layers}               & 2                  & BiLSTM depth \\ \tfgrowsep
+\code{dropout}                   & 0.3                & between LSTM layers \\ \tfgrowsep
+\code{batch\_size}               & 16                 & fits in 12\,GB at \code{img\_height=128} \\ \tfgrowsep
+\code{lr}                        & $1{\times}10^{-3}$ & OneCycleLR peak \\ \tfgrowsep
+\code{weight\_decay}             & $1{\times}10^{-4}$ & AdamW \\ \tfgrowsep
+\code{warmup\_frac}              & 0.08               & of total steps \\ \tfgrowsep
+\code{max\_grad\_norm}           & 5.0                & gradient clipping \\ \tfgrowsep
+\code{epochs}                    & 60                 & maximum, with early stopping \\ \tfgrowsep
+\code{early\_stopping\_patience} & 12                 & epochs without val SER improvement \\ \tfgrowsep
+\code{val\_frac}                 & 0.10               & validation split fraction \\ \tfgrowsep
+\code{test\_frac}                & 0.10               & test split fraction \\ \tfgrowsep
+\code{strip\_header\_prob}       & 0.40               & header-strip augmentation rate (training only) \\ \tfgrowsep
+\code{online\_aug\_prob}         & 0.50               & in-loader jitter rate (training only) \\ \tfgrowsep
+\code{rare\_lmx\_oversample}     & 2                  & multiplier for samples with tie tokens \\ \tfgrowsep
+\code{num\_workers}              & 10                 & DataLoader worker processes \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Default hyperparameters of the \code{Config} dataclass.
 Every value is overridable via a CLI flag; the entire \code{Config} is
 serialised alongside the checkpoint so that evaluation always uses the
@@ -410,11 +449,28 @@ are dropped silently.
 \section{Inference Pipeline Implementation}
 \label{sec:impl-inference}
 
+\begin{figure}[ht]
+  \centering
+  \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering \todo{FIGURE:
+  Two-stream inference flow. Input PDF/image $\to$ preprocess
+  (binarise + deskew) $\to$ staff-detect $\to$ for each \code{System}:
+  (a) staff image $\to$ music CRNN $\to$ grammar fixer $\to$ LMX
+  tokens; (b) chord-strip image $\to$ chord CRNN $\to$ chord
+  post-processor $\to$ chord list. Both streams merge into JSON,
+  keyed by the staff bounding box.}}}
+  \caption{Two-stream inference flow. Music recognition and chord
+  recognition run as independent CRNN--CTC streams; their outputs are
+  joined per staff into the final JSON.}
+  \label{fig:infer-twostream}
+\end{figure}
+
 The inference pipeline is a single function, \code{run\_pipeline},
 that accepts the raw bytes of a PDF or image plus the original filename
 and returns a structured JSON dictionary.
-It is called both by the CLI \code{infer} subcommand and by the FastAPI
-endpoint described in Section~\ref{sec:impl-api}.
+It is invoked by the FastAPI endpoint described in
+Section~\ref{sec:impl-api}; no separate CLI subcommand is exposed for
+single-page inference because the typical use-case is uploading a page
+through the web UI.
 
 \subsection{Preprocessing}
 
@@ -501,7 +557,7 @@ Rules are applied as the walker encounters each token:
           sequence) ends the prior note prematurely.
     \item An accidental appearing before the duration is reordered to
           appear after.
-    \item Octaves outside $[3, 6]$ are clamped to that range.
+    \item Octaves outside $[3, 7]$ are clamped to that range.
     \item Clefs other than \code{clef:G2} are rewritten.
     \item Time signatures outside the eight-element allowed set are
           rejected, and the prior measure's time signature is
@@ -526,20 +582,24 @@ Table~\ref{tab:cli-subcommands}.
 \begin{table}[htbp]
 \centering
 \small
-\begin{tabularx}{\textwidth}{l X}
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabularx}{\textwidth}{@{} l L @{}}
 \toprule
 \textbf{Subcommand} & \textbf{Purpose} \\
 \midrule
-\code{render}         & Render PrIMuS \code{.semantic} files to LilyJAZZ PNGs. \\
-\code{convert}        & Convert PrIMuS \code{.semantic} files to LMX labels. \\
-\code{augment}        & Apply scan-simulation augmentation to clean PNGs. \\
-\code{vocab}          & Build the LMX vocabulary file from a corpus. \\
-\code{pipeline}       & Run \code{render} + \code{convert} + \code{augment} + \code{vocab}. \\
-\code{train}          & Train the CRNN on a prepared dataset. \\
-\code{evaluate}       & Evaluate a checkpoint and report SER. \\
-\code{evaluate-ab}    & Compare beam widths on the same checkpoint. \\
-\code{infer}          & Run the full inference pipeline on a PDF or image. \\
-\code{api}            & Launch the FastAPI server. \\
+\code{render}      & Render PrIMuS \code{.semantic} files to LilyJAZZ PNGs. \\ \tfgrowsep
+\code{convert}     & Convert PrIMuS \code{.semantic} files to LMX labels. \\ \tfgrowsep
+\code{augment}     & Apply scan-simulation augmentation to clean PNGs. \\ \tfgrowsep
+\code{vocab}       & Build the LMX vocabulary file from a corpus. \\ \tfgrowsep
+\code{pipeline}    & Run \code{render} + \code{convert} + \code{augment} + \code{vocab}. \\ \tfgrowsep
+\code{train}       & Train the CRNN on a prepared dataset. \\ \tfgrowsep
+\code{evaluate}    & Evaluate a checkpoint and report SER. \\ \tfgrowsep
+\code{evaluate-ab} & Compare beam widths on the same checkpoint. \\ \tfgrowsep
+\code{api}         & Launch the FastAPI web service that wraps the
+inference pipeline (PDF/image upload, JSON response). \\ \tfgrowsep
+\code{pipeline-train} & Run the full data pipeline and then immediately
+start training. \\
 \bottomrule
 \end{tabularx}
 \caption{CLI subcommands exposed by \code{src/cli.py}.

@@ -26,6 +26,34 @@ detection and removal; segmentation and classification of the musical
 primitives left behind once the staff lines have been erased; and semantic
 reconstruction, in which the recognised primitives are assembled into a
 structured score~\cite{calvoZaragozaUnderstandingOMR2020}.
+\Cref{fig:soa-arch-bainbridge,fig:soa-arch-rebelo} show two
+influential illustrations of this decomposition.
+Both predate the deep-learning shift discussed in \Cref{sec:soa-crnn} and
+share the same backbone of preprocessing, staff handling, primitive
+recognition, and semantic reconstruction.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.82\textwidth]{figures/fig_omr_arch_bainbridge}
+  \caption[Classical OMR pipeline (Bainbridge and Bell, 2001).]{Classical OMR
+    pipeline architecture proposed by
+    \textcite{bainbridgeChallengeOpticalMusic2001}. The four-stage structure
+    (preprocessing, staff handling, primitive recognition, and semantic
+    reconstruction) set the template for the field for two decades.
+    Source: Wikimedia Commons, redrawn from the cited work.}
+  \label{fig:soa-arch-bainbridge}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.82\textwidth]{figures/fig_omr_arch_rebelo}
+  \caption[Classical OMR pipeline (Rebelo et al., 2012).]{The widely-cited
+    OMR block diagram of \textcite{rebeloOpticalMusicRecognition2012}, which
+    explicitly shows the feedback loops from musical knowledge into the
+    recognition stages. Source: Wikimedia Commons, redrawn from the cited work.}
+  \label{fig:soa-arch-rebelo}
+\end{figure}
+
 The second stage was historically the most studied because every subsequent
 step depended on it.
 Dalitz et al.~\cite{dalitzComparativeStudyStaff2008} compared the principal
@@ -71,7 +99,7 @@ distribution into a token sequence using the CTC alignment---eliminating
 the need for per-symbol segmentation.
 
 Alongside the architecture, Calvo-Zaragoza and Rizo released the
-\term{PrIMuS} corpus~\cite{PrIMuSDataset}: 87\,678 real-music monophonic
+\term{PrIMuS} corpus~\cite{PrIMuSDataset,calvoZaragozaEndToEndNeural2018}: 87\,678 real-music monophonic
 incipits sourced from the RISM library and distributed in five
 representations, including two purpose-built token formats.
 The \term{agnostic} encoding lists visual primitives without musical
@@ -86,6 +114,51 @@ the same incipits with synthetic photographic distortion and demonstrates
 that the same network retains useful accuracy on phone-captured real-world
 inputs.
 This is the precise template that the present thesis follows.
+\Cref{fig:soa-crnn-pipeline} illustrates the CRNN--CTC pipeline as applied
+to a music staff.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  box/.style={
+    draw, rounded corners=3pt,
+    minimum width=1.6cm, minimum height=1.1cm,
+    align=center, font=\small, text width=1.7cm,
+    inner sep=3pt
+  },
+  arr/.style={->, thick, >=stealth},
+  ann/.style={font=\scriptsize\itshape, text=black!55, align=center},
+  node distance=0.45cm
+]
+  \node[box, fill=blue!8]      (img)  {Staff\\image};
+  \node[box, fill=orange!18,   right=0.7cm of img]  (cnn)  {CNN\\backbone};
+  \node[box, fill=teal!18,     right=0.7cm of cnn]  (lstm) {Bi-LSTM};
+  \node[box, fill=violet!18,   right=0.7cm of lstm] (lin)  {Linear\\+\,softmax};
+  \node[box, fill=red!10,      right=0.7cm of lin]  (ctc)  {CTC\\decoder};
+  \node[box, fill=blue!8,      right=0.7cm of ctc]  (out)  {Token\\sequence};
+
+  \draw[arr] (img)  -- (cnn);
+  \draw[arr] (cnn)  -- (lstm);
+  \draw[arr] (lstm) -- (lin);
+  \draw[arr] (lin)  -- (ctc);
+  \draw[arr] (ctc)  -- (out);
+
+  \node[ann, below=0.2cm of cnn]  {feature column\\per time step};
+  \node[ann, below=0.2cm of lstm] {contextualised\\hidden states};
+  \node[ann, below=0.2cm of lin]  {per-frame vocab\\distribution};
+  \node[ann, below=0.2cm of ctc]  {blank-collapsed\\tokens};
+\end{tikzpicture}
+\caption[CRNN--CTC pipeline for monophonic OMR.]{%
+  The CRNN--CTC pipeline applied to a music staff.
+  The image is treated as a sequence of vertical feature columns extracted
+  by a convolutional backbone (ResNet18 in this work); a bidirectional LSTM
+  contextualises each column; a linear projection produces a per-frame
+  probability distribution over the vocabulary; and CTC decoding collapses
+  the blank-padded alignment into a flat token sequence---without requiring
+  any explicit symbol segmentation.
+  Architecture introduced by \textcite{calvoZaragozaEndToEndNeural2018}.}
+\label{fig:soa-crnn-pipeline}
+\end{figure}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{End-to-End Transformer Architectures}
@@ -109,6 +182,80 @@ trend further with a vision-LLM backbone, an ABC-notation decoder, and over
 of \SI{47}{\percent}--\SI{68}{\percent} over previous state of the art on
 hard typeset benchmarks.
 
+\Cref{fig:soa-transformer-pipeline} shows the generic encoder--decoder
+structure shared by these systems.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  box/.style={
+    draw, rounded corners=3pt,
+    minimum width=1.9cm, minimum height=1.1cm,
+    align=center, font=\small, text width=2.0cm,
+    inner sep=4pt
+  },
+  wide/.style={
+    draw, rounded corners=3pt,
+    minimum width=2.7cm, minimum height=1.1cm,
+    align=center, font=\small, text width=2.8cm,
+    inner sep=4pt
+  },
+  arr/.style={->, thick, >=stealth},
+  darr/.style={->, thick, >=stealth, dashed, black!45},
+  lbl/.style={font=\scriptsize\itshape, text=black!55, align=center}
+]
+  %% ── Encoder row ──────────────────────────────────────────────────
+  \node[box,  fill=orange!12]                    (img) {Sheet music\\image};
+  \node[wide, fill=orange!22, right=0.9cm of img](enc) {Vision Transformer\\Encoder (ViT)};
+  \node[box,  fill=gray!14,   right=0.9cm of enc](mem) {Context\\memory};
+
+  \draw[arr] (img) -- (enc);
+  \draw[arr] (enc) -- (mem);
+
+  %% ── Decoder row — 3.0 cm below encoder centres ───────────────────
+  \node[box,  fill=green!12,  below=3.0cm of img] (prev)
+      {\texttt{<SOS>} +\\prev.\ tokens};
+  \node[wide, fill=green!22, right=0.9cm of prev] (dec)
+      {Autoregressive\\Transformer Decoder};
+  \node[box,  fill=blue!10,  right=0.9cm of dec]  (nxt) {Next\\token};
+
+  \draw[arr] (prev) -- (dec);
+  \draw[arr] (dec)  -- (nxt);
+
+  %% ── Cross-attention ──────────────────────────────────────────────
+  %% mem.south → drop 1.0 cm (corner) → left → dec.north
+  \coordinate (ca-corner) at ($(mem.south) + (0,-1.0)$);
+  \draw[arr, blue!65, line width=1.1pt]
+      (mem.south) -- (ca-corner) -| (dec.north);
+  %% Label sits above the horizontal segment, centred between mem and dec
+  \node[lbl, text=blue!65, above=3pt]
+      at ($(ca-corner)!0.5!(dec.north |- ca-corner)$) {cross-attention};
+
+  %% ── Autoregressive feedback ──────────────────────────────────────
+  %% nxt.south → drop 0.65 cm → left → prev.south (U-shape below all)
+  \draw[darr]
+      (nxt.south)  -- ++(0,-0.65)
+      -- ($(prev.south) + (0,-0.65)$)
+      -- (prev.south);
+  %% Label below the horizontal segment, centred between prev and nxt
+  \node[lbl] at ($(nxt.south)!0.5!(prev.south) + (0,-1.05)$)
+      {autoregressive (step $t \to t\!+\!1$)};
+
+\end{tikzpicture}
+\caption[Encoder--decoder transformer architecture for OMR (SMT style).]{%
+  The encoder--decoder transformer used in OMR systems such as
+  SMT~\cite{riosVilaSheetMusicTransformer2024} and
+  SMT++~\cite{riosVilaSMTPlusPlus2024}.
+  A Vision Transformer (ViT) encoder maps the sheet music image to a
+  sequence of patch embeddings; an autoregressive decoder then generates
+  the output token sequence one token at a time, attending at each step to
+  the full encoder memory via cross-attention.
+  Unlike CRNN--CTC, no explicit segmentation or conditional-independence
+  assumption is imposed---the decoder can, in principle, model arbitrary
+  long-range token dependencies.}
+\label{fig:soa-transformer-pipeline}
+\end{figure}
+
 These architectures, however, demand resources that exceed the budget of
 a Bachelor's thesis.
 For a strictly monophonic target domain---where the CRNN--CTC baseline
@@ -116,7 +263,7 @@ already attains sub-percent SER and the headroom for further gain is in
 domain robustness rather than model capacity---CRNN--CTC remains the right
 point on the cost/capability curve.
 The quantitative justification of this choice is developed in
-Chapter~\ref{ch:mgmt}.
+\Cref{ch:mgmt}.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Datasets for OMR Training}
@@ -124,7 +271,7 @@ Chapter~\ref{ch:mgmt}.
 
 The choice of architecture is inseparable from the choice of training
 corpus.
-Table~\ref{tab:omr-datasets} summarises the principal labelled corpora
+\Cref{tab:omr-datasets} summarises the principal labelled corpora
 available to the field as of 2026.
 
 \begin{table}[htbp]
@@ -136,13 +283,13 @@ available to the field as of 2026.
 \toprule
 \textbf{Dataset} & \textbf{Type} & \textbf{Size} & \textbf{Labels} & \textbf{Use} \\
 \midrule
-PrIMuS~\cite{PrIMuSDataset}                       & Monophonic, typeset           & 87\,678 incipits                       & agnostic / semantic / MEI  & Monophonic CRNN--CTC training \\ \tfgrowsep
+PrIMuS~\cite{PrIMuSDataset,calvoZaragozaEndToEndNeural2018} & Monophonic, typeset  & 87\,678 incipits                       & agnostic / semantic / MEI  & Monophonic CRNN--CTC training \\ \tfgrowsep
 Camera-PrIMuS~\cite{calvoZaragozaCameraPrimus2018} & Monophonic, distorted        & 87\,678 incipits                       & same as PrIMuS             & Domain-robustness training \\ \tfgrowsep
 DeepScoresV2~\cite{tuggenerDeepScoresV22020}      & Polyphonic, typeset           & 255\,385 pages, $\sim$151\,M symbols   & per-symbol bboxes + masks  & Music object detection \\ \tfgrowsep
 CVC-MUSCIMA~\cite{fornesCVCMUSCIMAGroundTruth2012} & Polyphonic, handwritten      & 1\,000 pages                           & staff-removal masks        & Staff removal / writer ID \\ \tfgrowsep
 MUSCIMA++~\cite{hajicMuscimaPP2017}               & Polyphonic, handwritten       & 140 pages, $\sim$91\,k symbols         & MuNG notation graph        & Symbol + relation recognition \\ \tfgrowsep
-DoReMi~\cite{shatriDoReMi2021}                    & Polyphonic, typeset (Dorico)  & $\sim$6\,432 pages, $\sim$1\,M objects & MusicXML + MuNG-style      & Universal OMR research \\ \tfgrowsep
-OLiMPiC~\cite{mayerPracticalEndToEnd2024}         & Pianoform, typeset + scan     & $\sim$17\,945 synth, 2\,931 scanned    & MusicXML / LMX             & End-to-end pianoform OMR \\
+DoReMi~\cite{shatriDoReMi2021}                    & Polyphonic, typeset (Dorico)  & $\sim$6\,432 pages, $\sim$1\,M objects\todo{verify: exact page and object counts from DoReMi arXiv 2107.07786} & MusicXML + MuNG-style      & Universal OMR research \\ \tfgrowsep
+OLiMPiC~\cite{mayerPracticalEndToEnd2024}         & Pianoform, typeset + scan     & $\sim$17\,945 synth, 2\,931 scanned\todo{verify: confirm split counts against Mayer et al. 2024 Table 1}    & MusicXML / LMX             & End-to-end pianoform OMR \\
 \bottomrule
 \end{tabularx}
 \caption{Principal labelled corpora used in modern OMR research.
@@ -158,7 +305,7 @@ First, none of these corpora captures the LilyJAZZ-style engraving of
 objects; the only directly comparable corpus emerged contemporaneously
 with this work~\cite{martinezSevillaJazzLeadSheets2025} and remains too
 small to train a CRNN--CTC model from scratch.
-Second, every recent end-to-end system---SMT, SMT++, OLIMPIC, LEGATO, and
+Second, every recent end-to-end system---SMT, SMT++, OLiMPiC, LEGATO, and
 Camera-PrIMuS itself---follows the same recipe of synthetic pretraining
 followed by fine-tuning on a small annotated target set.
 This is the recipe applied here.
@@ -183,21 +330,22 @@ The PrIMuS \textbf{agnostic} and \textbf{semantic} formats are compact and
 CTC-friendly but interoperate only with the PrIMuS ecosystem.
 
 \textbf{LMX} (Linearised MusicXML), introduced by
-Mayer et al.~\cite{mayerPracticalEndToEnd2024}, depth-first-traverses the
+Mayer et al.~\cite{mayerPracticalEndToEnd2024} and maintained as an open
+specification~\cite{OMRResearchLmx2025}, depth-first-traverses the
 MusicXML tree and emits one whitespace-separated token per leaf event.
 It is round-trippable to MusicXML with minimal information loss,
 substantially more compact than the parent format, and was designed
-specifically as a CRNN- and transformer-friendly target; the OLIMPIC
+specifically as a CRNN- and transformer-friendly target; the OLiMPiC
 reference implementation provides a Python \code{Linearizer}/\code{Delinearizer}
 pair that converts between the two representations directly.
 
 This work adopts LMX with a project-specific grammar that drops features
 outside the jazz lead-sheet domain (tuplets, slurs, articulations, double
 accidentals, non-treble clefs); the full grammar is described in
-Section~\ref{sec:lmx-format}.
+\Cref{sec:lmx-format}.
 LMX was preferred over the PrIMuS native formats because it round-trips
 losslessly to MusicXML---the format expected by downstream music
-applications---and because using the same representation as the OLIMPIC
+applications---and because using the same representation as the OLiMPiC
 reference work~\cite{mayerPracticalEndToEnd2024} keeps the present results
 directly comparable.
 
@@ -221,13 +369,13 @@ across encodings.
 Two recent metrics partially address these shortcomings.
 \textbf{TEDn} (normalised tree edit distance on the parsed MusicXML tree)
 weights structural errors appropriately and is the primary metric in
-OLIMPIC and SMT++.
+OLiMPiC and SMT++.
 \textbf{OMR-NED}~\cite{martinezSevillaOMRNED2025} extends SER with
 per-element categories so that error distribution---not only error
 rate---is legible from the metric itself.
 This thesis reports SER as the primary metric for backward comparability
 and complements it with a category-level error breakdown in
-Chapter~\ref{ch:results}.
+\Cref{ch:results}.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{OMR for Jazz Lead Sheets}
@@ -247,7 +395,7 @@ pipeline for chord-symbol recognition on printed and handwritten lead
 sheets and used the recovered chord progressions to attempt
 formal-structure reconstruction.
 The closest published precedent is
-\textbf{Martínez-Sevilla et al.~\cite{martinezSevillaJazzLeadSheets2025}},
+\textbf{Martínez-Sevilla et al.}~\cite{martinezSevillaJazzLeadSheets2025},
 presented at ISMIR 2025 and roughly contemporaneous with the final stages
 of this thesis.
 That work introduces a 293-sheet dataset of \textit{handwritten} jazz lead
@@ -283,3 +431,5 @@ Jazz lead-sheet OMR remained essentially open until 2025; this thesis and
 the concurrent ISMIR 2025
 work~\cite{martinezSevillaJazzLeadSheets2025} represent the first two
 focused attempts to fill that niche.
+The architectural choices made in this thesis---detailed in
+\Cref{ch:design}---are motivated by the findings surveyed above.

@@ -4,13 +4,13 @@
 This chapter records the sustainability dimension of the project,
 following the matrix and reflection framework set out in the FIB
 GEP sustainability guide~\cite{gepSustainabilityReport2018}.
-Section~\ref{sec:sust-selfassessment} reports the self-assessment
-that opened the project; Section~\ref{sec:sust-matrix} fills the
+\Cref{sec:sust-selfassessment} reports the self-assessment
+that opened the project; \Cref{sec:sust-matrix} fills the
 three-dimensional sustainability matrix (economic, environmental,
 and social) at the project's design-and-development stage and at
-its anticipated useful life; Section~\ref{sec:sust-commitment}
+its anticipated useful life; \Cref{sec:sust-commitment}
 records the ethical position and open-science commitments adopted;
-and Section~\ref{sec:sust-final} revisits the assessment in light
+and \Cref{sec:sust-final} revisits the assessment in light
 of the completed work.
 
 % ─────────────────────────────────────────────────────────────────────────────
@@ -40,14 +40,14 @@ between one-time experimentation and sustained deployment impact.
 I also realised that selecting lighter architectures is not only a
 computational decision but also an environmental one---a point
 explicitly reflected in the architectural justification of
-Section~\ref{sec:mgmt-justification}.
+\Cref{sec:mgmt-justification}.
 
 Three concrete improvement commitments emerged for the remainder
 of the project.
 
 \textit{First}, energy-related impact should be quantified wherever
 possible rather than asserted qualitatively.
-The energy estimate of Section~\ref{sec:sust-environmental} is the
+The energy estimate of \Cref{sec:sust-environmental} is the
 result of this commitment: it is computed from the actual GPU
 hours consumed by the training runs, multiplied by the rated
 power draw of the workstation and converted to CO\textsubscript{2}
@@ -58,7 +58,7 @@ quantities rather than in adjectives.
 
 \textit{Second}, architecture choices should be justified with both
 performance and efficiency criteria.
-The comparison table in Section~\ref{sec:mgmt-justification}
+The comparison table in \Cref{sec:mgmt-justification}
 includes ``computational feasibility'' and ``data requirements''
 as first-class criteria alongside accuracy, which is the direct
 operationalisation of this commitment.
@@ -72,8 +72,8 @@ monophonic target.
 tool, and under what limitations, must be explicit rather than
 implicit.
 This commitment shapes the social-dimension discussion in
-Section~\ref{sec:sust-social} and the ethical-position statement
-in Section~\ref{sec:sust-commitment}: both name specific
+\Cref{sec:sust-social} and the ethical-position statement
+in \Cref{sec:sust-commitment}: both name specific
 beneficiary groups (musicians, educators, archivists,
 researchers) and specific limitations (monophonic contract,
 treble-clef-only inputs, residual SER profile) rather than
@@ -93,7 +93,7 @@ treated as a downstream addendum.
 \section{Sustainability Matrix}
 \label{sec:sust-matrix}
 
-Table~\ref{tab:sustainability-matrix} summarises the
+\Cref{tab:sustainability-matrix} summarises the
 three-dimensional sustainability matrix as used in the GEP
 framework.
 The remainder of this section discusses each dimension in turn,
@@ -134,7 +134,7 @@ impact once the system is in service).
 
 \textbf{PPP (design and development).}
 The total project cost is estimated at \EUR{}16\,097.16
-(Section~\ref{sec:mgmt-budget}), dominated by specialised
+(\Cref{sec:mgmt-budget}), dominated by specialised
 engineering time at roughly \SI{85}{\percent} of the total.
 This profile is typical of a research-intensive software
 project: hardware and tooling are commodity items whose
@@ -144,7 +144,7 @@ The remaining cost components---general overheads, the risk-driven
 incidentals, and the contingency reserve---together account for
 the remaining fifteen per cent and are justified by the
 risk-register exercise of
-Section~\ref{sec:mgmt-risks}.
+\Cref{sec:mgmt-risks}.
 
 \textbf{Useful life and state of the art.}
 The current alternatives for lead-sheet digitisation are manual
@@ -159,7 +159,7 @@ PhotoScore, SharpEye) and open-source (Audiveris)---reduce the
 recurrent cost but require substantial correction effort on the
 jazz-specific notation studied here, because their internal
 heuristics are tuned for classical engraving styles
-(Section~\ref{sec:soa-classical}).
+(\Cref{sec:soa-classical}).
 A specialised CRNN--CTC model targeted at the Real Book
 engraving style reduces the correction workload further, on the
 class of input it was trained for, and eliminates the licence
@@ -172,7 +172,7 @@ A user of the system still has to verify and correct the output
 manually for any application that depends on note-perfect
 transcription, but the per-page correction time is reduced
 because the model handles the bulk of the symbol recognition
-correctly (Chapter~\ref{ch:results}).
+correctly (\Cref{ch:results}).
 A second improvement is research reproducibility: the open-source
 release of the code, the training scripts, and the trained model
 weights lowers the entry cost for future OMR research targeting
@@ -211,11 +211,11 @@ workflow.
 \textbf{Minimisation plan.}
 Four mitigations together keep the training-time energy cost
 within the estimated envelope.
-First, the architecture choice (Section~\ref{sec:design-model})
+First, the architecture choice (\Cref{sec:design-model})
 favours a \textit{lightweight} backbone, ResNet18, over the
 heavier alternatives that would yield only marginal accuracy
 gains on monophonic input;
-Section~\ref{sec:mgmt-justification} makes this trade-off
+\Cref{sec:mgmt-justification} makes this trade-off
 explicit.
 Second, \textit{mixed-precision training} via PyTorch's
 \code{torch.amp} reduces both VRAM occupancy and the cycle time
@@ -268,7 +268,7 @@ required by a thesis-length document).
 The project also reinforces ethical awareness about the
 limitations and failure modes of automated transcription:
 working through the residual-error analysis of
-Chapter~\ref{ch:results} produces a much more concrete picture
+\Cref{ch:results} produces a much more concrete picture
 of what the model gets right and wrong than a single aggregate
 metric can convey.
 
@@ -309,19 +309,19 @@ Social value depends on transparent communication of the
 system's current limitations.
 Four limitations are particularly important to name explicitly.
 The \textit{monophonic-only contract}
-(Section~\ref{sec:design-data}) means the model is not designed
+(\Cref{sec:design-data}) means the model is not designed
 to transcribe piano scores, choral parts, or any input with more
 than one simultaneous voice on the staff.
 The \textit{Real-Book-specific engraving style} means the model's
 accuracy on other engraving styles---classical Sibelius output,
 historical editions, handwritten manuscripts---is not the
-accuracy reported in Chapter~\ref{ch:results} and would have to
+accuracy reported in \Cref{ch:results} and would have to
 be measured separately.
 The \textit{treble-clef-only assumption} excludes any input on
 F or C clefs, which is acceptable for lead sheets but
 disqualifying for full scores.
 The \textit{residual error rate} reported in
-Chapter~\ref{ch:results}, while small in aggregate, is not zero;
+\Cref{ch:results}, while small in aggregate, is not zero;
 applications that depend on note-perfect transcription must
 include a human verification step.
 Overpromising the system in scenarios outside the validated
@@ -343,7 +343,7 @@ The source code is released under a permissive open-source
 licence and is tracked in a public Git repository.
 Every experiment in the thesis can be reproduced from a clean
 clone using a pinned-dependency environment managed by Poetry
-(Section~\ref{sec:impl-reproducibility}), and the trained model
+(\Cref{sec:impl-reproducibility}), and the trained model
 weights are distributed alongside the code.
 This commitment matters because OMR systems often disappear into
 private repositories that cannot be inspected or extended; making
@@ -351,7 +351,7 @@ the implementation public is the most direct contribution the
 project can make to the surrounding research community.
 
 \textit{Documented evaluation protocol.}
-The metric protocol used in Chapter~\ref{ch:results} is documented
+The metric protocol used in \Cref{ch:results} is documented
 in full, including the definition of the aggregate Symbol Error
 Rate, the melodic SER that strips structural tokens, and the
 category-level error breakdown that decomposes edits into
@@ -385,7 +385,7 @@ the treble-clef-only assumption, the eight allowed time
 signatures, and the residual SER profile---are documented
 prominently in the project's \code{README}, in the project
 overview documentation, and in the present thesis
-(Sections~\ref{sec:scope} and \ref{sec:sust-social}).
+(\Cref{sec:scope} and \Cref{sec:sust-social}).
 Future users of the model can therefore evaluate in advance
 whether the system is suitable for their use case rather than
 discovering its limitations through failure in production.
@@ -400,17 +400,17 @@ two updates are worth recording.
 First, the \textbf{environmental} estimate of $\approx 57.5$\,kWh
 made at the planning stage is consistent with the executed
 training profile: the final checkpoint converged in
-\num{37} epochs (Section~\ref{sec:res-training}) and the full
+\num{37} epochs (\Cref{sec:res-training}) and the full
 training run including ablations fits within the planned envelope.
 Mixed-precision training was the single most effective mitigation:
 it reduced VRAM usage enough that the entire pipeline runs on a
 consumer GPU, avoiding the cloud-rental scenario reserved as the
 worst-case fallback in the incidentals table
-(Table~\ref{tab:incidentals}).
+(\Cref{tab:incidentals}).
 
 Second, the \textbf{social} value of the system depends on the
 deployment surface, not just on its accuracy in isolation.
-The FastAPI web service of Section~\ref{sec:impl-api} packages
+The FastAPI web service of \Cref{sec:impl-api} packages
 the inference pipeline behind a single REST endpoint with no
 GPU requirement on the client side, which is precisely the
 deployment shape that makes the tool accessible to musicians,

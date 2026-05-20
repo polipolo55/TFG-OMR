@@ -2,7 +2,7 @@
 \label{ch:impl}
 
 This chapter describes how the design presented in
-Chapter~\ref{ch:design} is realised in code: the libraries chosen at
+\Cref{ch:design} is realised in code: the libraries chosen at
 each layer, the structure of the project repository, the concrete
 configuration values used, and the engineering decisions taken to keep
 the system reproducible and within the compute budget of a single
@@ -50,7 +50,7 @@ reproducible virtual environment across machines.}
 The runtime target is a single NVIDIA RTX~3060 with 12\,GB of VRAM,
 which is the hardware available to the author for the duration of the
 thesis.
-All architectural choices in Chapter~\ref{ch:design} were taken with
+All architectural choices in \Cref{ch:design} were taken with
 this budget in mind; the implementation does not require multi-GPU
 support, distributed training, or specialised cloud infrastructure.
 
@@ -118,11 +118,32 @@ of paths.
 
 \begin{figure}[ht]
   \centering
-  \fbox{\parbox[c][5cm][c]{0.85\textwidth}{\centering \todo{FIGURE: Data
-  pipeline flow. PrIMuS package $\to$ \code{render} (LilyJAZZ PNG) $\to$
-  \code{convert} (LMX label) $\to$ \code{augment} (scanned copy with
-  \code{albumentations}) $\to$ \code{vocab} (token index). Train loader
-  consumes the (clean, scanned, .lmx) triples.}}}
+  \begin{tikzpicture}[
+    box/.style={
+      draw, rounded corners=3pt,
+      minimum width=4.6cm, minimum height=1.0cm,
+      align=center, font=\footnotesize,
+      inner sep=4pt
+    },
+    arr/.style={->, thick, >=stealth},
+    annot/.style={font=\scriptsize\itshape, align=left},
+    node distance=0.65cm
+  ]
+    \node[box, fill=blue!8]                              (raw)    {PrIMuS raw data\\\scriptsize(\code{.semantic} + audio)};
+    \node[box, fill=orange!15, below=of raw]             (render) {\code{generate\_realbook.py}\\\scriptsize LilyPond render $\to$ PNG};
+    \node[box, fill=orange!15, below=of render]          (conv)   {\code{semantic\_to\_lmx.py}\\\scriptsize \code{.semantic} $\to$ LMX tokens};
+    \node[box, fill=orange!15, below=of conv]            (aug)    {\code{augment\_scanned.py}\\\scriptsize scan simulation};
+    \node[box, fill=green!15,  below=of aug]             (split)  {Dataset splits\\\scriptsize train / val / test};
+
+    \draw[arr] (raw)    -- (render);
+    \draw[arr] (render) -- (conv);
+    \draw[arr] (conv)   -- (aug);
+    \draw[arr] (aug)    -- (split);
+
+    \node[annot, right=0.25cm of render.south east, anchor=west, yshift=-0.05cm] {(PNG + LMX labels)};
+    \node[annot, right=0.25cm of conv.south east,   anchor=west, yshift=-0.05cm] {(normalised LMX)};
+    \node[annot, right=0.25cm of aug.south east,    anchor=west, yshift=-0.05cm] {(augmented PNG + labels)};
+  \end{tikzpicture}
   \caption{Data pipeline: PrIMuS semantic files are re-rendered in
   LilyJAZZ, converted to LMX labels, augmented to simulate scanned
   conditions, and indexed into a vocabulary file.}
@@ -152,7 +173,7 @@ runtime.
 
 The \code{convert} subcommand parses each \code{.semantic} file
 token-by-token, computes the display-accidental rules described in
-Section~\ref{sec:lmx-format} from the pitch spelling and the active
+\Cref{sec:lmx-format} from the pitch spelling and the active
 key signature, and emits an LMX label file co-located with the
 rendered PNG.
 The conversion is direct: no intermediate MusicXML is produced.
@@ -211,12 +232,15 @@ calibrated against a sample of real Real Book scans.}
 
 \begin{figure}[ht]
   \centering
-  \fbox{\parbox[c][5cm][c]{0.85\textwidth}{\centering \todo{FIGURE:
-  Augmentation samples. Top row: one clean LilyJAZZ render. Bottom
-  row: four scanned-style augmented copies showing elastic warp,
-  blur+noise, uneven illumination, and JPEG compression
-  artefacts.}}}
-  \caption{One clean LilyJAZZ render and four scan-simulated copies
+  \fbox{\parbox[c][5cm][c]{0.85\textwidth}{\centering \todo{FIGURE: Six
+  side-by-side staff strips. Left: clean LilyPond render. Then five
+  progressively augmented versions: (1) Gaussian blur ($\sigma=1.5$),
+  (2) elastic warp, (3) ink-bleed simulation, (4) JPEG compression
+  artifacts, (5) all combined. Generate with:
+  \texttt{poetry run python scripts/generate\_augment\_samples.py
+  --n-samples 1 --show-steps}.  Target: 6 panels,
+  width=\textbackslash textwidth, height approx 2\,cm each.}}}
+  \caption{One clean LilyJAZZ render and five scan-simulated copies
   produced by the \code{augment} stage.}
   \label{fig:augment-samples}
 \end{figure}
@@ -306,7 +330,7 @@ The latter is essential: it silently zeroes the loss contribution of
 samples whose label length exceeds their effective input length
 ($W/4$), which would otherwise cause a NaN-inducing infinity.
 On the in-scope corpus this masking is virtually never triggered
-because the multi-staff filter (Section~\ref{sec:design-data}) removes
+because the multi-staff filter (\Cref{sec:design-data}) removes
 the samples most at risk; \code{zero\_infinity} is a safety net rather
 than a routine code path.
 
@@ -326,13 +350,10 @@ Each epoch performs the following:
           in single precision.
     \item Backward pass via the \code{GradScaler}'s scaled-loss path;
           gradient norm clipped at \num{5.0} to stabilise the LSTM.
-    \item Optimiser step (\code{AdamW}\todo{ref? Loshchilov \& Hutter
-          2019 ``Decoupled Weight Decay Regularization'' --- not in
-          references.bib}, peak learning rate $1{\times}10^{-3}$,
+    \item Optimiser step (\code{AdamW}~\cite{loshchilovDecoupledWeightDecay2019},
+          peak learning rate $1{\times}10^{-3}$,
           weight decay $1{\times}10^{-4}$).
-    \item Scheduler step (\code{OneCycleLR}\todo{ref? Smith 2018
-          ``Super-Convergence: Very Fast Training of Neural Networks
-          Using Large Learning Rates'' --- not in references.bib},
+    \item Scheduler step (\code{OneCycleLR}~\cite{smithSuperConvergenceVeryFast2019},
           single-cycle cosine annealing, warm-up fraction \num{0.08}).
     \item Validation pass at end of epoch: greedy CTC decode on the
           full validation set, SER computed against ground truth, best
@@ -451,16 +472,58 @@ are dropped silently.
 
 \begin{figure}[ht]
   \centering
-  \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering \todo{FIGURE:
-  Two-stream inference flow. Input PDF/image $\to$ preprocess
-  (binarise + deskew) $\to$ staff-detect $\to$ for each \code{System}:
-  (a) staff image $\to$ music CRNN $\to$ grammar fixer $\to$ LMX
-  tokens; (b) chord-strip image $\to$ chord CRNN $\to$ chord
-  post-processor $\to$ chord list. Both streams merge into JSON,
-  keyed by the staff bounding box.}}}
+  \begin{tikzpicture}[
+    box/.style={
+      draw, rounded corners=3pt,
+      minimum width=2.6cm, minimum height=0.95cm,
+      align=center, font=\footnotesize, text width=2.6cm,
+      inner sep=2pt
+    },
+    arr/.style={->, thick, >=stealth},
+    node distance=0.55cm
+  ]
+    %% ── Top: input, preprocess, staff detect ─────────────────────────
+    \node[box, fill=blue!8]                              (in)   {PDF /\\image};
+    \node[box, fill=blue!8,   below=of in]               (pre)  {Preprocess\\\scriptsize deskew, binarise, resize};
+    \node[box, fill=blue!8,   below=of pre]              (det)  {Staff detection\\\scriptsize horizontal projection};
+
+    %% ── Music stream (left branch) ───────────────────────────────────
+    \node[box, fill=orange!18, below left=0.9cm and 0.6cm of det]  (mcrn) {Music CRNN};
+    \node[box, fill=orange!18, below=of mcrn]                      (mdec) {Greedy / beam\\CTC decode};
+    \node[box, fill=orange!18, below=of mdec]                      (lmx)  {LMX tokens};
+
+    %% ── Chord stream (right branch) ──────────────────────────────────
+    \node[box, fill=teal!18,   below right=0.9cm and 0.6cm of det] (ccrn) {Chord CRNN};
+    \node[box, fill=teal!18,   below=of ccrn]                      (cdec) {Greedy / beam\\CTC decode};
+    \node[box, fill=teal!18,   below=of cdec]                      (chl)  {Chord labels};
+
+    %% ── Merge: grammar fix → JSON ────────────────────────────────────
+    \node[box, fill=violet!18, below=1.1cm of det, yshift=-5.6cm] (gf)  {Grammar fixer};
+    \node[box, fill=blue!8,    below=of gf]                       (out) {JSON output};
+
+    %% ── Arrows: top column ───────────────────────────────────────────
+    \draw[arr] (in)  -- (pre);
+    \draw[arr] (pre) -- (det);
+
+    %% Fork from staff detect to both streams
+    \draw[arr] (det.south) -- ++(0,-0.25) -| node[above, font=\scriptsize, pos=0.25] {staff strips} (mcrn.north);
+    \draw[arr] (det.south) -- ++(0,-0.25) -| (ccrn.north);
+
+    \draw[arr] (mcrn) -- (mdec);
+    \draw[arr] (mdec) -- (lmx);
+    \draw[arr] (ccrn) -- (cdec);
+    \draw[arr] (cdec) -- (chl);
+
+    %% Merge to grammar fixer
+    \draw[arr] (lmx.south) -- ++(0,-0.25) -| (gf.north);
+    \draw[arr] (chl.south) -- ++(0,-0.25) -| (gf.north);
+
+    \draw[arr] (gf) -- (out);
+  \end{tikzpicture}
   \caption{Two-stream inference flow. Music recognition and chord
   recognition run as independent CRNN--CTC streams; their outputs are
-  joined per staff into the final JSON.}
+  joined per staff and validated by the grammar fixer before
+  serialisation as JSON.}
   \label{fig:infer-twostream}
 \end{figure}
 
@@ -468,7 +531,7 @@ The inference pipeline is a single function, \code{run\_pipeline},
 that accepts the raw bytes of a PDF or image plus the original filename
 and returns a structured JSON dictionary.
 It is invoked by the FastAPI endpoint described in
-Section~\ref{sec:impl-api}; no separate CLI subcommand is exposed for
+\Cref{sec:impl-api}; no separate CLI subcommand is exposed for
 single-page inference because the typical use-case is uploading a page
 through the web UI.
 
@@ -567,7 +630,7 @@ Rules are applied as the walker encounters each token:
 \end{itemize}
 
 The walker emits a normalised LMX token list that satisfies the grammar
-specified in Section~\ref{sec:lmx-format}.
+specified in \Cref{sec:lmx-format}.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Command-Line Interface}
@@ -619,16 +682,21 @@ plumbing.
 
 The system exposes a FastAPI web service that wraps
 \code{run\_pipeline} as a REST endpoint.
-The service accepts a multipart file upload (PDF or image) and returns
-the JSON dictionary produced by the pipeline.
-Two additional endpoints support hand-labelling of chord strips
-(\code{/labeler} and its supporting API routes), used during the
-chord-network fine-tuning workflow.
+The principal endpoint, \code{POST /api/omr/lead-sheet}, accepts a
+multipart file upload (PDF or image) and returns the JSON dictionary
+produced by the pipeline.
+A \code{GET /health} endpoint reports liveness and the resolved
+checkpoint path, suitable as a container healthcheck probe.
+Two additional UIs support hand-labelling of training data
+(\code{/labeler} for chord strips and \code{/music-labeler} for staff
+strips) together with their supporting \code{/api/labeler/*} and
+\code{/api/music-labeler/*} routes; these were used during the
+fine-tuning workflows of \Cref{sec:impl-chord}.
 
-A minimal HTML upload UI is served at the root path; it accepts a
-file, displays the rendered page with detected staff bounding boxes
-overlaid, and shows the recognised LMX token sequence and chord list
-for each segment.
+A minimal HTML upload UI is served at the root path (\code{GET /});
+it accepts a file, displays the rendered page with detected staff
+bounding boxes overlaid, and shows the recognised LMX token sequence
+and chord list for each segment.
 The UI is not the principal deliverable of the thesis; it is a
 debugging aid that doubles as a demonstration interface.
 
@@ -637,7 +705,7 @@ debugging aid that doubles as a demonstration interface.
 \label{sec:impl-reproducibility}
 
 Three mechanisms together guarantee that any experiment reported in
-Chapter~\ref{ch:results} can be reproduced exactly.
+\Cref{ch:results} can be reproduced exactly.
 
 \textbf{Deterministic dataset splits.}
 The \code{make\_splits} function partitions samples by hashing the

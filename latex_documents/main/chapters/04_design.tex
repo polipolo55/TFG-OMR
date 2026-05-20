@@ -3,7 +3,7 @@
 
 This chapter describes \textit{what} the system does and \textit{why} each
 high-level decision was taken.
-The companion chapter on implementation (Chapter~\ref{ch:impl}) describes
+The companion chapter on implementation (\Cref{ch:impl}) describes
 \textit{how} the design is realised in code: the specific libraries, file
 layout, and engineering choices.
 The separation follows the principle of presenting the conceptual
@@ -51,10 +51,57 @@ Figure~\ref{fig:pipeline-design} summarises the data flow.
 
 \begin{figure}[htbp]
 \centering
-\todo{Block diagram: PDF/image → Preprocess → Staff Detect → \{Melody
-CRNN, Chord CRNN\} → Grammar Fix + Chord Postprocess → JSON.
-Label each arrow with the data type that flows along it.}
-\caption{High-level data flow of the five-stage inference pipeline.
+\begin{tikzpicture}[
+  box/.style={
+    draw, rounded corners=3pt,
+    minimum width=1.7cm, minimum height=0.95cm,
+    align=center, font=\footnotesize, text width=1.7cm,
+    inner sep=2pt
+  },
+  arr/.style={->, thick, >=stealth},
+  node distance=0.45cm
+]
+  %% ── Top row: input → preprocess → staff detect ──────────────────────
+  \node[box, fill=blue!8]                          (in)   {PDF /\\image};
+  \node[box, fill=blue!8,   right=0.55cm of in]    (pre)  {Preprocess};
+  \node[box, fill=blue!8,   right=0.55cm of pre]   (det)  {Staff\\detect};
+
+  %% ── Music stream (top branch) ───────────────────────────────────────
+  \node[box, fill=orange!18, right=0.85cm of det]  (mcrn) {Music\\CRNN};
+  \node[box, fill=orange!18, right=0.55cm of mcrn] (mctc) {CTC\\decode};
+
+  %% ── Chord stream (bottom branch) ────────────────────────────────────
+  \node[box, fill=teal!18,   below=0.9cm of mcrn]  (ccrn) {Chord\\CRNN};
+  \node[box, fill=teal!18,   right=0.55cm of ccrn] (cctc) {CTC\\decode};
+
+  %% ── Merge: grammar fix → JSON ───────────────────────────────────────
+  \node[box, fill=violet!18, right=0.85cm of mctc, yshift=-0.75cm] (gf) {Grammar\\fix};
+  \node[box, fill=blue!8,    right=0.55cm of gf]   (out) {JSON};
+
+  %% ── Arrows ──────────────────────────────────────────────────────────
+  \draw[arr] (in)  -- (pre);
+  \draw[arr] (pre) -- (det);
+
+  %% fork: staff detect → music CRNN (top) and chord CRNN (bottom)
+  \draw[arr] (det.east) -- ++(0.25,0) |- (mcrn.west);
+  \draw[arr] (det.east) -- ++(0.25,0) |- (ccrn.west);
+
+  \draw[arr] (mcrn) -- (mctc);
+  \draw[arr] (ccrn) -- (cctc);
+
+  %% merge: both CTC decoders → grammar fix
+  \draw[arr] (mctc.east) -- ++(0.25,0) |- (gf.west);
+  \draw[arr] (cctc.east) -- ++(0.25,0) |- (gf.west);
+
+  \draw[arr] (gf) -- (out);
+\end{tikzpicture}
+\caption[Five-stage inference pipeline.]{%
+High-level data flow of the five-stage inference pipeline.
+A preprocessing front-end normalises the input page; a staff detector
+emits a staff image and a chord-strip image for every detected system;
+two independent CRNN--CTC recognisers process the two streams in
+parallel; a deterministic grammar fixer repairs structural defects in
+the music stream; and the merged result is serialised as JSON.
 Each block has a single responsibility and a typed input/output
 contract.}
 \label{fig:pipeline-design}
@@ -250,7 +297,7 @@ gracefully rather than collapsing to \code{<unk>}.
 
 \subsection{Why LMX over alternatives}
 
-Section~\ref{sec:soa-representations} surveyed the available symbolic
+\Cref{sec:soa-representations} surveyed the available symbolic
 output formats; this thesis adopts LMX rather than MusicXML directly,
 the PrIMuS native formats, or \code{**kern}.
 LMX is round-trippable to MusicXML---the format downstream music
@@ -271,19 +318,52 @@ Network trained with the Connectionist Temporal Classification loss
 This section justifies that architectural choice and its principal
 hyperparameters in conceptual terms.
 The implementation details---PyTorch module structure, exact stride
-table, optimiser state---live in Chapter~\ref{ch:impl}.
+table, optimiser state---live in \Cref{ch:impl}.
 
 \begin{figure}[ht]
   \centering
-  \fbox{\parbox[c][6cm][c]{0.8\textwidth}{\centering \todo{FIGURE: CRNN--CTC block
-  diagram. Input staff image $(B,1,128,W)$ $\to$ CNN backbone $\to$
-  feature map $(B,C,1,W/4)$ $\to$ squeeze-height + transpose $\to$
-  BiLSTM $\times$ 2 $\to$ linear projection to vocabulary $\to$
-  log-softmax $\to$ CTC.}}}
-  \caption{Block diagram of the CRNN--CTC melody recogniser.
-  The CNN compresses height to one while preserving width up to a $4\times$
-  factor; the resulting feature sequence is consumed left-to-right by
-  the BiLSTM and decoded by CTC.}
+  \begin{tikzpicture}[
+    box/.style={
+      draw, rounded corners=3pt,
+      minimum width=1.8cm, minimum height=1.1cm,
+      align=center, font=\small, text width=1.8cm,
+      inner sep=3pt
+    },
+    arr/.style={->, thick, >=stealth},
+    ann/.style={font=\scriptsize\itshape, text=black!55, align=center,
+                text width=2.0cm},
+    node distance=0.45cm
+  ]
+    \node[box, fill=blue!8]                          (img)  {Staff\\strip\\image};
+    \node[box, fill=orange!18, right=0.55cm of img]  (cnn)  {ResNet18\\backbone};
+    \node[box, fill=orange!18, right=0.55cm of cnn]  (col)  {Collapse\\height};
+    \node[box, fill=teal!18,   right=0.55cm of col]  (lstm) {BiLSTM\\$2\times 256$};
+    \node[box, fill=violet!18, right=0.55cm of lstm] (lin)  {Linear\\+\,softmax};
+    \node[box, fill=red!10,    right=0.55cm of lin]  (ctc)  {CTC\\decoder};
+    \node[box, fill=blue!8,    right=0.55cm of ctc]  (out)  {Token\\sequence};
+
+    \draw[arr] (img)  -- (cnn);
+    \draw[arr] (cnn)  -- (col);
+    \draw[arr] (col)  -- (lstm);
+    \draw[arr] (lstm) -- (lin);
+    \draw[arr] (lin)  -- (ctc);
+    \draw[arr] (ctc)  -- (out);
+
+    \node[ann, below=0.2cm of cnn]  {$128\!\times\! W \to$\\$1\!\times\! W/4$ map};
+    \node[ann, below=0.2cm of col]  {width-indexed\\frames};
+    \node[ann, below=0.2cm of lstm] {2 layers,\\512-dim output};
+    \node[ann, below=0.2cm of lin]  {$|V|$ = vocab\\size};
+    \node[ann, below=0.2cm of ctc]  {blank-collapsed\\alignment};
+  \end{tikzpicture}
+  \caption[CRNN--CTC melody recogniser design.]{%
+  Block diagram of the CRNN--CTC melody recogniser.
+  A ResNet18 backbone with asymmetric strides compresses the input
+  staff strip from $128\times W$ down to a $1\times W/4$ feature map;
+  the height-collapsed sequence of feature columns is consumed
+  left-to-right by a two-layer bidirectional LSTM (256 hidden units per
+  direction, 512-dim concatenated output); a linear projection produces
+  a per-frame distribution over the vocabulary; and CTC decoding
+  collapses the blank-padded alignment into a flat LMX token sequence.}
   \label{fig:crnn-arch}
 \end{figure}
 
@@ -292,8 +372,7 @@ table, optimiser state---live in Chapter~\ref{ch:impl}.
 A single staff from a jazz lead sheet is read strictly left to right and
 produces a variable-length sequence of tokens that is shorter than the
 image is wide.
-This matches the data assumptions of CTC\todo{ref? Graves et al.\ 2006
-``Connectionist Temporal Classification'' --- not in references.bib} exactly:
+This matches the data assumptions of CTC~\cite{gravesConnectionistTemporal2006} exactly:
 the loss learns the alignment between an input feature sequence and a
 shorter output token sequence without per-frame supervision, and it
 tolerates the two-dimensional context (relative vertical position on
@@ -301,7 +380,9 @@ the staff) needed to disambiguate pitch from notehead shape.
 End-to-end CRNN--CTC has been the dominant architecture for monophonic
 OMR since \textcite{calvoZaragozaEndToEndNeural2018} and remains the
 strongest baseline for the present
-domain~\cite{calvoZaragozaCameraPrimus2018,mayerPracticalEndToEnd2024}.
+domain~\cite{calvoZaragozaCameraPrimus2018,mayerPracticalEndToEnd2024};
+the full literature trail behind this choice is laid out in
+\Cref{sec:soa-crnn}.
 A convolutional backbone provides translation-invariant feature
 extraction along the staff width; a bidirectional recurrent layer
 captures the local dependencies needed to interpret accidentals, dots,
@@ -310,13 +391,12 @@ symbolic output.
 A transformer of comparable capacity would in principle perform at
 least as well but at substantially higher data and compute costs that
 are not justified for monophonic input
-(Section~\ref{sec:soa-transformer}).
+(\Cref{sec:soa-transformer}).
 
 \subsection{Backbone choice}
 
 The default backbone is a modified
-ResNet18\todo{ref? He et al.\ 2016 ``Deep Residual Learning'' --- not in
-references.bib} with asymmetric strides that compress the height
+ResNet18~\cite{heDeepResidualLearning2016} with asymmetric strides that compress the height
 dimension aggressively while preserving width, leaving the horizontal
 dimension as the CTC time axis.
 A five-block VGG-style stack is retained as a legacy alternative for
@@ -328,7 +408,7 @@ convergence; its pre-trained weights from ImageNet provide a reasonable
 initialisation for the first convolutional layers, even though the
 downstream task is monochrome rather than colour; and its parameter
 count fits comfortably within the VRAM budget of a single consumer GPU
-(see Chapter~\ref{ch:mgmt}).
+(see \Cref{ch:mgmt}).
 
 \subsection{Temporal resolution and width compression}
 
@@ -348,13 +428,12 @@ adjacent notes even on densely-engraved staves.
 \subsection{Recurrent layer}
 
 The convolutional features are fed to a stacked bidirectional
-LSTM\todo{ref? Hochreiter \& Schmidhuber 1997 ``Long Short-Term Memory''
---- not in references.bib}.
+LSTM~\cite{hochreiterLongShortTermMemory1997}.
 Two layers are used, with 256 hidden units per direction; this gives
 the model bidirectional context over the entire staff while keeping
 parameter count modest.
 A single-layer LSTM was found to under-fit on dense passages
-(see ablations in Chapter~\ref{ch:results}); a three-layer LSTM gave no
+(see ablations in \Cref{ch:results}); a three-layer LSTM gave no
 measurable gain over two layers and slowed training.
 Dropout between LSTM layers, applied during training only, regularises
 the model against the inevitable overfitting that arises from training
@@ -379,7 +458,7 @@ The architectural response is a \textit{two-stream} design: two
 independent neural networks, each specialised to its own visual
 distribution, with results merged in post-processing.
 The melody network is the CRNN--CTC described in
-Section~\ref{sec:design-model}; its vocabulary is the LMX token set.
+\Cref{sec:design-model}; its vocabulary is the LMX token set.
 The chord network is a separate CRNN--CTC of the same family but
 character-level: its vocabulary is the 26-character alphabet sufficient
 to spell every chord symbol in the Real Book.
@@ -446,7 +525,7 @@ contaminate the held-out evaluation.
 
 This is a textbook synthetic-pretrain → real-fine-tune transfer
 learning plan; its effectiveness is the principal experimental
-question of Chapter~\ref{ch:results}.
+question of \Cref{ch:results}.
 
 \subsection{Loss and supervision signal}
 
@@ -512,7 +591,7 @@ Its responsibilities are:
 
 \begin{itemize}
     \item enforce the LMX grammar laid out in
-          Section~\ref{sec:lmx-format} (correct token order within a
+          \Cref{sec:lmx-format} (correct token order within a
           note, correct duration after \code{rest}, correct nesting of
           tied groups);
     \item normalise predictions outside the lead-sheet contract: any
@@ -581,4 +660,4 @@ real Real Book pages, exposing the raw synthetic-to-real gap;
 (ii)~the same model after fine-tuning on a small annotated real set is
 evaluated on the same pages, quantifying the reduction in the gap.
 The fine-tuning protocol is the same as that described in
-Section~\ref{sec:design-training}.
+\Cref{sec:design-training}.

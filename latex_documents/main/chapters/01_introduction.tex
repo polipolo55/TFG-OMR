@@ -33,8 +33,7 @@ hundreds of thousands of pages of notation that cannot be searched, transposed, 
 back, or analysed without manual transcription into notation software.
 Manual transcription is slow and demands specialist training that is unavailable at
 scale---per-page effort estimates vary widely by source complexity, but they
-consistently dominate the cost of corpus-level digitisation projects~\cite{calvoZaragozaUnderstandingOMR2020}.
-\todo{ref?: a concrete per-page transcription-time figure (e.g.\ from a digital-libraries study) would strengthen this claim.}
+consistently dominate the cost of corpus-level digitisation projects~\cite{calvoZaragozaUnderstandingOMR2020, hajicOMRMetricsEvaluation2019}.
 
 The practical consequences are significant.
 A music educator who wishes to assign a jazz standard in a different key must either
@@ -50,7 +49,7 @@ newspapers, and documents searchable and editable at almost zero marginal cost.
 OMR is the musical analogue, but it remains far less mature: the visual language of
 music notation is substantially more complex than alphabetic text, the available
 annotated data is orders of magnitude smaller, and the community of researchers and
-tools is correspondingly narrower as its a more specialized field.
+tools is correspondingly narrower---it is a more specialised field.
 
 \subsection{Jazz Lead Sheets and \textit{The Real Book}}
 
@@ -64,9 +63,10 @@ information: a single-voice melody line written on a staff, chord symbols printe
 it indicating the harmonic context, and---occasionally---lyrics beneath the staff.
 This format is the lingua franca of jazz practice: it allows musicians to memorise and
 improvise over a tune from a minimal, portable representation without the burden of a
-full orchestral score.
+full orchestral score~\cite{reedHonorsLeadSheets2018}.
 
-\textit{The Real Book} is the most widely circulated collection of jazz lead sheets.
+\textit{The Real Book} is the most widely circulated collection of jazz lead
+sheets~\cite{martinezSevillaJazzLeadSheets2025}.
 Originally assembled as an unauthorised compilation by Berklee College of Music students
 in the 1970s, it circulated as a hand-copied samizdat for years before receiving
 official publication.
@@ -150,9 +150,9 @@ When a pitch falls above or below the range of the five-line staff, short horizo
 Middle C (C4), for example, sits on the first ledger line below the treble staff; a
 high A (A5) sits on the first ledger line above it.
 Jazz lead sheets use the treble clef exclusively, and this thesis targets the treble
-clef only (see Section~\ref{sec:scope}).
+clef only (see \Cref{sec:scope}).
 
-Figure~\ref{fig:staff-pitches} illustrates the ascending C major scale from middle C
+\Cref{fig:staff-pitches} illustrates the ascending C major scale from middle C
 (C4) to C5 on the treble staff.
 The leftmost note sits on a ledger line below the staff; successive notes step upward
 through the five-line grid, making the pitch--position correspondence explicit.
@@ -219,7 +219,7 @@ notes, with distinct graphical symbols for each value.
 A \term{whole-bar rest}---a filled rectangle hanging below a staff line---indicates that
 an entire measure is silent, regardless of the time signature.
 
-Figure~\ref{fig:note-durations} shows the seven standard note values side by side,
+\Cref{fig:note-durations} shows the seven standard note values side by side,
 together with dotted variants.
 The progressive reduction in note value is visually encoded by the head shape
 (open vs.\ filled), stem flags, and augmentation dot.
@@ -277,7 +277,7 @@ Chord symbols are typeset as free-form text---not as graphical notation symbols-
 their recognition requires optical character recognition (OCR) rather than the
 staff-pattern recognition applied to the melody line.
 This distinction motivates the two-stream architecture described in
-Chapter~\ref{ch:design}.
+\Cref{ch:design}.
 
 \subsection{The Lead-Sheet Format}
 
@@ -289,9 +289,9 @@ markers such as repeat signs, section labels (\textit{A}, \textit{B},
 \textit{Bridge}), and tempo or style indications---though these are absent from many
 informal editions, including large parts of \textit{The Real Book}.
 
-Figure~\ref{fig:leadsheet-example} illustrates a clean synthetic rendering of a
+\Cref{fig:leadsheet-example} illustrates a clean synthetic rendering of a
 lead-sheet excerpt in the LilyJAZZ style used throughout this project, and
-Figure~\ref{fig:realbook-annotated} shows an actual page from \textit{The Real Book}
+\Cref{fig:realbook-annotated} shows an actual page from \textit{The Real Book}
 with its key notation elements identified.
 
 \begin{figure}[htbp]
@@ -440,7 +440,7 @@ requirements but accumulate segmentation errors that propagate irreversibly thro
 recognition chain.
 The CRNN-CTC architecture represents the best trade-off for this project's constraints;
 this judgement is substantiated by the comparative analysis in
-Chapter~\ref{ch:mgmt}.
+\Cref{ch:mgmt}.
 
 The system is organised around a five-stage inference pipeline---preprocessing,
 staff detection, melody recognition, grammar correction, and chord OCR---whose
@@ -453,7 +453,7 @@ In the absence of labelled real-world data, the model is first trained entirely 
 synthetic LilyJAZZ-rendered images augmented with scan simulation, then fine-tuned on a
 small annotated set of real Real Book pages.
 This two-phase approach is a standard domain adaptation technique and is the practical
-solution to the data scarcity problem described in Section~\ref{sec:problem-formulation}.
+solution to the data scarcity problem described in \Cref{sec:problem-formulation}.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Scope}
@@ -501,33 +501,33 @@ The project is bounded by the following scope definition.
 
 The remainder of this document is organised as follows.
 
-Chapter~\ref{ch:soa} surveys the state of the art in OMR, covering the progression
+\Cref{ch:soa} surveys the state of the art in OMR, covering the progression
 from heuristic modular pipelines through CRNN-CTC models to modern transformer-based
 end-to-end architectures, and reviews the available datasets and symbolic
 representations relevant to this work.
 
-Chapter~\ref{ch:mgmt} covers project management: the justification of the chosen
+\Cref{ch:mgmt} covers project management: the justification of the chosen
 architecture through comparative analysis, the work-breakdown structure and timeline,
 the budget and economic analysis, and the project's sustainability and ethical impact
 assessment.
 
-Chapter~\ref{ch:design} describes the conceptual design of the system: the
+\Cref{ch:design} describes the conceptual design of the system: the
 pipeline decomposition, the data strategy, the LMX output representation and
 vocabulary, the CRNN--CTC architectural choices, the two-stream approach for
 melody and chord recognition, the training strategy, and the evaluation
 design.
 
-Chapter~\ref{ch:impl} describes the implementation: the technology stack, the
+\Cref{ch:impl} describes the implementation: the technology stack, the
 repository structure, the data and augmentation pipeline, the model and
 training loop, the chord OCR network, the inference pipeline, the CLI and
 web service, and the mechanisms used to keep the experiments reproducible.
 
-Chapter~\ref{ch:results} presents experimental results: training curves, SER on the
+\Cref{ch:results} presents experimental results: training curves, SER on the
 synthetic test set, ablation studies, qualitative error analysis by failure category,
 and domain-gap measurements with and without fine-tuning on real Real Book pages.
 
-Chapter~\ref{ch:sustain} revisits sustainability and ethical considerations in light of
+\Cref{ch:sustain} revisits sustainability and ethical considerations in light of
 the completed work.
 
-Finally, Chapter~\ref{ch:conclusions} draws conclusions, reflects on the extent to
+Finally, \Cref{ch:conclusions} draws conclusions, reflects on the extent to
 which the stated objectives were achieved, and outlines directions for future work.

@@ -8,7 +8,7 @@ it, the work-breakdown structure and Gantt schedule, the risk register
 and contingency plans, and the economic budget with its control
 mechanism.
 The introductory framing of the project---academic context, scope,
-objectives, and stakeholders---is given in Chapter~\ref{ch:intro}
+objectives, and stakeholders---is given in \Cref{ch:intro}
 and is not repeated here.
 
 % ── Gantt colour palette (reused from the GEP deliverable) ─────────────────────
@@ -26,8 +26,8 @@ and is not repeated here.
 
 \subsection{Existing alternatives}
 
-Section~\ref{sec:soa-classical}, Section~\ref{sec:soa-crnn}, and
-Section~\ref{sec:soa-transformer} surveyed the three principal
+\Cref{sec:soa-classical}, \Cref{sec:soa-crnn}, and
+\Cref{sec:soa-transformer} surveyed the three principal
 families of OMR systems in the literature.
 Considered as candidate architectures for this thesis, they are:
 
@@ -136,7 +136,7 @@ A traditional modular pipeline is cheap to implement but is
 penalised by error propagation across stages and by its sensitivity
 to the jazz engraving style; this option is in fact retained as the
 \textit{lower bound} baseline against which the CRNN--CTC results
-are compared in Chapter~\ref{ch:results}.
+are compared in \Cref{ch:results}.
 
 \subsection{Chosen alternative}
 
@@ -144,8 +144,8 @@ The selected architecture is a \textbf{two-stream CRNN--CTC system}
 in which a music CRNN--CTC transcribes the monophonic staff line and
 a second, independently trained CRNN--CTC performs OCR on the chord
 strip above the staff; its design is the subject of
-Chapter~\ref{ch:design} and its implementation of
-Chapter~\ref{ch:impl}.
+\Cref{ch:design} and its implementation of
+\Cref{ch:impl}.
 The decision balances modelling capacity against feasibility: the
 model is lighter than transformer alternatives, has strong prior
 art in OMR datasets, and supports robust sequence prediction
@@ -160,13 +160,13 @@ public dataset (PrIMuS) re-rendered in the target engraving style,
 which keeps the data-acquisition cost within the budget allocated
 for the thesis.
 Second, the output representation can be a compact flat token
-sequence (LMX, Section~\ref{sec:lmx-format}) consumed by both the
+sequence (LMX, \Cref{sec:lmx-format}) consumed by both the
 music and the chord branches, avoiding the verbose-XML output that
 transformer-decoder architectures typically produce.
 Third, the model's training time on a consumer GPU is short enough
 (of the order of a day per full run) that several training
 iterations per sprint are realistic; this is what makes the
-iterative methodology of Section~\ref{sec:mgmt-methodology}
+iterative methodology of \Cref{sec:mgmt-methodology}
 workable in practice.
 
 The decision is also a risk-control choice.
@@ -230,9 +230,9 @@ against which to compare.
 Data generation, training, and evaluation are all driven by
 scripts rather than by interactive notebook sessions, and the
 full \code{Config} dataclass is embedded in every checkpoint
-(Section~\ref{sec:impl-reproducibility}).
+(\Cref{sec:impl-reproducibility}).
 A consequence is that any experiment reported in
-Chapter~\ref{ch:results} can be re-run with a single CLI
+\Cref{ch:results} can be re-run with a single CLI
 invocation from a clean clone of the repository on a different
 machine; this is enforced as Hard Constraint~3 in the project's
 contributor guide.
@@ -245,7 +245,7 @@ edit-distance breakdown, per-sample SER distribution---are
 computed alongside, so that a single aggregate number is never
 the basis for a design decision.
 The category-level error breakdown of
-Section~\ref{sec:res-errors} is the direct product of this
+\Cref{sec:res-errors} is the direct product of this
 practice.
 
 \textit{Corrective loop.}
@@ -258,7 +258,7 @@ on whether the sprint hit its objectives, what evidence supports
 that judgement, and what is carried forward into the next
 sprint.
 The note is the input to the budget-control mechanism described
-in Section~\ref{sec:mgmt-control}.
+in \Cref{sec:mgmt-control}.
 
 Monitoring tools include Git and GitHub for version control,
 per-experiment training logs and CSV summaries written into the
@@ -299,7 +299,7 @@ modes of single-person projects.
 
 \textit{WP1 -- Literature review and baseline (78\,h).}
 This package establishes the analytical foundation: a literature
-survey of OMR (the material that becomes Chapter~\ref{ch:soa}),
+survey of OMR (the material that becomes \Cref{ch:soa}),
 an exploration of the public OMR datasets that informs the
 data-strategy choice, and a classical computer-vision baseline
 that provides a quantitative reference against which the
@@ -334,7 +334,7 @@ analysis identifies systematic failure modes, the data pipeline
 and the training configuration are adjusted, and the model is
 retrained.
 This is the work package where most of the closed-loop behaviour
-described in Section~\ref{sec:mgmt-methodology} actually
+described in \Cref{sec:mgmt-methodology} actually
 happens; its 68-hour budget is split across roughly two sprints
 of refinement and ablations.
 
@@ -470,7 +470,7 @@ earlier packages overruns its budget.
 Third, the bars within each sprint deliberately do not all
 extend to the sprint boundary; this leaves room within each
 sprint for the corrective-loop activities of
-Section~\ref{sec:mgmt-methodology}, which would otherwise have
+\Cref{sec:mgmt-methodology}, which would otherwise have
 to come out of the next sprint's allocation.
 
 \begin{landscape}
@@ -620,7 +620,7 @@ A persistent risk in OMR research is the temptation to extend
 the model to polyphonic input before the monophonic objective
 has been achieved.
 The mitigation is structural rather than reactive: the project
-scope (Section~\ref{sec:scope}) explicitly excludes polyphony,
+scope (\Cref{sec:scope}) explicitly excludes polyphony,
 and the conditional extension task (T5.3) is restricted to a
 feasibility discussion rather than implementation.
 If the temptation arises mid-project, up to eighteen hours of
@@ -654,48 +654,48 @@ weeks.
 Together, these three buffers absorb the schedule consequences
 of the lower-impact risks without triggering the
 budget-control mechanism described in
-Section~\ref{sec:mgmt-control}.
+\Cref{sec:mgmt-control}.
 
 \begin{table}[h!]
     \centering
     \caption{Risk register with alternative plans and estimated
-    impact.
-    L/I are likelihood and impact, rated L/M/H.}
+    impact. Likelihood and impact are rated on a three-level scale:
+    Low, Med(ium), or High.}
     \label{tab:risk-register}
     \scriptsize
-    \setlength{\tabcolsep}{5pt}
+    \setlength{\tabcolsep}{4pt}
     \renewcommand{\arraystretch}{1.35}
-    \begin{tabularx}{\linewidth}{@{} c >{\raggedright\arraybackslash}p{2.2cm} c >{\raggedright\arraybackslash}p{3.4cm} >{\raggedright\arraybackslash}p{2.5cm} >{\raggedright\arraybackslash}p{1.9cm} @{}}
+    \begin{tabularx}{\linewidth}{@{} c >{\raggedright\arraybackslash}p{2.2cm} >{\centering\arraybackslash}p{1.4cm} >{\centering\arraybackslash}p{1.4cm} >{\raggedright\arraybackslash}p{2.8cm} >{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}p{1.6cm} @{}}
         \toprule
-        \textbf{ID} & \textbf{Risk} & \textbf{L/I} & \textbf{Alternative plan} & \textbf{Schedule impact} & \textbf{Extra resources} \\
+        \textbf{ID} & \textbf{Risk} & \textbf{Likelihood} & \textbf{Impact} & \textbf{Alternative plan} & \textbf{Schedule impact} & \textbf{Extra resources} \\
         \midrule
         R1 & Limited ground-truth data on real Real Book pages
-            & H/H
+            & High & High
             & Fall back to synthetic / typeset sources and strengthen the augmentation pipeline.
             & Reallocate up to 10\,h.
             & None. \\ \tfgrowsep
         R2 & Staff-detection errors propagating downstream
-            & M/M
+            & Med & Med
             & Use manually cropped staff regions for critical evaluations.
             & Shift hours from T5.3 to T5.4.
             & None. \\ \tfgrowsep
         R3 & Output-encoding design complexity (LMX vocabulary)
-            & M/M
+            & Med & Med
             & Start from a minimal vocabulary and extend incrementally after stable runs.
             & Up to 6\,h redesign.
             & None. \\ \tfgrowsep
         R4 & Model underfitting or CTC misalignment
-            & M/H
+            & Med & High
             & Simplify vocabulary, retrain with cleaned subsets, adjust image scale.
             & Up to 10\,h from buffer.
             & Additional GPU time. \\ \tfgrowsep
         R5 & Scope creep toward polyphony
-            & M/H
+            & Med & High
             & Restrict extension to feasibility discussion only.
             & Recover up to 18\,h.
             & None. \\ \tfgrowsep
         R6 & Computational resource constraints
-            & L--M/M
+            & Low/Med & Med
             & Reduce model/data size or rent a short cloud-GPU window.
             & Up to 5\,h setup.
             & Cloud GPU (\EUR{}20--50). \\
@@ -705,7 +705,34 @@ Section~\ref{sec:mgmt-control}.
 
 \begin{figure}[ht]
   \centering
-  \fbox{\parbox[c][6cm][c]{0.6\textwidth}{\centering \todo{FIGURE: 3$\times$3 likelihood/impact matrix plotting R1--R6 of Table~\ref{tab:risk-register}. Axes: Likelihood (L/M/H) horizontal, Impact (L/M/H) vertical. Cells colour-coded green/yellow/red.}}}
+  \begin{tikzpicture}[font=\small]
+    \def\cw{2.8cm}
+    \def\ch{1.8cm}
+    \fill[green!50]  (0*\cw, 0*\ch) rectangle (1*\cw, 1*\ch);
+    \fill[green!50]  (0*\cw, 1*\ch) rectangle (1*\cw, 2*\ch);
+    \fill[green!50]  (0*\cw, 2*\ch) rectangle (1*\cw, 3*\ch);
+    \fill[yellow!60] (1*\cw, 0*\ch) rectangle (2*\cw, 1*\ch);
+    \fill[yellow!60] (1*\cw, 1*\ch) rectangle (2*\cw, 2*\ch);
+    \fill[orange!70] (1*\cw, 2*\ch) rectangle (2*\cw, 3*\ch);
+    \fill[yellow!60] (2*\cw, 0*\ch) rectangle (3*\cw, 1*\ch);
+    \fill[orange!70] (2*\cw, 1*\ch) rectangle (3*\cw, 2*\ch);
+    \fill[red!70]    (2*\cw, 2*\ch) rectangle (3*\cw, 3*\ch);
+    \draw[thick] (0,0) grid[xstep=\cw, ystep=\ch] (3*\cw, 3*\ch);
+    \node[above] at (0.5*\cw, 3*\ch) {Low};
+    \node[above] at (1.5*\cw, 3*\ch) {Med};
+    \node[above] at (2.5*\cw, 3*\ch) {High};
+    \node[left]  at (0, 0.5*\ch) {Low};
+    \node[left]  at (0, 1.5*\ch) {Med};
+    \node[left]  at (0, 2.5*\ch) {High};
+    \node[below] at (1.5*\cw, 0) {Likelihood};
+    \node[left, rotate=90] at (-1.2cm, 1.5*\ch) {Impact};
+    \node at (2.5*\cw, 2.5*\ch) {\textbf{R1}};
+    \node at (1.5*\cw, 2.3*\ch) {\textbf{R4}};
+    \node at (1.5*\cw, 1.9*\ch) {\textbf{R5}};
+    \node at (1.5*\cw, 1.5*\ch) {\textbf{R2}};
+    \node at (1.5*\cw, 1.1*\ch) {\textbf{R3}};
+    \node at (0.5*\cw, 1.5*\ch) {\textbf{R6}};
+  \end{tikzpicture}
   \caption{Risk-impact matrix locating each of the six register
   entries on the likelihood/impact plane.}
   \label{fig:risk-matrix}
@@ -721,7 +748,7 @@ The budget follows the standard software-project cost framework
 taught in the FIB GEP module~\cite{gepModule24EconomicManagement}
 and is organised into four components: \textit{human resources by
 activity}, itemised against the task structure of
-Section~\ref{sec:mgmt-planning}; \textit{general costs}, covering
+\Cref{sec:mgmt-planning}; \textit{general costs}, covering
 hardware amortisation, electricity and connectivity overheads, and
 software-licence costs (zero, since the entire toolchain is open
 source); \textit{incidentals}, which translate each risk's
@@ -732,7 +759,7 @@ the residual uncertainty that the risk register cannot enumerate
 explicitly.
 The wider sustainability framing of this budget---useful life,
 break-even, and the economic-impact assessment proper---is
-deferred to Section~\ref{sec:sust-economic}, which uses the
+deferred to \Cref{sec:sust-economic}, which uses the
 totals derived here as its inputs.
 
 \subsection{Human resources}
@@ -849,7 +876,7 @@ risk register cannot anticipate by definition.
 The incidentals figure of \EUR{}150.96
 (Table~\ref{tab:incidentals}) is the expected-value sum of the
 four cost-bearing entries of the risk register
-(Section~\ref{sec:mgmt-risks}).
+(\Cref{sec:mgmt-risks}).
 Each entry is the full cost of activating the corresponding
 contingency action multiplied by the assigned probability of the
 risk materialising.

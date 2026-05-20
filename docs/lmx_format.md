@@ -118,7 +118,7 @@ measure clef:G2 key:fifths:3 time beats:3 beat-type:4 pitch:A octave:4 quarter d
 5. `flat`, `sharp`, `natural` appear after the duration (and any dots) of the same note
 6. `dot` appears only after a duration or another `dot`
 7. `tied:stop` must be matched by a prior `tied:start`; both are emitted as part of a note
-8. Octaves outside [3, 6] are clamped to that range by the grammar fixer
+8. Octaves outside [3, 7] are clamped to that range by the grammar fixer
 9. Clef is normalised to `clef:G2` (only treble supported in the jazz lead-sheet domain)
 10. Time signatures not in the common jazz set are rejected; the previous system's time is propagated instead
 11. `fermata` is only valid immediately after a note or rest's full token sequence (pitch+octave+duration[+dot…+accidental][+tied:stop]); stray fermatas are dropped

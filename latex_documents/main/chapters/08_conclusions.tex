@@ -1,36 +1,169 @@
 \chapter{Conclusions and Future Work}
 \label{ch:conclusions}
 
-\todo{EXPAND: conclusions should restate (1) what was achieved
-against the objectives in Chapter~\ref{ch:intro} \S``Objectives'',
-(2) headline numerical results from Chapter~\ref{ch:results}
-(use Table~\ref{tab:results-headline} as the single source of
-numbers; do not re-quote SER values verbatim from \S~Summary),
-(3) lessons learned, and (4) one paragraph on personal growth and
-scope management.  The Future Work bullets below are placeholders;
-expand each into one or two sentences situating the proposed
-extension against the present limitations.}
-
 \section{Conclusions}
+\label{sec:conclusions}
 
-\todo{Key achievements; framing as Seq2Seq; synthetic SER (cite
-Table~\ref{tab:results-headline}); domain-gap fine-tuning.
-Do not paste sentences from Chapter~\ref{ch:intro} motivation or
-Chapter~\ref{ch:results} summary---paraphrase tightly.}
+This thesis has presented the design, implementation, and quantitative
+evaluation of an end-to-end Optical Music Recognition system tailored
+to the monophonic jazz lead sheet, with \textit{The Real Book} as the
+primary target.
+The system is organised as a \term{two-stream} architecture
+(\Cref{sec:design-twostream}): a melody branch that consumes a
+horizontal staff strip through a ResNet18 convolutional backbone,
+a two-layer bidirectional LSTM with hidden size~256, and a CTC
+output head, producing a sequence of LMX tokens that jointly
+encode pitch, duration, accidentals, and barline structure
+(\Cref{sec:lmx-format}); and a chord branch that runs an
+architecturally identical CRNN--CTC model on the chord-symbol
+strip extracted above each staff.
+The two models are trained independently on the synthetic
+LilyJAZZ-rendered PrIMuS corpus augmented with a calibrated
+scan-simulation pipeline, and are wired together behind a single
+FastAPI endpoint that accepts a PDF or image of a lead-sheet page
+and returns a structured JSON transcription suitable for downstream
+musical applications (\Cref{ch:design}, \Cref{ch:impl}).
+
+On the headline figures, the music CRNN reaches an aggregate
+Symbol Error Rate of \SI{1.19}{\percent} on the clean test split
+and \SI{1.28}{\percent} on the scan-augmented split, with a
+melodic SER---computed after stripping the structural \code{measure}
+and tie tokens---of \SI{0.11}{\percent} and \SI{0.18}{\percent}
+respectively, and a perfect-transcription rate of
+\SI{73}{\percent} on the clean split and \SI{71}{\percent} on
+the scanned split (\Cref{tab:results-headline}).
+These numbers, obtained from the epoch-37 checkpoint on \num{4604}
+held-out samples per split, demonstrate that a moderately sized
+CRNN--CTC stack (\Cref{sec:soa-crnn}) is sufficient for practical
+monophonic jazz transcription, and that the scan-simulation
+augmentation strategy designed in \Cref{sec:design-data} narrows
+the synthetic-to-real domain gap without requiring real annotated
+training data: the gap between clean and scanned SER is
+approximately \num{0.09} percentage points in aggregate and
+\num{0.07} percentage points on the melodic metric.
+
+Reviewing the specific objectives listed in \Cref{sec:objectives}:
+Objective~1 (state-of-the-art survey and architectural
+justification) is met by \Cref{ch:soa} and the comparative
+analysis in \Cref{ch:design}.
+Objective~2 (synthetic dataset construction via LilyPond and
+LilyJAZZ, paired with LMX annotations) is met by the data
+pipeline described in \Cref{sec:design-data}.
+Objective~3 (scan-simulation augmentation) is met and validated
+quantitatively by the small clean-vs-scanned gap reported above.
+Objective~4 (CRNN--CTC design, training, and SER evaluation) is
+met by the model and training stack of \Cref{ch:impl} and the
+results of \Cref{sec:res-ser}.
+Objective~5 (quantitative error analysis) is met by the per-token
+breakdown of \Cref{sec:res-errors}, which decomposes the residual
+SER into substitution, insertion, and deletion classes.
+Objective~6 (complete inference pipeline with chord OCR returning
+structured JSON) is met by the FastAPI service.
+Objective~7 (domain-gap quantification and fine-tuning on real
+Real Book pages) is \textit{partially} met: the synthetic
+domain gap is bounded by the scanned-split evaluation, but the
+fine-tuning stage on a manually annotated set of Real Book pages
+remains an open extension (\Cref{sec:res-domaingap}).
+
+Four lessons learned are worth recording for follow-up work.
+\textit{First}, the LMX token format is decisively more practical
+than full MusicXML for staff-level sequence-to-sequence modelling:
+it is compact, CTC-friendly, and avoids the deep nesting that
+makes MusicXML cumbersome as a model target.
+\textit{Second}, CTC remains a strong baseline for OMR despite
+the popularity of transformer decoders: it requires no
+autoregressive decoding loop, handles variable-length staves
+without explicit segmentation, and trains stably on the data
+volumes available within a Bachelor's thesis budget.
+\textit{Third}, scan-simulation augmentation in
+\code{albumentations} closes most of the synthetic-to-real
+distribution shift, but residual errors persist on difficult
+fonts and low-contrast pages---scanned-split SER never quite
+collapses to the clean-split SER.
+\textit{Fourth}, decoupling melody recognition and chord
+recognition into two independent CRNNs prevents vocabulary
+pollution between the two visual languages and allows each
+branch to be retrained or fine-tuned without disturbing the
+other; this modularity proved more valuable in practice than the
+theoretical elegance of a unified output head would have been.
+
+The scope of the system remains deliberately narrow
+(\Cref{sec:scope}): monophonic melodies in treble clef only, on
+the eight in-scope time signatures, with single-page PDFs and
+no tuplets, voltas, or navigation marks.
+Polyphonic writing, bass clef, handwritten manuscripts, and
+multi-page layout recovery are explicitly out of scope.
+The most important open question---visible in
+\Cref{sec:res-domaingap}---is the model's accuracy on genuine
+scanned Real Book pages, which the present evaluation bounds via
+the scan-augmented synthetic split but does not measure end to
+end against a manually annotated real-page ground truth.
+Closing that gap is the natural next step and is the leading
+item in the future-work plan that follows.
 
 \section{Future Lines of Research}
+\label{sec:future-work}
 
-\todo{Expand each bullet into one or two sentences:}
 \begin{itemize}
-    \item Full-page transcription via layout analysis (YOLO or
-          DETR-style detectors) replacing the current
-          morphology-based staff detector.
-    \item Polyphony and multi-voice support, requiring a richer
-          LMX grammar and a redesigned dataset filter.
-    \item Broader vocabulary: tuplets, slurs, articulations, and
-          double accidentals (see Chapter~\ref{ch:design}
-          \S``Output Representation'').
-    \item Transformer-based end-to-end architectures
-          (Section~\ref{sec:soa-transformer}) as a replacement for
-          the CRNN--CTC stack, contingent on data scale.
+  \item \textbf{Polyphonic OMR.}
+        The current label grammar and CTC loss assume a single
+        voice per staff.
+        Extending the system to polyphonic input would require a
+        richer LMX vocabulary (chord-stack tokens, voice
+        indicators) and either a multi-target CTC formulation or
+        a sequence-to-sequence decoder.
+        The main challenge is label ambiguity in vertically
+        stacked noteheads, where the reading order is not always
+        recoverable from the image alone.
+
+  \item \textbf{Real-data fine-tuning.}
+        Collecting and manually annotating \numrange{50}{100}
+        staves from genuine Real Book scans and fine-tuning both
+        CRNN branches on this small set would directly close the
+        residual synthetic-to-real gap identified in
+        \Cref{sec:res-domaingap}.
+        Standard transfer-learning practice suggests freezing the
+        convolutional backbone and updating only the BiLSTM and
+        CTC head, which limits the data requirement and reduces
+        the risk of overfitting to the small fine-tuning set.
+
+  \item \textbf{Full-page segmentation.}
+        The current preprocessing stage relies on a
+        morphology-and-projection staff detector that performs
+        well on cleanly scanned single-page PDFs but is fragile
+        on slanted staves, partial systems, and multi-page
+        documents.
+        Replacing it with a deep-learning detector (YOLO-style
+        box regression or a DETR-style transformer detector
+        trained on annotated page-layout data) is the most
+        pressing engineering bottleneck for practical
+        deployment and would unlock multi-page Real Book
+        processing.
+
+  \item \textbf{Transformer-based decoder.}
+        The greedy CTC decoder currently used could be compared
+        head-to-head against an autoregressive transformer
+        decoder conditioned on the same convolutional features,
+        in the style of the Sheet Music
+        Transformer~\cite{riosVilaSheetMusicTransformer2024}.
+        A transformer decoder would be expected to handle
+        long-range dependencies between measures (key-signature
+        propagation, beam-internal rhythm consistency) more
+        gracefully than CTC, at the cost of slower inference
+        and a larger data requirement; quantifying that trade-off
+        on the present dataset is a natural follow-up
+        experiment.
+
+  \item \textbf{Richer output format (MusicXML / LMX v2).}
+        The current LMX output is purpose-built for CTC training
+        and omits notation features---ties across barlines, slurs,
+        articulations, dynamics, double accidentals---that are
+        present in many Real Book pages but not in the in-scope
+        vocabulary.
+        Exporting recognised staves to MusicXML would enable
+        round-trip compatibility with notation software
+        (MuseScore, Finale, Sibelius) and would require a
+        post-processing pass that infers the missing
+        notation-graphical structure from the LMX token stream
+        and the original image.
 \end{itemize}

@@ -64,7 +64,15 @@ Upload a PDF or image for OMR transcription.
           "staff_bbox": [x, y, w, h],
           "chord_bbox": [x, y, w, h],
           "lmx_tokens": ["measure", "clef:G2", "key:fifths:0", "time", "beats:4", "beat-type:4", "pitch:C", "octave:5", "quarter", "..."],
-          "chords": ["Cmaj7", "Am7", "Dm7", "G7"]
+          "chords": ["Cmaj7", "Am7", "Dm7", "G7"],
+          "rejected": null,
+          "reject_diagnostics": {
+            "line_span_min": 0.83,
+            "spacing_cov": 0.04,
+            "interline_ink_frac": 0.17,
+            "text_area_frac": 0.02,
+            "mean_logprob": -0.03
+          }
         }
       ]
     }
@@ -75,6 +83,7 @@ Upload a PDF or image for OMR transcription.
     "page_height": 3508,
     "deskew_angle_deg": 0.2,
     "num_systems": 8,
+    "num_rejected": 0,
     "pdf_render_dpi": 300
   }
 }
@@ -86,8 +95,15 @@ Notes on the segment fields:
 |-------|------|-------------|
 | `staff_bbox` | `[x, y, w, h]` | Bounding box of the music staff region (page pixels) |
 | `chord_bbox` | `[x, y, w, h] \| null` | Bounding box of the chord strip above the staff, or `null` if no chord region was found |
-| `lmx_tokens` | `list[str]` | Flat LMX token sequence after grammar fixing |
-| `chords` | `list[str]` | Jazz chord symbols, left-to-right order |
+| `lmx_tokens` | `list[str]` | Flat LMX token sequence after grammar fixing. Empty for rejected segments. |
+| `chords` | `list[str]` | Jazz chord symbols, left-to-right order. Empty for rejected segments. |
+| `rejected` | `str \| null` | Reject reason code, or `null` when the segment is good. Codes: `geometry_no_strip`, `geometry_no_staff_lines`, `geometry_line_span`, `geometry_spacing_cov`, `geometry_interline_ink`, `ocr_text_density`, `ctc_low_confidence`, `ctc_zero_length`. Every detected system is included in the response (rejected ones too, so the UI can render or filter them); see `docs/inference_pipeline.md` Stage 2b. |
+| `reject_diagnostics` | `object` | Per-gate numeric signals: `line_span_min`, `spacing_cov`, `interline_ink_frac`, `text_area_frac`, `mean_logprob`. Always present. `mean_logprob` is `null` for geometry-rejected segments (no CRNN call was made). May also include `override_reason` (string) when a geometry rejection was overridden by high CRNN confidence — the segment is treated as a clean pass but the original failing gate is preserved here for audit. |
+
+Top-level `meta` gains:
+- `num_rejected` — total number of segments with a non-null `rejected` reason.
+- `num_rejected_by_gate` — `{geometry, ocr_text_density, ctc}` counts.
+- `staff_detection` — per-pass detector statistics (`horizontal_lines_found`, `raw_systems`, `local_validated_systems`, `after_pre_crnn_gate`, `pre_crnn_geometry_rejected`). Use this to diagnose **missing** staves: if `horizontal_lines_total` is low or `raw_systems` is short relative to the expected staff count, the morphological detector itself is the bottleneck, not the rejection gate.
 
 **Response (no staff detected):** `200 OK` with `error` set and empty `segments`
 ```json

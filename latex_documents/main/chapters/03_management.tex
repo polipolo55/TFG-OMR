@@ -703,41 +703,6 @@ budget-control mechanism described in
     \end{tabularx}
 \end{table}
 
-\begin{figure}[ht]
-  \centering
-  \begin{tikzpicture}[font=\small]
-    \def\cw{2.8cm}
-    \def\ch{1.8cm}
-    \fill[green!50]  (0*\cw, 0*\ch) rectangle (1*\cw, 1*\ch);
-    \fill[green!50]  (0*\cw, 1*\ch) rectangle (1*\cw, 2*\ch);
-    \fill[green!50]  (0*\cw, 2*\ch) rectangle (1*\cw, 3*\ch);
-    \fill[yellow!60] (1*\cw, 0*\ch) rectangle (2*\cw, 1*\ch);
-    \fill[yellow!60] (1*\cw, 1*\ch) rectangle (2*\cw, 2*\ch);
-    \fill[orange!70] (1*\cw, 2*\ch) rectangle (2*\cw, 3*\ch);
-    \fill[yellow!60] (2*\cw, 0*\ch) rectangle (3*\cw, 1*\ch);
-    \fill[orange!70] (2*\cw, 1*\ch) rectangle (3*\cw, 2*\ch);
-    \fill[red!70]    (2*\cw, 2*\ch) rectangle (3*\cw, 3*\ch);
-    \draw[thick] (0,0) grid[xstep=\cw, ystep=\ch] (3*\cw, 3*\ch);
-    \node[above] at (0.5*\cw, 3*\ch) {Low};
-    \node[above] at (1.5*\cw, 3*\ch) {Med};
-    \node[above] at (2.5*\cw, 3*\ch) {High};
-    \node[left]  at (0, 0.5*\ch) {Low};
-    \node[left]  at (0, 1.5*\ch) {Med};
-    \node[left]  at (0, 2.5*\ch) {High};
-    \node[below] at (1.5*\cw, 0) {Likelihood};
-    \node[left, rotate=90] at (-1.2cm, 1.5*\ch) {Impact};
-    \node at (2.5*\cw, 2.5*\ch) {\textbf{R1}};
-    \node at (1.5*\cw, 2.3*\ch) {\textbf{R4}};
-    \node at (1.5*\cw, 1.9*\ch) {\textbf{R5}};
-    \node at (1.5*\cw, 1.5*\ch) {\textbf{R2}};
-    \node at (1.5*\cw, 1.1*\ch) {\textbf{R3}};
-    \node at (0.5*\cw, 1.5*\ch) {\textbf{R6}};
-  \end{tikzpicture}
-  \caption{Risk-impact matrix locating each of the six register
-  entries on the likelihood/impact plane.}
-  \label{fig:risk-matrix}
-\end{figure}
-
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Economic Management}
 \label{sec:mgmt-budget}

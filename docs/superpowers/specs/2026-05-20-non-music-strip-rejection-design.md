@@ -62,6 +62,7 @@ class RejectThresholds:
     min_interline_ink_frac: float = 0.005
     max_text_area_frac: float = 0.35
     min_mean_logprob: float = -1.2
+    confident_override_logprob: float = -0.1   # see "CTC-confidence override"
 
 DEFAULT_THRESHOLDS = RejectThresholds()
 
@@ -73,7 +74,6 @@ def evaluate_post_crnn(
     system: System,
     log_probs: torch.Tensor,   # (T, C) for this strip
     out_len: int,
-    tokens: list[str],
     pre_result: RejectionResult,
     thresholds: RejectThresholds | None = None,
 ) -> RejectionResult: ...
@@ -136,10 +136,29 @@ Within `evaluate_pre_crnn`: gates run in order **geometry → OCR**. First failu
 
 Final segment status:
 - `pre_result.passed AND post_result.passed` → segment is normal output.
-- `not pre_result.passed AND reason starts with "geometry_"` → **drop segment entirely** (no entry in `segments[]`).
-- otherwise → keep segment with `rejected = reason`, empty `lmx_tokens`, empty `chords`.
+- Any rejection (geometry, OCR, CTC) → keep segment with `rejected = reason`,
+  empty `lmx_tokens`, empty `chords`. The UI hides them by default; the API
+  consumer can inspect the diagnostics to debug.
+- Geometry-rejected segments skip the CRNN call (so `mean_logprob` is `null`),
+  but their bbox and full diagnostics are returned.
 
-The asymmetry: geometry-impossible strips almost certainly aren't staves at all and would only add noise to the UI; OCR/CTC failures mean "we found something but don't trust the transcription" which is more useful to surface.
+**CTC-confidence override (post-implementation addition).** A *geometry*
+rejection is overridden if the CRNN's mean argmax log-prob is at or above
+`thresholds.confident_override_logprob`. Rationale: sparse music (e.g. a
+single whole rest) under-shoots `interline_ink_frac` and gets a false
+geometry rejection — high CRNN confidence is the most reliable rescue
+signal. **OCR text-density rejections are never overridden** (text in a
+strip means it's not music, regardless of how confidently the CRNN
+hallucinates tokens from the text strokes).
+
+When an override fires, the returned `RejectionResult` has `passed=True`
+and `reason=None` (so downstream treats the segment as a normal pass),
+but `diagnostics["override_reason"]` carries the original failing gate
+for audit. The field is absent on segments that were not overridden.
+
+**Update (2026-05-20):** Earlier drafts of this spec dropped geometry-rejected
+segments entirely. We reversed that during testing — silent drops make
+detector regressions invisible. Always-include keeps the API debuggable.
 
 ### Import structure (avoid cycle)
 
@@ -163,7 +182,7 @@ inference.recognize_music(strip_images, ckpt)
 pipeline._process_systems(systems, ckpt)
    ├─ pulls images, runs recognize_music
    └─ for each system:
-         post_result = evaluate_post_crnn(system, log_probs[i], out_lens[i], tokens[i], system.pre_result)
+         post_result = evaluate_post_crnn(system, log_probs[i], out_lens[i], system.pre_result)
          segment["rejected"] = post_result.reason   # None when passed
          segment["reject_diagnostics"] = post_result.diagnostics
          if post_result.reason is not None:

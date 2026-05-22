@@ -127,21 +127,28 @@ def recognize_music(
     strip_images: list[np.ndarray],
     checkpoint_path: Path | None = None,
     beam_width: int | None = None,
-) -> list[str]:
+) -> tuple[list[str], list[Tensor], list[int]]:
     """Run CRNN on a list of music-staff crops.
 
-    Returns one space-joined LMX token string per crop, in the same order as
-    *strip_images*.  Empty or unreadable strips yield ``""``.
+    Returns three parallel lists, one entry per crop:
+
+    * ``token_strings``: space-joined LMX token string (``""`` if the strip was
+      empty or preprocess failed).
+    * ``per_strip_log_probs``: a CPU tensor of shape ``(T_i, C)`` carrying the
+      log-probabilities for the first ``out_len_i`` time-steps of strip ``i``.
+      Used by the post-CRNN reject gate in ``staff_reject``.
+    * ``per_strip_out_lens``: the effective time-step count ``out_len_i``.
     """
     if not strip_images:
-        return []
+        return [], [], []
 
     if checkpoint_path is None:
         env_ckpt = os.environ.get("OMR_CHECKPOINT", "").strip()
         checkpoint_path = Path(env_ckpt) if env_ckpt else Path("models/latest/best_model.pt")
     if not checkpoint_path.exists():
         log.error("Checkpoint not found: %s", checkpoint_path)
-        return [""] * len(strip_images)
+        n = len(strip_images)
+        return ([""] * n, [torch.zeros(0, 1) for _ in range(n)], [0] * n)
 
     entry = _load_model(checkpoint_path)
     model = entry["model"]
@@ -200,7 +207,19 @@ def recognize_music(
         log_probs, out_lens = model(batch, width_t)
     token_lists = decode_fn(log_probs, out_lens, vocab)
 
+    # CRNN returns log_probs shaped (T, B, C). Move to CPU and slice per-strip.
+    lp_cpu = log_probs.detach().to("cpu")            # (T, B, C)
+    ol_cpu = out_lens.detach().to("cpu").tolist()    # length B
+
     results: list[str] = []
-    for tl, ok in zip(token_lists, valid_mask):
+    per_strip_lp: list[Tensor] = []
+    per_strip_ol: list[int] = []
+    for i, (tl, ok) in enumerate(zip(token_lists, valid_mask)):
         results.append(" ".join(tl) if ok else "")
-    return results
+        ol = int(ol_cpu[i]) if i < len(ol_cpu) else 0
+        if ok and ol > 0:
+            per_strip_lp.append(lp_cpu[:ol, i, :].clone())
+        else:
+            per_strip_lp.append(torch.zeros(0, lp_cpu.shape[-1]))
+        per_strip_ol.append(ol if ok else 0)
+    return results, per_strip_lp, per_strip_ol

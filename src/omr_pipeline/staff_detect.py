@@ -50,6 +50,10 @@ class System:
     music_image: np.ndarray | None = field(default=None, repr=False)
     chord_binary: np.ndarray | None = field(default=None, repr=False)
     music_binary: np.ndarray | None = field(default=None, repr=False)
+    # Set by the pre-CRNN reject gate in detect_systems. None means the gate
+    # has not been run. A RejectionResult with passed=False and a geometry_*
+    # reason indicates the strip was dropped before reaching the CRNN.
+    pre_result: object | None = field(default=None, repr=False)
 
 
 # ---------------------------------------------------------------------------
@@ -340,6 +344,58 @@ def _detect_systems_one_pass(
     return systems, line_ys
 
 
+def _round_diag(diag: dict[str, float]) -> dict[str, object]:
+    return {k: (round(v, 4) if isinstance(v, float) else v) for k, v in diag.items()}
+
+
+def _count_geometry_rejected(systems: list[System]) -> int:
+    return sum(
+        1 for s in systems
+        if s.pre_result is not None
+        and not s.pre_result.passed
+        and (s.pre_result.reason or "").startswith("geometry_")
+    )
+
+
+def _apply_pre_crnn_gate(systems: list[System]) -> list[System]:
+    """Run the pre-CRNN reject gate on each system and attach the result.
+
+    Every system is kept in the returned list so that downstream consumers can
+    see what was tried and why each verdict was reached. Geometry-rejected
+    strips skip the CRNN call in :mod:`pipeline` but still appear in the API
+    output with ``rejected = "geometry_*"`` and full ``reject_diagnostics``.
+
+    Local import keeps ``staff_detect`` cycle-free at module load.
+    """
+    from .staff_reject import evaluate_pre_crnn
+
+    for s in systems:
+        pre = evaluate_pre_crnn(s)
+        s.pre_result = pre
+        reason = pre.reason or ""
+        if not pre.passed:
+            log.info(
+                "Pre-CRNN gate %s strip @ y=%d (reason=%s, diag=%s)",
+                "rejected" if reason.startswith("geometry_") else "flagged",
+                s.staff.top,
+                reason,
+                _round_diag(pre.diagnostics),
+            )
+        else:
+            log.info(
+                "Pre-CRNN gate passed strip @ y=%d (diag=%s)",
+                s.staff.top,
+                _round_diag(pre.diagnostics),
+            )
+    return systems
+
+
+# Set by ``detect_systems`` with per-pass detection counts so the pipeline can
+# surface them in the API response under ``meta.staff_detection``. Treat as
+# read-only outside this module.
+LAST_DETECTION_STATS: dict[str, object] = {}
+
+
 def detect_systems(grayscale: np.ndarray, binary: np.ndarray) -> list[System]:
     """Detect staff systems and their chord regions on a preprocessed page.
 
@@ -348,7 +404,8 @@ def detect_systems(grayscale: np.ndarray, binary: np.ndarray) -> list[System]:
     the image contains no recognisable staff).
 
     Retries with looser line clustering and spacing tolerance when wavy or
-    thick hand-drawn staves fail the default morphological pass.
+    thick hand-drawn staves fail the default morphological pass. Stores
+    per-pass counts in :data:`LAST_DETECTION_STATS` for debugging.
     """
     attempts: list[tuple[float, int, float]] = [
         (0.35, 3, 0.15),
@@ -358,6 +415,8 @@ def detect_systems(grayscale: np.ndarray, binary: np.ndarray) -> list[System]:
 
     last_line_count = 0
     fallback_systems: list[System] | None = None
+    fallback_pass: dict | None = None
+    passes_log: list[dict] = []
 
     for spacing_tol, merge_dist, ink_thr in attempts:
         systems, line_ys = _detect_systems_one_pass(
@@ -368,6 +427,14 @@ def detect_systems(grayscale: np.ndarray, binary: np.ndarray) -> list[System]:
             ink_threshold_frac=ink_thr,
         )
         last_line_count = len(line_ys)
+        pass_stats = {
+            "spacing_tolerance": spacing_tol,
+            "line_merge_dist": merge_dist,
+            "ink_threshold_frac": ink_thr,
+            "horizontal_lines_found": len(line_ys),
+            "raw_systems": len(systems),
+        }
+        passes_log.append(pass_stats)
         log.info(
             "Staff-line pass (tol=%.2f merge=%d ink=%.3f): %d lines → %d raw system(s)",
             spacing_tol, merge_dist, ink_thr, len(line_ys), len(systems),
@@ -377,33 +444,63 @@ def detect_systems(grayscale: np.ndarray, binary: np.ndarray) -> list[System]:
             continue
 
         validated = [s for s in systems if music_strip_has_valid_staff(s.music_binary)]
+        pass_stats["local_validated_systems"] = len(validated)
         if validated:
             if len(validated) < len(systems):
                 log.info(
                     "Dropped %d region(s) without a local five-line staff",
                     len(systems) - len(validated),
                 )
-            systems = validated
+            systems = _apply_pre_crnn_gate(validated)
+            pass_stats["after_pre_crnn_gate"] = len(systems)
+            pass_stats["pre_crnn_geometry_rejected"] = _count_geometry_rejected(systems)
             log.info(
-                "Detected %d staff system(s); staff-space ≈ %.1f px",
+                "Detected %d staff system(s) (%d geometry-rejected); staff-space ≈ %.1f px",
                 len(systems),
-                float(np.mean([s.staff.staff_space for s in systems])),
+                pass_stats["pre_crnn_geometry_rejected"],
+                float(np.mean([s.staff.staff_space for s in systems])) if systems else 0.0,
             )
+            LAST_DETECTION_STATS.clear()
+            LAST_DETECTION_STATS.update({
+                "passes": passes_log,
+                "selected_pass": pass_stats,
+                "horizontal_lines_total": last_line_count,
+                "used_fallback": False,
+            })
             return systems
 
         fallback_systems = systems
+        fallback_pass = pass_stats
 
     if fallback_systems:
         log.warning(
             "No strip passed local staff validation — keeping all %d page-level system(s)",
             len(fallback_systems),
         )
+        fallback_systems = _apply_pre_crnn_gate(fallback_systems)
+        assert fallback_pass is not None
+        fallback_pass["after_pre_crnn_gate"] = len(fallback_systems)
+        fallback_pass["pre_crnn_geometry_rejected"] = _count_geometry_rejected(fallback_systems)
         log.info(
             "Detected %d staff system(s); staff-space ≈ %.1f px",
             len(fallback_systems),
-            float(np.mean([s.staff.staff_space for s in fallback_systems])),
+            float(np.mean([s.staff.staff_space for s in fallback_systems])) if fallback_systems else 0.0,
         )
+        LAST_DETECTION_STATS.clear()
+        LAST_DETECTION_STATS.update({
+            "passes": passes_log,
+            "selected_pass": fallback_pass,
+            "horizontal_lines_total": last_line_count,
+            "used_fallback": True,
+        })
         return fallback_systems
 
     log.info("Staff-line detection: %d horizontal lines found", last_line_count)
+    LAST_DETECTION_STATS.clear()
+    LAST_DETECTION_STATS.update({
+        "passes": passes_log,
+        "selected_pass": None,
+        "horizontal_lines_total": last_line_count,
+        "used_fallback": False,
+    })
     return []

@@ -72,6 +72,57 @@ class System:
     bbox: tuple[int,int,int,int]  # (x, y, w, h) in page
 ```
 
+## Stage 2b — Rejection Gates
+
+**File:** `src/omr_pipeline/staff_reject.py`
+
+Detected staff systems pass through a hybrid pre-CRNN + post-CRNN gate that
+filters out title regions, footer text, and other non-music page elements.
+
+**Pre-CRNN gates** (run inside `detect_systems`):
+
+| Gate | Signal | Reject when |
+|------|--------|-------------|
+| `geometry_no_staff_lines` | local 5-line re-detection | <5 lines found |
+| `geometry_line_span` | min fraction of cols with ink on each line | < `min_line_span_frac` |
+| `geometry_spacing_cov` | std/mean of inter-line gaps | > `max_spacing_cov` |
+| `geometry_interline_ink` | ink fraction between lines (excluding line bands) | < `min_interline_ink_frac` |
+| `ocr_text_density` | EasyOCR text-bbox area / strip area | > `max_text_area_frac` |
+
+**Post-CRNN gate** (run inside `pipeline._process_systems`):
+
+| Gate | Signal | Reject when |
+|------|--------|-------------|
+| `ctc_low_confidence` | mean log-prob of argmax frames | < `min_mean_logprob` |
+| `ctc_zero_length` | `out_len` after width compression | == 0 |
+
+**CTC confidence override.** Geometric pre-CRNN gates sometimes mis-fire on
+sparse music (e.g. a single whole note on a staff where `interline_ink_frac`
+ends up below the threshold). To recover those, every strip with a borderline
+geometric verdict still goes through the CRNN. If the resulting `mean_logprob`
+is at or above `confident_override_logprob`, the geometric rejection is
+overridden and the strip is accepted.
+
+**The override only applies to `geometry_*` rejections.** `ocr_text_density`
+is treated as a stronger signal — when EasyOCR finds significant text in the
+strip, that means it's not music, regardless of how confidently the CRNN
+hallucinates tokens from the text strokes. This avoids a class of false
+positives where footer text under an empty staff produces high-confidence
+CRNN output.
+
+**Behaviour on rejection:**
+- All rejections (geometry, OCR, CTC) **keep** the segment in `pages[].segments[]`
+  with `rejected: "<reason>"`, empty `lmx_tokens`, empty `chords`, and full
+  `reject_diagnostics`. The UI is expected to hide segments with non-null
+  `rejected`. Keeping them in the response makes debugging tractable — you can
+  see exactly which strips were tried and why each verdict was reached.
+- Geometry-rejected strips still **skip the CRNN call** (so `mean_logprob` is
+  `null` for them) — only their diagnostics and bbox survive.
+
+**Threshold calibration:** see `poetry run python src/cli.py calibrate-reject --help`.
+After re-training the CRNN, **re-run calibration** — the CTC log-prob
+distribution will shift.
+
 ## Stage 3 — Music Recognition (CRNN)
 
 **File:** `src/omr_pipeline/inference.py`
@@ -97,6 +148,8 @@ class System:
         ▼
   list[list[str]]    one token sequence per staff
 ```
+
+**Returns:** `(token_lists, log_probs_per_strip, out_lens_per_strip)`. The log-probs (shape `(T_i, C)` per strip, on CPU) and lengths are consumed by the post-CRNN gate in Stage 2b.
 
 **Model caching:** The CRNN is loaded once from checkpoint into memory and reused for all subsequent calls in the same process.
 

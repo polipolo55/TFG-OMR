@@ -23,6 +23,7 @@ import cv2
 import numpy as np
 
 from .preprocess import load_image, load_pdf_page, pdf_load_dpi, preprocess_page
+from . import staff_detect as _staff_detect
 from .staff_detect import System, detect_systems
 from .inference import recognize_music
 from .chord_recognizer import recognize_chords_crnn
@@ -71,25 +72,42 @@ def _process_systems(
 ) -> list[dict]:
     """One segment per staff.
 
-    Each segment: ``{staff_bbox, chord_bbox, lmx_tokens, chords}``.
+    Each segment carries ``staff_bbox``, ``chord_bbox``, ``lmx_tokens``,
+    ``chords``, ``rejected`` (reason code or ``None``) and
+    ``reject_diagnostics`` (per-gate numeric signals).
     Segments are ordered top-to-bottom.
     """
+    from .staff_reject import RejectionResult, evaluate_post_crnn
+
     music_imgs: list[np.ndarray] = []
     chord_imgs: list[np.ndarray] = []
+    # Truly impossible strips (no bbox / no staff lines at all) skip the CRNN
+    # call to save compute. Borderline geometry rejections (low line_span,
+    # high spacing_cov, low interline_ink) still get CRNN'd so that a confident
+    # CRNN output can override a wrong geometry verdict.
+    _UNRECOVERABLE = {"geometry_no_strip", "geometry_no_staff_lines", "geometry_no_image"}
+    crnn_skip_mask: list[bool] = []
 
     for sys in systems:
-        if sys.music_image is not None and sys.music_image.size > 0:
-            music_imgs.append(sys.music_image)
-        else:
+        pre = sys.pre_result
+        skip = (
+            isinstance(pre, RejectionResult)
+            and not pre.passed
+            and (pre.reason or "") in _UNRECOVERABLE
+        )
+        crnn_skip_mask.append(skip)
+        if skip or sys.music_image is None or sys.music_image.size == 0:
             music_imgs.append(np.zeros((10, 10), dtype=np.uint8))
-        if sys.chord_image is not None and sys.chord_image.size > 0:
-            chord_imgs.append(sys.chord_image)
         else:
+            music_imgs.append(sys.music_image)
+        if skip or sys.chord_image is None or sys.chord_image.size == 0:
             chord_imgs.append(np.zeros((10, 10), dtype=np.uint8))
+        else:
+            chord_imgs.append(sys.chord_image)
 
     _save_debug(music_imgs, chord_imgs)
 
-    music_preds = recognize_music(music_imgs, checkpoint_path)
+    music_preds, music_logprobs, music_outlens = recognize_music(music_imgs, checkpoint_path)
     chord_preds = recognize_chords_crnn(chord_imgs)
 
     # LMX grammar correction with cross-system key + time propagation
@@ -103,20 +121,55 @@ def _process_systems(
         )
         fixed_music.append(fixed)
 
+    _empty_diag = {
+        "line_span_min": 0.0, "spacing_cov": 0.0,
+        "interline_ink_frac": 0.0, "text_area_frac": 0.0,
+    }
+
     segments: list[dict] = []
     for i, sys in enumerate(systems):
         lmx_str = fixed_music[i] if i < len(fixed_music) else ""
         chord_str = chord_preds[i] if i < len(chord_preds) else ""
 
+        pre = sys.pre_result
+        if not isinstance(pre, RejectionResult):
+            pre = RejectionResult(passed=True, reason=None, diagnostics=dict(_empty_diag))
+
+        if crnn_skip_mask[i]:
+            # Geometry-rejected: keep bbox + diagnostics, do not trust CRNN
+            # output. mean_logprob is left as ``null`` in the response.
+            diag = {**pre.diagnostics, "mean_logprob": None}
+            post = RejectionResult(passed=False, reason=pre.reason, diagnostics=diag)
+        else:
+            post = evaluate_post_crnn(
+                sys, music_logprobs[i], int(music_outlens[i]), pre,
+            )
+
         mx, my, mw, mh = sys.music_bbox
         chord_bbox = list(sys.chord_bbox) if sys.chord_bbox is not None else None
+
+        rejected_reason = None if post.passed else post.reason
+        if rejected_reason is not None:
+            lmx_tokens_out: list[str] = []
+            chord_tokens_out: list[str] = []
+        else:
+            lmx_tokens_out = lmx_str.split() if lmx_str else []
+            chord_tokens_out = chord_str.split() if chord_str else []
 
         segments.append({
             "staff_bbox": [mx, my, mw, mh],
             "chord_bbox": chord_bbox,
-            "lmx_tokens": lmx_str.split() if lmx_str else [],
-            "chords": chord_str.split() if chord_str else [],
+            "lmx_tokens": lmx_tokens_out,
+            "chords": chord_tokens_out,
+            "rejected": rejected_reason,
+            "reject_diagnostics": post.diagnostics,
         })
+        log.info(
+            "Segment %d @ bbox=%s: rejected=%s tokens=%d diag=%s",
+            i, [mx, my, mw, mh], rejected_reason, len(lmx_tokens_out),
+            {k: (round(v, 4) if isinstance(v, float) else v)
+             for k, v in post.diagnostics.items()},
+        )
 
     return segments
 
@@ -178,6 +231,16 @@ def run_pipeline(
     # 4. Recognise + grammar fix
     segments = _process_systems(systems, checkpoint_path)
 
+    geometry_rejected = sum(
+        1 for s in segments
+        if s.get("rejected") and str(s["rejected"]).startswith("geometry_")
+    )
+    ocr_rejected = sum(1 for s in segments if s.get("rejected") == "ocr_text_density")
+    ctc_rejected = sum(
+        1 for s in segments
+        if s.get("rejected") in ("ctc_low_confidence", "ctc_zero_length")
+    )
+
     return {
         "error": None,
         "pages": [{
@@ -185,5 +248,15 @@ def run_pipeline(
             "page_image_data_url": page_url,
             "segments": segments,
         }],
-        "meta": {**base_meta, "num_systems": len(systems)},
+        "meta": {
+            **base_meta,
+            "num_systems": len(systems),
+            "num_rejected": sum(1 for s in segments if s.get("rejected") is not None),
+            "num_rejected_by_gate": {
+                "geometry": geometry_rejected,
+                "ocr_text_density": ocr_rejected,
+                "ctc": ctc_rejected,
+            },
+            "staff_detection": dict(_staff_detect.LAST_DETECTION_STATS),
+        },
     }

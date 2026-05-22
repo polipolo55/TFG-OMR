@@ -72,6 +72,12 @@ The allowed set is `{4/4, 3/4, 2/4, 2/2, 6/8, 6/4, 5/4, 12/8}` and is defined in
 The project uses Poetry for dependency isolation. Never run `python src/...` directly;
 always `poetry run python src/...`.
 
+**7. CTC mean-logprob threshold in `staff_reject.py` is checkpoint-dependent.**
+The CTC-confidence gate uses `min_mean_logprob` calibrated against the current
+CRNN checkpoint's log-prob distribution. After every CRNN re-train, re-run
+`poetry run python src/cli.py calibrate-reject ...` and commit the updated
+`models/staff_reject/thresholds.json`.
+
 ---
 
 ## Non-Obvious Conventions

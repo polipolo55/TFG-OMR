@@ -488,6 +488,178 @@ def cmd_pipeline_train(args: argparse.Namespace) -> None:
     cmd_train(args)
 
 
+# ---------------------------------------------------------------------------
+# Reject-gate fixture harvesting + calibration
+# ---------------------------------------------------------------------------
+
+def cmd_harvest_reject_fixtures(args: argparse.Namespace) -> None:
+    """Harvest detected music strips from PDFs for the reject calibration set."""
+    import glob
+
+    import cv2
+
+    from omr_pipeline.preprocess import load_pdf_page, pdf_load_dpi, preprocess_page
+    from omr_pipeline.staff_detect import detect_systems
+
+    out_dir = Path(args.out)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    paths: list[str] = []
+    for pat in args.pdfs:
+        paths.extend(glob.glob(pat))
+    if not paths:
+        log.error("no PDFs matched %s", args.pdfs)
+        return
+
+    counter = 0
+    dpi = pdf_load_dpi()
+    for p in paths:
+        try:
+            blob = Path(p).read_bytes()
+            n_pages = max(1, args.pages)
+            for page_idx in range(n_pages):
+                try:
+                    img = load_pdf_page(blob, page=page_idx, dpi=dpi)
+                except Exception:
+                    break
+                page = preprocess_page(img)
+                systems = detect_systems(page.grayscale, page.binary)
+                for s in systems:
+                    if s.music_image is None or s.music_image.size == 0:
+                        continue
+                    name = f"{Path(p).stem}_p{page_idx:03d}_s{counter:04d}.png"
+                    cv2.imwrite(str(out_dir / name), s.music_image)
+                    counter += 1
+        except Exception as exc:
+            log.warning("skip %s: %s", p, exc)
+
+    log.info("Harvested %d strips into %s", counter, out_dir)
+    log.info("Now sort them manually into <out>/../music/ and <out>/../non_music/.")
+
+
+def cmd_calibrate_reject(args: argparse.Namespace) -> None:
+    """Sweep rejection thresholds against a labelled fixture set and write the result."""
+    import json
+    from dataclasses import asdict
+
+    import cv2
+    import numpy as np
+
+    from omr_pipeline.staff_reject import (
+        DEFAULT_THRESHOLDS,
+        RejectThresholds,
+        _interline_ink_frac,
+        _line_span_min,
+        _spacing_cov,
+        _strip_line_ys,
+        _text_area_frac,
+    )
+
+    root = Path(args.fixtures)
+    music_dir = root / "music"
+    non_music_dir = root / "non_music"
+    if not music_dir.is_dir() or not non_music_dir.is_dir():
+        log.error("expected <fixtures>/music/ and <fixtures>/non_music/ to exist (%s)", root)
+        return
+
+    def _signals_for(p: Path) -> dict[str, float]:
+        gray = cv2.imread(str(p), cv2.IMREAD_GRAYSCALE)
+        if gray is None:
+            raise RuntimeError(f"could not read {p}")
+        _, binary = cv2.threshold(gray, 0, 1, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
+        binary = binary.astype(np.uint8)
+        line_ys = _strip_line_ys(binary)
+        if not line_ys or len(line_ys) < 5:
+            return {
+                "line_span_min": 0.0,
+                "spacing_cov": float("inf"),
+                "interline_ink_frac": 0.0,
+                "text_area_frac": _text_area_frac(gray),
+                "no_lines": 1.0,
+            }
+        return {
+            "line_span_min": _line_span_min(binary, line_ys),
+            "spacing_cov": _spacing_cov(line_ys),
+            "interline_ink_frac": _interline_ink_frac(binary, line_ys),
+            "text_area_frac": _text_area_frac(gray),
+            "no_lines": 0.0,
+        }
+
+    samples_pos: list[tuple[str, dict[str, float]]] = []
+    samples_neg: list[tuple[str, dict[str, float]]] = []
+    for p in sorted(music_dir.glob("*.png")):
+        samples_pos.append((str(p), _signals_for(p)))
+    for p in sorted(non_music_dir.glob("*.png")):
+        samples_neg.append((str(p), _signals_for(p)))
+
+    log.info("Loaded %d positive (music) and %d negative (non-music) samples",
+             len(samples_pos), len(samples_neg))
+
+    def _sweep(values_pos: list[float], values_neg: list[float], reject_when_greater: bool) -> float:
+        finite = [v for v in (values_pos + values_neg) if np.isfinite(v)]
+        candidates = sorted(set(finite)) or [0.0]
+        best_t, best_j = candidates[0], -2.0
+        for t in candidates:
+            if reject_when_greater:
+                tp = sum(1 for v in values_neg if v > t)
+                fp = sum(1 for v in values_pos if v > t)
+            else:
+                tp = sum(1 for v in values_neg if v < t)
+                fp = sum(1 for v in values_pos if v < t)
+            tpr = tp / max(1, len(values_neg))
+            fpr = fp / max(1, len(values_pos))
+            j = tpr - fpr
+            if j > best_j:
+                best_j, best_t = j, t
+        return float(best_t)
+
+    keys = ("line_span_min", "spacing_cov", "interline_ink_frac", "text_area_frac")
+    pos_sig = {k: [s[1][k] for s in samples_pos] for k in keys}
+    neg_sig = {k: [s[1][k] for s in samples_neg] for k in keys}
+
+    chosen = RejectThresholds(
+        min_line_span_frac=_sweep(pos_sig["line_span_min"], neg_sig["line_span_min"], reject_when_greater=False),
+        max_spacing_cov=_sweep(pos_sig["spacing_cov"], neg_sig["spacing_cov"], reject_when_greater=True),
+        min_interline_ink_frac=_sweep(pos_sig["interline_ink_frac"], neg_sig["interline_ink_frac"], reject_when_greater=False),
+        max_text_area_frac=_sweep(pos_sig["text_area_frac"], neg_sig["text_area_frac"], reject_when_greater=True),
+        min_mean_logprob=DEFAULT_THRESHOLDS.min_mean_logprob,
+    )
+
+    log.info("Recommended thresholds:")
+    for k, v in asdict(chosen).items():
+        log.info("  %s = %.4f", k, v)
+
+    def _would_reject(sig: dict[str, float], th: RejectThresholds) -> bool:
+        if sig.get("no_lines", 0.0) > 0.5:
+            return True
+        if sig["line_span_min"] < th.min_line_span_frac:
+            return True
+        if sig["spacing_cov"] > th.max_spacing_cov:
+            return True
+        if sig["interline_ink_frac"] < th.min_interline_ink_frac:
+            return True
+        if sig["text_area_frac"] > th.max_text_area_frac:
+            return True
+        return False
+
+    tp = sum(1 for (_, s) in samples_neg if _would_reject(s, chosen))
+    fp = sum(1 for (_, s) in samples_pos if _would_reject(s, chosen))
+    log.info("Confusion at chosen thresholds: TP=%d/%d  FP=%d/%d",
+             tp, len(samples_neg), fp, len(samples_pos))
+
+    for (p, s) in samples_pos:
+        if _would_reject(s, chosen):
+            log.info("  FP %s %s", p, {k: round(v, 4) for k, v in s.items()})
+    for (p, s) in samples_neg:
+        if not _would_reject(s, chosen):
+            log.info("  FN %s %s", p, {k: round(v, 4) for k, v in s.items()})
+
+    out_path = Path(args.out)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(asdict(chosen), indent=2))
+    log.info("Wrote thresholds to %s", out_path)
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # Argument parser
 # ═══════════════════════════════════════════════════════════════════════════
@@ -928,6 +1100,30 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Additional scanned data directory (repeatable)")
     
     p_ptrain.set_defaults(func=cmd_pipeline_train)
+
+    # ─── harvest-reject-fixtures ───────────────────────────────────────────
+    p_harvest = sub.add_parser(
+        "harvest-reject-fixtures",
+        help="Harvest detected staff strips from PDFs for reject calibration",
+    )
+    p_harvest.add_argument("--pdfs", nargs="+", required=True,
+                           help="Glob(s) of PDFs to harvest from")
+    p_harvest.add_argument("--pages", type=int, default=1,
+                           help="Number of pages per PDF to process (default 1)")
+    p_harvest.add_argument("--out", default="data/staff_reject/_harvest",
+                           help="Output directory for harvested strips")
+    p_harvest.set_defaults(func=cmd_harvest_reject_fixtures)
+
+    # ─── calibrate-reject ──────────────────────────────────────────────────
+    p_calibrate = sub.add_parser(
+        "calibrate-reject",
+        help="Sweep reject thresholds on a labelled fixture set",
+    )
+    p_calibrate.add_argument("--fixtures", default="data/staff_reject",
+                             help="Root dir containing music/ and non_music/")
+    p_calibrate.add_argument("--out", default="models/staff_reject/thresholds.json",
+                             help="Where to write the thresholds JSON")
+    p_calibrate.set_defaults(func=cmd_calibrate_reject)
 
     return parser
 

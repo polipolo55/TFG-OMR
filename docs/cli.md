@@ -248,3 +248,34 @@ poetry run python src/cli.py pipeline \
 ```bash
 poetry run python src/cli.py api --port 8000
 ```
+
+
+---
+
+### Harvest staff strips for reject calibration
+
+```bash
+poetry run python src/cli.py harvest-reject-fixtures \
+  --pdfs 'data/real_book/*.pdf' --pages 5 \
+  --out data/staff_reject/_harvest
+```
+
+Runs preprocessing + staff detection on each PDF page and saves every detected
+music strip as a PNG into `--out`. Manually sort the harvested files into
+`data/staff_reject/music/` (real music staves) and
+`data/staff_reject/non_music/` (titles, footers, page numbers).
+
+### Calibrate reject thresholds
+
+```bash
+poetry run python src/cli.py calibrate-reject \
+  --fixtures data/staff_reject \
+  --out models/staff_reject/thresholds.json
+```
+
+Sweeps each gate's signal (Youden's J) on the labelled fixtures, prints a
+confusion matrix and per-strip diagnostics for misclassified samples, then
+writes the chosen thresholds to `--out`. Point
+`$OMR_REJECT_THRESHOLDS=<path>` at the JSON to make the pipeline use them.
+
+Re-run after every CRNN re-train — the CTC log-prob distribution will shift.

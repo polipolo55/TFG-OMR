@@ -31,8 +31,6 @@ from pydantic import BaseModel
 
 from omr_pipeline.pipeline import run_pipeline
 
-log = logging.getLogger(__name__)
-
 app = FastAPI(title="TFG-OMR Lead Sheet API", version="0.2.0")
 
 # Static frontend

@@ -27,29 +27,23 @@ import csv
 import json
 import logging
 import time
-from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 
-import cv2
 import numpy as np
 import torch
 import torch.nn as nn
-from torch import Tensor
-from torch.amp import GradScaler, autocast
+from torch.amp import GradScaler
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, WeightedRandomSampler
-from tqdm import tqdm
 
 from .chord_dataset import (
     ChordDataset,
-    _add_realbook_clutter,
     _apply_augmentation,
     _load_chord_image,
 )
 from .chord_train import _seed_everything, _train_one_epoch, _validate
-from .evaluate import compute_ser_batch, greedy_decode
 from .model import CRNN
 from .vocab import Vocabulary
 from .dataset import collate_fn  # generic; reused as-is

@@ -79,8 +79,6 @@ def _parse_pitch(pitch_str: str) -> str:
     Convert a PrIMuS semantic pitch string (e.g. 'Bb5', 'F#4', 'C6') to a
     LilyPond pitch token (e.g. 'bes''', 'fis\'', 'c\'\'\'').
     """
-    step = pitch_str[0]
-    # octave is the trailing digit(s)
     m = re.match(r"^([A-G])(b{1,2}|#{1,2}|x?)(\d+)$", pitch_str)
     if not m:
         raise ValueError(f"Cannot parse pitch: {pitch_str!r}")

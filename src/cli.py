@@ -60,61 +60,6 @@ def _get_default_workers() -> int:
     return max(1, cpu_count - 2)
 
 
-def _discover_packages(root: Path) -> list[str]:
-    """Return sorted package_* directory names inside ``root``."""
-    if not root.is_dir():
-        return []
-    return sorted(
-        p.name
-        for p in root.iterdir()
-        if p.is_dir() and p.name.startswith("package_")
-    )
-
-
-def _resolve_packages(primus_dir: Path, requested: list[str] | None) -> list[str]:
-    """Resolve package list, auto-discovering from ``primus_dir`` when omitted."""
-    if requested:
-        return requested
-
-    discovered = _discover_packages(primus_dir)
-    if not discovered:
-        log.error(
-            "No package_* directories found under %s. "
-            "Pass --packages explicitly or check the data path.",
-            primus_dir,
-        )
-        sys.exit(1)
-    log.info("Auto-discovered packages: %s", ", ".join(discovered))
-    return discovered
-
-
-def _wire_training_data_from_packages(args: argparse.Namespace, packages: list[str]) -> None:
-    """Populate train args using clean+augmented dirs for all selected packages."""
-    clean_packages = [p for p in packages if (args.output_dir / p).is_dir()]
-    augmented_packages = [p for p in packages if (args.augmented_dir / p).is_dir()]
-
-    usable_packages = [p for p in clean_packages if p in set(augmented_packages)]
-    if not usable_packages:
-        log.error(
-            "No package had both clean and augmented data. "
-            "Checked %s and %s for packages: %s",
-            args.output_dir,
-            args.augmented_dir,
-            ", ".join(packages),
-        )
-        sys.exit(1)
-
-    args.data_dir = str(args.output_dir / usable_packages[0])
-    args.scanned_dir = str(args.augmented_dir / usable_packages[0])
-    args.extra_data_dir = [str(args.output_dir / p) for p in usable_packages[1:]] or None
-    args.extra_scanned_dir = [str(args.augmented_dir / p) for p in usable_packages[1:]] or None
-
-    log.info(
-        "Training data packages: %s",
-        ", ".join(usable_packages),
-    )
-
-
 # ═══════════════════════════════════════════════════════════════════════════
 # Subcommand handlers
 # ═══════════════════════════════════════════════════════════════════════════

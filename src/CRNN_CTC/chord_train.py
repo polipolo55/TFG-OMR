@@ -23,13 +23,12 @@ import argparse
 import csv
 import logging
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 
 import torch
 import torch.nn as nn
-from torch import Tensor
 from torch.amp import GradScaler, autocast
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import OneCycleLR

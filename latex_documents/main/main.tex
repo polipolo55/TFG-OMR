@@ -33,6 +33,9 @@
 \usepackage{pgfgantt}
 \usepackage{pdflscape}
 
+% ── Cover page (regulatory PDF) ────────────────────────────────────────────────
+\usepackage{pdfpages}
+
 % ── Bibliography (must come before tfg.sty which loads hyperref) ───────────────
 \usepackage[style=ieee, sorting=none]{biblatex}
 \addbibresource{references.bib}
@@ -78,29 +81,9 @@
 \begin{document}
 % ==============================================================================
 
-% ── Cover page ─────────────────────────────────────────────────────────────────
+% ── Cover page (regulatory FIB/UPC cover) ──────────────────────────────────────
 \hypersetup{pageanchor=false}
-\begin{titlepage}
-    \centering
-    \vspace*{2cm}
-    {\LARGE\bfseries OPTICAL MUSIC RECOGNITION FOR JAZZ LEAD SHEETS\par}
-    \vspace{0.4cm}
-    {\large A CRNN--CTC Approach for Monophonic Lines\par}
-    \vspace{2.5cm}
-    {\large\bfseries Pol Casanovas Puig\par}
-    \vspace{1.8cm}
-    \begin{tabular}{rl}
-        \textit{Supervisor:} & Manel Frigola Bourlon  \\[4pt]
-        \textit{Department:} & Automatic Control (ESAII) -- FIB/UPC \\[4pt]
-        \textit{Degree:}     & Bachelor's in Informatics Engineering (Computing) \\[4pt]
-        \textit{Speciality:} & Computing \\
-    \end{tabular}
-    \vfill
-    {\small Facultat d'Informàtica de Barcelona (FIB)\par}
-    {\small Universitat Politècnica de Catalunya (UPC) -- BarcelonaTech\par}
-    \vspace{0.6cm}
-    {\small\bfseries Spring 2026\par}
-\end{titlepage}
+\includepdf[pages=-]{portada.pdf}
 \hypersetup{pageanchor=true}
 
 % ── Front matter ───────────────────────────────────────────────────────────────

@@ -1,0 +1,102 @@
+% ------------------------------------------------------------------
+% Encoder--decoder transformer (SMT family) figure
+% (Chapter 2 — State of the Art).
+% Inputted from chapters/02_soa.tex. TikZ libraries are loaded in
+% main.tex; the \code macro is defined in tfg.sty.
+% ------------------------------------------------------------------
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  >={Stealth[round]},
+  io/.style={
+    draw, shape=regular polygon, regular polygon sides=6,
+    shape border rotate=90, inner sep=1pt, align=center,
+    font=\footnotesize\sffamily
+  },
+  stage/.style={
+    draw, rectangle, rounded corners=4pt,
+    minimum width=3.7cm, minimum height=0.85cm,
+    align=center, font=\footnotesize\sffamily
+  },
+  store/.style={
+    draw, rectangle, align=center, font=\footnotesize\sffamily, inner sep=4pt
+  },
+  flow/.style={->, thick},
+  cflow/.style={->, very thick},
+  dflow/.style={->, thick, dashed},
+  glbl/.style={font=\footnotesize\itshape, text=black!60},
+  albl/.style={font=\scriptsize\itshape, text=black!55, align=center},
+  node distance=0.75cm and 2.6cm
+]
+  % ── Encoder column (left) ────────────────────────────────────────────────
+  \node[io]                      (img)   {Sheet music\\image};
+  \node[stage, below=of img]     (patch) {Patch embedding\\$+$ positional encoding};
+  \node[stage, below=of patch]   (enc)   {Transformer encoder\\(self-attention) $\times N$};
+  \node[store, below=of enc]     (mem)   {Encoder memory\\(patch embeddings)};
+
+  % ── Decoder column (right); the decoder layer is anchored at the encoder
+  %    memory's height so the cross-attention arrow is exactly horizontal ───
+  \node[stage] (declayer) at ($(mem)+(6.8cm,0)$)
+        {Transformer decoder\\(masked self-attn,\\cross-attn, FFN) $\times N$};
+  \node[io,    above=of declayer] (sos) {$\langle$SOS$\rangle$ $+$\\previous tokens};
+  \node[stage, below=of declayer] (lin) {Linear $+$ softmax};
+  \node[io,    below=of lin]      (nxt) {Next token};
+  \node[io,    below=of nxt]      (seq) {Output token seq.\\(\code{**kern}/ABC/LMX)};
+
+  % ── Group labels (bottom-right, inside the dashed phases) ────────────────
+  \node[glbl, anchor=east] (lenc) at ($(mem.south east)+(0,-0.42)$) {Encoder};
+  \node[glbl, anchor=west] (ldec) at ($(seq.south)+(0.55,-0.12)$) {Decoder};
+
+  % ── Dashed phase boxes (behind nodes) ────────────────────────────────────
+  \begin{scope}[on background layer]
+    \node[draw, dashed, rounded corners, inner sep=10pt, fit=(img)(mem)(lenc)] (genc) {};
+    \node[draw, dashed, rounded corners, inner sep=10pt, fit=(sos)(seq)(ldec)] (gdec) {};
+  \end{scope}
+
+  % ── Encoder data flow ────────────────────────────────────────────────────
+  \draw[flow] (img)   -- (patch);
+  \draw[flow] (patch) -- (enc);
+  \draw[flow] (enc)   -- (mem);
+
+  % ── Decoder data flow ────────────────────────────────────────────────────
+  \draw[flow] (sos)      -- (declayer);
+  \draw[flow] (declayer) -- (lin);
+  \draw[flow] (lin)      -- (nxt);
+  \draw[flow] (nxt)      -- (seq);
+
+  % ── Cross-attention (encoder memory → decoder) ───────────────────────────
+  \draw[cflow] (mem.east) -- (declayer.west)
+      node[albl, midway, above] {cross-attention};
+
+  % ── Autoregressive feedback (next token → previous tokens), routed clear
+  %    of the decoder dashed box on the right ─────────────────────────────
+  \coordinate (fb)  at ($(nxt.east)+(1.7cm,0)$);
+  \draw[dflow] (nxt.east) -- (fb) |- (sos.east);
+  \node[albl, anchor=west] (arlbl)
+        at ($(fb)!0.5!(fb |- sos.east)+(0.12,0)$) {autoregressive\\($t \to t{+}1$)};
+
+  % ── Outer system box + bold label ────────────────────────────────────────
+  \begin{scope}[on background layer]
+    \node[draw, fit=(genc)(gdec)(fb)(arlbl), inner sep=14pt] (outer) {};
+  \end{scope}
+  \node[anchor=south west, font=\small\bfseries\sffamily, inner sep=4pt]
+        at (outer.south west) {Encoder--decoder transformer (SMT family)};
+\end{tikzpicture}
+\caption[Encoder--decoder transformer architecture for OMR (SMT style).]{%
+  The encoder--decoder transformer used in OMR systems such as
+  SMT~\cite{riosVilaSheetMusicTransformer2024} and
+  SMT++~\cite{riosVilaSMTPlusPlus2024}, drawn in two phases.
+  The \emph{encoder} splits the sheet-music image into patches, adds
+  positional encodings, and applies $N$ self-attention layers to produce an
+  encoder memory of patch embeddings. The \emph{decoder} generates the
+  output sequence one token at a time: at each step it embeds the
+  previously emitted tokens, runs $N$ decoder layers (masked self-attention,
+  cross-attention into the encoder memory, and a feed-forward block), and
+  projects the result to the next token. The thick arrow is the
+  cross-attention link; the dashed arrow is the autoregressive feedback that
+  appends each predicted token to the decoder input at step $t{+}1$.
+  Unlike CRNN--CTC, no explicit segmentation or conditional-independence
+  assumption is imposed, and the target may be any linear encoding
+  (\code{**kern}, ABC, or LMX).}
+\label{fig:soa-transformer-pipeline}
+\end{figure}

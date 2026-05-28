@@ -1,0 +1,97 @@
+% ------------------------------------------------------------------
+% Five-stage OMR inference pipeline (Chapter 4 — Design).
+% Inputted from chapters/04_design.tex. TikZ libraries are loaded in
+% main.tex.
+% ------------------------------------------------------------------
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  >={Stealth[round]},
+  io/.style={
+    draw, shape=regular polygon, regular polygon sides=6,
+    shape border rotate=90, inner sep=1pt, align=center,
+    font=\scriptsize\sffamily
+  },
+  stage/.style={
+    draw, rectangle, rounded corners=3pt,
+    minimum width=1.7cm, minimum height=0.85cm,
+    align=center, font=\scriptsize\sffamily,
+    inner sep=2pt
+  },
+  flow/.style={->, thick},
+  grp/.style={draw, dashed, rounded corners, inner sep=5pt},
+  glbl/.style={font=\scriptsize\itshape, text=black!60},
+  node distance=0.5cm
+]
+  % ── Visual front-end (main axis) ─────────────────────────────────────────
+  \node[io]                  (in)  {PDF /\\image};
+  \node[stage, right=of in]  (pre) {Preprocess};
+  \node[stage, right=of pre] (det) {Staff\\detect};
+
+  % ── Streams: music above, chord below ────────────────────────────────────
+  \node[stage] (mcrnn) at ($(det.east)+(1.8,1.5)$)  {Music\\CRNN};
+  \node[stage, right=of mcrnn] (mctc) {CTC\\decode};
+
+  \node[stage] (ccrnn) at ($(det.east)+(1.8,-1.5)$) {Chord\\CRNN};
+  \node[stage, right=of ccrnn] (cctc) {CTC\\decode};
+
+  % ── Output: grammar fix + JSON ───────────────────────────────────────────
+  \node[stage] (gf)  at ($(mctc.east |- in)+(1.6,0)$) {Grammar\\fix};
+  \node[io, right=of gf] (out) {JSON};
+
+  % ── Group labels (top of each dashed phase) ──────────────────────────────
+  \node[glbl, anchor=south west] (lfront) at ($(in.north west)+(0,0.06)$) {Visual front-end};
+  \node[glbl, anchor=south west] (lmus)   at ($(mcrnn.north west)+(0,0.06)$) {Music stream};
+  \node[glbl, anchor=north west] (lchd)   at ($(ccrnn.south west)+(0,-0.06)$) {Chord stream};
+  \node[glbl, anchor=south west] (lout)   at ($(gf.north west)+(0,0.06)$) {Output stage};
+
+  % ── Dashed phase boxes (behind nodes) ────────────────────────────────────
+  \begin{scope}[on background layer]
+    \node[grp, fit=(in)(pre)(det)(lfront)] (gfront) {};
+    \node[grp, fit=(mcrnn)(mctc)(lmus)]    (gmusic) {};
+    \node[grp, fit=(ccrnn)(cctc)(lchd)]    (gchord) {};
+    \node[grp, fit=(gf)(out)(lout)]        (gout)   {};
+  \end{scope}
+
+  % ── Arrows ───────────────────────────────────────────────────────────────
+  \draw[flow] (in)  -- (pre);
+  \draw[flow] (pre) -- (det);
+
+  % Fork from staff detect → two streams
+  \coordinate (fork) at ($(det.east)!0.5!(mcrnn.west |- in)$);
+  \draw[thick] (det.east) -- (fork);
+  \draw[flow]  (fork) |- (mcrnn.west);
+  \draw[flow]  (fork) |- (ccrnn.west);
+
+  \draw[flow] (mcrnn) -- (mctc);
+  \draw[flow] (ccrnn) -- (cctc);
+
+  % Merge from two CTCs → grammar fix
+  \coordinate (merge) at ($(mctc.east |- in)!0.5!(gf.west)$);
+  \draw[thick] (mctc.east) -| (merge);
+  \draw[thick] (cctc.east) -| (merge);
+  \draw[flow]  (merge) -- (gf.west);
+
+  \draw[flow] (gf) -- (out);
+
+  % ── Outer system box + bold label below ──────────────────────────────────
+  \begin{scope}[on background layer]
+    \node[draw, fit=(gfront)(gmusic)(gchord)(gout), inner sep=7pt] (outer) {};
+  \end{scope}
+  \node[anchor=north, font=\small\bfseries\sffamily, inner sep=2pt]
+        at ($(outer.south)+(0,-0.05)$) {Five-stage OMR inference pipeline};
+\end{tikzpicture}
+\caption[Five-stage inference pipeline.]{%
+  Horizontal data flow of the inference pipeline.  The
+  \emph{visual front-end} (preprocessing $+$ staff detection)
+  normalises the input page and emits, for every detected system, one
+  staff-strip image and one chord-strip image.  Two parallel
+  \emph{streams} (music and chord) feed each strip through an
+  independent CRNN--CTC recogniser.  The \emph{output stage} repairs
+  the music stream with a deterministic grammar validator and merges
+  the two outputs into a JSON document.  Each block has a single
+  responsibility and a typed input/output contract
+  (\Cref{tab:stage-contracts}); the two streams share no parameters
+  and are trained independently.}
+\label{fig:pipeline-design}
+\end{figure}

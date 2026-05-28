@@ -1,0 +1,89 @@
+% ------------------------------------------------------------------
+% CTC alignment by example (Chapter 4 — Design, §4.5).
+% Inputted from chapters/04_design.tex.
+% ------------------------------------------------------------------
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  >={Stealth[round]},
+  cell/.style={
+    draw, rectangle, minimum width=0.75cm, minimum height=0.65cm,
+    align=center, font=\scriptsize\sffamily,
+    inner sep=1pt
+  },
+  blank/.style={cell, fill=black!10, text=black!60},
+  flow/.style={->, thick},
+  glbl/.style={font=\scriptsize\itshape, text=black!60, align=right}
+]
+  % ── Row 1: per-frame argmax over W/4 frames ──────────────────────────────
+  \node[blank] (f1) at (0,0)              {$\emptyset$};
+  \node[cell,  right=0pt of f1]  (f2)     {\code{C}};
+  \node[cell,  right=0pt of f2]  (f3)     {\code{C}};
+  \node[blank, right=0pt of f3]  (f4)     {$\emptyset$};
+  \node[cell,  right=0pt of f4]  (f5)     {\code{5}};
+  \node[blank, right=0pt of f5]  (f6)     {$\emptyset$};
+  \node[cell,  right=0pt of f6]  (f7)     {\code{q}};
+  \node[blank, right=0pt of f7]  (f8)     {$\emptyset$};
+  \node[cell,  right=0pt of f8]  (f9)     {\code{dot}};
+  \node[blank, right=0pt of f9]  (f10)    {$\emptyset$};
+  \node[cell,  right=0pt of f10] (f11)    {\code{dot}};
+  \node[blank, right=0pt of f11] (f12)    {$\emptyset$};
+
+  \node[glbl, anchor=east] (l1) at ($(f1.west)+(-0.30,0)$)
+        {per-frame argmax\\($W/4$ frames)};
+
+  % ── Row 2: after collapsing consecutive duplicates ───────────────────────
+  \node[blank] (g1) at ($(f1)+(0,-1.4)$)  {$\emptyset$};
+  \node[cell,  right=0pt of g1]  (g2)    {\code{C}};
+  \node[blank, right=0pt of g2]  (g3)    {$\emptyset$};
+  \node[cell,  right=0pt of g3]  (g4)    {\code{5}};
+  \node[blank, right=0pt of g4]  (g5)    {$\emptyset$};
+  \node[cell,  right=0pt of g5]  (g6)    {\code{q}};
+  \node[blank, right=0pt of g6]  (g7)    {$\emptyset$};
+  \node[cell,  right=0pt of g7]  (g8)    {\code{dot}};
+  \node[blank, right=0pt of g8]  (g9)    {$\emptyset$};
+  \node[cell,  right=0pt of g9]  (g10)   {\code{dot}};
+  \node[blank, right=0pt of g10] (g11)   {$\emptyset$};
+
+  \node[glbl, anchor=east] at (l1 |- g1)
+        {collapse consecutive\\duplicates};
+
+  % ── Row 3: drop blanks → final LMX tokens ────────────────────────────────
+  \node[cell] (h1) at ($(g1)+(0,-1.4)$)   {\code{C}};
+  \node[cell, right=0pt of h1] (h2)       {\code{5}};
+  \node[cell, right=0pt of h2] (h3)       {\code{q}};
+  \node[cell, right=0pt of h3] (h4)       {\code{dot}};
+  \node[cell, right=0pt of h4] (h5)       {\code{dot}};
+
+  \node[glbl, anchor=east] at (l1 |- h1)
+        {drop blanks\\(final LMX tokens)};
+
+  % ── Highlight the critical blank between the two dots ────────────────────
+  \node[draw=red!60, line width=0.8pt, rounded corners=2pt,
+        fit=(f10), inner sep=-0.5pt] (hi) {};
+  \node[font=\scriptsize\itshape, text=red!60, anchor=south west]
+        at ($(f12.north east)+(0.05,-0.05)$)
+        {$\leftarrow$ separator: prevents the two \code{dot}s from merging};
+
+  % ── Vertical arrows between rows ─────────────────────────────────────────
+  \draw[flow] (f1.south) -- (g1.north);
+  \draw[flow] (g1.south) -- (h1.north);
+\end{tikzpicture}
+\caption[CTC alignment by example.]{CTC alignment by example.  The
+encoder emits a per-frame argmax over $W/4$ feature frames
+(\code{C}, \code{5}, \code{q}, \code{dot} abbreviate the LMX tokens
+\code{pitch:C}, \code{octave:5}, \code{quarter}, \code{dot};
+$\emptyset$ is the blank class).  The decoder collapses runs of
+consecutive identical tokens---here \code{C\,C}~$\to$~\code{C} in
+row~2---and then drops every blank, recovering the LMX sequence
+\code{C\,5\,q\,dot\,dot} (a double-dotted C-octave-5 quarter note).
+The highlighted blank between the two \code{dot} frames is the
+\emph{separator}: without it, the two \code{dot} tokens would collapse
+to one in row~2 and the double-dot would be lost.  This is the
+canonical reason the blank symbol exists in CTC---it lets the model
+emit the same token twice in a row.  Many different per-frame
+alignments collapse to the same output, which is why CTC trains
+without per-frame supervision and tolerates a compressed time axis
+$W/4$ strictly wider than the output length $N$.}
+\label{fig:ctc-alignment}
+\end{figure}

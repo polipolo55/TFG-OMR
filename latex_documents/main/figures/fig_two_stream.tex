@@ -1,0 +1,74 @@
+% ------------------------------------------------------------------
+% Two-stream lead-sheet recognition design (Chapter 4 — Design).
+% Inputted from chapters/04_design.tex.
+% ------------------------------------------------------------------
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  >={Stealth[round]},
+  io/.style={
+    draw, shape=regular polygon, regular polygon sides=6,
+    shape border rotate=90, inner sep=1pt, align=center,
+    font=\scriptsize\sffamily
+  },
+  stage/.style={
+    draw, rectangle, rounded corners=3pt,
+    minimum width=3.2cm, minimum height=1.1cm,
+    align=center, font=\scriptsize\sffamily,
+    inner sep=3pt
+  },
+  flow/.style={->, thick},
+  grp/.style={draw, dashed, rounded corners, inner sep=6pt},
+  glbl/.style={font=\scriptsize\itshape, text=black!60, align=center},
+  data/.style={font=\scriptsize\itshape, text=black!55, align=center},
+  node distance=0.55cm
+]
+  % ── Music stream (top row) ───────────────────────────────────────────────
+  \node[io]                    (mimg)  {Staff\\strip};
+  \node[stage, right=of mimg]  (mcrnn) {CRNN--CTC\\\scriptsize\sffamily $|V| \approx 270$\\\scriptsize\sffamily LMX tokens};
+  \node[io, right=of mcrnn]    (mout)  {LMX\\tokens};
+  \node[data, below=0.10cm of mcrnn] (mdata)
+        {synthetic LilyJAZZ corpus $+$\\fine-tune on Real Book pages};
+
+  % ── Chord stream (bottom row) ────────────────────────────────────────────
+  \node[io] (cimg) at ($(mimg)+(0,-2.7)$) {Chord\\strip};
+  \node[stage, right=of cimg]  (ccrnn) {CRNN--CTC\\\scriptsize\sffamily $|V| = 29$\\\scriptsize\sffamily characters};
+  \node[io, right=of ccrnn]    (cout)  {Chord\\strings};
+  \node[data, below=0.10cm of ccrnn] (cdata)
+        {synthetic chord strips $+$\\fine-tune on labelled real strips};
+
+  % ── Stream labels ────────────────────────────────────────────────────────
+  \node[glbl, anchor=south west] (lmus) at ($(mimg.north west)+(0,0.06)$) {Music stream};
+  \node[glbl, anchor=south west] (lchd) at ($(cimg.north west)+(0,0.06)$) {Chord stream};
+
+  % ── Dashed group boxes ───────────────────────────────────────────────────
+  \begin{scope}[on background layer]
+    \node[grp, fit=(mimg)(mcrnn)(mout)(mdata)(lmus)] (gmus) {};
+    \node[grp, fit=(cimg)(ccrnn)(cout)(cdata)(lchd)] (gchd) {};
+  \end{scope}
+
+  % ── Arrows ───────────────────────────────────────────────────────────────
+  \draw[flow] (mimg)  -- (mcrnn);
+  \draw[flow] (mcrnn) -- (mout);
+  \draw[flow] (cimg)  -- (ccrnn);
+  \draw[flow] (ccrnn) -- (cout);
+
+  % ── Outer system box + bold label below ──────────────────────────────────
+  \begin{scope}[on background layer]
+    \node[draw, fit=(gmus)(gchd), inner sep=7pt] (outer) {};
+  \end{scope}
+  \node[anchor=north, font=\small\bfseries\sffamily, inner sep=2pt]
+        at ($(outer.south)+(0,-0.05)$) {Two-stream lead-sheet recognition};
+\end{tikzpicture}
+\caption[Two-stream lead-sheet recognition.]{%
+  The two-stream design: two CRNN--CTC recognisers of the same
+  architectural family (\Cref{fig:soa-crnn-pipeline}) but with
+  disjoint vocabularies, disjoint training corpora, and no shared
+  parameters or cross-attention.  The music stream emits LMX tokens
+  over a vocabulary of $\approx 270$ symbols; the chord stream emits
+  jazz-chord strings over a $29$-character alphabet.  Each is
+  pre-trained on its own synthetic corpus and fine-tuned independently
+  on a small hand-labelled real set.  Merging into the JSON output
+  happens in post-processing, not inside the model.}
+\label{fig:two-stream-arch}
+\end{figure}

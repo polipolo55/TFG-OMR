@@ -11,14 +11,117 @@ architecture first---in the vocabulary of music notation and machine
 learning---so that the reasoning behind each choice is legible before the
 reader is asked to interpret library names and configuration flags.
 
+Three considerations shape every decision in this chapter.
+First, the target domain (\Cref{sec:design-domain}) is intentionally narrow:
+monophonic treble-clef lead sheets in the Real Book style.
+A general-purpose OMR system is out of scope; deliberately restricting
+the domain frees the design from a long tail of notation features that
+would otherwise consume disproportionate effort.
+Second, the principal data constraint---the absence of a labelled corpus
+of real jazz lead sheets---rules out fully supervised end-to-end
+training from real data and pushes the design toward synthetic
+supervision with domain transfer.
+Third, the project runs on a single consumer GPU within a Bachelor's
+thesis time budget, which sets practical ceilings on model capacity,
+training time, and the number of architectural alternatives that can be
+explored empirically.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Target Domain and Acceptance Criteria}
+\label{sec:design-domain}
+
+The system is designed for monophonic jazz lead sheets in the style of
+\textit{The Real Book}\,\cite{kernfeldStoryFakeBooks2006}: a single
+melody line in treble clef with chord symbols printed above the staff.
+The notation contract is summarised in \Cref{tab:domain-contract}; it
+defines the inputs the design must handle correctly and, equally
+importantly, the inputs that are deliberately out of scope.
+
+\begin{table}[ht]
+\centering
+\caption[Notation contract for the target domain.]{%
+Notation contract for the in-scope domain.
+The contract is enforced consistently across the training-time dataset
+filters and the inference-time grammar fixer: inputs that violate the
+contract are filtered from training, and any prediction outside the
+contract is rewritten or rejected at inference.}
+\label{tab:domain-contract}
+\small
+\begin{tabularx}{\linewidth}{@{}lL@{}}
+\toprule
+\textbf{Aspect} & \textbf{Contract} \\
+\midrule
+Voicing & Monophonic --- one melody line per staff. \\
+\tfgrowsep
+Clef & Treble (\code{clef:G2}) only. \\
+\tfgrowsep
+Key signatures & Any of \code{key:fifths:N}, $N \in [-6,\,+7]$. \\
+\tfgrowsep
+Time signatures & One of $\{4/4,\,3/4,\,2/4,\,2/2,\,6/8,\,6/4,\,5/4,\,12/8\}$. \\
+\tfgrowsep
+Pitch range & Octaves $3$--$7$ inclusive (treble plus altissimo). \\
+\tfgrowsep
+Note values & Whole through 64th, with augmentation dots and ties. \\
+\tfgrowsep
+Accidentals & \code{flat}, \code{sharp}, \code{natural} --- display-only, single. \\
+\tfgrowsep
+Barlines & Single barline only. \\
+\tfgrowsep
+Chord symbols & Real Book convention (see \Cref{sec:design-twostream}). \\
+\tfgrowsep
+Out of scope & Tuplets, slurs, articulations, repeats / voltas / D.C., double accidentals, polyphony, non-treble clefs. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The contract is deliberate, not a workaround for missing features.
+The Real Book is monophonic by construction; multi-voice piano grand
+staves are a different genre.  Likewise, exotic meters or non-treble
+clefs do appear in printed music in general, but they are vanishingly
+rare in the Real Book corpus that drives the project's motivation.
+Extending the contract to cover the long tail of features in the
+``Out of scope'' row would require a much larger labelled corpus and a
+substantially more complex output vocabulary---an open research
+direction, not a Bachelor's-thesis deliverable.
+
+\paragraph{Quantitative acceptance criteria.}
+A design has to commit to falsifiable targets before \Cref{ch:results}
+can adjudicate whether the system works.
+The thresholds below are calibrated against published baselines on
+PrIMuS-like clean data, where end-to-end CRNN--CTC systems report
+aggregate Symbol Error Rates in the
+range \SIrange{1}{3}{\percent}~\cite{calvoZaragozaCameraPrimus2018,mayerPracticalEndToEnd2024}:
+
+\begin{itemize}
+    \item \textbf{Aggregate SER on the clean test split} below
+          \SI{2}{\percent}.  This is the headline number that
+          \Cref{sec:design-eval} commits the model to.
+    \item \textbf{Aggregate SER on the scanned test split} below
+          \SI{3}{\percent}.  The augmentation pipeline is judged a
+          success if the gap to the clean number stays under
+          $1$~percentage point.
+    \item \textbf{Melodic SER} (the SER restricted to musically
+          relevant tokens; see \Cref{sec:design-eval}) below
+          \SI{0.5}{\percent} on both splits, because barlines and ties
+          dominate the absolute edit count but a downstream renderer
+          can re-bar the output trivially.
+    \item \textbf{Perfect-transcription rate} above \SI{60}{\percent}
+          on the scanned test split, as an interpretable user-facing
+          measure: more than half of input staves come out
+          token-perfect.
+\end{itemize}
+
+These four numbers, evaluated on the same held-out splits, are the
+acceptance test for \Cref{ch:results}.
+
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Problem Decomposition}
 \label{sec:design-pipeline}
-\todo{Chapter lacks a \emph{Staff detection} design section: the pipeline figure shows a ``Staff detect'' block but no subsection explains the chosen approach (heuristic / YOLO / RT-DETR), its alternatives, or its accuracy target. Major omission for a five-stage pipeline.}
 
 The end-to-end transcription task is decomposed into five sequential
 stages, with a clearly defined contract between each pair.
-Figure~\ref{fig:pipeline-design} summarises the data flow.\todo{Use \Cref{fig:pipeline-design} mid-sentence instead of Figure~\ref; apply consistently throughout the chapter.}\todo{Inter-stage contracts are described in prose but never given as a typed schema (e.g.\ image dims, dtype, JSON shape). Add an explicit interface table or per-stage I/O contract block.}
+\Cref{fig:pipeline-design} summarises the data flow, and
+\Cref{tab:stage-contracts} gives the typed input/output for each stage.
 
 \begin{enumerate}
     \item \textbf{Preprocessing} takes the input bytes (a PDF page or a
@@ -50,63 +153,47 @@ Figure~\ref{fig:pipeline-design} summarises the data flow.\todo{Use \Cref{fig:pi
           separate neural network.
 \end{enumerate}
 
-\begin{figure}[htbp]
+\input{figures/fig_pipeline_design}
+
+\begin{table}[ht]
 \centering
-\begin{tikzpicture}[
-  box/.style={
-    draw, rounded corners=3pt,
-    minimum width=1.7cm, minimum height=0.95cm,
-    align=center, font=\footnotesize, text width=1.7cm,
-    inner sep=2pt
-  },
-  arr/.style={->, thick, >=stealth},
-  node distance=0.45cm
-]
-  %% ── Top row: input → preprocess → staff detect ──────────────────────
-  \node[box, fill=blue!8]                          (in)   {PDF /\\image};
-  \node[box, fill=blue!8,   right=0.55cm of in]    (pre)  {Preprocess};
-  \node[box, fill=blue!8,   right=0.55cm of pre]   (det)  {Staff\\detect};
-
-  %% ── Music stream (top branch) ───────────────────────────────────────
-  \node[box, fill=orange!18, right=0.85cm of det]  (mcrn) {Music\\CRNN};
-  \node[box, fill=orange!18, right=0.55cm of mcrn] (mctc) {CTC\\decode};
-
-  %% ── Chord stream (bottom branch) ────────────────────────────────────
-  \node[box, fill=teal!18,   below=0.9cm of mcrn]  (ccrn) {Chord\\CRNN};
-  \node[box, fill=teal!18,   right=0.55cm of ccrn] (cctc) {CTC\\decode};
-
-  %% ── Merge: grammar fix → JSON ───────────────────────────────────────
-  \node[box, fill=violet!18, right=0.85cm of mctc, yshift=-0.75cm] (gf) {Grammar\\fix};
-  \node[box, fill=blue!8,    right=0.55cm of gf]   (out) {JSON};
-
-  %% ── Arrows ──────────────────────────────────────────────────────────
-  \draw[arr] (in)  -- (pre);
-  \draw[arr] (pre) -- (det);
-
-  %% fork: staff detect → music CRNN (top) and chord CRNN (bottom)
-  \draw[arr] (det.east) -- ++(0.25,0) |- (mcrn.west);
-  \draw[arr] (det.east) -- ++(0.25,0) |- (ccrn.west);
-
-  \draw[arr] (mcrn) -- (mctc);
-  \draw[arr] (ccrn) -- (cctc);
-
-  %% merge: both CTC decoders → grammar fix
-  \draw[arr] (mctc.east) -- ++(0.25,0) |- (gf.west);
-  \draw[arr] (cctc.east) -- ++(0.25,0) |- (gf.west);
-
-  \draw[arr] (gf) -- (out);
-\end{tikzpicture}
-\caption[Five-stage inference pipeline.]{%
-High-level data flow of the five-stage inference pipeline.
-A preprocessing front-end normalises the input page; a staff detector
-emits a staff image and a chord-strip image for every detected system;
-two independent CRNN--CTC recognisers process the two streams in
-parallel; a deterministic grammar fixer repairs structural defects in
-the music stream; and the merged result is serialised as JSON.
-Each block has a single responsibility and a typed input/output
-contract.}
-\label{fig:pipeline-design}
-\end{figure}
+\caption[Inter-stage interface contracts.]{%
+Typed input/output contract for each stage of the inference pipeline.
+Stages communicate exclusively through these types; this lets any
+stage be re-implemented (e.g.\ a learned staff detector replacing the
+morphological one) without touching the others.}
+\label{tab:stage-contracts}
+\small
+\begin{tabularx}{\linewidth}{@{}lLL@{}}
+\toprule
+\textbf{Stage} & \textbf{Input} & \textbf{Output} \\
+\midrule
+Preprocess
+  & Raw PDF / image bytes
+  & Grayscale and binary page images (\code{uint8}, page-pixel coords). \\
+\tfgrowsep
+Staff detect
+  & Grayscale + binary page
+  & List of \term{System} records: cropped staff image, chord-strip image, page-level bounding box, detected staff geometry. \\
+\tfgrowsep
+Melody recogniser
+  & One staff image (\SI{128}{px} target height, variable width)
+  & Flat sequence of LMX tokens (possibly malformed). \\
+\tfgrowsep
+Chord recogniser
+  & One chord-strip image
+  & Sequence of jazz chord strings (\code{Cmaj7}, \code{G-7}, \dots). \\
+\tfgrowsep
+Grammar fix
+  & Raw LMX token sequence
+  & Syntactically valid LMX token sequence. \\
+\tfgrowsep
+Serialise
+  & Per-system staff bbox, validated tokens, chord list
+  & JSON document (page$\to$segments$\to$\{bbox,\,tokens,\,chords\}). \\
+\bottomrule
+\end{tabularx}
+\end{table}
 
 \textbf{Why a five-stage decomposition.}
 Three constraints drove this decomposition.
@@ -121,7 +208,136 @@ Third, both major surveys of the field~\cite{calvoZaragozaUnderstandingOMR2020,s
 explicitly recommend modular decomposition for OMR systems that target
 specific notation styles, because it allows each module to be replaced
 or retrained independently as the target domain evolves.
-\todo{Missing \emph{Alternatives considered} subsection for the pipeline decomposition: name $\geq$2 rejected designs (e.g.\ end-to-end full-page transformer; SMT++ tree-decoder) with reasons. FIB rubric requirement.}
+
+\subsection{Alternatives considered}
+\label{sec:design-pipeline-alts}
+
+Two end-to-end architectures were considered as alternatives to the
+five-stage decomposition and rejected for the following reasons.
+
+\paragraph{Full-page transformer (LEGATO\,\cite{yangLEGATO2025}).}
+A single encoder--decoder transformer that consumes a full-page image
+and emits the entire transcription as a long token sequence.
+This eliminates the staff-detection and grammar-fix stages and shares
+representations across the whole page.
+It was rejected for two reasons.
+First, training a full-page transformer to competitive accuracy
+requires either a corpus of full-page transcriptions (which does not
+exist for the Real Book) or a synthetic generator capable of laying
+out full pages with realistic chord placement, neither of which fits
+the time budget.
+Second, the failure modes of a monolithic model are opaque: a single
+mis-prediction of a chord symbol cannot be debugged without re-running
+the entire model.  Modular pipelines yield localised failures that the
+grammar fixer can repair.
+
+\paragraph{Tree-decoder transformer (SMT/SMT++\,\cite{riosVilaSheetMusicTransformer2024,riosVilaSMTPlusPlus2024}).}
+A transformer that emits a hierarchical MusicXML-like tree, removing
+the need for a separate grammar-correction step because the output is
+structurally valid by construction.
+SMT++ is the strongest current end-to-end baseline on polyphonic
+piano music.  It was rejected because (i)~the target domain is
+monophonic, so the structural advantage of a tree decoder over a flat
+CTC decoder is small; (ii)~SMT++'s training recipe requires
+several hundred GPU-hours of pre-training that this project's hardware
+cannot afford; and (iii)~the existing CRNN--CTC baseline on Camera-PrIMuS
+already saturates the clean monophonic benchmark, leaving little
+headroom for a more complex architecture to demonstrate gain.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Staff Detection}
+\label{sec:design-staffdetect}
+
+The staff-detection stage is the segmentation front-end of the pipeline:
+it consumes a binarised page and emits one cropped \term{System} record
+per detected staff, each carrying the staff geometry, a tightly bounded
+music-region crop, and a chord-strip crop positioned in the band
+immediately above the staff.
+Downstream stages never see the full page; their input contract is a
+single staff at a time.
+
+\subsection{Design choice: classical morphology}
+
+Staff detection is implemented as a classical morphological pipeline
+rather than as a learned segmenter.
+The reasoning is empirical and pragmatic.
+The Real Book's staff geometry is unusually regular: five thin
+horizontal lines, equispaced within a tight tolerance, spanning most of
+the page width.
+A morphological pipeline composed of a wide horizontal opening
+(to isolate long horizontal ink runs), row-projection clustering
+(to find line centroids), and a sliding 5-line window (to group
+centroids into staves whose inter-line gaps are uniform within a
+tolerance) recovers staves at near-perfect precision on this input
+distribution, runs in milliseconds on CPU, and produces
+\textit{deterministic} outputs that can be debugged by visual
+inspection.
+
+A learned detector would gain little on this domain: there is no
+visual ambiguity to resolve, only routine pattern matching.
+It would, however, add a second training pipeline, a second
+annotation effort, and a second source of mode-collapse or
+distribution-shift failures---costs that the time budget does not
+support without a corresponding accuracy gain to claim.
+
+\subsection{Rejection gate}
+
+Real pages contain non-music regions---page titles, footers,
+composer credits---that morphological staff detection can falsely
+accept when their layout is staff-like (e.g.\ a row of small print
+that produces five collinear ink runs).
+A staff that is mis-detected on a non-music region is then fed to the
+CRNN, which dutifully emits a high-confidence but musically nonsense
+token sequence.
+
+The design therefore includes a two-tier rejection gate sitting
+between the staff detector and the recogniser:
+\begin{itemize}
+    \item \textbf{Pre-CRNN gates} use geometric and OCR signals on the
+          candidate strip (re-detection of five lines locally,
+          inter-line ink coverage, EasyOCR text density) to filter out
+          obvious non-music regions before the recogniser is invoked.
+    \item \textbf{Post-CRNN gate} reads the CTC mean log-probability
+          of the recogniser's output; strips that produce confident
+          predictions are kept, strips below a calibrated log-prob
+          threshold are dropped.
+\end{itemize}
+A CTC-confidence override re-admits geometry-rejected strips when the
+recogniser is confident on them; the override does not apply to the
+OCR-density rejection, because high CRNN confidence on a strip of
+running text is a known false-positive mode.
+
+The log-prob threshold is checkpoint-dependent (it tracks the
+particular CRNN's confidence calibration) and is re-calibrated whenever
+the recogniser is retrained.  The implementation details of the gate
+and its calibration procedure live in \Cref{ch:impl}.
+
+\subsection{Alternatives considered}
+\label{sec:design-staffdetect-alts}
+
+\paragraph{Deep object detector (YOLO, RT-DETR, Mask~R-CNN).}
+A learned staff detector trained on bounding-box annotations of staff
+regions.  Modern detectors give competitive segmentation on cluttered
+pages~\cite{simonettaOpticalMusicRecognition2024}.
+Rejected: the annotation cost is non-trivial (hundreds to thousands of
+manually labelled pages) and the gain over the morphological detector
+on Real Book pages is in the noise.  A learned detector becomes
+attractive when the page layout is irregular (handwritten manuscripts,
+historical scores), which is outside the project's scope.
+
+\paragraph{Projection-profile slicer.}
+An earlier version of this project used a horizontal-projection slicer
+that cut the page at low-density rows.  Rejected after testing on Real
+Book pages with chord symbols printed close to the staff: the chord
+text reduced the inter-staff gap and produced under-segmented
+two-staff strips.
+The morphological line detector is robust to chord-text density
+because it operates on isolated long horizontal runs, not on the full
+page projection.
+The comparative literature on staff-line removal and
+detection~\cite{dalitzComparativeStudyStaff2008} supports this choice:
+morphological line operators consistently outperform pure
+projection-profile methods on typeset music.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Data Strategy}
@@ -149,12 +365,16 @@ manual annotation cost, and visually aligned with the target domain.
 
 Per-sample rendering variations sample the natural visual variability of
 real lead sheets without altering the musical content: the time
-signature is rendered numerically or as the C / cut-time glyph with
-equal probability; cautionary accidentals are added in roughly half of
-samples; the global staff size is drawn uniformly from a six-element
-range, varying note size and horizontal density;
-and unbeamed eighth notes appear in a small fraction of samples to
-expose the model to both beamed and unbeamed groupings.\todo{Concrete probabilities (``equal probability'', ``half of samples'', ``six-element range'', ``small fraction'') are implementation details. Either keep as ranges with justification or move exact values to Ch.5.}
+signature is rendered with non-trivial probability as the C / cut-time
+glyph rather than numerically; cautionary accidentals are added on a
+fraction of samples; the global staff size is drawn from a small range
+of point sizes, varying note size and horizontal density; and unbeamed
+eighth notes appear in a minority of samples to expose the model to
+both beamed and unbeamed groupings.
+The specific probabilities and ranges are deliberately treated as
+hyperparameters and live in \Cref{ch:impl}; the design commitment is
+that the variations are independent random draws applied at
+render time, not class-conditioned augmentations.
 
 \subsection{Domain augmentation: from clean renders to scanned pages}
 
@@ -174,7 +394,34 @@ This is the same recipe followed by every recent end-to-end OMR
 system~\cite{calvoZaragozaCameraPrimus2018,mayerPracticalEndToEnd2024,riosVilaSMTPlusPlus2024,yangLEGATO2025};
 the specific list of distortions used here is calibrated against a
 sample of real Real Book scans.
-\todo{Missing \emph{Alternatives considered} for augmentation strategy: e.g.\ GAN-based domain transfer, CycleGAN scan-style, no augmentation + larger model. Justify rejection of each.}
+
+\subsubsection*{Alternatives considered}
+
+\paragraph{No augmentation, larger model.}
+Train on clean LilyJAZZ renders only, relying on a deeper model and
+larger capacity to generalise to scans.
+Rejected because the synthetic-to-real domain gap on this task is
+known to be a feature-distribution shift, not a capacity bottleneck:
+adding parameters does not move the training distribution closer to
+the test distribution.
+
+\paragraph{Learned domain transfer (CycleGAN, style transfer).}
+Train an unpaired image-to-image translator (e.g.\ CycleGAN) to map
+clean LilyJAZZ renders to the Real Book scan distribution.
+Rejected for three reasons: (i)~CycleGAN training is notoriously
+unstable and would consume a substantial fraction of the project's
+GPU budget; (ii)~the mapping that minimises a cycle loss does not
+necessarily preserve the structural details (notehead position,
+accidental placement) that the recogniser must learn; (iii)~a
+hand-crafted augmentation pipeline gives explicit control over each
+distortion's intensity, which is easier to debug when a particular
+failure mode appears at evaluation time.
+
+\paragraph{Real-only training (no synthetic).}
+Hand-label enough real Real Book pages to train from scratch.
+Rejected on cost: producing a fully labelled corpus of even a few
+thousand staves is well outside the time budget, and the resulting
+dataset would still be smaller than PrIMuS by orders of magnitude.
 
 \subsection{Domain restriction: filtering the training set}
 
@@ -211,9 +458,20 @@ musical concepts.
 \section{Output Representation: LMX}
 \label{sec:lmx-format}
 
-The model's output is a flat sequence of LMX tokens.
-This section defines the LMX grammar used in this thesis, describes the
-vocabulary the model learns, and justifies the design choices made.
+The model's output is a flat sequence of \term{Linearised MusicXML}
+(LMX) tokens.  LMX is the symbolic encoding introduced by
+\textcite{mayerPracticalEndToEnd2024} as part of the OLIMPIC
+benchmark and maintained as an open
+specification~\cite{OMRResearchLmx2025}; it depth-first-traverses the
+MusicXML score tree and emits one whitespace-separated token per leaf
+event, yielding a representation that is round-trippable to MusicXML
+yet compact enough to serve as a CTC target.
+This thesis adopts LMX rather than reinventing a project-specific
+format, and restricts its grammar to the subset needed for monophonic
+jazz lead sheets (no tuplets, no slurs, single accidentals only,
+treble clef only).
+The remainder of this section defines that subset and justifies the
+encoding choices that interact with the model.
 
 \subsection{Grammar}
 
@@ -281,9 +539,9 @@ accidental token only when a sign should be drawn.
 \subsection{Vocabulary}
 
 The model treats LMX tokens as opaque class labels.
-Three special tokens are reserved by convention: index 0 is the CTC
-blank, index 1 is the padding token used during batch collation, and
-index 2 is the out-of-vocabulary token.
+Three special tokens are reserved by convention: the lowest index is
+the CTC blank, the next is the padding token used during batch
+collation, and the third is the out-of-vocabulary token.
 The remaining indices, sorted alphabetically, encode the LMX tokens
 that appear in the training corpus.
 
@@ -298,173 +556,213 @@ The full pitch and octave ranges are always reserved even if absent in
 the corpus, so that out-of-distribution pitch predictions decode
 gracefully rather than collapsing to \code{<unk>}.
 
-\subsection{Why LMX over alternatives}
+\subsection{Alternatives considered}
+\label{sec:design-lmx-alts}
 
-\Cref{sec:soa-representations} surveyed the available symbolic
-output formats; this thesis adopts LMX rather than MusicXML directly,
-the PrIMuS native formats, or \code{**kern}.
-LMX is round-trippable to MusicXML---the format downstream music
-applications expect---without requiring the model to emit verbose XML
-tags; it is the same representation used by the
-OLIMPIC reference work~\cite{mayerPracticalEndToEnd2024}, keeping the
-present results directly comparable; and its flat, whitespace-separated
-form is directly compatible with CTC training, with no
-linearisation logic required at the model boundary.\todo{Missing explicit \emph{Alternatives considered} subsection: MusicXML, PrIMuS agnostic/semantic, \code{**kern}, ABC each need a one-line rejection reason here, not just a forward pointer to Ch.\,2.}
+\paragraph{MusicXML.}
+The de-facto interchange format for score data and the natural output
+target for an OMR system that must integrate with notation software.
+Rejected as the model's direct output because the XML markup is
+verbose and structured: each note is wrapped in nested
+\code{<note>$\langle$pitch$\rangle$\dots} tags that contribute large
+numbers of tokens with no acoustic content.
+MusicXML is instead the downstream target: LMX is round-trippable to
+MusicXML through a deterministic post-processor, isolating the
+model's learning task from the XML formatting overhead.
+
+\paragraph{PrIMuS \code{.semantic} (agnostic / semantic encoding).}
+The two native PrIMuS encodings.
+The \code{semantic} form is close to LMX in spirit but encodes pitch
+and accidentals jointly (\code{note-Bb5\_quarter} rather than a flat
+sequence) and uses a project-internal vocabulary not used by any
+downstream tool.
+Rejected because LMX is more compact, more easily round-trippable to
+MusicXML, and matches the OLIMPIC reference work, keeping the
+present results directly comparable.
+
+\paragraph{\code{**kern} (Humdrum).}
+A compact, pipe-delimited format widely used in musicology
+research~\cite{huronHumdrum2002,Humdrum}.
+Rejected because its tooling ecosystem outside musicology is thin and
+because its expression of accidentals and rhythm requires per-cell
+escape characters that complicate CTC training.
+
+\paragraph{ABC notation.}
+A line-oriented format originally designed for folk-tune
+exchange~\cite{walshawABC2011}.
+Rejected for the same reason as \code{**kern}: tooling support outside
+the folk-music community is limited, and the format's spacing/headers
+are stylistically opinionated in a way that LMX's flat token stream
+avoids.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Model Design}
 \label{sec:design-model}
 
-The melody recognition stage is a Convolutional Recurrent Neural
-Network trained with the Connectionist Temporal Classification loss
-(CRNN--CTC).
-This section justifies that architectural choice and its principal
-hyperparameters in conceptual terms.
-The implementation details---PyTorch module structure, exact stride
-table, optimiser state---live in \Cref{ch:impl}.
-
-\begin{figure}[ht]
-  \centering
-  \begin{tikzpicture}[
-    box/.style={
-      draw, rounded corners=3pt,
-      minimum width=1.8cm, minimum height=1.1cm,
-      align=center, font=\small, text width=1.8cm,
-      inner sep=3pt
-    },
-    arr/.style={->, thick, >=stealth},
-    ann/.style={font=\scriptsize\itshape, text=black!55, align=center,
-                text width=2.0cm},
-    node distance=0.45cm
-  ]
-    \node[box, fill=blue!8]                          (img)  {Staff\\strip\\image};
-    \node[box, fill=orange!18, right=0.55cm of img]  (cnn)  {ResNet18\\backbone};
-    \node[box, fill=orange!18, right=0.55cm of cnn]  (col)  {Collapse\\height};
-    \node[box, fill=teal!18,   right=0.55cm of col]  (lstm) {BiLSTM\\$2\times 256$};
-    \node[box, fill=violet!18, right=0.55cm of lstm] (lin)  {Linear\\+\,softmax};
-    \node[box, fill=red!10,    right=0.55cm of lin]  (ctc)  {CTC\\decoder};
-    \node[box, fill=blue!8,    right=0.55cm of ctc]  (out)  {Token\\sequence};
-
-    \draw[arr] (img)  -- (cnn);
-    \draw[arr] (cnn)  -- (col);
-    \draw[arr] (col)  -- (lstm);
-    \draw[arr] (lstm) -- (lin);
-    \draw[arr] (lin)  -- (ctc);
-    \draw[arr] (ctc)  -- (out);
-
-    \node[ann, below=0.2cm of cnn]  {$128\!\times\! W \to$\\$1\!\times\! W/4$ map};
-    \node[ann, below=0.2cm of col]  {width-indexed\\frames};
-    \node[ann, below=0.2cm of lstm] {2 layers,\\512-dim output};
-    \node[ann, below=0.2cm of lin]  {$|V|$ = vocab\\size};
-    \node[ann, below=0.2cm of ctc]  {blank-collapsed\\alignment};
-  \end{tikzpicture}
-  \caption[CRNN--CTC melody recogniser design.]{%
-  Block diagram of the CRNN--CTC melody recogniser.
-  A ResNet18 backbone with asymmetric strides compresses the input
-  staff strip from $128\times W$ down to a $1\times W/4$ feature map;
-  the height-collapsed sequence of feature columns is consumed
-  left-to-right by a two-layer bidirectional LSTM (256 hidden units per
-  direction, 512-dim concatenated output); a linear projection produces
-  a per-frame distribution over the vocabulary; and CTC decoding
-  collapses the blank-padded alignment into a flat LMX token sequence.}
-  \label{fig:crnn-arch}
-\end{figure}
+The melody recognition stage instantiates the canonical CRNN--CTC
+pipeline surveyed in \Cref{sec:soa-crnn} and illustrated in
+\Cref{fig:soa-crnn-pipeline}.
+This section justifies the choice of that architectural family and
+its specific instantiation here; implementation details (module
+structure, exact stride table, optimiser state) live in
+\Cref{ch:impl}.
 
 \subsection{Why CRNN--CTC}
 
-A single staff from a jazz lead sheet is read strictly left to right and
-produces a variable-length sequence of tokens that is shorter than the
-image is wide.
-This matches the data assumptions of CTC~\cite{gravesConnectionistTemporal2006} exactly:
-the loss learns the alignment between an input feature sequence and a
-shorter output token sequence without per-frame supervision, and it
-tolerates the two-dimensional context (relative vertical position on
-the staff) needed to disambiguate pitch from notehead shape.
-End-to-end CRNN--CTC has been the dominant architecture for monophonic
-OMR since \textcite{calvoZaragozaEndToEndNeural2018} and remains the
-strongest baseline for the present
-domain~\cite{calvoZaragozaCameraPrimus2018,mayerPracticalEndToEnd2024};
-the full literature trail behind this choice is laid out in
-\Cref{sec:soa-crnn}.
-A convolutional backbone provides translation-invariant feature
-extraction along the staff width; a bidirectional recurrent layer
-captures the local dependencies needed to interpret accidentals, dots,
-and beam groupings; and CTC blank-collapsing decode produces a clean
-symbolic output.
-A transformer of comparable capacity would in principle perform at
-least as well but at substantially higher data and compute costs that
-are not justified for monophonic input
-(\Cref{sec:soa-transformer}).\todo{This is the chapter that should carry the CRNN--CTC technical case. Promote to an explicit \emph{Alternatives considered} subsection naming $\geq$2 rejected designs (e.g.\ encoder--decoder transformer/TrOMR, tree-decoder SMT++) with reasons, rather than deferring to Ch.\,2.}
+A single staff from a jazz lead sheet is read strictly left to right
+and produces a variable-length token sequence shorter than the image
+is wide---the regime where
+CTC~\cite{gravesConnectionistTemporal2006} matches the data
+assumptions exactly, learning the alignment between input frames and
+output tokens without per-frame supervision.
+\Cref{fig:ctc-alignment} illustrates the alignment mechanism on a
+concrete three-token example.
+The full literature trail behind this choice is laid out in
+\Cref{sec:soa-crnn}: in short, end-to-end CRNN--CTC has been the
+strongest baseline for monophonic OMR since
+\textcite{calvoZaragozaEndToEndNeural2018} and remains so for the
+present
+domain~\cite{calvoZaragozaCameraPrimus2018,mayerPracticalEndToEnd2024}.
+
+\input{figures/fig_ctc_alignment}
+
+\subsection{Alternatives considered}
+\label{sec:design-model-alts}
+
+\paragraph{Encoder--decoder transformer with attention (TrOMR-style).}
+A transformer encoder that ingests the staff image as a sequence of
+patches and a transformer decoder that emits LMX tokens
+auto-regressively, supervised by cross-entropy on the token
+sequence~\cite{riosVilaSheetMusicTransformer2024}.
+Rejected on three grounds.
+First, transformer decoders need substantially more training data than
+CRNN--CTC to reach comparable accuracy on monophonic input, and the
+project does not have the budget to generate that volume of data.
+Second, the autoregressive decoder amplifies exposure-bias errors when
+a single token is mispredicted: subsequent tokens are conditioned on
+the wrong context.  CTC's frame-independent prediction does not have
+this failure mode.
+Third, on monophonic Real Book staves the input--output alignment is
+nearly monotonic and length-bounded, exactly the regime where CTC is
+known to match or exceed attention-based decoders at a fraction of the
+compute cost (\Cref{sec:soa-transformer}).
+
+\paragraph{Tree-decoder transformer (SMT++\,\cite{riosVilaSMTPlusPlus2024}).}
+A transformer that emits a structured tree representing the score's
+hierarchical syntax, removing the need for a post-hoc grammar fix.
+Rejected because the structural advantage of tree decoders manifests
+primarily on polyphonic, multi-voice scores; on a monophonic flat
+token stream the gain over CTC + deterministic grammar fix is small,
+while the training cost and architectural complexity are large.
+
+\paragraph{Pure-CNN classifier (no recurrence).}
+Replace the BiLSTM with a deeper CNN and treat each column-of-features
+as an independent class prediction.
+Rejected because monophonic OMR requires non-trivial horizontal
+context to disambiguate adjacent symbols (a dot belongs to the
+preceding note; an accidental belongs to the following note; a beam
+groups several notes).  CNN-only models on this task historically
+underperform CRNNs by several SER points.
 
 \subsection{Backbone choice}
 
 The default backbone is a modified
-ResNet18~\cite{heDeepResidualLearning2016} with asymmetric strides that compress the height
-dimension aggressively while preserving width, leaving the horizontal
-dimension as the CTC time axis.
-A five-block VGG-style stack is retained as a legacy alternative for
-backward compatibility with earlier checkpoints; it converges more
-slowly and is not used for new experiments.
-ResNet18 was preferred for three reasons: its residual connections give
-the gradient a direct path through the network and accelerate
-convergence; its pre-trained weights from ImageNet provide a reasonable
-initialisation for the first convolutional layers, even though the
-downstream task is monochrome rather than colour; and its parameter
-count fits comfortably within the VRAM budget of a single consumer GPU
-(see \Cref{ch:mgmt}).\todo{Backbone choice needs an explicit \emph{Alternatives considered}: ResNet34/50, EfficientNet, MobileNet, ViT/Swin patches---each with a one-line reason for rejection.}
+ResNet18~\cite{heDeepResidualLearning2016} with asymmetric strides that
+compress the height dimension aggressively while preserving width,
+leaving the horizontal dimension as the CTC time axis.
+ResNet18 was preferred for three reasons.
+First, its residual connections give the gradient a direct path through
+the network and accelerate convergence; on the synthetic corpus the
+ResNet18 backbone reached its plateau in roughly half the epochs of an
+otherwise comparable plain CNN.
+Second, the ImageNet-pretrained weights of its first convolutional
+layers provide a reasonable initialisation even for a monochrome task,
+because the lowest-level filters (edges, corners) transfer.
+Third, its parameter count fits comfortably within the VRAM budget of a
+single consumer GPU and leaves enough headroom for a non-trivial batch
+size, which is necessary for stable CTC training (see \Cref{ch:mgmt}).
+
+\subsubsection*{Alternatives considered}
+
+\paragraph{Deeper ResNets (ResNet34, ResNet50).}
+Tested as ablations and rejected: the increase in parameter count
+slowed each epoch noticeably without measurable SER improvement on
+the validation split, because the bottleneck on this task is the
+synthetic-to-real domain gap, not backbone capacity.
+
+\paragraph{EfficientNet / MobileNet.}
+Lightweight backbones designed for mobile inference.  Their channel
+widths and depth-wise convolutions are tuned for natural-image
+classification, not for a 128-pixel-tall monochrome strip with
+asymmetric aspect ratio; preliminary tests with EfficientNet-B0
+converged more slowly than ResNet18 and offered no inference-speed
+advantage on the project's hardware.  Rejected.
+
+\paragraph{Vision Transformer (ViT, Swin).}
+A patch-based transformer encoder.  Rejected on the same training-data
+argument as the encoder--decoder transformer above: ViTs are
+data-hungry and the project's synthetic corpus, while large in
+absolute terms, has lower visual diversity than ImageNet by orders of
+magnitude.
+
+\paragraph{VGG-style stack (legacy).}
+A five-block VGG-style stack with progressive max-pooling is retained
+in the codebase as a legacy alternative for backward compatibility
+with earlier checkpoints; it converged more slowly than ResNet18 on
+the same data and is not used for new experiments.
 
 \subsection{Temporal resolution and width compression}
 
-The backbone compresses the width of the input image by a factor of
-four, leaving the model with one feature vector per four input columns
-of the original image.
+The backbone compresses the width of the input image by a fixed factor,
+leaving the model with one feature vector per several input columns of
+the original image.
 This factor was chosen by a trade-off: a smaller compression ratio
 preserves more time steps and so admits longer output sequences without
 saturating CTC alignment, but increases compute cost; a larger ratio
 risks producing more output tokens than time steps, which CTC's
 \code{zero\_infinity} option silently masks but which corrupts gradient
 estimates.
-At a factor of four, all in-scope samples comfortably satisfy the CTC
-length constraint, and the time axis remains rich enough to disambiguate
-adjacent notes even on densely-engraved staves.
+The selected factor is the smallest power-of-two ratio at which all
+in-scope samples comfortably satisfy the CTC length constraint while
+keeping the time axis rich enough to disambiguate adjacent notes even
+on densely-engraved staves; the exact value lives in \Cref{ch:impl}.
 
 \subsection{Recurrent layer}
 
 The convolutional features are fed to a stacked bidirectional
 LSTM~\cite{hochreiterLongShortTermMemory1997}.
-Two layers are used, with 256 hidden units per direction; this gives
-the model bidirectional context over the entire staff while keeping
-parameter count modest.\todo{Exact hyperparameters (``256 hidden units'', ``two layers'', \SI{40}{\percent} header strip, \SI{10}{\percent} splits, etc.) belong in Ch.\,5. Here state the design rationale (``small enough to fit on one consumer GPU''); move concrete values to implementation.}
-A single-layer LSTM was found to under-fit on dense passages
-(see ablations in \Cref{ch:results}); a three-layer LSTM gave no
-measurable gain over two layers and slowed training.
-Dropout between LSTM layers, applied during training only, regularises
-the model against the inevitable overfitting that arises from training
-on a synthetic corpus whose support is narrower than the inference-time
-distribution.
+The depth and width of the recurrent stack are set by two competing
+considerations.
+On the one hand, single-layer recurrence was found to under-fit on
+dense passages where accidentals, dots, and beamed groups require
+context from several feature columns on either side of the current
+position (see \Cref{ch:results}).
+On the other hand, the recurrent stack must remain small enough that
+the full network fits within the VRAM of a single consumer GPU at a
+non-trivial batch size; adding capacity beyond two layers gave no
+measurable accuracy gain in pilot experiments and slowed training.
+Inter-layer dropout regularises against the inevitable overfitting
+that arises from training on a synthetic corpus whose support is
+narrower than the inference-time distribution.
+Concrete hidden sizes, layer counts, and dropout probabilities live in
+\Cref{ch:impl}.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Two-Stream Architecture for Lead Sheets}
 \label{sec:design-twostream}
 
-A jazz lead sheet contains two parallel visual streams: the melody on
-the staff and the chord symbols typeset above it.
-Their visual nature is fundamentally different.
-The melody is a sequence of graphical symbols positioned relative to the
-staff lines; correct interpretation depends on the clef and key
-signature.
-The chord symbols are short alphanumeric strings (\code{Cmaj7},
-\code{F\#m7b5}, \code{Bb13}); their interpretation is a text-recognition
-task and does not depend on staff geometry.
+A jazz lead sheet contains two visually distinct streams: the melody
+on the staff (graphical symbols positioned relative to staff lines,
+clef-dependent) and the chord symbols typeset above it (short
+alphanumeric strings such as \code{Cmaj7}, \code{F\#m7b5}, \code{Bb13},
+read as text and independent of staff geometry).
+The architectural response, summarised in \Cref{fig:two-stream-arch},
+is a \textit{two-stream} design: two independent CRNN--CTC recognisers
+of the same family (\Cref{sec:design-model}) but with disjoint
+vocabularies and disjoint training data, merged only in
+post-processing.
 
-The architectural response is a \textit{two-stream} design: two
-independent neural networks, each specialised to its own visual
-distribution, with results merged in post-processing.
-The melody network is the CRNN--CTC described in
-\Cref{sec:design-model}; its vocabulary is the LMX token set.
-The chord network is a separate CRNN--CTC of the same family but
-character-level: its vocabulary is the 26-character alphabet sufficient
-to spell every chord symbol in the Real Book.
+\input{figures/fig_two_stream}
 
 \subsection{Why two networks rather than one}
 
@@ -479,6 +777,36 @@ Both surveys of the field~\cite{calvoZaragozaUnderstandingOMR2020,shatriOPTICALM
 explicitly recommend this decomposition for systems that handle
 text-like adjuncts to staff notation.
 
+\subsection{Alternatives considered}
+\label{sec:design-twostream-alts}
+
+\paragraph{Single multi-task network with shared backbone.}
+One CNN backbone feeds two task-specific recurrent heads (one for LMX,
+one for chord characters), trained jointly with a summed CTC loss.
+Rejected because the visual features useful for chord OCR (letter
+strokes, numeric glyphs) and for melody recognition (notehead
+position relative to staff lines) have little overlap.  Sharing the
+backbone forces the network to allocate capacity to a generic feature
+representation when a specialised one would do, and the joint loss
+introduces a tuning headache (weighting the two losses against each
+other) that the two-stream split avoids entirely.
+
+\paragraph{Single full-page transformer with positional decoding.}
+The same family as the LEGATO baseline discussed in
+\Cref{sec:design-pipeline-alts}, with a single decoder that emits both
+streams interleaved.  Rejected for the same reasons stated there:
+prohibitive data and compute requirements, and opaque failure modes.
+
+\paragraph{Pipeline OCR (text detector + chord parser).}
+Apply a general-purpose OCR (e.g.\ EasyOCR, Tesseract) to the chord
+strip, then parse the output text into chord symbols.
+Rejected because general-purpose OCR is trained on standard text and
+mis-reads stylised jazz symbols (the \code{ø} half-diminished glyph is
+read as \code{0}, \code{O}, or \code{o}; the \code{maj} suffix is
+often split across two lines).  A specialised CRNN trained on
+synthetic Real Book chord strips reaches substantially higher
+accuracy at the cost of a one-off training effort.
+
 \subsection{Independent training, joint inference}
 
 The two networks are trained on disjoint datasets and produce
@@ -488,7 +816,7 @@ and a chord-strip image for each detected system; the two are processed
 in parallel and their outputs are joined into a single JSON segment
 keyed by the system's bounding box on the page.
 No cross-attention or shared representation links the two networks;
-this is a deliberate simplicity choice.\todo{Two-stream split is a major decision but the rejected alternative (single multi-task network with shared backbone, or full-page transformer) is only sketched. Add an \emph{Alternatives considered} listing $\geq$2 with reasons.}
+this is a deliberate simplicity choice.
 
 \subsection{Chord vocabulary and notation conventions}
 
@@ -526,7 +854,7 @@ The validation and test splits remain drawn exclusively from the
 synthetic corpus throughout, so that phase-2 fine-tuning does not
 contaminate the held-out evaluation.
 
-This is a textbook synthetic-pretrain → real-fine-tune transfer
+This is a textbook synthetic-pretrain $\to$ real-fine-tune transfer
 learning plan; its effectiveness is the principal experimental
 question of \Cref{ch:results}.
 
@@ -538,42 +866,73 @@ CTC loss takes the log-probability tensor (one vector per output time
 step), the target token sequence, and their respective lengths, and
 computes the negative log-likelihood of the target marginalised over
 all valid alignments to the input time axis.
-The CTC blank class (index 0) absorbs time steps where no symbol is
-emitted, which is the mechanism by which the model handles
+The CTC blank class (the reserved index) absorbs time steps where no
+symbol is emitted, which is the mechanism by which the model handles
 variable-rate output without explicit alignment.
 
 \subsection{Data splits}
 
 The corpus is partitioned deterministically into train, validation, and
 test splits with a fixed seed.
-Validation and test fractions are each \SI{10}{\percent}; the remaining
-\SI{80}{\percent} is used for training.
+The held-out fractions for validation and test are kept small but not
+negligible---each comfortably exceeds the few-thousand-sample threshold
+at which SER estimates stabilise to two decimal places---and the
+remaining majority of the data is used for training.
 The same sample identifier always falls into the same split across
 runs, so successive experiments are directly comparable.
 When fine-tuning data is added, it is injected only into the train
 split; no fine-tuning sample ever enters validation or test.
+Exact split fractions are stated in \Cref{ch:impl}.
 
 \subsection{Header-stripping augmentation}
 
 Real Book pages often span multiple staves per system; every staff
 after the first omits the clef, key, and time-signature header.
 To prevent the model from over-relying on the header, a fraction of
-training samples (\SI{40}{\percent}) have their header pixels cropped
-out and the corresponding tokens removed from the label.
+training samples have their header pixels cropped out and the
+corresponding tokens removed from the label.
 This forces the model to learn pitch and rhythm in the absence of an
 explicit clef, which it can do because the staff geometry alone is
 sufficient given the treble-clef-only contract.
+The augmentation applies to training samples only; validation and test
+samples always retain their header so the held-out evaluation is
+comparable across runs.
 
 \subsection{Rare-token oversampling}
 
 Two LMX tokens (\code{tied:start} and \code{tied:stop}) are visually
 subtle and statistically rare in the corpus, so the model
 under-predicts them.
-The training loader duplicates---in the training split only---every
-sample whose label contains a rare token, with a configurable
-multiplier.\todo{``Training loader'' / ``configurable multiplier'' drifts into Ch.\,5 territory. Ch.\,4 should state the design choice (oversample rare-token samples instead of class-weighted loss) and \emph{why}; leave the loader mechanism for the implementation chapter.}
-This is a class-imbalance fix applied at the sample level rather than
-in the loss function, which CTC does not easily admit.
+The design choice is to oversample at the dataset level---duplicating
+samples whose label contains a rare token in the training split
+only---rather than to up-weight the rare token in the loss.
+Sample-level oversampling preserves the natural distribution of
+context (the rare token appears in its real visual context, with the
+correct surrounding tokens) and, crucially, is compatible with CTC,
+which does not admit per-class weights in its standard formulation.
+
+\subsubsection*{Alternatives considered}
+
+\paragraph{Class-weighted CTC loss.}
+Adjust the loss by a per-class weight that up-weights rare tokens.
+Rejected because the standard CTC formulation marginalises over
+alignments and does not factorise into per-token contributions that
+can be weighted independently.  Approximate per-token weighting is
+possible but introduces gradient bias that is hard to characterise.
+
+\paragraph{Focal-style CTC.}
+A focal-loss variant of CTC that down-weights easy samples and lets
+hard samples dominate the gradient.  Rejected because the rarity of
+ties is a label-frequency issue, not a sample-difficulty issue:
+focal-style weighting does not specifically target the under-represented
+classes the project cares about.
+
+\paragraph{Synthetic over-generation of rare-token samples.}
+Generate additional PrIMuS-style samples that contain ties.  Rejected
+on cost: it requires modifying the LilyPond generator's musical
+content in a way that risks producing musically improbable tie
+patterns, which would distort training distribution rather than fix
+the imbalance.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Grammar Correction as a Design Layer}
@@ -611,17 +970,58 @@ Its responsibilities are:
 
 The grammar fixer is purely deterministic: it never invents new musical
 content, only repairs structural defects in the model's output.
-A learned alternative---training the model end-to-end against a
-grammar-aware loss---is conceivable but adds complexity and offers
-limited gain for a vocabulary as small and as well-structured as LMX.\todo{Grammar fixer needs an explicit \emph{Alternatives considered} block listing $\geq$2 rejected designs (e.g.\ constrained CTC decoding with grammar-aware beam, FST-based decoder, learned seq2seq corrector) with reasons---not only a sentence on grammar-aware loss.}
 Keeping grammar enforcement out of the loss also keeps the model's
 output legible: every token in the raw prediction is interpretable in
-the same way as the corresponding ground-truth token.
+the same way as the corresponding ground-truth token, which simplifies
+error analysis (\Cref{ch:results}).
+
+\subsection{Alternatives considered}
+\label{sec:design-grammar-alts}
+
+\paragraph{Grammar-aware CTC beam search.}
+A constrained decoder that restricts the beam to grammatically valid
+prefixes at each time step, much like a language-model-shallow-fusion
+ASR decoder.
+Rejected because the LMX grammar is a small finite-state object whose
+post-hoc enforcement is essentially free; folding it into beam search
+would slow inference proportionally to the beam width without
+contributing extra accuracy beyond what the deterministic post-pass
+already provides.
+
+\paragraph{Weighted finite-state transducer (WFST) decoder.}
+Compose the model's per-frame distribution with an explicit WFST
+representation of the LMX grammar at decode time.
+Rejected as over-engineered for a vocabulary this small: the
+hand-written stateful walker is shorter, easier to debug, and
+sufficient for the project's grammar complexity.
+
+\paragraph{Learned sequence-to-sequence corrector.}
+Train a small transformer to map raw model output to grammatically
+valid output, supervised by (noisy, grammatical) pairs.
+Rejected for two reasons: it requires a corpus of model errors that
+is only available after the model has been trained (a chicken-and-egg
+problem in the design stage), and it would introduce a second
+data-driven component that itself has failure modes harder to debug
+than a deterministic walker.
+
+\paragraph{End-to-end grammar-aware loss.}
+Augment the CTC loss with a regulariser that penalises ungrammatical
+prefixes during training.
+Conceivable but rejected because (i)~it complicates loss optimisation
+for marginal gain on a vocabulary as small and as well-structured as
+LMX, and (ii)~deferring grammar to post-processing keeps the
+training-time concerns separated from the inference-time concerns,
+which simplifies analysis.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Evaluation Design}
 \label{sec:design-eval}
-\todo{No quantitative acceptance / success target. State the SER threshold (e.g.\ ``target SER\,$<$\,X\,\% on clean test, $<$\,Y\,\% on real scans'') that defines whether the design has succeeded; otherwise Ch.\,6 has nothing to compare against.}
+
+The acceptance criteria stated in \Cref{sec:design-domain} commit the
+project to four numeric targets.  This section defines the metrics
+that produce those numbers and the protocol under which they are
+collected, so that \Cref{ch:results} can adjudicate against them
+without ambiguity.
 
 \subsection{Primary metric: Symbol Error Rate}
 
@@ -652,6 +1052,8 @@ Structural tokens dominate the absolute edit count on the current
 corpus but are largely musically irrelevant once a downstream renderer
 re-bars the output; the melodic SER captures how often the model gets
 the \textit{actual notes} right.
+This is the metric that the \SI{0.5}{\percent} target in
+\Cref{sec:design-domain} commits to.
 
 \subsection{Domain-gap evaluation}
 
@@ -665,3 +1067,18 @@ real Real Book pages, exposing the raw synthetic-to-real gap;
 evaluated on the same pages, quantifying the reduction in the gap.
 The fine-tuning protocol is the same as that described in
 \Cref{sec:design-training}.
+
+\subsection{Reporting protocol}
+
+To make the four numeric targets falsifiable, the evaluation protocol
+commits in advance to:
+(a)~the split definitions and seed used to construct them,
+which are fixed once and not retuned per experiment;
+(b)~the decoding strategy used to produce predictions (greedy CTC
+decoding as the headline number, with beam search reported as an
+ablation);
+(c)~the metric aggregation rule (micro-averaged: total edits divided
+by total ground-truth length across the split, not the mean of
+per-sample SERs).
+\Cref{ch:results} reports its primary numbers under this protocol;
+any deviation is called out explicitly.

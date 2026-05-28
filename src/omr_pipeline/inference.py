@@ -1,24 +1,9 @@
-"""
-CRNN inference — minimal, matches dataset.py training preprocessing exactly.
+"""CRNN inference — preprocessing matches ``dataset.py`` training exactly."""
 
-Training reference (src/CRNN_CTC/dataset.py::_load_image + __getitem__):
-
-    img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)            # uint8
-    new_w = round(w * img_height / h);  clamp to max_width
-    img = cv2.resize(img, (new_w, img_height), INTER_AREA)
-    img = img.astype(np.float32) / 255.0
-    img = (img - img.mean()) / (img.std() + 1e-6)
-    img_t = torch.from_numpy(img).unsqueeze(0)              # (1, H, W)
-
-Inference here is identical — no staff-aware re-cropping, no tiling, no
-overlay padding.  Padding the staff crop with white before normalisation
-shifts the per-image statistics and was the cause of garbage predictions.
-"""
 from __future__ import annotations
 
 import logging
 import os
-import sys
 from pathlib import Path
 
 import cv2
@@ -27,9 +12,9 @@ import torch
 from torch import Tensor
 from torch.amp import autocast
 
-_SRC = Path(__file__).resolve().parent.parent
-if str(_SRC) not in sys.path:
-    sys.path.insert(0, str(_SRC))
+from ._bootstrap import ensure_src_path
+
+ensure_src_path()
 
 log = logging.getLogger(__name__)
 
@@ -46,9 +31,9 @@ def _load_model(checkpoint_path: Path) -> dict:
     if key in _model_cache:
         return _model_cache[key]
 
+    from CRNN_CTC.config import Config
     from CRNN_CTC.model import CRNN
     from CRNN_CTC.vocab import Vocabulary
-    from CRNN_CTC.config import Config
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
@@ -67,9 +52,7 @@ def _load_model(checkpoint_path: Path) -> dict:
     ]
     vocab_path = next((p for p in candidates if p.exists()), None)
     if vocab_path is None:
-        raise FileNotFoundError(
-            f"Vocab file not found; tried: {[str(p) for p in candidates]}"
-        )
+        raise FileNotFoundError(f"Vocab file not found; tried: {[str(p) for p in candidates]}")
 
     vocab = Vocabulary.from_file(vocab_path)
 
@@ -88,7 +71,9 @@ def _load_model(checkpoint_path: Path) -> dict:
     _model_cache[key] = entry
     log.info(
         "CRNN loaded from %s (epoch %d, val_SER=%.4f)",
-        checkpoint_path, ckpt.get("epoch", -1), ckpt.get("val_ser", -1),
+        checkpoint_path,
+        ckpt.get("epoch", -1),
+        ckpt.get("val_ser", -1),
     )
     return entry
 
@@ -96,6 +81,7 @@ def _load_model(checkpoint_path: Path) -> dict:
 # ---------------------------------------------------------------------------
 # Preprocessing — exact match to dataset.py
 # ---------------------------------------------------------------------------
+
 
 def _preprocess_strip(img: np.ndarray, img_height: int, max_width: int) -> tuple[Tensor, int]:
     """Grayscale uint8 → resize → /255 → per-image norm → (1, H, W) tensor."""
@@ -121,6 +107,7 @@ def _preprocess_strip(img: np.ndarray, img_height: int, max_width: int) -> tuple
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 @torch.inference_mode()
 def recognize_music(
@@ -164,10 +151,14 @@ def recognize_music(
 
     if beam_width > 1:
         from CRNN_CTC.evaluate import beam_search_decode
-        decode_fn = lambda lp, ol, v: beam_search_decode(lp, ol, v, beam_width)
+
+        def decode_fn(lp, ol, v):
+            return beam_search_decode(lp, ol, v, beam_width)
+
         log.info("Using beam search (width=%d)", beam_width)
     else:
         from CRNN_CTC.evaluate import greedy_decode
+
         decode_fn = greedy_decode
 
     # Preprocess all strips into per-image tensors + widths
@@ -208,8 +199,8 @@ def recognize_music(
     token_lists = decode_fn(log_probs, out_lens, vocab)
 
     # CRNN returns log_probs shaped (T, B, C). Move to CPU and slice per-strip.
-    lp_cpu = log_probs.detach().to("cpu")            # (T, B, C)
-    ol_cpu = out_lens.detach().to("cpu").tolist()    # length B
+    lp_cpu = log_probs.detach().to("cpu")  # (T, B, C)
+    ol_cpu = out_lens.detach().to("cpu").tolist()  # length B
 
     results: list[str] = []
     per_strip_lp: list[Tensor] = []

@@ -6,6 +6,7 @@ candidate angles, pick the angle whose horizontal projection has the
 sharpest peaks (highest variance). This is the gold-standard method
 for document/score images with dominant horizontal lines.
 """
+
 from __future__ import annotations
 
 import os
@@ -20,24 +21,22 @@ try:
 except ImportError:
     fitz = None
 
-# Single CLAHE instance reused across all binarize() calls in a process.
-# clipLimit=2.0 and tileGridSize=(8,8) are gentler than the OCR preprocessing
-# (ocr_chords.py uses 3.0/(4,4)) — we only need to normalise coarse page-level
-# illumination gradients, not enhance fine text contrast.
 _CLAHE = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 
 
 @dataclass
 class PageImage:
     """Single page as grayscale and binary versions."""
+
     grayscale: np.ndarray  # (H, W) uint8
-    binary: np.ndarray     # (H, W) 0/255
+    binary: np.ndarray  # (H, W) 0/255
     meta: dict
 
 
 # ---------------------------------------------------------------------------
 # Image loading
 # ---------------------------------------------------------------------------
+
 
 def load_image(source: bytes | Path | np.ndarray) -> np.ndarray:
     """Load image as grayscale. Accepts raw bytes, path, or numpy array."""
@@ -97,6 +96,7 @@ def pdf_load_dpi() -> int:
 # Binarization
 # ---------------------------------------------------------------------------
 
+
 def binarize(img: np.ndarray) -> np.ndarray:
     """CLAHE equalization + Otsu binarization → ink=255, bg=0.
 
@@ -115,12 +115,12 @@ def binarize(img: np.ndarray) -> np.ndarray:
 # Deskew — projection-profile variance method
 # ---------------------------------------------------------------------------
 
+
 def _rotate_small(img: np.ndarray, angle_deg: float) -> np.ndarray:
     """Fast rotation for small images (no bound expansion — edges clipped)."""
     h, w = img.shape[:2]
     M = cv2.getRotationMatrix2D((w / 2.0, h / 2.0), angle_deg, 1.0)
-    return cv2.warpAffine(img, M, (w, h), flags=cv2.INTER_NEAREST,
-                          borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+    return cv2.warpAffine(img, M, (w, h), flags=cv2.INTER_NEAREST, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
 
 
 def _projection_variance(binary: np.ndarray) -> float:
@@ -129,10 +129,9 @@ def _projection_variance(binary: np.ndarray) -> float:
     return float(np.var(proj))
 
 
-def _estimate_skew_projection(binary_ink: np.ndarray,
-                               angle_range: float = 5.0,
-                               coarse_step: float = 0.5,
-                               fine_step: float = 0.1) -> float:
+def _estimate_skew_projection(
+    binary_ink: np.ndarray, angle_range: float = 5.0, coarse_step: float = 0.5, fine_step: float = 0.1
+) -> float:
     """Find the rotation angle that maximises projection-profile variance.
 
     Two-pass search: coarse sweep, then fine sweep around the best coarse angle.
@@ -176,7 +175,9 @@ def _rotate_bound(img: np.ndarray, angle_deg: float, border_value: int = 255) ->
     M[0, 2] += (nW / 2.0) - cX
     M[1, 2] += (nH / 2.0) - cY
     return cv2.warpAffine(
-        img, M, (nW, nH),
+        img,
+        M,
+        (nW, nH),
         flags=cv2.INTER_LINEAR,
         borderMode=cv2.BORDER_CONSTANT,
         borderValue=border_value,
@@ -192,8 +193,7 @@ def deskew(img_gray: np.ndarray) -> tuple[np.ndarray, float]:
     scale = 1.0
     if max(h, w) > max_dim:
         scale = max_dim / float(max(h, w))
-        small = cv2.resize(img_gray, (int(w * scale), int(h * scale)),
-                           interpolation=cv2.INTER_AREA)
+        small = cv2.resize(img_gray, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
     else:
         small = img_gray
 
@@ -210,6 +210,7 @@ def deskew(img_gray: np.ndarray) -> tuple[np.ndarray, float]:
 # ---------------------------------------------------------------------------
 # Full preprocessing pipeline
 # ---------------------------------------------------------------------------
+
 
 def preprocess_page(img: np.ndarray) -> PageImage:
     """Deskew, then produce grayscale + binary versions."""

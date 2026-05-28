@@ -29,193 +29,35 @@ from __future__ import annotations
 import csv
 import logging
 import time
-from datetime import datetime
 from pathlib import Path
-
-from tqdm import tqdm
 
 import torch
 import torch.nn as nn
-from torch import Tensor
-from torch.amp import GradScaler, autocast
+from torch.amp import GradScaler
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader
 
 from .config import Config
 from .dataset import collate_fn, make_splits
-from .evaluate import compute_ser_batch, greedy_decode
 from .model import CRNN
+from .training_utils import (
+    create_run_dir,
+    seed_everything,
+    train_one_epoch,
+    validate_ctc_epoch,
+)
 from .vocab import Vocabulary
 
 log = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Seeding
-# ---------------------------------------------------------------------------
-
-def _seed_everything(seed: int) -> None:
-    import random
-
-    import numpy as np
-
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-
-
-# ---------------------------------------------------------------------------
-# Single epoch
-# ---------------------------------------------------------------------------
-
-def _train_one_epoch(
-    model: CRNN,
-    loader: DataLoader,
-    criterion: nn.CTCLoss,
-    optimiser: torch.optim.Optimizer,
-    scheduler: OneCycleLR | None,
-    scaler: GradScaler,
-    device: torch.device,
-    use_amp: bool,
-    max_grad_norm: float = 5.0,
-) -> float:
-    """Run one training epoch. Returns average loss."""
-    model.train()
-    total_loss = 0.0
-    n_batches = 0
-
-    bar = tqdm(loader, desc="train", leave=False, dynamic_ncols=True)
-    for batch in bar:
-        images: Tensor = batch["images"].to(device)
-        labels: Tensor = batch["labels"].to(device)
-        label_lens: Tensor = batch["label_lens"].to(device)
-        image_widths: Tensor = batch["image_widths"].to(device)
-
-        optimiser.zero_grad(set_to_none=True)
-
-        with autocast("cuda", enabled=use_amp):
-            log_probs, output_lens = model(images, image_widths)
-            # CTCLoss expects (T, B, C), targets flat, input_lengths, target_lengths
-            loss = criterion(log_probs, labels, output_lens, label_lens)
-
-        scaler.scale(loss).backward()
-        # Gradient clipping — essential for CTC stability
-        scaler.unscale_(optimiser)
-        nn.utils.clip_grad_norm_(model.parameters(), max_norm=max_grad_norm)
-
-        # Track scale before step: if it drops, the step was skipped (inf/NaN
-        # in gradients during AMP warm-up). Only advance the LR scheduler when
-        # the optimizer actually performed an update.
-        scale_before = scaler.get_scale()
-        scaler.step(optimiser)
-        scaler.update()
-
-        if scheduler is not None and scaler.get_scale() >= scale_before:
-            scheduler.step()
-
-        total_loss += loss.item()
-        n_batches += 1
-        bar.set_postfix(loss=f"{total_loss / n_batches:.4f}",
-                        lr=f"{optimiser.param_groups[0]['lr']:.2e}")
-
-    return total_loss / max(n_batches, 1)
-
-
-@torch.inference_mode()
-def _validate(
-    model: CRNN,
-    loader: DataLoader,
-    criterion: nn.CTCLoss,
-    vocab: Vocabulary,
-    device: torch.device,
-    use_amp: bool,
-) -> tuple[float, float]:
-    """Run validation. Returns (avg_loss, SER)."""
-    model.eval()
-    total_loss = 0.0
-    n_batches = 0
-    total_edit = 0
-    total_len = 0
-
-    for batch in loader:
-        images: Tensor = batch["images"].to(device)
-        labels: Tensor = batch["labels"].to(device)
-        label_lens: Tensor = batch["label_lens"].to(device)
-        image_widths: Tensor = batch["image_widths"].to(device)
-
-        with autocast("cuda", enabled=use_amp):
-            log_probs, output_lens = model(images, image_widths)
-            loss = criterion(log_probs, labels, output_lens, label_lens)
-
-        total_loss += loss.item()
-        n_batches += 1
-
-        # Greedy decode + SER
-        preds = greedy_decode(log_probs, output_lens, vocab)
-        # Reconstruct per-sample ground truth from flat labels
-        gt_tokens: list[list[str]] = []
-        offset = 0
-        for length in label_lens:
-            l = length.item()
-            gt_tokens.append(vocab.decode(labels[offset : offset + l].tolist()))
-            offset += l
-
-        edit, ref_len = compute_ser_batch(preds, gt_tokens)
-        total_edit += edit
-        total_len += ref_len
-
-    avg_loss = total_loss / max(n_batches, 1)
-    ser = total_edit / max(total_len, 1)
-    return avg_loss, ser
-
-
-# ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
 
-def _create_run_dir(base_dir: Path) -> Path:
-    """Create a timestamped run directory and update the ``latest`` symlink.
 
-    Directory structure::
-
-        models/
-        ├── run_20260304_123956/      ← this run
-        │   ├── best_model.pt
-        │   ├── latest_checkpoint.pt
-        │   └── training_log.csv
-        ├── run_20260303_091022/      ← previous run (preserved)
-        │   └── ...
-        └── latest -> run_20260304_123956   ← convenience symlink
-    """
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = base_dir / f"run_{stamp}"
-    run_dir.mkdir(parents=True, exist_ok=True)
-
-    # Atomic symlink update: create temp link, then rename over old one
-    link = base_dir / "latest"
-    tmp_link = base_dir / f"_latest_tmp_{stamp}"
-    try:
-        tmp_link.symlink_to(run_dir.name)  # relative symlink
-        tmp_link.rename(link)
-    except OSError:
-        # Fallback: remove + recreate (non-atomic but works on all FS)
-        link.unlink(missing_ok=True)
-        try:
-            link.symlink_to(run_dir.name)
-        except OSError:
-            pass  # symlinks unsupported — not critical
-
-    return run_dir
-
-
-def _resolve_run_dir(
-    cfg: Config, resume_from: Path | str | None
-) -> Path:
+def _resolve_run_dir(cfg: Config, resume_from: Path | str | None) -> Path:
     """Decide which run directory to use.
 
     * **Fresh run:** create a new timestamped directory.
@@ -229,9 +71,9 @@ def _resolve_run_dir(
             return parent
         # Legacy layout: checkpoint directly in model_dir — create new run
         # and copy the checkpoint there so the old file stays untouched.
-        return _create_run_dir(cfg.model_dir)
+        return create_run_dir(cfg.model_dir)
 
-    return _create_run_dir(cfg.model_dir)
+    return create_run_dir(cfg.model_dir)
 
 
 def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
@@ -242,7 +84,7 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
     cfg : Config
         Centralised configuration (paths, hyperparameters, etc.).
     """
-    _seed_everything(cfg.seed)
+    seed_everything(cfg.seed)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     use_amp = device.type == "cuda"
@@ -275,20 +117,13 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
         filter_multi_staff=cfg.filter_multi_staff,
         max_source_height=cfg.max_source_height,
         extra_data_dirs=cfg.extra_data_dirs or None,
-        extra_scanned_dirs=(
-            cfg.extra_scanned_dirs if cfg.use_scanned else None
-        ) or None,
+        extra_scanned_dirs=(cfg.extra_scanned_dirs if cfg.use_scanned else None) or None,
         strip_header_prob=cfg.strip_header_prob,
         online_aug_prob=cfg.online_aug_prob,
         rare_lmx_oversample=cfg.rare_lmx_oversample,
-        rare_lmx_tokens=frozenset(cfg.rare_lmx_tokens)
-        if cfg.rare_lmx_tokens
-        else frozenset(),
+        rare_lmx_tokens=frozenset(cfg.rare_lmx_tokens) if cfg.rare_lmx_tokens else frozenset(),
         finetune_data_dirs=cfg.finetune_data_dirs or None,
-        finetune_scanned_dirs=(
-            cfg.finetune_scanned_dirs if cfg.use_scanned else None
-        )
-        or None,
+        finetune_scanned_dirs=(cfg.finetune_scanned_dirs if cfg.use_scanned else None) or None,
     )
 
     train_loader = DataLoader(
@@ -334,10 +169,8 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
             weight_decay=cfg.weight_decay,
             fused=use_amp,
         )
-    except (TypeError, RuntimeError):
-        optimiser = AdamW(
-            model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay
-        )
+    except TypeError, RuntimeError:
+        optimiser = AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
 
     # ── Resume from checkpoint (if requested) ──────────────────────────────
     start_epoch = 1
@@ -355,13 +188,19 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
         start_epoch = ckpt["epoch"] + 1
         best_ser = ckpt.get("val_ser", float("inf"))
         patience_counter = ckpt.get("patience_counter", 0)
-        log.info("  Resumed at epoch %d  (best val_SER so far: %.4f, patience: %d)", start_epoch, best_ser, patience_counter)
+        log.info(
+            "  Resumed at epoch %d  (best val_SER so far: %.4f, patience: %d)",
+            start_epoch,
+            best_ser,
+            patience_counter,
+        )
 
     remaining_epochs = cfg.epochs - (start_epoch - 1)
     if remaining_epochs <= 0:
         log.warning(
             "Checkpoint already reached epoch %d / %d — nothing left to train.",
-            start_epoch - 1, cfg.epochs,
+            start_epoch - 1,
+            cfg.epochs,
         )
         return run_dir / "best_model.pt"
 
@@ -401,12 +240,24 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
     for epoch in range(start_epoch, cfg.epochs + 1):
         t_epoch = time.time()
 
-        train_loss = _train_one_epoch(
-            model, train_loader, criterion, optimiser, scheduler, scaler, device, use_amp,
+        train_loss = train_one_epoch(
+            model,
+            train_loader,
+            criterion,
+            optimiser,
+            scheduler,
+            scaler,
+            device,
+            use_amp,
             max_grad_norm=cfg.max_grad_norm,
         )
-        val_loss, val_ser = _validate(
-            model, val_loader, criterion, vocab, device, use_amp,
+        val_loss, val_ser = validate_ctc_epoch(
+            model,
+            val_loader,
+            criterion,
+            vocab,
+            device,
+            use_amp,
         )
 
         elapsed = time.time() - t0
@@ -414,15 +265,28 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
 
         log.info(
             "Epoch %3d/%d  train_loss=%.4f  val_loss=%.4f  val_SER=%.4f  lr=%.2e  [%.0fs]",
-            epoch, cfg.epochs, train_loss, val_loss, val_ser, current_lr, elapsed,
+            epoch,
+            cfg.epochs,
+            train_loss,
+            val_loss,
+            val_ser,
+            current_lr,
+            elapsed,
         )
 
         # Append to CSV log
         with open(log_path, "a", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow([epoch, f"{train_loss:.6f}", f"{val_loss:.6f}",
-                             f"{val_ser:.6f}", f"{current_lr:.2e}",
-                             f"{time.time() - t_epoch:.1f}"])
+            writer.writerow(
+                [
+                    epoch,
+                    f"{train_loss:.6f}",
+                    f"{val_loss:.6f}",
+                    f"{val_ser:.6f}",
+                    f"{current_lr:.2e}",
+                    f"{time.time() - t_epoch:.1f}",
+                ]
+            )
 
         # Checkpoint best model
         if val_ser < best_ser:
@@ -467,13 +331,15 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
         if cfg.early_stopping_patience > 0 and patience_counter >= cfg.early_stopping_patience:
             log.info(
                 "Early stopping — val SER did not improve for %d epochs (best=%.4f)",
-                cfg.early_stopping_patience, best_ser,
+                cfg.early_stopping_patience,
+                best_ser,
             )
             break
 
     total_time = time.time() - t0
     log.info(
         "Training complete. Best val SER=%.4f  Total time=%.0fs",
-        best_ser, total_time,
+        best_ser,
+        total_time,
     )
     return best_ckpt

@@ -22,28 +22,23 @@ import matplotlib as mpl
 
 PALETTE: dict[str, str] = {
     # Primary accent — used for the "main" or "best" series
-    "primary":       "#1565C0",   # deep blue
-    "primary_light": "#42A5F5",   # light blue
-
+    "primary": "#1565C0",  # deep blue
+    "primary_light": "#42A5F5",  # light blue
     # Secondary accent — used for contrast / "second" series
-    "secondary":       "#E65100",   # deep orange
-    "secondary_light": "#FFA726",   # light orange
-
+    "secondary": "#E65100",  # deep orange
+    "secondary_light": "#FFA726",  # light orange
     # Tertiary — additional series, e.g. third model variant
-    "tertiary":       "#2E7D32",   # deep green
-    "tertiary_light": "#81C784",   # light green
-
+    "tertiary": "#2E7D32",  # deep green
+    "tertiary_light": "#81C784",  # light green
     # Highlight — warnings, errors, attention
-    "highlight":       "#880E4F",   # deep pink / magenta
-    "highlight_light": "#F06292",   # light pink
-
+    "highlight": "#880E4F",  # deep pink / magenta
+    "highlight_light": "#F06292",  # light pink
     # Neutral tones
-    "neutral_dark":  "#212121",   # near-black
-    "neutral_mid":   "#757575",   # medium grey
-    "neutral_light": "#E0E0E0",   # light grey (grid lines, borders)
-
+    "neutral_dark": "#212121",  # near-black
+    "neutral_mid": "#757575",  # medium grey
+    "neutral_light": "#E0E0E0",  # light grey (grid lines, borders)
     # Background helpers
-    "bg_paper":  "#FFFFFF",
+    "bg_paper": "#FFFFFF",
     "bg_figure": "#FAFAFA",
 }
 
@@ -60,61 +55,54 @@ COLOR_CYCLE: list[str] = [
 ]
 
 # Convenience aliases
-C = PALETTE   # short handle:  style.C["primary"]
+C = PALETTE  # short handle:  style.C["primary"]
 
 
 # ── rcParams ───────────────────────────────────────────────────────────────────
 
 _RC: dict = {
     # Figure
-    "figure.dpi":        150,
-    "figure.facecolor":  PALETTE["bg_paper"],
-    "figure.edgecolor":  PALETTE["bg_paper"],
-
+    "figure.dpi": 150,
+    "figure.facecolor": PALETTE["bg_paper"],
+    "figure.edgecolor": PALETTE["bg_paper"],
     # Axes
-    "axes.facecolor":    PALETTE["bg_figure"],
-    "axes.edgecolor":    PALETTE["neutral_mid"],
-    "axes.labelcolor":   PALETTE["neutral_dark"],
-    "axes.titlesize":    10,
-    "axes.titleweight":  "bold",
-    "axes.labelsize":    9,
-    "axes.spines.top":   False,
+    "axes.facecolor": PALETTE["bg_figure"],
+    "axes.edgecolor": PALETTE["neutral_mid"],
+    "axes.labelcolor": PALETTE["neutral_dark"],
+    "axes.titlesize": 10,
+    "axes.titleweight": "bold",
+    "axes.labelsize": 9,
+    "axes.spines.top": False,
     "axes.spines.right": False,
-    "axes.prop_cycle":   mpl.cycler(color=COLOR_CYCLE),  # type: ignore[attr-defined]
-    "axes.grid":         True,
-    "axes.axisbelow":    True,
-
+    "axes.prop_cycle": mpl.cycler(color=COLOR_CYCLE),  # type: ignore[attr-defined]
+    "axes.grid": True,
+    "axes.axisbelow": True,
     # Grid
-    "grid.color":     PALETTE["neutral_light"],
+    "grid.color": PALETTE["neutral_light"],
     "grid.linewidth": 0.8,
-    "grid.alpha":     0.7,
-
+    "grid.alpha": 0.7,
     # Lines & markers
-    "lines.linewidth":  1.8,
+    "lines.linewidth": 1.8,
     "lines.markersize": 5,
-
     # Fonts  (LaTeX-compatible, no full LaTeX engine required)
-    "font.family":   "serif",
-    "font.size":      9,
+    "font.family": "serif",
+    "font.size": 9,
     "mathtext.fontset": "cm",
-
     # Legend
-    "legend.fontsize":    8,
-    "legend.framealpha":  0.85,
-    "legend.edgecolor":   PALETTE["neutral_light"],
-
+    "legend.fontsize": 8,
+    "legend.framealpha": 0.85,
+    "legend.edgecolor": PALETTE["neutral_light"],
     # Ticks
-    "xtick.color":       PALETTE["neutral_dark"],
-    "ytick.color":       PALETTE["neutral_dark"],
-    "xtick.labelsize":   8,
-    "ytick.labelsize":   8,
-    "xtick.direction":   "out",
-    "ytick.direction":   "out",
-
+    "xtick.color": PALETTE["neutral_dark"],
+    "ytick.color": PALETTE["neutral_dark"],
+    "xtick.labelsize": 8,
+    "ytick.labelsize": 8,
+    "xtick.direction": "out",
+    "ytick.direction": "out",
     # Saving
-    "savefig.dpi":        300,
-    "savefig.bbox":       "tight",
-    "savefig.facecolor":  PALETTE["bg_paper"],
+    "savefig.dpi": 300,
+    "savefig.bbox": "tight",
+    "savefig.facecolor": PALETTE["bg_paper"],
 }
 
 
@@ -129,6 +117,7 @@ def reset() -> None:
 
 
 # ── Bar-chart helper ───────────────────────────────────────────────────────────
+
 
 def bar_colors(n: int, *, start: str = "primary") -> list[str]:
     """

@@ -43,7 +43,7 @@ _DEFAULT_RARE_LMX_TOKENS: frozenset[str] = frozenset({"tied:start", "tied:stop"}
 
 
 def _train_indices_with_rare_oversample(
-    full_ds: "OMRDataset",
+    full_ds: OMRDataset,
     train_idx: list[int],
     *,
     oversample: int,
@@ -82,16 +82,18 @@ _CLEF_LEADSHEET = frozenset({"clef:G2"})
 # Exotic meters (7/4, 9/8, 11/8 …) appear in classical PrIMuS but not Real Book.
 # These two constants are kept in separate modules to avoid coupling CRNN_CTC
 # (training) to omr_pipeline (inference).
-_COMMON_TIME_SIGS: frozenset[tuple[str, str]] = frozenset({
-    ("beats:4", "beat-type:4"),
-    ("beats:3", "beat-type:4"),
-    ("beats:2", "beat-type:4"),
-    ("beats:2", "beat-type:2"),
-    ("beats:6", "beat-type:8"),
-    ("beats:6", "beat-type:4"),
-    ("beats:5", "beat-type:4"),
-    ("beats:12", "beat-type:8"),
-})
+_COMMON_TIME_SIGS: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("beats:4", "beat-type:4"),
+        ("beats:3", "beat-type:4"),
+        ("beats:2", "beat-type:4"),
+        ("beats:2", "beat-type:2"),
+        ("beats:6", "beat-type:8"),
+        ("beats:6", "beat-type:4"),
+        ("beats:5", "beat-type:4"),
+        ("beats:12", "beat-type:8"),
+    }
+)
 
 
 def _is_degenerate(
@@ -136,6 +138,7 @@ def _is_degenerate(
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _discover_samples(
     data_dir: Path,
     *,
@@ -173,6 +176,7 @@ def _image_source_height(path: Path) -> int:
     """
     try:
         from PIL import Image
+
         with Image.open(path) as img:
             return img.size[1]  # (width, height) → height
     except Exception:
@@ -213,6 +217,7 @@ def _load_lmx_tokens(path: Path) -> list[str]:
 # Online augmentation — applied at __getitem__ for epoch-to-epoch diversity
 # ---------------------------------------------------------------------------
 
+
 def _online_jitter(img: np.ndarray) -> np.ndarray:
     """Apply cheap per-sample jitter to a [0, 1] grayscale image.
 
@@ -231,7 +236,7 @@ def _online_jitter(img: np.ndarray) -> np.ndarray:
     h, w = img.shape
 
     gain = 1.0 + (random.random() - 0.5) * 0.10  # [0.95, 1.05]
-    bias = (random.random() - 0.5) * 0.06         # [-0.03, 0.03]
+    bias = (random.random() - 0.5) * 0.06  # [-0.03, 0.03]
     img = img * gain + bias
 
     sigma = random.uniform(0.005, 0.015)
@@ -241,9 +246,9 @@ def _online_jitter(img: np.ndarray) -> np.ndarray:
     if shift != 0:
         img = np.roll(img, shift, axis=1)
         if shift > 0:
-            img[:, :shift] = img[:, shift:shift + 1]
+            img[:, :shift] = img[:, shift : shift + 1]
         else:
-            img[:, shift:] = img[:, shift - 1:shift]
+            img[:, shift:] = img[:, shift - 1 : shift]
 
     return np.clip(img, 0.0, 1.0)
 
@@ -265,10 +270,7 @@ def _strip_header_tokens(tokens: list[str]) -> list[str]:
         return tokens
 
     i = 1
-    while i < len(tokens) and any(
-        tokens[i] == p or tokens[i].startswith(p)
-        for p in _HEADER_PREFIXES
-    ):
+    while i < len(tokens) and any(tokens[i] == p or tokens[i].startswith(p) for p in _HEADER_PREFIXES):
         i += 1
     return ["measure"] + tokens[i:]
 
@@ -288,13 +290,14 @@ def _find_header_crop_x(img: np.ndarray) -> int | None:
     gray = img if img.ndim == 2 else cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     _, binary = cv2.threshold(
         (gray * 255).astype(np.uint8) if gray.dtype == np.float32 else gray,
-        0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU,
+        0,
+        255,
+        cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU,
     )
 
     h_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (max(15, w // 10), 1))
     staff_mask = cv2.morphologyEx(binary, cv2.MORPH_OPEN, h_kernel)
-    content = np.clip(binary.astype(np.int16) - staff_mask.astype(np.int16),
-                      0, 255).astype(np.uint8)
+    content = np.clip(binary.astype(np.int16) - staff_mask.astype(np.int16), 0, 255).astype(np.uint8)
 
     col_ink = content.sum(axis=0).astype(np.float32) / 255.0
     k = max(3, w // 100) | 1
@@ -320,6 +323,7 @@ def _find_header_crop_x(img: np.ndarray) -> int | None:
 # ---------------------------------------------------------------------------
 # Dataset
 # ---------------------------------------------------------------------------
+
 
 class OMRDataset(Dataset):
     """PNG + LMX dataset for CTC-based monophonic OMR.
@@ -359,7 +363,7 @@ class OMRDataset(Dataset):
         max_image_width: int = 0,
         scanned_dir: Path | str | None = None,
         filter_non_leadsheet_clef: bool = False,  # Config default: True
-        filter_unusual_time: bool = False,         # Config default: True
+        filter_unusual_time: bool = False,  # Config default: True
         filter_multi_staff: bool = True,
         max_source_height: int = 180,
         extra_data_dirs: list[Path] | None = None,
@@ -379,7 +383,7 @@ class OMRDataset(Dataset):
 
         # Discover all valid (png + lmx) samples from primary + extra dirs
         raw_samples = _discover_samples(self.data_dir, require_lmx=True)
-        for extra in (extra_data_dirs or []):
+        for extra in extra_data_dirs or []:
             extra_path = Path(extra)
             if extra_path.is_dir():
                 extra_samples = _discover_samples(extra_path, require_lmx=True)
@@ -427,7 +431,8 @@ class OMRDataset(Dataset):
             if n_tall:
                 log.info(
                     "Height filter (max %dpx) removed %d multi-staff images",
-                    max_source_height, n_tall,
+                    max_source_height,
+                    n_tall,
                 )
         else:
             self._samples = after_token_filter
@@ -435,22 +440,21 @@ class OMRDataset(Dataset):
         if self._samples:
             log.info(
                 "OMRDataset: %d samples retained from %s%s",
-                len(self._samples), self.data_dir,
+                len(self._samples),
+                self.data_dir,
                 f" (images from {self.scanned_dir})" if self.scanned_dir else "",
             )
 
         if not self._samples:
-            raise RuntimeError(
-                f"No samples remain in {self.data_dir} after filtering."
-            )
+            raise RuntimeError(f"No samples remain in {self.data_dir} after filtering.")
 
         if oov:
             total = sum(oov.values())
             top5 = sorted(oov.items(), key=lambda x: -x[1])[:5]
             log.warning(
-                "OOV tokens in dataset: %d unique, %d occurrences. "
-                "Top: %s",
-                len(oov), total,
+                "OOV tokens in dataset: %d unique, %d occurrences. Top: %s",
+                len(oov),
+                total,
                 ", ".join(f"{tok!r} ×{cnt}" for tok, cnt in top5),
             )
 
@@ -498,15 +502,15 @@ class OMRDataset(Dataset):
 
         # Normalise to zero-mean, unit-variance
         img = (img - img.mean()) / (img.std() + 1e-6)
-        img_t = torch.from_numpy(img).unsqueeze(0)      # (1, H, W)
+        img_t = torch.from_numpy(img).unsqueeze(0)  # (1, H, W)
 
         label = self.vocab.encode(tokens)
 
         return {
             "sample_id": sid,
-            "image": img_t,                          # (1, H, W)
+            "image": img_t,  # (1, H, W)
             "label": torch.tensor(label, dtype=torch.long),  # (L,)
-            "tokens": tokens,                         # raw strings (debug)
+            "tokens": tokens,  # raw strings (debug)
         }
 
     # -- Convenience --------------------------------------------------------
@@ -519,6 +523,7 @@ class OMRDataset(Dataset):
 # ---------------------------------------------------------------------------
 # Collate function — pad images to uniform width, pack CTC targets
 # ---------------------------------------------------------------------------
+
 
 def collate_fn(
     batch: list[dict[str, Tensor | list[str] | str]],
@@ -551,11 +556,9 @@ def collate_fn(
         padded.append(im)
 
     return {
-        "images": torch.stack(padded, dim=0),           # (B, 1, H, W_max)
-        "labels": torch.cat(labels, dim=0),              # (sum L_i,)
-        "label_lens": torch.tensor(
-            [l.size(0) for l in labels], dtype=torch.long
-        ),                                                # (B,)
+        "images": torch.stack(padded, dim=0),  # (B, 1, H, W_max)
+        "labels": torch.cat(labels, dim=0),  # (sum L_i,)
+        "label_lens": torch.tensor([label.size(0) for label in labels], dtype=torch.long),  # (B,)
         "image_widths": torch.tensor(widths, dtype=torch.long),  # (B,)
         "sample_ids": sample_ids,
     }
@@ -564,6 +567,7 @@ def collate_fn(
 # ---------------------------------------------------------------------------
 # Train / val split helper
 # ---------------------------------------------------------------------------
+
 
 class _AugSubset(Dataset):
     """Thin wrapper around a ``Subset`` that enables training-only augmentation.
@@ -655,7 +659,9 @@ def make_splits(
     extra_scanned_combined.extend(finetune_scanned_dirs or [])
 
     full_ds = OMRDataset(
-        data_dir, vocab, img_height=img_height,
+        data_dir,
+        vocab,
+        img_height=img_height,
         max_image_width=max_image_width,
         scanned_dir=scanned_dir,
         filter_non_leadsheet_clef=filter_non_leadsheet_clef,
@@ -675,11 +681,7 @@ def make_splits(
     n_train = n - n_val - n_test
 
     train_idx = perm[:n_train]
-    rare_set = (
-        rare_lmx_tokens
-        if rare_lmx_tokens is not None
-        else _DEFAULT_RARE_LMX_TOKENS
-    )
+    rare_set = rare_lmx_tokens if rare_lmx_tokens is not None else _DEFAULT_RARE_LMX_TOKENS
     train_idx = _train_indices_with_rare_oversample(
         full_ds,
         train_idx,
@@ -703,6 +705,9 @@ def make_splits(
 
     log.info(
         "Split: train_loader=%d (unique ids %d)  val=%d  test=%d",
-        len(train_idx), n_train, n_val, n_test,
+        len(train_idx),
+        n_train,
+        n_val,
+        n_test,
     )
     return train_ds, Subset(full_ds, val_idx), Subset(full_ds, test_idx)

@@ -49,35 +49,47 @@ log = logging.getLogger(__name__)
 
 # PrIMuS duration names → LMX duration token
 _DUR_LMX: dict[str, str] = {
-    "breve":            "breve",
-    "whole":            "whole",
-    "half":             "half",
-    "quarter":          "quarter",
-    "eighth":           "eighth",
-    "sixteenth":        "16th",
-    "32nd":             "32nd",
-    "64th":             "64th",
+    "breve": "breve",
+    "whole": "whole",
+    "half": "half",
+    "quarter": "quarter",
+    "eighth": "eighth",
+    "sixteenth": "16th",
+    "32nd": "32nd",
+    "64th": "64th",
     # legacy PrIMuS aliases
-    "thirty_second":    "32nd",
-    "sixty_fourth":     "64th",
+    "thirty_second": "32nd",
+    "sixty_fourth": "64th",
     # longa (4 whole notes)
-    "quadruple_whole":  "longa",
+    "quadruple_whole": "longa",
     # double whole (breve alias sometimes seen)
-    "double_whole":     "breve",
+    "double_whole": "breve",
 }
 
 # Key-signature root → number of fifths.
 # The PrIMuS key format is e.g. "EbM", "F#m", "C", "AbM".
 _KEY_FIFTHS: dict[str, int] = {
-    "Cb": -7, "Gb": -6, "Db": -5, "Ab": -4, "Eb": -3, "Bb": -2,
-    "F":  -1, "C":   0, "G":   1, "D":   2, "A":   3, "E":   4,
-    "B":   5, "F#":  6, "C#":  7,
+    "Cb": -7,
+    "Gb": -6,
+    "Db": -5,
+    "Ab": -4,
+    "Eb": -3,
+    "Bb": -2,
+    "F": -1,
+    "C": 0,
+    "G": 1,
+    "D": 2,
+    "A": 3,
+    "E": 4,
+    "B": 5,
+    "F#": 6,
+    "C#": 7,
 }
 
 # Steps altered by N fifths.  Positive fifths → sharps in FCGDAEB order;
 # negative fifths → flats in BEADGCF order.
 _SHARP_ORDER = "FCGDAEB"
-_FLAT_ORDER  = "BEADGCF"
+_FLAT_ORDER = "BEADGCF"
 
 
 def _key_altered_steps(fifths: int) -> set[str]:
@@ -94,10 +106,10 @@ def _key_altered_steps(fifths: int) -> set[str]:
 
 # PrIMuS accidental suffixes → LMX accidental token
 _ACC_SEMANTIC_TO_LMX: dict[str, str] = {
-    "b":  "flat",
+    "b": "flat",
     "bb": "flat-flat",
-    "#":  "sharp",
-    "x":  "double-sharp",
+    "#": "sharp",
+    "x": "double-sharp",
     "##": "double-sharp",
 }
 
@@ -108,6 +120,7 @@ _PITCH_RE = re.compile(r"^([A-G])(b{1,2}|#{1,2}|x?)(\d+)$")
 # ---------------------------------------------------------------------------
 # Core converter: .semantic tokens → LMX tokens
 # ---------------------------------------------------------------------------
+
 
 def semantic_to_lmx_tokens(
     tokens: list[str],
@@ -134,7 +147,7 @@ def semantic_to_lmx_tokens(
 
     # State
     key_altered: set[str] = set()  # steps altered by current key sig
-    key_emitted: bool = False      # guard: emit key:fifths:0 if no explicit key seen
+    key_emitted: bool = False  # guard: emit key:fifths:0 if no explicit key seen
     pending_tie_stop: bool = False
     in_multirest: bool = False  # suppress barline after multirest
 
@@ -335,6 +348,7 @@ def semantic_to_lmx_tokens(
 # Full conversion: .semantic → .lmx
 # ---------------------------------------------------------------------------
 
+
 def convert_sample(sample_dir: Path) -> list[str] | None:
     """
     Read the ``.semantic`` file from *sample_dir*, convert to LMX, and write
@@ -384,16 +398,14 @@ def _convert_worker(sample_dir: Path) -> bool:
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Convert PrIMuS .semantic annotations to monophonic LMX."
-    )
+    parser = argparse.ArgumentParser(description="Convert PrIMuS .semantic annotations to monophonic LMX.")
     parser.add_argument(
         "--source",
         type=Path,
         default=Path("data/processed/primus/clean"),
-        help="Dataset root containing rendered sample subdirectories "
-             "(default: data/processed/primus/clean)",
+        help="Dataset root containing rendered sample subdirectories (default: data/processed/primus/clean)",
     )
     parser.add_argument(
         "--limit",
@@ -426,10 +438,7 @@ def main() -> None:
         logging.getLogger().setLevel(logging.DEBUG)
 
     # Collect sample directories recursively
-    sample_dirs = sorted(
-        d for d in args.source.rglob("*")
-        if d.is_dir() and (d / f"{d.name}.semantic").exists()
-    )
+    sample_dirs = sorted(d for d in args.source.rglob("*") if d.is_dir() and (d / f"{d.name}.semantic").exists())
 
     if not sample_dirs:
         log.error("No samples found in %s", args.source)
@@ -440,7 +449,8 @@ def main() -> None:
 
     log.info(
         "Converting %d samples → LMX (workers=%d)",
-        len(sample_dirs), args.workers,
+        len(sample_dirs),
+        args.workers,
     )
 
     error_log = args.source / "errors_convert.log"

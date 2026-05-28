@@ -20,6 +20,7 @@ Usage::
     poetry run python -m CRNN_CTC.chord_finetune \
         --epochs 20 --synth-weight 0.5 --lr 2e-4
 """
+
 from __future__ import annotations
 
 import argparse
@@ -43,10 +44,15 @@ from .chord_dataset import (
     _apply_augmentation,
     _load_chord_image,
 )
-from .chord_train import _seed_everything, _train_one_epoch, _validate
+from .dataset import collate_fn
 from .model import CRNN
+from .training_utils import (
+    seed_everything,
+    train_one_epoch,
+    update_latest_symlink,
+    validate_ctc_epoch,
+)
 from .vocab import Vocabulary
-from .dataset import collate_fn  # generic; reused as-is
 
 log = logging.getLogger(__name__)
 
@@ -54,6 +60,7 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Real-data dataset (reads labels.jsonl)
 # ---------------------------------------------------------------------------
+
 
 class RealChordDataset(Dataset):
     """Hand-labeled real Real Book chord strips."""
@@ -80,6 +87,7 @@ class RealChordDataset(Dataset):
         # which we silently normalise here so they match the synthetic
         # training distribution.
         import re as _re
+
         vocab_chars = set(vocab._tok2idx.keys())
 
         # Half-diminished synonyms typed without ø: "m7b5", "-7b5", "min7b5"
@@ -121,12 +129,12 @@ class RealChordDataset(Dataset):
             log.warning("Dropped %d real samples with empty/non-vocab labels", n_dropped)
 
         if not self._samples:
-            raise RuntimeError(
-                f"No labeled real samples in {labels_jsonl} (status=done with non-null label)"
-            )
+            raise RuntimeError(f"No labeled real samples in {labels_jsonl} (status=done with non-null label)")
         log.info(
             "RealChordDataset: %d labeled strips from %s (augment=%s)",
-            len(self._samples), labels_jsonl, augment,
+            len(self._samples),
+            labels_jsonl,
+            augment,
         )
 
     def __len__(self) -> int:
@@ -140,7 +148,6 @@ class RealChordDataset(Dataset):
             self.max_image_width,
         )
         if self.augment:
-            import random as _r
             img_u8 = (img * 255).astype(np.uint8)
             # Real strips already have natural clutter — only apply
             # Albumentations geometric/photometric jitter, not synthetic clutter.
@@ -162,6 +169,7 @@ class RealChordDataset(Dataset):
 # Fine-tune driver
 # ---------------------------------------------------------------------------
 
+
 def _build_weighted_sampler(
     n_real: int,
     n_synth: int,
@@ -175,7 +183,7 @@ def _build_weighted_sampler(
 
 
 def finetune(args) -> Path:
-    _seed_everything(args.seed)
+    seed_everything(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     use_amp = device.type == "cuda"
     if use_amp:
@@ -217,8 +225,9 @@ def finetune(args) -> Path:
     train_idx = perm[n_val:]
 
     from torch.utils.data import Subset
+
     real_train = Subset(real_ds, train_idx)
-    real_val   = Subset(real_ds, val_idx)
+    real_val = Subset(real_ds, val_idx)
     log.info("Real split: %d train / %d val", len(real_train), len(real_val))
 
     synth_train = ChordDataset(
@@ -240,17 +249,25 @@ def finetune(args) -> Path:
     )
     log.info(
         "Combined sampler: %d epoch samples (real wt=1.0, synth wt=%.2f)",
-        sampler.num_samples, args.synth_weight,
+        sampler.num_samples,
+        args.synth_weight,
     )
 
     train_loader = DataLoader(
-        combined, batch_size=args.batch_size, sampler=sampler,
-        num_workers=args.num_workers, collate_fn=collate_fn,
-        pin_memory=use_amp, drop_last=True,
+        combined,
+        batch_size=args.batch_size,
+        sampler=sampler,
+        num_workers=args.num_workers,
+        collate_fn=collate_fn,
+        pin_memory=use_amp,
+        drop_last=True,
     )
     val_loader = DataLoader(
-        real_val, batch_size=args.batch_size, shuffle=False,
-        num_workers=args.num_workers, collate_fn=collate_fn,
+        real_val,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=args.num_workers,
+        collate_fn=collate_fn,
         pin_memory=use_amp,
     )
 
@@ -272,8 +289,11 @@ def finetune(args) -> Path:
 
     total_steps = len(train_loader) * args.epochs
     scheduler = OneCycleLR(
-        optimiser, max_lr=args.lr, total_steps=total_steps,
-        pct_start=args.warmup_frac, anneal_strategy="cos",
+        optimiser,
+        max_lr=args.lr,
+        total_steps=total_steps,
+        pct_start=args.warmup_frac,
+        anneal_strategy="cos",
     )
     scaler = GradScaler("cuda", enabled=use_amp)
 
@@ -293,16 +313,35 @@ def finetune(args) -> Path:
 
     for epoch in range(1, args.epochs + 1):
         t0 = time.time()
-        train_loss = _train_one_epoch(
-            model, train_loader, criterion, optimiser, scheduler, scaler,
-            device, use_amp, args.max_grad_norm,
+        train_loss = train_one_epoch(
+            model,
+            train_loader,
+            criterion,
+            optimiser,
+            scheduler,
+            scaler,
+            device,
+            use_amp,
+            max_grad_norm=args.max_grad_norm,
         )
-        val_loss, val_cer = _validate(model, val_loader, criterion, vocab, device, use_amp)
+        val_loss, val_cer = validate_ctc_epoch(
+            model,
+            val_loader,
+            criterion,
+            vocab,
+            device,
+            use_amp,
+        )
         dt = time.time() - t0
 
         log.info(
             "Epoch %d/%d  train=%.4f  val=%.4f  CER=%.4f  (%.1fs)",
-            epoch, args.epochs, train_loss, val_loss, val_cer, dt,
+            epoch,
+            args.epochs,
+            train_loss,
+            val_loss,
+            val_cer,
+            dt,
         )
         with open(log_csv, "a", newline="") as f:
             csv.writer(f).writerow([epoch, train_loss, val_loss, val_cer, dt])
@@ -310,15 +349,18 @@ def finetune(args) -> Path:
         if val_cer < best_cer:
             best_cer = val_cer
             no_improve = 0
-            torch.save({
-                "epoch": epoch,
-                "model_state": model.state_dict(),
-                "config": cfg,
-                "vocab_tokens": vocab._idx2tok[3:],
-                "val_cer": val_cer,
-                "val_loss": val_loss,
-                "finetuned_from": str(ckpt_path),
-            }, best_path)
+            torch.save(
+                {
+                    "epoch": epoch,
+                    "model_state": model.state_dict(),
+                    "config": cfg,
+                    "vocab_tokens": vocab._idx2tok[3:],
+                    "val_cer": val_cer,
+                    "val_loss": val_loss,
+                    "finetuned_from": str(ckpt_path),
+                },
+                best_path,
+            )
             log.info("  ↳ new best CER: %.4f  saved → %s", best_cer, best_path)
         else:
             no_improve += 1
@@ -326,14 +368,7 @@ def finetune(args) -> Path:
                 log.info("Early stopping: no val-CER improvement for %d epochs", no_improve)
                 break
 
-    # Update 'latest' symlink for inference auto-discovery
-    latest = Path(args.model_dir) / "latest"
-    if latest.is_symlink() or latest.exists():
-        latest.unlink()
-    try:
-        latest.symlink_to(out_dir.name)
-    except OSError:
-        pass
+    update_latest_symlink(Path(args.model_dir), out_dir)
 
     log.info("Fine-tune complete.  Best CER: %.4f  →  %s", best_cer, best_path)
     return best_path
@@ -341,27 +376,27 @@ def finetune(args) -> Path:
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    p.add_argument("--checkpoint",
-                   default="models/chord/latest/best_model.pt",
-                   help="Synthetic-pretrained checkpoint to start from.")
+    p.add_argument(
+        "--checkpoint",
+        default="models/chord/latest/best_model.pt",
+        help="Synthetic-pretrained checkpoint to start from.",
+    )
     p.add_argument("--real-strips-dir", default="data/chord_real/strips")
-    p.add_argument("--real-labels",     default="data/chord_real/labels.jsonl")
-    p.add_argument("--synth-dir",       default="data/chord_synth")
-    p.add_argument("--vocab-path",      default="data/vocab/chord.txt")
-    p.add_argument("--model-dir",       default="models/chord")
-    p.add_argument("--epochs",          type=int, default=20)
-    p.add_argument("--batch-size",      type=int, default=32)
-    p.add_argument("--lr",              type=float, default=2e-4,
-                   help="Lower LR than from-scratch (default: 2e-4).")
-    p.add_argument("--weight-decay",    type=float, default=1e-4)
-    p.add_argument("--warmup-frac",     type=float, default=0.05)
-    p.add_argument("--max-grad-norm",   type=float, default=5.0)
-    p.add_argument("--num-workers",     type=int, default=6)
-    p.add_argument("--synth-weight",    type=float, default=0.5,
-                   help="Per-sample weight for synthetic data (real=1.0).")
+    p.add_argument("--real-labels", default="data/chord_real/labels.jsonl")
+    p.add_argument("--synth-dir", default="data/chord_synth")
+    p.add_argument("--vocab-path", default="data/vocab/chord.txt")
+    p.add_argument("--model-dir", default="models/chord")
+    p.add_argument("--epochs", type=int, default=20)
+    p.add_argument("--batch-size", type=int, default=32)
+    p.add_argument("--lr", type=float, default=2e-4, help="Lower LR than from-scratch (default: 2e-4).")
+    p.add_argument("--weight-decay", type=float, default=1e-4)
+    p.add_argument("--warmup-frac", type=float, default=0.05)
+    p.add_argument("--max-grad-norm", type=float, default=5.0)
+    p.add_argument("--num-workers", type=int, default=6)
+    p.add_argument("--synth-weight", type=float, default=0.5, help="Per-sample weight for synthetic data (real=1.0).")
     p.add_argument("--early-stopping-patience", type=int, default=6)
-    p.add_argument("--seed",            type=int, default=42)
-    p.add_argument("--log-level",       default="INFO")
+    p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--log-level", default="INFO")
     args = p.parse_args()
 
     logging.basicConfig(

@@ -34,11 +34,7 @@ import os
 import sys
 from pathlib import Path
 
-# ---------------------------------------------------------------------------
-# Ensure src/ is on sys.path so imports work when the script is invoked
-# directly (``python src/cli.py …``).
-# ---------------------------------------------------------------------------
-_SRC = Path(__file__).resolve().parent            # …/TFG-OMR/src
+_SRC = Path(__file__).resolve().parent
 for _p in (str(_SRC), str(_SRC.parent)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
@@ -60,20 +56,17 @@ def _get_default_workers() -> int:
     return max(1, cpu_count - 2)
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Subcommand handlers
-# ═══════════════════════════════════════════════════════════════════════════
-
-# ── render ────────────────────────────────────────────────────────────────
-
 def cmd_render(args: argparse.Namespace) -> None:
     """Render PrIMuS samples with LilyJAZZ and optionally generate LMX."""
     from data_processing.generate_realbook import main as _render_main
 
     argv: list[str] = [
-        "--source", str(args.source),
-        "--output", str(args.output),
-        "--dpi", *(str(d) for d in args.dpi),
+        "--source",
+        str(args.source),
+        "--output",
+        str(args.output),
+        "--dpi",
+        *(str(d) for d in args.dpi),
     ]
     if args.limit is not None:
         argv += ["--limit", str(args.limit)]
@@ -95,6 +88,7 @@ def cmd_render(args: argparse.Namespace) -> None:
 
 
 # ── convert ───────────────────────────────────────────────────────────────
+
 
 def cmd_convert(args: argparse.Namespace) -> None:
     """Convert PrIMuS .semantic annotations → monophonic LMX (direct token remapping)."""
@@ -118,6 +112,7 @@ def cmd_convert(args: argparse.Namespace) -> None:
 
 
 # ── vocab ─────────────────────────────────────────────────────────────────
+
 
 def cmd_vocab(args: argparse.Namespace) -> None:
     """Build the LMX vocabulary file from a directory of .lmx files."""
@@ -143,6 +138,7 @@ def cmd_vocab(args: argparse.Namespace) -> None:
 
 
 # ── train ─────────────────────────────────────────────────────────────────
+
 
 def _build_config_from_args(args: argparse.Namespace):
     """Construct a Config from CLI flags, overriding only what was set."""
@@ -206,9 +202,7 @@ def _build_config_from_args(args: argparse.Namespace):
 
     rlx = getattr(args, "rare_lmx_tokens", None)
     if rlx is not None:
-        overrides["rare_lmx_tokens"] = tuple(
-            t.strip() for t in rlx.split(",") if t.strip()
-        )
+        overrides["rare_lmx_tokens"] = tuple(t.strip() for t in rlx.split(",") if t.strip())
 
     # Convert string paths to Path objects
     for key in ("data_dir", "scanned_dir", "model_dir", "vocab_path"):
@@ -275,6 +269,7 @@ def cmd_train(args: argparse.Namespace) -> None:
 
 # ── evaluate ──────────────────────────────────────────────────────────────
 
+
 def cmd_evaluate(args: argparse.Namespace) -> None:
     """Evaluate a trained model checkpoint."""
     from CRNN_CTC.evaluate import evaluate
@@ -319,13 +314,16 @@ def cmd_evaluate_ab(args: argparse.Namespace) -> None:
 
 # ── augment ───────────────────────────────────────────────────────────────
 
+
 def cmd_augment(args: argparse.Namespace) -> None:
     """Apply scan-simulation augmentations to clean dataset images."""
     from data_processing.augment_scanned import main as _augment_main
 
     argv: list[str] = [
-        "--source", str(args.source),
-        "--output", str(args.output),
+        "--source",
+        str(args.source),
+        "--output",
+        str(args.output),
     ]
     if args.copies is not None:
         argv += ["--copies", str(args.copies)]
@@ -346,16 +344,20 @@ def cmd_augment(args: argparse.Namespace) -> None:
 
 # ── api ────────────────────────────────────────────────────────────────────
 
+
 def cmd_api(args: argparse.Namespace) -> None:
     """Start the OMR web API server."""
     import uvicorn
+
     # Run from project root; api lives in src/api
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from api.main import app
+
     uvicorn.run(app, host=args.host, port=args.port)
 
 
 # ── pipeline ──────────────────────────────────────────────────────────────
+
 
 def cmd_pipeline(args: argparse.Namespace) -> None:
     """Run the full data pipeline (render → convert → augment → vocab).
@@ -418,6 +420,7 @@ def cmd_pipeline(args: argparse.Namespace) -> None:
 
 # ── pipeline-train ────────────────────────────────────────────────────────
 
+
 def cmd_pipeline_train(args: argparse.Namespace) -> None:
     """Run full pipeline followed by training."""
     cmd_pipeline(args)
@@ -436,6 +439,7 @@ def cmd_pipeline_train(args: argparse.Namespace) -> None:
 # ---------------------------------------------------------------------------
 # Reject-gate fixture harvesting + calibration
 # ---------------------------------------------------------------------------
+
 
 def cmd_harvest_reject_fixtures(args: argparse.Namespace) -> None:
     """Harvest detected music strips from PDFs for the reject calibration set."""
@@ -490,13 +494,13 @@ def cmd_calibrate_reject(args: argparse.Namespace) -> None:
     import cv2
     import numpy as np
 
+    from omr_pipeline.staff_detect import local_primary_staff_lines
     from omr_pipeline.staff_reject import (
         DEFAULT_THRESHOLDS,
         RejectThresholds,
         _interline_ink_frac,
         _line_span_min,
         _spacing_cov,
-        _strip_line_ys,
         _text_area_frac,
     )
 
@@ -513,7 +517,7 @@ def cmd_calibrate_reject(args: argparse.Namespace) -> None:
             raise RuntimeError(f"could not read {p}")
         _, binary = cv2.threshold(gray, 0, 1, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
         binary = binary.astype(np.uint8)
-        line_ys = _strip_line_ys(binary)
+        line_ys = local_primary_staff_lines(binary)
         if not line_ys or len(line_ys) < 5:
             return {
                 "line_span_min": 0.0,
@@ -537,8 +541,7 @@ def cmd_calibrate_reject(args: argparse.Namespace) -> None:
     for p in sorted(non_music_dir.glob("*.png")):
         samples_neg.append((str(p), _signals_for(p)))
 
-    log.info("Loaded %d positive (music) and %d negative (non-music) samples",
-             len(samples_pos), len(samples_neg))
+    log.info("Loaded %d positive (music) and %d negative (non-music) samples", len(samples_pos), len(samples_neg))
 
     def _sweep(values_pos: list[float], values_neg: list[float], reject_when_greater: bool) -> float:
         finite = [v for v in (values_pos + values_neg) if np.isfinite(v)]
@@ -565,7 +568,11 @@ def cmd_calibrate_reject(args: argparse.Namespace) -> None:
     chosen = RejectThresholds(
         min_line_span_frac=_sweep(pos_sig["line_span_min"], neg_sig["line_span_min"], reject_when_greater=False),
         max_spacing_cov=_sweep(pos_sig["spacing_cov"], neg_sig["spacing_cov"], reject_when_greater=True),
-        min_interline_ink_frac=_sweep(pos_sig["interline_ink_frac"], neg_sig["interline_ink_frac"], reject_when_greater=False),
+        min_interline_ink_frac=_sweep(
+            pos_sig["interline_ink_frac"],
+            neg_sig["interline_ink_frac"],
+            reject_when_greater=False,
+        ),
         max_text_area_frac=_sweep(pos_sig["text_area_frac"], neg_sig["text_area_frac"], reject_when_greater=True),
         min_mean_logprob=DEFAULT_THRESHOLDS.min_mean_logprob,
     )
@@ -589,13 +596,12 @@ def cmd_calibrate_reject(args: argparse.Namespace) -> None:
 
     tp = sum(1 for (_, s) in samples_neg if _would_reject(s, chosen))
     fp = sum(1 for (_, s) in samples_pos if _would_reject(s, chosen))
-    log.info("Confusion at chosen thresholds: TP=%d/%d  FP=%d/%d",
-             tp, len(samples_neg), fp, len(samples_pos))
+    log.info("Confusion at chosen thresholds: TP=%d/%d  FP=%d/%d", tp, len(samples_neg), fp, len(samples_pos))
 
-    for (p, s) in samples_pos:
+    for p, s in samples_pos:
         if _would_reject(s, chosen):
             log.info("  FP %s %s", p, {k: round(v, 4) for k, v in s.items()})
-    for (p, s) in samples_neg:
+    for p, s in samples_neg:
         if not _would_reject(s, chosen):
             log.info("  FN %s %s", p, {k: round(v, 4) for k, v in s.items()})
 
@@ -605,23 +611,17 @@ def cmd_calibrate_reject(args: argparse.Namespace) -> None:
     log.info("Wrote thresholds to %s", out_path)
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Argument parser
-# ═══════════════════════════════════════════════════════════════════════════
-
 def _add_common_data_args(parser: argparse.ArgumentParser) -> None:
     """Add flags shared by train / evaluate."""
     g = parser.add_argument_group("data")
-    g.add_argument("--data-dir", type=str, default=None,
-                   help="Root clean sample directory "
-                        "(default: data/processed/primus/clean)")
-    g.add_argument("--scanned-dir", type=str, default=None,
-                   help="Scanned-image directory "
-                        "(default: data/processed/primus/scanned)")
-    g.add_argument("--vocab-path", type=str, default=None,
-                   help="Vocabulary file (default: data/vocab/primus_lmx.txt)")
-    g.add_argument("--img-height", type=int, default=None,
-                   help="Resize images to this height (default: 128)")
+    g.add_argument(
+        "--data-dir", type=str, default=None, help="Root clean sample directory (default: data/processed/primus/clean)"
+    )
+    g.add_argument(
+        "--scanned-dir", type=str, default=None, help="Scanned-image directory (default: data/processed/primus/scanned)"
+    )
+    g.add_argument("--vocab-path", type=str, default=None, help="Vocabulary file (default: data/vocab/primus_lmx.txt)")
+    g.add_argument("--img-height", type=int, default=None, help="Resize images to this height (default: 128)")
     scan_group = g.add_mutually_exclusive_group()
     scan_group.add_argument(
         "--use-scanned",
@@ -636,41 +636,52 @@ def _add_common_data_args(parser: argparse.ArgumentParser) -> None:
         action="store_false",
         help="Force use of clean originals only (override default True).",
     )
-    g.add_argument("--val-frac", type=float, default=None,
-                   help="Validation split fraction (default: 0.10)")
-    g.add_argument("--test-frac", type=float, default=None,
-                   help="Test split fraction (default: 0.10)")
-    g.add_argument("--num-workers", type=int, default=None,
-                   help="DataLoader workers (default: 10)")
-    g.add_argument("--seed", type=int, default=None,
-                   help="Random seed (default: 42)")
-    g.add_argument("--no-filter-multi-staff", dest="filter_multi_staff",
-                   action="store_false", default=None,
-                   help="Disable filtering of multi-staff (tall) images (default: enabled)")
-    g.add_argument("--max-source-height", type=int, default=None,
-                   help="Max original image height for single-staff filter (default: 180 px)")
-    g.add_argument("--extra-data-dir", type=str, action="append", default=None,
-                   help="Additional data directory (repeatable, for package_ab etc.)")
-    g.add_argument("--extra-scanned-dir", type=str, action="append", default=None,
-                   help="Additional scanned-image directory (repeatable)")
+    g.add_argument("--val-frac", type=float, default=None, help="Validation split fraction (default: 0.10)")
+    g.add_argument("--test-frac", type=float, default=None, help="Test split fraction (default: 0.10)")
+    g.add_argument("--num-workers", type=int, default=None, help="DataLoader workers (default: 10)")
+    g.add_argument("--seed", type=int, default=None, help="Random seed (default: 42)")
+    g.add_argument(
+        "--no-filter-multi-staff",
+        dest="filter_multi_staff",
+        action="store_false",
+        default=None,
+        help="Disable filtering of multi-staff (tall) images (default: enabled)",
+    )
+    g.add_argument(
+        "--max-source-height",
+        type=int,
+        default=None,
+        help="Max original image height for single-staff filter (default: 180 px)",
+    )
+    g.add_argument(
+        "--extra-data-dir",
+        type=str,
+        action="append",
+        default=None,
+        help="Additional data directory (repeatable, for package_ab etc.)",
+    )
+    g.add_argument(
+        "--extra-scanned-dir",
+        type=str,
+        action="append",
+        default=None,
+        help="Additional scanned-image directory (repeatable)",
+    )
 
 
 def _add_model_args(parser: argparse.ArgumentParser) -> None:
     """Add model-architecture flags shared by train / evaluate."""
     g = parser.add_argument_group("model")
-    g.add_argument("--backbone", type=str, default=None,
-                   choices=["resnet18", "vgg"],
-                   help="CNN backbone (default: resnet18)")
-    g.add_argument("--cnn-out-channels", type=int, default=None,
-                   help="CNN output feature maps — VGG only (default: 256)")
-    g.add_argument("--cnn-dropout", type=float, default=None,
-                   help="Dropout2d after CNN blocks (default: 0.25)")
-    g.add_argument("--rnn-hidden", type=int, default=None,
-                   help="LSTM hidden size per direction (default: 256)")
-    g.add_argument("--rnn-layers", type=int, default=None,
-                   help="Stacked LSTM layers (default: 2)")
-    g.add_argument("--dropout", type=float, default=None,
-                   help="Dropout between LSTM layers (default: 0.3)")
+    g.add_argument(
+        "--backbone", type=str, default=None, choices=["resnet18", "vgg"], help="CNN backbone (default: resnet18)"
+    )
+    g.add_argument(
+        "--cnn-out-channels", type=int, default=None, help="CNN output feature maps — VGG only (default: 256)"
+    )
+    g.add_argument("--cnn-dropout", type=float, default=None, help="Dropout2d after CNN blocks (default: 0.25)")
+    g.add_argument("--rnn-hidden", type=int, default=None, help="LSTM hidden size per direction (default: 256)")
+    g.add_argument("--rnn-layers", type=int, default=None, help="Stacked LSTM layers (default: 2)")
+    g.add_argument("--dropout", type=float, default=None, help="Dropout between LSTM layers (default: 0.3)")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -679,37 +690,39 @@ def build_parser() -> argparse.ArgumentParser:
         description="TFG-OMR: End-to-end Optical Music Recognition pipeline",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("-v", "--verbose", action="store_true",
-                        help="Enable DEBUG-level logging")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Enable DEBUG-level logging")
     sub = parser.add_subparsers(dest="command", required=True)
 
     # ── render ────────────────────────────────────────────────────────
     p_rend = sub.add_parser(
         "render",
         help="Render PrIMuS → LilyJAZZ PNGs (+ LMX annotations)",
-        description="Re-render PrIMuS samples with LilyJAZZ styling and "
-                    "optionally generate LMX labels inline.",
+        description="Re-render PrIMuS samples with LilyJAZZ styling and optionally generate LMX labels inline.",
     )
-    p_rend.add_argument("--source", type=Path,
-                        default=Path("data/raw/primus"),
-                        help="PrIMuS source root (default: data/raw/primus)")
-    p_rend.add_argument("--output", type=Path,
-                        default=Path("data/processed/primus/clean"),
-                        help="Clean rendered dataset root "
-                             "(default: data/processed/primus/clean)")
-    p_rend.add_argument("--dpi", type=int, nargs="+",
-                        default=[200, 250, 300],
-                        help="Rendering resolution(s).  Pass one int for a "
-                             "fixed DPI or several for per-sample uniform "
-                             "jitter (default: 200 250 300).")
-    p_rend.add_argument("--limit", type=int, default=None,
-                        help="Process at most N samples (for testing)")
-    p_rend.add_argument("--workers", type=int, default=_get_default_workers(),
-                        help="Parallel workers (default: cpu_count - 2)")
-    p_rend.add_argument("--force", action="store_true",
-                        help="Re-render even if output PNG already exists")
-    p_rend.add_argument("--no-lmx", action="store_true",
-                        help="Skip inline LMX generation")
+    p_rend.add_argument(
+        "--source", type=Path, default=Path("data/raw/primus"), help="PrIMuS source root (default: data/raw/primus)"
+    )
+    p_rend.add_argument(
+        "--output",
+        type=Path,
+        default=Path("data/processed/primus/clean"),
+        help="Clean rendered dataset root (default: data/processed/primus/clean)",
+    )
+    p_rend.add_argument(
+        "--dpi",
+        type=int,
+        nargs="+",
+        default=[200, 250, 300],
+        help="Rendering resolution(s).  Pass one int for a "
+        "fixed DPI or several for per-sample uniform "
+        "jitter (default: 200 250 300).",
+    )
+    p_rend.add_argument("--limit", type=int, default=None, help="Process at most N samples (for testing)")
+    p_rend.add_argument(
+        "--workers", type=int, default=_get_default_workers(), help="Parallel workers (default: cpu_count - 2)"
+    )
+    p_rend.add_argument("--force", action="store_true", help="Re-render even if output PNG already exists")
+    p_rend.add_argument("--no-lmx", action="store_true", help="Skip inline LMX generation")
     p_rend.set_defaults(func=cmd_render)
 
     # ── convert ───────────────────────────────────────────────────────
@@ -718,16 +731,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="Convert PrIMuS .semantic → monophonic LMX",
         description="Run the semantic → LMX conversion pipeline.",
     )
-    p_conv.add_argument("--source", type=Path,
-                        default=Path("data/processed/primus/clean"),
-                        help="Root directory of clean rendered samples "
-                             "(default: data/processed/primus/clean)")
-    p_conv.add_argument("--limit", type=int, default=None,
-                        help="Process only N samples (for smoke tests)")
-    p_conv.add_argument("--workers", type=int, default=_get_default_workers(),
-                        help="Parallel workers for conversion (default: cpu_count - 2)")
-    p_conv.add_argument("--verbose", action="store_true",
-                        help="Per-sample conversion logging")
+    p_conv.add_argument(
+        "--source",
+        type=Path,
+        default=Path("data/processed/primus/clean"),
+        help="Root directory of clean rendered samples (default: data/processed/primus/clean)",
+    )
+    p_conv.add_argument("--limit", type=int, default=None, help="Process only N samples (for smoke tests)")
+    p_conv.add_argument(
+        "--workers",
+        type=int,
+        default=_get_default_workers(),
+        help="Parallel workers for conversion (default: cpu_count - 2)",
+    )
+    p_conv.add_argument("--verbose", action="store_true", help="Per-sample conversion logging")
     p_conv.set_defaults(func=cmd_convert)
 
     # ── augment ───────────────────────────────────────────────────────
@@ -736,21 +753,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="Apply scan-simulation augmentations to clean images",
         description="Distort clean LilyJAZZ PNGs to simulate physical scans.",
     )
-    p_aug.add_argument("--source", type=Path,
-                       default=Path("data/processed/primus/clean"),
-                       help="Clean dataset root (default: data/processed/primus/clean)")
-    p_aug.add_argument("--output", type=Path,
-                       default=Path("data/processed/primus/scanned"),
-                       help="Scanned/augmented dataset root "
-                            "(default: data/processed/primus/scanned)")
-    p_aug.add_argument("--copies", type=int, default=None,
-                       help="Augmented copies per sample (default: 1)")
-    p_aug.add_argument("--seed", type=int, default=None,
-                       help="Global random seed (default: 42)")
-    p_aug.add_argument("--workers", type=int, default=_get_default_workers(),
-                       help="Parallel workers (default: cpu_count - 2)")
-    p_aug.add_argument("--limit", type=int, default=None,
-                       help="Process at most N samples (for testing)")
+    p_aug.add_argument(
+        "--source",
+        type=Path,
+        default=Path("data/processed/primus/clean"),
+        help="Clean dataset root (default: data/processed/primus/clean)",
+    )
+    p_aug.add_argument(
+        "--output",
+        type=Path,
+        default=Path("data/processed/primus/scanned"),
+        help="Scanned/augmented dataset root (default: data/processed/primus/scanned)",
+    )
+    p_aug.add_argument("--copies", type=int, default=None, help="Augmented copies per sample (default: 1)")
+    p_aug.add_argument("--seed", type=int, default=None, help="Global random seed (default: 42)")
+    p_aug.add_argument(
+        "--workers", type=int, default=_get_default_workers(), help="Parallel workers (default: cpu_count - 2)"
+    )
+    p_aug.add_argument("--limit", type=int, default=None, help="Process at most N samples (for testing)")
     p_aug.set_defaults(func=cmd_augment)
 
     # ── vocab ─────────────────────────────────────────────────────────
@@ -759,16 +779,25 @@ def build_parser() -> argparse.ArgumentParser:
         help="Build LMX vocabulary file from .lmx data",
         description="Scan .lmx files and produce a sorted vocabulary.",
     )
-    p_vocab.add_argument("--data-dir", type=str,
-                         default="data/processed/primus/clean",
-                         help="Directory with .lmx files (searched recursively, "
-                              "default: data/processed/primus/clean)")
-    p_vocab.add_argument("--extra-data-dir", type=str, action="append", default=None,
-                         help="Additional data directory (repeatable, for package_ab etc.)")
-    p_vocab.add_argument("--output", type=str,
-                         default="data/vocab/primus_lmx.txt",
-                         help="Output vocabulary file path "
-                              "(default: data/vocab/primus_lmx.txt)")
+    p_vocab.add_argument(
+        "--data-dir",
+        type=str,
+        default="data/processed/primus/clean",
+        help="Directory with .lmx files (searched recursively, default: data/processed/primus/clean)",
+    )
+    p_vocab.add_argument(
+        "--extra-data-dir",
+        type=str,
+        action="append",
+        default=None,
+        help="Additional data directory (repeatable, for package_ab etc.)",
+    )
+    p_vocab.add_argument(
+        "--output",
+        type=str,
+        default="data/vocab/primus_lmx.txt",
+        help="Output vocabulary file path (default: data/vocab/primus_lmx.txt)",
+    )
     p_vocab.add_argument(
         "--workers",
         type=int,
@@ -786,50 +815,55 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common_data_args(p_train)
     _add_model_args(p_train)
     g_train = p_train.add_argument_group("training")
-    g_train.add_argument("--epochs", type=int, default=None,
-                   help="Number of training epochs (default: 60)")
-    g_train.add_argument("--batch-size", type=int, default=None,
-                   help="Training batch size (default: 16)")
-    g_train.add_argument("--lr", type=float, default=None,
-                   help="Peak learning rate — OneCycleLR (default: 1e-3)")
-    g_train.add_argument("--weight-decay", type=float, default=None,
-                   help="AdamW weight decay (default: 1e-4)")
-    g_train.add_argument("--warmup-frac", type=float, default=None,
-                   help="Fraction of steps for LR warm-up (default: 0.08)")
-    g_train.add_argument("--early-stopping-patience", type=int, default=None,
-                   help="Epochs without val SER improvement to wait before stopping (default: 12)")
-    g_train.add_argument("--model-dir", type=str, default=None,
-                         help="Directory for checkpoints (default: models/)")
-    g_train.add_argument("--resume", nargs="?", const="", default=None, metavar="CHECKPOINT",
-                         help="Resume from a checkpoint. Omit a path to auto-use "
-                              "the latest run's checkpoint, or supply an explicit .pt path.")
+    g_train.add_argument("--epochs", type=int, default=None, help="Number of training epochs (default: 60)")
+    g_train.add_argument("--batch-size", type=int, default=None, help="Training batch size (default: 16)")
+    g_train.add_argument("--lr", type=float, default=None, help="Peak learning rate — OneCycleLR (default: 1e-3)")
+    g_train.add_argument("--weight-decay", type=float, default=None, help="AdamW weight decay (default: 1e-4)")
+    g_train.add_argument(
+        "--warmup-frac", type=float, default=None, help="Fraction of steps for LR warm-up (default: 0.08)"
+    )
+    g_train.add_argument(
+        "--early-stopping-patience",
+        type=int,
+        default=None,
+        help="Epochs without val SER improvement to wait before stopping (default: 12)",
+    )
+    g_train.add_argument("--model-dir", type=str, default=None, help="Directory for checkpoints (default: models/)")
+    g_train.add_argument(
+        "--resume",
+        nargs="?",
+        const="",
+        default=None,
+        metavar="CHECKPOINT",
+        help="Resume from a checkpoint. Omit a path to auto-use "
+        "the latest run's checkpoint, or supply an explicit .pt path.",
+    )
     g_train.add_argument(
         "--rare-lmx-oversample",
         type=int,
         default=None,
         help="Repeat training indices for samples containing rare LMX tokens "
-             "(default: 2; 1 disables). Tokens: --rare-lmx-tokens.",
+        "(default: 2; 1 disables). Tokens: --rare-lmx-tokens.",
     )
     g_train.add_argument(
         "--strip-header-prob",
         type=float,
         default=None,
-        help="Probability of stripping clef+key+time visual header during "
-             "training (default: 0.4; 0 disables).",
+        help="Probability of stripping clef+key+time visual header during training (default: 0.4; 0 disables).",
     )
     g_train.add_argument(
         "--online-aug-prob",
         type=float,
         default=None,
         help="Probability of applying lightweight online jitter (brightness, "
-             "noise, ±2 px shift) per training sample (default: 0.5; 0 disables).",
+        "noise, ±2 px shift) per training sample (default: 0.5; 0 disables).",
     )
     g_train.add_argument(
         "--rare-lmx-tokens",
         type=str,
         default=None,
         help="Comma-separated LMX tokens to up-weight (default: tied:start,tied:stop). "
-             "Pass empty string to disable token-based oversampling.",
+        "Pass empty string to disable token-based oversampling.",
     )
     g_train.add_argument(
         "--finetune-data-dir",
@@ -853,17 +887,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Evaluate a model checkpoint",
         description="Load a checkpoint, decode a split, and report SER.",
     )
-    p_eval.add_argument("--checkpoint", type=str, required=True,
-                        help="Path to model checkpoint (.pt)")
-    p_eval.add_argument("--split", choices=["train", "val", "test"],
-                        default="test", help="Split to evaluate (default: test)")
-    p_eval.add_argument("--per-sample", action="store_true",
-                        help="Log per-sample SER (worst first)")
-    p_eval.add_argument("--beam-width", type=int, default=1,
-                        help="Beam search width (1=greedy, default: 1)")
-    p_eval.add_argument("--melodic", action="store_true",
-                        help="Also report melodic SER (measure / tied:* "
-                             "tokens stripped) alongside aggregate SER.")
+    p_eval.add_argument("--checkpoint", type=str, required=True, help="Path to model checkpoint (.pt)")
+    p_eval.add_argument(
+        "--split", choices=["train", "val", "test"], default="test", help="Split to evaluate (default: test)"
+    )
+    p_eval.add_argument("--per-sample", action="store_true", help="Log per-sample SER (worst first)")
+    p_eval.add_argument("--beam-width", type=int, default=1, help="Beam search width (1=greedy, default: 1)")
+    p_eval.add_argument(
+        "--melodic",
+        action="store_true",
+        help="Also report melodic SER (measure / tied:* tokens stripped) alongside aggregate SER.",
+    )
     _add_common_data_args(p_eval)
     _add_model_args(p_eval)
     p_eval.set_defaults(func=cmd_evaluate)
@@ -873,10 +907,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Compare SER across multiple beam widths (same split)",
         description="Runs evaluate() once per beam width for A/B comparison.",
     )
-    p_eval_ab.add_argument("--checkpoint", type=str, required=True,
-                           help="Path to model checkpoint (.pt)")
-    p_eval_ab.add_argument("--split", choices=["train", "val", "test"],
-                           default="test", help="Split (default: test)")
+    p_eval_ab.add_argument("--checkpoint", type=str, required=True, help="Path to model checkpoint (.pt)")
+    p_eval_ab.add_argument("--split", choices=["train", "val", "test"], default="test", help="Split (default: test)")
     p_eval_ab.add_argument(
         "--beams",
         type=str,
@@ -901,32 +933,47 @@ def build_parser() -> argparse.ArgumentParser:
         "pipeline",
         help="Run full data pipeline (render → convert → augment → vocab)",
     )
-    p_pipe.add_argument("--raw-primus-dir", type=Path, default=Path("data/raw/primus"),
-                        help="PrIMuS source root (default: data/raw/primus)")
-    p_pipe.add_argument("--clean-dir", type=Path, default=Path("data/processed/primus/clean"),
-                        help="Rendered clean output root "
-                             "(default: data/processed/primus/clean)")
-    p_pipe.add_argument("--scanned-dir", type=Path, default=Path("data/processed/primus/scanned"),
-                        help="Scanned/augmented output root "
-                             "(default: data/processed/primus/scanned)")
-    p_pipe.add_argument("--vocab-path", type=str, default="data/vocab/primus_lmx.txt",
-                        help="Output vocabulary path "
-                             "(default: data/vocab/primus_lmx.txt)")
+    p_pipe.add_argument(
+        "--raw-primus-dir",
+        type=Path,
+        default=Path("data/raw/primus"),
+        help="PrIMuS source root (default: data/raw/primus)",
+    )
+    p_pipe.add_argument(
+        "--clean-dir",
+        type=Path,
+        default=Path("data/processed/primus/clean"),
+        help="Rendered clean output root (default: data/processed/primus/clean)",
+    )
+    p_pipe.add_argument(
+        "--scanned-dir",
+        type=Path,
+        default=Path("data/processed/primus/scanned"),
+        help="Scanned/augmented output root (default: data/processed/primus/scanned)",
+    )
+    p_pipe.add_argument(
+        "--vocab-path",
+        type=str,
+        default="data/vocab/primus_lmx.txt",
+        help="Output vocabulary path (default: data/vocab/primus_lmx.txt)",
+    )
     p_pipe.add_argument(
         "--extra-vocab-data-dir",
         type=str,
         action="append",
         default=None,
         help="Extra directory to scan for .lmx when building vocab (repeatable), "
-             "e.g. an additional realbook_primus package.",
+        "e.g. an additional realbook_primus package.",
     )
     p_pipe.add_argument(
-        "--render-dpi", type=int, nargs="+",
+        "--render-dpi",
+        type=int,
+        nargs="+",
         default=list(_FULL_RUN_RENDER_DPI),
         help=(
             "LilyPond render DPI(s).  Pass one int for a fixed DPI or several "
-            "for per-sample uniform jitter (default: %s)."
-            % " ".join(str(d) for d in _FULL_RUN_RENDER_DPI)
+            f"for per-sample uniform jitter (default: "
+            f"{' '.join(str(d) for d in _FULL_RUN_RENDER_DPI)})."
         ),
     )
     p_pipe.add_argument(
@@ -939,7 +986,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=_FULL_RUN_AUGMENT_COPIES,
         help=f"Augmented PNGs per clean sample; keep 1 so scanned/ mirrors clean ids "
-             f"(default: {_FULL_RUN_AUGMENT_COPIES}).",
+        f"(default: {_FULL_RUN_AUGMENT_COPIES}).",
     )
     p_pipe.add_argument(
         "--augment-seed",
@@ -947,12 +994,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=_FULL_RUN_AUGMENT_SEED,
         help=f"Augmentation RNG seed (default: {_FULL_RUN_AUGMENT_SEED}).",
     )
-    p_pipe.add_argument("--limit", type=int, default=None,
-                        help="Limit number of samples processed (for testing)")
-    p_pipe.add_argument("--workers", type=int, default=_get_default_workers(),
-                        help="Parallel workers (default: cpu_count - 2)")
-    p_pipe.add_argument("--verbose", action="store_true",
-                        help="Enable verbose output")
+    p_pipe.add_argument("--limit", type=int, default=None, help="Limit number of samples processed (for testing)")
+    p_pipe.add_argument(
+        "--workers", type=int, default=_get_default_workers(), help="Parallel workers (default: cpu_count - 2)"
+    )
+    p_pipe.add_argument("--verbose", action="store_true", help="Enable verbose output")
     p_pipe.set_defaults(func=cmd_pipeline)
 
     # ── pipeline-train ────────────────────────────────────────────────
@@ -973,12 +1019,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Extra .lmx roots for vocab (repeatable); same as pipeline.",
     )
     p_ptrain.add_argument(
-        "--render-dpi", type=int, nargs="+",
+        "--render-dpi",
+        type=int,
+        nargs="+",
         default=list(_FULL_RUN_RENDER_DPI),
         help=(
             "LilyPond render DPI(s); same semantics as `pipeline --render-dpi` "
-            "(default: %s)."
-            % " ".join(str(d) for d in _FULL_RUN_RENDER_DPI)
+            f"(default: {' '.join(str(d) for d in _FULL_RUN_RENDER_DPI)})."
         ),
     )
     p_ptrain.add_argument(
@@ -991,18 +1038,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_ptrain.add_argument("--limit", type=int, default=None)
     p_ptrain.add_argument("--workers", type=int, default=_get_default_workers())
     p_ptrain.add_argument("--verbose", action="store_true")
-    
+
     # Training-specific args (inherited, excluding generic data paths)
     _add_model_args(p_ptrain)
-    
+
     # Training-specific flags not covered by common groups
     g_train = p_ptrain.add_argument_group("training")
-    g_train.add_argument("--epochs", type=int, default=None,
-                         help="Training epochs (default: from Config, 60)")
-    g_train.add_argument("--batch-size", type=int, default=None,
-                         help="Batch size (default: 16)")
-    g_train.add_argument("--lr", type=float, default=None,
-                         help="Peak learning rate / OneCycleLR (default: 1e-3)")
+    g_train.add_argument("--epochs", type=int, default=None, help="Training epochs (default: from Config, 60)")
+    g_train.add_argument("--batch-size", type=int, default=None, help="Batch size (default: 16)")
+    g_train.add_argument("--lr", type=float, default=None, help="Peak learning rate / OneCycleLR (default: 1e-3)")
     g_train.add_argument("--weight-decay", type=float, default=None)
     g_train.add_argument("--warmup-frac", type=float, default=None)
     g_train.add_argument("--early-stopping-patience", type=int, default=None)
@@ -1010,8 +1054,7 @@ def build_parser() -> argparse.ArgumentParser:
     g_train.add_argument("--resume", nargs="?", const="", default=None, metavar="CHECKPOINT")
     # Data-related training overrides (optional; by default pipeline dirs are used)
     g_data = p_ptrain.add_argument_group("data")
-    g_data.add_argument("--img-height", type=int, default=None,
-                        help="Resize images to this height (default: 128)")
+    g_data.add_argument("--img-height", type=int, default=None, help="Resize images to this height (default: 128)")
     scan_group = g_data.add_mutually_exclusive_group()
     scan_group.add_argument(
         "--use-scanned",
@@ -1026,24 +1069,34 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_false",
         help="Force use of clean originals only (override default True).",
     )
-    g_data.add_argument("--val-frac", type=float, default=None,
-                        help="Validation split fraction (default: 0.10)")
-    g_data.add_argument("--test-frac", type=float, default=None,
-                        help="Test split fraction (default: 0.10)")
-    g_data.add_argument("--num-workers", type=int, default=None,
-                        help="DataLoader workers (default: 10)")
-    g_data.add_argument("--seed", type=int, default=None,
-                        help="Random seed (default: 42)")
-    g_data.add_argument("--no-filter-multi-staff", dest="filter_multi_staff",
-                        action="store_false", default=None,
-                        help="Disable filtering of multi-staff (tall) images (default: enabled)")
-    g_data.add_argument("--max-source-height", type=int, default=None,
-                        help="Max original image height for single-staff filter (default: 180 px)")
-    g_data.add_argument("--extra-data-dir", type=str, action="append", default=None,
-                        help="Additional clean data directory (repeatable)")
-    g_data.add_argument("--extra-scanned-dir", type=str, action="append", default=None,
-                        help="Additional scanned data directory (repeatable)")
-    
+    g_data.add_argument("--val-frac", type=float, default=None, help="Validation split fraction (default: 0.10)")
+    g_data.add_argument("--test-frac", type=float, default=None, help="Test split fraction (default: 0.10)")
+    g_data.add_argument("--num-workers", type=int, default=None, help="DataLoader workers (default: 10)")
+    g_data.add_argument("--seed", type=int, default=None, help="Random seed (default: 42)")
+    g_data.add_argument(
+        "--no-filter-multi-staff",
+        dest="filter_multi_staff",
+        action="store_false",
+        default=None,
+        help="Disable filtering of multi-staff (tall) images (default: enabled)",
+    )
+    g_data.add_argument(
+        "--max-source-height",
+        type=int,
+        default=None,
+        help="Max original image height for single-staff filter (default: 180 px)",
+    )
+    g_data.add_argument(
+        "--extra-data-dir", type=str, action="append", default=None, help="Additional clean data directory (repeatable)"
+    )
+    g_data.add_argument(
+        "--extra-scanned-dir",
+        type=str,
+        action="append",
+        default=None,
+        help="Additional scanned data directory (repeatable)",
+    )
+
     p_ptrain.set_defaults(func=cmd_pipeline_train)
 
     # ─── harvest-reject-fixtures ───────────────────────────────────────────
@@ -1051,12 +1104,9 @@ def build_parser() -> argparse.ArgumentParser:
         "harvest-reject-fixtures",
         help="Harvest detected staff strips from PDFs for reject calibration",
     )
-    p_harvest.add_argument("--pdfs", nargs="+", required=True,
-                           help="Glob(s) of PDFs to harvest from")
-    p_harvest.add_argument("--pages", type=int, default=1,
-                           help="Number of pages per PDF to process (default 1)")
-    p_harvest.add_argument("--out", default="data/staff_reject/_harvest",
-                           help="Output directory for harvested strips")
+    p_harvest.add_argument("--pdfs", nargs="+", required=True, help="Glob(s) of PDFs to harvest from")
+    p_harvest.add_argument("--pages", type=int, default=1, help="Number of pages per PDF to process (default 1)")
+    p_harvest.add_argument("--out", default="data/staff_reject/_harvest", help="Output directory for harvested strips")
     p_harvest.set_defaults(func=cmd_harvest_reject_fixtures)
 
     # ─── calibrate-reject ──────────────────────────────────────────────────
@@ -1064,10 +1114,12 @@ def build_parser() -> argparse.ArgumentParser:
         "calibrate-reject",
         help="Sweep reject thresholds on a labelled fixture set",
     )
-    p_calibrate.add_argument("--fixtures", default="data/staff_reject",
-                             help="Root dir containing music/ and non_music/")
-    p_calibrate.add_argument("--out", default="models/staff_reject/thresholds.json",
-                             help="Where to write the thresholds JSON")
+    p_calibrate.add_argument(
+        "--fixtures", default="data/staff_reject", help="Root dir containing music/ and non_music/"
+    )
+    p_calibrate.add_argument(
+        "--out", default="models/staff_reject/thresholds.json", help="Where to write the thresholds JSON"
+    )
     p_calibrate.set_defaults(func=cmd_calibrate_reject)
 
     return parser
@@ -1076,6 +1128,7 @@ def build_parser() -> argparse.ArgumentParser:
 # ═══════════════════════════════════════════════════════════════════════════
 # Entry point
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def main() -> None:
     parser = build_parser()

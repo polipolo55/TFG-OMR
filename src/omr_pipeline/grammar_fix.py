@@ -21,6 +21,7 @@ Expected LMX grammar (PrIMuS format):
   KEY      := 'key:fifths:N'
   TIME     := 'time' 'beats:N' 'beat-type:N'
 """
+
 from __future__ import annotations
 
 import logging
@@ -31,16 +32,31 @@ log = logging.getLogger(__name__)
 # Token categories
 # ---------------------------------------------------------------------------
 
-_DURATIONS = frozenset({
-    "whole", "half", "quarter", "eighth", "16th", "32nd", "64th",
-    "breve", "longa",
-})
+_DURATIONS = frozenset(
+    {
+        "whole",
+        "half",
+        "quarter",
+        "eighth",
+        "16th",
+        "32nd",
+        "64th",
+        "breve",
+        "longa",
+    }
+)
 
 # Duration → fraction of a whole note (used by barline regulariser)
 _DUR_BEATS: dict[str, float] = {
-    "longa": 4.0, "breve": 2.0, "whole": 1.0, "half": 0.5,
-    "quarter": 0.25, "eighth": 0.125, "16th": 0.0625,
-    "32nd": 0.03125, "64th": 0.015625,
+    "longa": 4.0,
+    "breve": 2.0,
+    "whole": 1.0,
+    "half": 0.5,
+    "quarter": 0.25,
+    "eighth": 0.125,
+    "16th": 0.0625,
+    "32nd": 0.03125,
+    "64th": 0.015625,
 }
 
 _ACCIDENTALS = frozenset({"flat", "sharp", "natural"})
@@ -49,16 +65,18 @@ _LEAD_SHEET_CLEF = "clef:G2"
 
 # Must stay in sync with ``_COMMON_TIME_SIGS`` in ``src/CRNN_CTC/dataset.py``
 # (the training-side counterpart used for dataset filtering).
-_COMMON_TIME_SIGS: frozenset[tuple[str, str]] = frozenset({
-    ("beats:4", "beat-type:4"),
-    ("beats:3", "beat-type:4"),
-    ("beats:2", "beat-type:4"),
-    ("beats:2", "beat-type:2"),
-    ("beats:6", "beat-type:8"),
-    ("beats:6", "beat-type:4"),
-    ("beats:5", "beat-type:4"),
-    ("beats:12", "beat-type:8"),
-})
+_COMMON_TIME_SIGS: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("beats:4", "beat-type:4"),
+        ("beats:3", "beat-type:4"),
+        ("beats:2", "beat-type:4"),
+        ("beats:2", "beat-type:2"),
+        ("beats:6", "beat-type:8"),
+        ("beats:6", "beat-type:4"),
+        ("beats:5", "beat-type:4"),
+        ("beats:12", "beat-type:8"),
+    }
+)
 
 _OCTAVE_MIN = 3
 # Cap raised to 7 to accommodate jazz altissimo (a high B5/C6 in alto-sax
@@ -100,6 +118,7 @@ def _is_beat_type(tok: str) -> bool:
 # Structural parser
 # ---------------------------------------------------------------------------
 
+
 def _parse_and_repair(tokens: list[str], force_clef: bool) -> list[str]:
     """Walk through the token stream and keep only structurally valid tokens.
 
@@ -112,7 +131,7 @@ def _parse_and_repair(tokens: list[str], force_clef: bool) -> list[str]:
     n = len(tokens)
     seen_header = False
     tie_open = False
-    last_had_duration = False   # tracks whether last note/rest has its duration
+    last_had_duration = False  # tracks whether last note/rest has its duration
 
     while i < n:
         tok = tokens[i]
@@ -232,9 +251,9 @@ def _parse_and_repair(tokens: list[str], force_clef: bool) -> list[str]:
                 octave_tok = f"octave:{_OCTAVE_MIN}"
 
             # Emit the note
-            out.append(tok)          # pitch:X
-            out.append(octave_tok)   # octave:Y
-            out.append(dur_tok)      # duration
+            out.append(tok)  # pitch:X
+            out.append(octave_tok)  # octave:Y
+            out.append(dur_tok)  # duration
             out.extend(dots)
             if acc_tok:
                 out.append(acc_tok)
@@ -312,6 +331,7 @@ def _parse_and_repair(tokens: list[str], force_clef: bool) -> list[str]:
 # Key propagation
 # ---------------------------------------------------------------------------
 
+
 def _propagate_key(
     tokens: list[str],
     global_key: str | None,
@@ -354,6 +374,7 @@ def _propagate_key(
 # ---------------------------------------------------------------------------
 # Time-signature propagation
 # ---------------------------------------------------------------------------
+
 
 def _propagate_time(
     tokens: list[str],
@@ -425,6 +446,7 @@ def _propagate_time(
 # Post-validation cleanup
 # ---------------------------------------------------------------------------
 
+
 def _clean_ties(tokens: list[str]) -> list[str]:
     """Remove nonsensical tie patterns.
 
@@ -479,9 +501,7 @@ def _remove_empty_measures(tokens: list[str]) -> list[str]:
 
     out: list[str] = []
     for m in measures:
-        has_content = any(
-            _is_pitch(t) or t == "rest" for t in m
-        )
+        has_content = any(_is_pitch(t) or t == "rest" for t in m)
         # Keep header measures (with clef/key/time) and content measures
         has_header = any(_is_clef(t) or _is_key(t) or t == "time" for t in m)
         if has_content or has_header:
@@ -493,6 +513,7 @@ def _remove_empty_measures(tokens: list[str]) -> list[str]:
 # ---------------------------------------------------------------------------
 # Barline regularisation — re-insert / remove barlines by beat counting
 # ---------------------------------------------------------------------------
+
 
 def _element_duration(tokens: list[str], start: int) -> tuple[float, int]:
     """Return (duration_in_whole_notes, tokens_consumed) for a note/rest at *start*.
@@ -560,10 +581,10 @@ def _regularise_barlines(tokens: list[str]) -> list[str]:
     for i, tok in enumerate(tokens):
         if tok == "time" and i + 2 < len(tokens):
             try:
-                b = int(tokens[i + 1].split(":")[1])   # beats:N
-                bt = int(tokens[i + 2].split(":")[1])   # beat-type:N
+                b = int(tokens[i + 1].split(":")[1])  # beats:N
+                bt = int(tokens[i + 2].split(":")[1])  # beat-type:N
                 measure_len = b / bt  # in whole notes
-            except (IndexError, ValueError):
+            except IndexError, ValueError:
                 pass
             break
 
@@ -610,6 +631,7 @@ def _regularise_barlines(tokens: list[str]) -> list[str]:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def fix_sequence(
     lmx_string: str,

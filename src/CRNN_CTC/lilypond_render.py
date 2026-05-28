@@ -37,7 +37,7 @@ CLEF_LY: dict[str, str] = {
     "C2": "mezzosoprano",
     "C3": "alto",
     "C4": "tenor",
-    "C5": "baritone",    # rare PrIMuS token; LilyPond has no exact C5 clef
+    "C5": "baritone",  # rare PrIMuS token; LilyPond has no exact C5 clef
     "F5": "subbass",
 }
 """Map PrIMuS / LMX clef identifiers to LilyPond clef names."""
@@ -54,27 +54,46 @@ def normalize_clef_id_for_lead_sheet(clef_id: str) -> str:
     """Return ``G2`` for clefs we drop from raw training; otherwise *clef_id*."""
     return "G2" if clef_id in CLEF_IDS_NORMALIZE_TO_G2 else clef_id
 
+
 KEY_LY: dict[int, str] = {
-    -7: r"\key ces \major", -6: r"\key ges \major", -5: r"\key des \major",
-    -4: r"\key aes \major", -3: r"\key ees \major", -2: r"\key bes \major",
-    -1: r"\key f \major",    0: r"\key c \major",    1: r"\key g \major",
-     2: r"\key d \major",    3: r"\key a \major",    4: r"\key e \major",
-     5: r"\key b \major",    6: r"\key fis \major",  7: r"\key cis \major",
+    -7: r"\key ces \major",
+    -6: r"\key ges \major",
+    -5: r"\key des \major",
+    -4: r"\key aes \major",
+    -3: r"\key ees \major",
+    -2: r"\key bes \major",
+    -1: r"\key f \major",
+    0: r"\key c \major",
+    1: r"\key g \major",
+    2: r"\key d \major",
+    3: r"\key a \major",
+    4: r"\key e \major",
+    5: r"\key b \major",
+    6: r"\key fis \major",
+    7: r"\key cis \major",
 }
 """Map *fifths* count (LMX ``key:fifths:N``) to a LilyPond ``\\key`` command."""
 
 DUR_LY: dict[str, str] = {
-    "whole": "1", "half": "2", "quarter": "4", "eighth": "8",
-    "16th": "16", "32nd": "32", "64th": "64", "128th": "128",
-    "256th": "256", "1024th": "1024", "breve": r"\breve",
+    "whole": "1",
+    "half": "2",
+    "quarter": "4",
+    "eighth": "8",
+    "16th": "16",
+    "32nd": "32",
+    "64th": "64",
+    "128th": "128",
+    "256th": "256",
+    "1024th": "1024",
+    "breve": r"\breve",
     "longa": r"\longa",
 }
 """Map LMX duration token names to LilyPond duration strings."""
 
 _SHARP_ORDER = list("FCGDAEB")
-_FLAT_ORDER  = list("BEADGCF")
+_FLAT_ORDER = list("BEADGCF")
 _PITCH_STEPS = set("ABCDEFG")
-_DURATIONS   = set(DUR_LY)
+_DURATIONS = set(DUR_LY)
 
 LY_TEMPLATE = r"""
 \version "2.26.0"
@@ -106,6 +125,7 @@ for a custom size — the directive must sit between ``\\version`` and
 
 # ── LMX tokens → LilyPond music body ──────────────────────────────────────────
 
+
 def lmx_to_lilypond(
     tokens: list[str],
     render_time_hint: tuple[int, int] | None = None,
@@ -135,11 +155,11 @@ def lmx_to_lilypond(
     """
     # Pre-scan: which header tokens are present? Drives \omit directives below.
     has_clef = any(t.startswith("clef:") for t in tokens)
-    has_key  = any(t.startswith("key:fifths:") for t in tokens)
+    has_key = any(t.startswith("key:fifths:") for t in tokens)
     has_time = "time" in tokens
 
     key_sharps: set[str] = set()
-    key_flats:  set[str] = set()
+    key_flats: set[str] = set()
     lily: list[str] = []
     if not has_clef:
         lily.append(r"\omit Staff.Clef")
@@ -156,15 +176,15 @@ def lmx_to_lilypond(
     beats_val: str | None = None
     beat_type_val: str | None = None
     pending: dict | None = None
-    cur_beats: int = 4          # numerator of current time signature
-    cur_beat_type: int = 4      # denominator of current time signature
+    cur_beats: int = 4  # numerator of current time signature
+    cur_beat_type: int = 4  # denominator of current time signature
 
     def _flush() -> None:
         nonlocal pending
         if pending is None:
             return
         kind = pending["kind"]
-        dur  = pending.get("dur")
+        dur = pending.get("dur")
         if not dur:
             pending = None
             return
@@ -175,14 +195,14 @@ def lmx_to_lilypond(
         elif kind == "forward":
             lily.append(f"s{dur}{dots}")
         elif kind == "note":
-            step    = pending.get("step")
-            octave  = pending.get("octave")
+            step = pending.get("step")
+            octave = pending.get("octave")
             if step is None or octave is None:
                 # Incomplete note — skip
                 pending = None
                 return
-            letter  = step.lower()
-            acc     = pending.get("acc")
+            letter = step.lower()
+            acc = pending.get("acc")
 
             if acc == "flat":
                 letter += "es"
@@ -223,11 +243,14 @@ def lmx_to_lilypond(
             fifths = int(tok.split(":")[-1])
             fifths = max(-7, min(7, fifths))
             if fifths > 0:
-                key_sharps = set(_SHARP_ORDER[:fifths]); key_flats = set()
+                key_sharps = set(_SHARP_ORDER[:fifths])
+                key_flats = set()
             elif fifths < 0:
-                key_flats = set(_FLAT_ORDER[:abs(fifths)]); key_sharps = set()
+                key_flats = set(_FLAT_ORDER[: abs(fifths)])
+                key_sharps = set()
             else:
-                key_sharps = set(); key_flats = set()
+                key_sharps = set()
+                key_flats = set()
             if fifths not in KEY_LY:
                 raise ValueError(f"Unsupported fifths value: {fifths}")
             lily.append(KEY_LY[fifths])
@@ -255,18 +278,22 @@ def lmx_to_lilypond(
             _flush()
             clef_id = tok.split(":")[1]
             if clef_id not in CLEF_LY:
-                raise ValueError(
-                    f"Unknown clef {clef_id!r} in token {tok!r}. "
-                    f"Add it to CLEF_LY in lilypond_render.py."
-                )
+                raise ValueError(f"Unknown clef {clef_id!r} in token {tok!r}. Add it to CLEF_LY in lilypond_render.py.")
             lily.append(rf"\clef {CLEF_LY[clef_id]}")
 
         elif tok.startswith("pitch:"):
             _flush()
             step = tok.split(":")[1]
             if step in _PITCH_STEPS:
-                pending = {"kind": "note", "step": step, "octave": None,
-                           "dur": None, "acc": None, "dots": 0, "tie": False}
+                pending = {
+                    "kind": "note",
+                    "step": step,
+                    "octave": None,
+                    "dur": None,
+                    "acc": None,
+                    "dots": 0,
+                    "tie": False,
+                }
 
         elif tok.startswith("octave:"):
             if pending and pending["kind"] == "note" and pending.get("octave") is None:
@@ -331,6 +358,7 @@ def lmx_to_lilypond(
 
 # ── Image utilities ────────────────────────────────────────────────────────────
 
+
 def crop_content(img: np.ndarray, pad: int = 6) -> np.ndarray:
     """Crop a white-background grayscale image to its ink bounding box.
 
@@ -348,9 +376,11 @@ def crop_content(img: np.ndarray, pad: int = 6) -> np.ndarray:
         return img
     r0, r1 = np.where(rows_mask)[0][[0, -1]]
     c0, c1 = np.where(cols_mask)[0][[0, -1]]
-    r0 = max(0, r0 - pad); r1 = min(img.shape[0] - 1, r1 + pad)
-    c0 = max(0, c0 - pad); c1 = min(img.shape[1] - 1, c1 + pad)
-    return img[r0:r1 + 1, c0:c1 + 1]
+    r0 = max(0, r0 - pad)
+    r1 = min(img.shape[0] - 1, r1 + pad)
+    c0 = max(0, c0 - pad)
+    c1 = min(img.shape[1] - 1, c1 + pad)
+    return img[r0 : r1 + 1, c0 : c1 + 1]
 
 
 # ── LilyPond rendering pipeline ───────────────────────────────────────────────
@@ -379,14 +409,16 @@ def run_lilypond(
     Returns *None* on render failure or timeout.
     """
     out_dir.mkdir(parents=True, exist_ok=True)
-    ly_path  = out_dir / f"{name}.ly"
+    ly_path = out_dir / f"{name}.ly"
     png_path = out_dir / f"{name}.png"
     ly_path.write_text(ly_source, encoding="utf-8")
     try:
         result = subprocess.run(
-            ["lilypond", f"-dresolution={dpi}", "--png",
-             "-o", str(out_dir / name), str(ly_path)],
-            capture_output=True, text=True, cwd=str(out_dir), timeout=timeout,
+            ["lilypond", f"-dresolution={dpi}", "--png", "-o", str(out_dir / name), str(ly_path)],
+            capture_output=True,
+            text=True,
+            cwd=str(out_dir),
+            timeout=timeout,
         )
     except subprocess.TimeoutExpired:
         log.debug("LilyPond timeout for %s", name)

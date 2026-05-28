@@ -26,6 +26,7 @@ sample* with:
 These together simulate the visual gap between LilyJAZZ renders and real
 Real Book scans (paper texture, scan noise, pen variations, slight skew).
 """
+
 from __future__ import annotations
 
 import csv
@@ -57,6 +58,7 @@ from .vocab import Vocabulary
 # overlay them onto chord strips before the Albumentations pipeline so the
 # downstream geometric / photometric jitter applies to clutter and chord
 # text alike.
+
 
 def _add_realbook_clutter(img: np.ndarray, rng: random.Random) -> np.ndarray:
     """Overlay random Real Book-style clutter onto a chord-strip image."""
@@ -106,6 +108,7 @@ def _add_realbook_clutter(img: np.ndarray, rng: random.Random) -> np.ndarray:
 
     return out
 
+
 log = logging.getLogger(__name__)
 
 # Default image height for the chord CRNN.  Chord text is simpler than music
@@ -117,6 +120,7 @@ DEFAULT_IMG_HEIGHT = 64
 # ---------------------------------------------------------------------------
 # Vocabulary
 # ---------------------------------------------------------------------------
+
 
 def build_chord_vocab(label_files: list[Path]) -> Vocabulary:
     """Scan labels CSVs and build a character-level chord vocabulary.
@@ -142,6 +146,7 @@ def build_chord_vocab(label_files: list[Path]) -> Vocabulary:
 # ---------------------------------------------------------------------------
 # Image loading
 # ---------------------------------------------------------------------------
+
 
 def _load_chord_image(
     path: Path,
@@ -177,41 +182,46 @@ def _get_aug_pipeline():
 
     import albumentations as A
 
-    _AUG_PIPELINE = A.Compose([
-        # Geometric — preserve chord legibility (small distortions only)
-        A.Affine(
-            scale=(0.92, 1.08),
-            translate_percent=(-0.02, 0.02),
-            rotate=(-3, 3),
-            shear=(-3, 3),
-            border_mode=cv2.BORDER_CONSTANT,
-            fill=255,
-            p=0.7,
-        ),
-        A.Perspective(
-            scale=(0.01, 0.04),
-            border_mode=cv2.BORDER_CONSTANT,
-            fill=255,
-            p=0.3,
-        ),
-
-        # Photometric — variations in scan exposure
-        A.RandomBrightnessContrast(brightness_limit=0.15, contrast_limit=0.2, p=0.7),
-
-        # Blur / noise — simulate scan resolution and ink bleed
-        A.OneOf([
-            A.GaussianBlur(blur_limit=(3, 5), p=1.0),
-            A.MotionBlur(blur_limit=3, p=1.0),
-            A.Downscale(scale_range=(0.5, 0.85), p=1.0),
-        ], p=0.4),
-        A.GaussNoise(std_range=(0.02, 0.12), p=0.4),
-
-        # Morphological — varies pen stroke thickness
-        A.OneOf([
-            A.Morphological(scale=(1, 2), operation="dilation", p=1.0),
-            A.Morphological(scale=(1, 2), operation="erosion", p=1.0),
-        ], p=0.3),
-    ])
+    _AUG_PIPELINE = A.Compose(
+        [
+            # Geometric — preserve chord legibility (small distortions only)
+            A.Affine(
+                scale=(0.92, 1.08),
+                translate_percent=(-0.02, 0.02),
+                rotate=(-3, 3),
+                shear=(-3, 3),
+                border_mode=cv2.BORDER_CONSTANT,
+                fill=255,
+                p=0.7,
+            ),
+            A.Perspective(
+                scale=(0.01, 0.04),
+                border_mode=cv2.BORDER_CONSTANT,
+                fill=255,
+                p=0.3,
+            ),
+            # Photometric — variations in scan exposure
+            A.RandomBrightnessContrast(brightness_limit=0.15, contrast_limit=0.2, p=0.7),
+            # Blur / noise — simulate scan resolution and ink bleed
+            A.OneOf(
+                [
+                    A.GaussianBlur(blur_limit=(3, 5), p=1.0),
+                    A.MotionBlur(blur_limit=3, p=1.0),
+                    A.Downscale(scale_range=(0.5, 0.85), p=1.0),
+                ],
+                p=0.4,
+            ),
+            A.GaussNoise(std_range=(0.02, 0.12), p=0.4),
+            # Morphological — varies pen stroke thickness
+            A.OneOf(
+                [
+                    A.Morphological(scale=(1, 2), operation="dilation", p=1.0),
+                    A.Morphological(scale=(1, 2), operation="erosion", p=1.0),
+                ],
+                p=0.3,
+            ),
+        ]
+    )
     return _AUG_PIPELINE
 
 
@@ -225,6 +235,7 @@ def _apply_augmentation(img_u8: np.ndarray) -> np.ndarray:
 # ---------------------------------------------------------------------------
 # Dataset
 # ---------------------------------------------------------------------------
+
 
 class ChordDataset(Dataset):
     """Synthetic Real Book chord-strip dataset.
@@ -274,13 +285,14 @@ class ChordDataset(Dataset):
                     self._samples.append((filename, label))
 
         if not self._samples:
-            raise RuntimeError(
-                f"No usable samples in {labels_csv} (image_dir={self.image_dir})"
-            )
+            raise RuntimeError(f"No usable samples in {labels_csv} (image_dir={self.image_dir})")
 
         log.info(
             "ChordDataset: %d samples from %s (height=%d, augment=%s)",
-            len(self._samples), labels_csv, img_height, augment,
+            len(self._samples),
+            labels_csv,
+            img_height,
+            augment,
         )
 
     def __len__(self) -> int:
@@ -320,7 +332,6 @@ class ChordDataset(Dataset):
 # Re-export the existing collate function — it operates on the dict layout
 # above (which matches OMRDataset's) so no chord-specific changes needed.
 from .dataset import collate_fn  # noqa: E402  (intentional re-export)
-
 
 __all__ = [
     "ChordDataset",

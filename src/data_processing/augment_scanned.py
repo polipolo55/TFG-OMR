@@ -26,14 +26,15 @@ from tqdm import tqdm
 # ---------------------------------------------------------------------------
 log = logging.getLogger(__name__)
 
-PAPER_BRIGHT  = 245
-PAPER_DARK    = 28
+PAPER_BRIGHT = 245
+PAPER_DARK = 28
 INK_DILATE_ITERATIONS = 1
-INK_DILATE_KERNEL     = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2))
+INK_DILATE_KERNEL = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2))
 VIGNETTE_STRENGTH = 0.15
 VIGNETTE_PROB = 0.55  # vignette is now probabilistic to prevent the
-                       # darkening stack (vignette + uneven illum + RandomBrightness)
-                       # from compounding into pitch-black corners.
+# darkening stack (vignette + uneven illum + RandomBrightness)
+# from compounding into pitch-black corners.
+
 
 def build_pipeline(seed: int | None = None) -> A.Compose:
     """Return an albumentations Compose pipeline for scan simulation."""
@@ -55,11 +56,8 @@ def build_pipeline(seed: int | None = None) -> A.Compose:
             A.GaussianBlur(blur_limit=0, sigma_limit=(0.2, 1.1), p=0.62),
             A.Sharpen(alpha=(0.15, 0.45), lightness=(0.85, 1.0), p=0.48),
             A.RandomToneCurve(scale=0.12, p=0.72),
-            A.GaussNoise(std_range=(0.012, 0.045), mean_range=(0.0, 0.0),
-                         per_channel=False, p=0.78),
-            A.RandomBrightnessContrast(brightness_limit=(-0.06, 0.06),
-                                       contrast_limit=(0.03, 0.18),
-                                       p=0.70),
+            A.GaussNoise(std_range=(0.012, 0.045), mean_range=(0.0, 0.0), per_channel=False, p=0.78),
+            A.RandomBrightnessContrast(brightness_limit=(-0.06, 0.06), contrast_limit=(0.03, 0.18), p=0.70),
             A.ImageCompression(quality_range=(72, 92), p=0.35),
         ],
         seed=seed,
@@ -69,6 +67,7 @@ def build_pipeline(seed: int | None = None) -> A.Compose:
 # ---------------------------------------------------------------------------
 # Individual augmentation steps applied outside albumentations
 # ---------------------------------------------------------------------------
+
 
 def dilate_ink(img_gray: np.ndarray, iterations: int = INK_DILATE_ITERATIONS) -> np.ndarray:
     """Simulate ink bleed by eroding the grayscale image.
@@ -110,9 +109,9 @@ def add_vignette(
     cx, cy = w / 2.0, h / 2.0
     xn = (X - cx) / cx
     yn = (Y - cy) / cy
-    dist = np.sqrt(xn ** 2 + yn ** 2)
+    dist = np.sqrt(xn**2 + yn**2)
     dist_norm = np.clip(dist / 1.414, 0.0, 1.0)
-    mask = 1.0 - s * dist_norm ** 2
+    mask = 1.0 - s * dist_norm**2
     out = np.clip(img_gray.astype(np.float32) * mask, 0, 255).astype(np.uint8)
     return out
 
@@ -202,6 +201,7 @@ def add_halftone_lines(
 # ---------------------------------------------------------------------------
 # Per-sample augmentation
 # ---------------------------------------------------------------------------
+
 
 def augment_sample(
     src_png: Path,
@@ -308,6 +308,7 @@ def _worker(args: tuple[Path, Path, int, int]) -> list[tuple[bool, str, str]]:
 # Standalone label-sync (no image re-augmentation)
 # ---------------------------------------------------------------------------
 
+
 def sync_labels(
     source: Path,
     output: Path,
@@ -343,6 +344,7 @@ def _init_worker(nice_val: int) -> None:
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -400,8 +402,8 @@ def main() -> None:
         "--sync-labels",
         action="store_true",
         help="Only copy/sync label files (.lmx, .semantic, .agnostic, .mid) "
-             "from source to output without re-augmenting images.  Use after "
-             "regenerating .lmx files in the source directory.",
+        "from source to output without re-augmenting images.  Use after "
+        "regenerating .lmx files in the source directory.",
     )
     args = parser.parse_args()
 
@@ -421,9 +423,9 @@ def main() -> None:
         return
 
     candidate_dirs = sorted(
-        d for d in args.source.rglob("*")
-        if d.is_dir() and not d.name.startswith(".")
-        and (d / f"{d.name}.png").exists()
+        d
+        for d in args.source.rglob("*")
+        if d.is_dir() and not d.name.startswith(".") and (d / f"{d.name}.png").exists()
     )
 
     if not candidate_dirs:
@@ -459,15 +461,18 @@ def main() -> None:
         log.error("No valid source images left after validation in %s", args.source)
         sys.exit(1)
 
-    log.info("Augmenting %d/%d valid samples × %d cop%s → %s (workers: %d, nice: %d)",
-             len(sample_dirs), len(candidate_dirs), args.copies,
-             "y" if args.copies == 1 else "ies",
-             args.output, args.workers, args.nice)
+    log.info(
+        "Augmenting %d/%d valid samples × %d cop%s → %s (workers: %d, nice: %d)",
+        len(sample_dirs),
+        len(candidate_dirs),
+        args.copies,
+        "y" if args.copies == 1 else "ies",
+        args.output,
+        args.workers,
+        args.nice,
+    )
 
-    work_items = [
-        (d, args.output, args.copies, args.seed + i * 1000)
-        for i, d in enumerate(sample_dirs)
-    ]
+    work_items = [(d, args.output, args.copies, args.seed + i * 1000) for i, d in enumerate(sample_dirs)]
 
     ok = fail = 0
     with multiprocessing.Pool(

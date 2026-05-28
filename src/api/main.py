@@ -3,6 +3,7 @@ FastAPI server for OMR lead sheet upload and processing.
 
 Run: poetry run python src/cli.py api
 """
+
 from __future__ import annotations
 
 import logging
@@ -25,8 +26,8 @@ import json
 from threading import Lock
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from omr_pipeline.pipeline import run_pipeline
@@ -77,6 +78,7 @@ async def health():
     # Attempt a lazy load to verify the checkpoint is readable
     try:
         from omr_pipeline.inference import _load_model
+
         _load_model(ckpt)
         return {
             "status": "ok",
@@ -128,19 +130,27 @@ _STRIPS_DIR = _LABELER_ROOT / "strips"
 _labels_lock = Lock()
 
 
-def _load_labels() -> list[dict]:
-    if not _LABELS_PATH.exists():
-        return []
-    with open(_LABELS_PATH, encoding="utf-8") as f:
-        return [json.loads(line) for line in f if line.strip()]
+class _JsonlLabelStore:
+    """Atomic read/write for a JSONL label file."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+
+    def load(self) -> list[dict]:
+        if not self.path.exists():
+            return []
+        with open(self.path, encoding="utf-8") as f:
+            return [json.loads(line) for line in f if line.strip()]
+
+    def save(self, records: list[dict]) -> None:
+        tmp = self.path.with_suffix(".jsonl.tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
+            for r in records:
+                f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        tmp.replace(self.path)
 
 
-def _save_labels(records: list[dict]) -> None:
-    tmp = _LABELS_PATH.with_suffix(".jsonl.tmp")
-    with open(tmp, "w", encoding="utf-8") as f:
-        for r in records:
-            f.write(json.dumps(r, ensure_ascii=False) + "\n")
-    tmp.replace(_LABELS_PATH)
+_chord_labels = _JsonlLabelStore(_LABELS_PATH)
 
 
 class SaveRequest(BaseModel):
@@ -162,7 +172,7 @@ async def labeler_page():
 async def labeler_stats():
     """Return counts of labels by status."""
     with _labels_lock:
-        records = _load_labels()
+        records = _chord_labels.load()
     counts = {"done": 0, "skip": 0, "pending": 0, "total": len(records)}
     for r in records:
         counts[r.get("status", "pending")] = counts.get(r.get("status", "pending"), 0) + 1
@@ -173,7 +183,7 @@ async def labeler_stats():
 async def labeler_next():
     """Return the next pending strip, or 404 if none remain."""
     with _labels_lock:
-        records = _load_labels()
+        records = _chord_labels.load()
     for r in records:
         if r.get("status") == "pending":
             return r
@@ -198,12 +208,12 @@ async def labeler_save(req: SaveRequest):
     if req.status not in ("done", "skip"):
         raise HTTPException(400, "status must be 'done' or 'skip'")
     with _labels_lock:
-        records = _load_labels()
+        records = _chord_labels.load()
         for r in records:
             if r["filename"] == req.filename:
                 r["label"] = req.label
                 r["status"] = req.status
-                _save_labels(records)
+                _chord_labels.save(records)
                 return {"ok": True}
     raise HTTPException(404, "Filename not in labels.jsonl")
 
@@ -216,21 +226,7 @@ _MUSIC_LABELER_ROOT = _ROOT / "data" / "music_real"
 _MUSIC_LABELS_PATH = _MUSIC_LABELER_ROOT / "labels.jsonl"
 _MUSIC_STRIPS_DIR = _MUSIC_LABELER_ROOT / "strips"
 _music_labels_lock = Lock()
-
-
-def _load_music_labels() -> list[dict]:
-    if not _MUSIC_LABELS_PATH.exists():
-        return []
-    with open(_MUSIC_LABELS_PATH, encoding="utf-8") as f:
-        return [json.loads(line) for line in f if line.strip()]
-
-
-def _save_music_labels(records: list[dict]) -> None:
-    tmp = _MUSIC_LABELS_PATH.with_suffix(".jsonl.tmp")
-    with open(tmp, "w", encoding="utf-8") as f:
-        for r in records:
-            f.write(json.dumps(r, ensure_ascii=False) + "\n")
-    tmp.replace(_MUSIC_LABELS_PATH)
+_music_labels = _JsonlLabelStore(_MUSIC_LABELS_PATH)
 
 
 class MusicSaveRequest(BaseModel):
@@ -259,7 +255,7 @@ async def music_labeler_page():
 @app.get("/api/music-labeler/stats")
 async def music_labeler_stats():
     with _music_labels_lock:
-        records = _load_music_labels()
+        records = _music_labels.load()
     counts = {"done": 0, "skip": 0, "pending": 0, "total": len(records)}
     for r in records:
         s = r.get("status", "pending")
@@ -271,7 +267,7 @@ async def music_labeler_stats():
 async def music_labeler_next():
     """Return the next pending strip, or 404 if none remain."""
     with _music_labels_lock:
-        records = _load_music_labels()
+        records = _music_labels.load()
     for r in records:
         if r.get("status") == "pending":
             return r
@@ -292,7 +288,9 @@ async def music_labeler_strip(filename: str):
 async def music_labeler_render(req: RenderRequest):
     """Render an LMX token string with LilyPond; return PNG as base64 data URL."""
     import base64
+
     import cv2 as _cv2
+
     try:
         from CRNN_CTC.lilypond_render import render_tokens
     except ImportError:
@@ -307,7 +305,7 @@ async def music_labeler_render(req: RenderRequest):
         try:
             b_str, bt_str = req.render_time.split("/", 1)
             render_time_hint = (int(b_str), int(bt_str))
-        except (ValueError, AttributeError):
+        except ValueError, AttributeError:
             raise HTTPException(400, f"Bad render_time {req.render_time!r}; expected 'beats/beat-type' e.g. '3/4'")
 
     arr = render_tokens(tokens, render_time_hint=render_time_hint)
@@ -327,17 +325,18 @@ async def music_labeler_save(req: MusicSaveRequest):
     if req.status not in ("done", "skip"):
         raise HTTPException(400, "status must be 'done' or 'skip'")
     with _music_labels_lock:
-        records = _load_music_labels()
+        records = _music_labels.load()
         for r in records:
             if r["filename"] == req.filename:
                 r["label"] = req.label
                 r["status"] = req.status
-                _save_music_labels(records)
+                _music_labels.save(records)
                 return {"ok": True}
     raise HTTPException(404, "Filename not in labels.jsonl")
 
 
 if __name__ == "__main__":
     import uvicorn
+
     logging.basicConfig(level=logging.INFO)
     uvicorn.run(app, host="0.0.0.0", port=8000)

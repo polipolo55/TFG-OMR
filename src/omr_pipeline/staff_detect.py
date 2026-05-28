@@ -8,6 +8,7 @@ with its chord text region (the gap above it).
 This is the sole segmentation strategy; it replaces the old projection-profile
 slicer and heuristic router.
 """
+
 from __future__ import annotations
 
 import logging
@@ -23,9 +24,11 @@ log = logging.getLogger(__name__)
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Staff:
     """Five detected staff lines with their page-level y-coordinates."""
+
     line_ys: list[int]
     staff_space: float
     x_start: int
@@ -43,9 +46,10 @@ class Staff:
 @dataclass
 class System:
     """One staff system on the page: chord region above + music staff."""
+
     staff: Staff
-    chord_bbox: tuple[int, int, int, int] | None   # (x, y, w, h) or None
-    music_bbox: tuple[int, int, int, int]           # (x, y, w, h)
+    chord_bbox: tuple[int, int, int, int] | None  # (x, y, w, h) or None
+    music_bbox: tuple[int, int, int, int]  # (x, y, w, h)
     chord_image: np.ndarray | None = field(default=None, repr=False)
     music_image: np.ndarray | None = field(default=None, repr=False)
     chord_binary: np.ndarray | None = field(default=None, repr=False)
@@ -59,6 +63,7 @@ class System:
 # ---------------------------------------------------------------------------
 # Staff-line extraction
 # ---------------------------------------------------------------------------
+
 
 def _extract_line_mask(binary: np.ndarray) -> np.ndarray:
     """Return a mask of long horizontal staff-line pixels."""
@@ -114,6 +119,7 @@ def _line_row_centroids(
 # Grouping lines into staves
 # ---------------------------------------------------------------------------
 
+
 def _group_into_staves(
     line_ys: list[int],
     page_width: int,
@@ -135,7 +141,7 @@ def _group_into_staves(
             i += 1
             continue
 
-        cand = line_ys[i:i + 5]
+        cand = line_ys[i : i + 5]
         gaps = [cand[j + 1] - cand[j] for j in range(4)]
         med = float(np.median(gaps))
         if med < 3:
@@ -143,12 +149,14 @@ def _group_into_staves(
             continue
 
         if all(abs(g - med) / med <= spacing_tolerance for g in gaps):
-            staves.append(Staff(
-                line_ys=cand,
-                staff_space=med,
-                x_start=0,
-                x_end=page_width,
-            ))
+            staves.append(
+                Staff(
+                    line_ys=cand,
+                    staff_space=med,
+                    x_start=0,
+                    x_end=page_width,
+                )
+            )
             used.update(range(i, i + 5))
             i += 5
         else:
@@ -203,6 +211,7 @@ def _refine_x_bounds(staves: list[Staff], binary: np.ndarray) -> None:
 # ---------------------------------------------------------------------------
 # Building systems (chord + music region pairs)
 # ---------------------------------------------------------------------------
+
 
 def _build_systems(
     staves: list[Staff],
@@ -263,15 +272,17 @@ def _build_systems(
             chord_bin = (binary[chord_y0:chord_y1, music_x0:music_x1] > 0).astype(np.uint8)
             chord_bbox = (music_x0, chord_y0, music_x1 - music_x0, chord_y1 - chord_y0)
 
-        systems.append(System(
-            staff=staff,
-            chord_bbox=chord_bbox,
-            music_bbox=(music_x0, music_y0, music_x1 - music_x0, music_y1 - music_y0),
-            chord_image=chord_gray,
-            music_image=music_gray,
-            chord_binary=chord_bin,
-            music_binary=music_bin,
-        ))
+        systems.append(
+            System(
+                staff=staff,
+                chord_bbox=chord_bbox,
+                music_bbox=(music_x0, music_y0, music_x1 - music_x0, music_y1 - music_y0),
+                chord_image=chord_gray,
+                music_image=music_gray,
+                chord_binary=chord_bin,
+                music_binary=music_bin,
+            )
+        )
 
     return systems
 
@@ -279,6 +290,7 @@ def _build_systems(
 # ---------------------------------------------------------------------------
 # Per-crop staff validation (CRNN input quality)
 # ---------------------------------------------------------------------------
+
 
 def local_primary_staff_lines(music_binary: np.ndarray) -> list[int] | None:
     """Re-detect five staff lines inside a music strip (crop coordinates).
@@ -316,6 +328,7 @@ def music_strip_has_valid_staff(music_binary: np.ndarray) -> bool:
 # Public API
 # ---------------------------------------------------------------------------
 
+
 def _detect_systems_one_pass(
     grayscale: np.ndarray,
     binary: np.ndarray,
@@ -350,10 +363,9 @@ def _round_diag(diag: dict[str, float]) -> dict[str, object]:
 
 def _count_geometry_rejected(systems: list[System]) -> int:
     return sum(
-        1 for s in systems
-        if s.pre_result is not None
-        and not s.pre_result.passed
-        and (s.pre_result.reason or "").startswith("geometry_")
+        1
+        for s in systems
+        if s.pre_result is not None and not s.pre_result.passed and (s.pre_result.reason or "").startswith("geometry_")
     )
 
 
@@ -437,7 +449,11 @@ def detect_systems(grayscale: np.ndarray, binary: np.ndarray) -> list[System]:
         passes_log.append(pass_stats)
         log.info(
             "Staff-line pass (tol=%.2f merge=%d ink=%.3f): %d lines → %d raw system(s)",
-            spacing_tol, merge_dist, ink_thr, len(line_ys), len(systems),
+            spacing_tol,
+            merge_dist,
+            ink_thr,
+            len(line_ys),
+            len(systems),
         )
 
         if not systems:
@@ -461,12 +477,14 @@ def detect_systems(grayscale: np.ndarray, binary: np.ndarray) -> list[System]:
                 float(np.mean([s.staff.staff_space for s in systems])) if systems else 0.0,
             )
             LAST_DETECTION_STATS.clear()
-            LAST_DETECTION_STATS.update({
-                "passes": passes_log,
-                "selected_pass": pass_stats,
-                "horizontal_lines_total": last_line_count,
-                "used_fallback": False,
-            })
+            LAST_DETECTION_STATS.update(
+                {
+                    "passes": passes_log,
+                    "selected_pass": pass_stats,
+                    "horizontal_lines_total": last_line_count,
+                    "used_fallback": False,
+                }
+            )
             return systems
 
         fallback_systems = systems
@@ -487,20 +505,24 @@ def detect_systems(grayscale: np.ndarray, binary: np.ndarray) -> list[System]:
             float(np.mean([s.staff.staff_space for s in fallback_systems])) if fallback_systems else 0.0,
         )
         LAST_DETECTION_STATS.clear()
-        LAST_DETECTION_STATS.update({
-            "passes": passes_log,
-            "selected_pass": fallback_pass,
-            "horizontal_lines_total": last_line_count,
-            "used_fallback": True,
-        })
+        LAST_DETECTION_STATS.update(
+            {
+                "passes": passes_log,
+                "selected_pass": fallback_pass,
+                "horizontal_lines_total": last_line_count,
+                "used_fallback": True,
+            }
+        )
         return fallback_systems
 
     log.info("Staff-line detection: %d horizontal lines found", last_line_count)
     LAST_DETECTION_STATS.clear()
-    LAST_DETECTION_STATS.update({
-        "passes": passes_log,
-        "selected_pass": None,
-        "horizontal_lines_total": last_line_count,
-        "used_fallback": False,
-    })
+    LAST_DETECTION_STATS.update(
+        {
+            "passes": passes_log,
+            "selected_pass": None,
+            "horizontal_lines_total": last_line_count,
+            "used_fallback": False,
+        }
+    )
     return []

@@ -38,6 +38,7 @@ log = logging.getLogger(__name__)
 # CTC greedy decoder
 # ---------------------------------------------------------------------------
 
+
 def greedy_decode(
     log_probs: Tensor,
     output_lengths: Tensor,
@@ -123,10 +124,7 @@ def beam_search_decode(
             scores_t = lp[t].tolist()  # vocab_size floats (log-probs)
 
             # Prune to top beam_width prefixes by total log-prob
-            scored = [
-                (prefix, _log_add(pb, pnb))
-                for prefix, (pb, pnb) in beams.items()
-            ]
+            scored = [(prefix, _log_add(pb, pnb)) for prefix, (pb, pnb) in beams.items()]
             scored.sort(key=lambda x: x[1], reverse=True)
             scored = scored[:beam_width]
 
@@ -150,9 +148,7 @@ def beam_search_decode(
                         # Also continue the prefix without extension
                         if prefix not in new_beams:
                             new_beams[prefix] = [NEG_INF, NEG_INF]
-                        new_beams[prefix][1] = _log_add(
-                            new_beams[prefix][1], pnb + sc
-                        )
+                        new_beams[prefix][1] = _log_add(new_beams[prefix][1], pnb + sc)
                     else:
                         new_pnb = _log_add(pb + sc, pnb + sc)
 
@@ -164,9 +160,7 @@ def beam_search_decode(
             beams = new_beams
 
         # Select best beam
-        best_prefix = max(
-            beams, key=lambda p: _log_add(beams[p][0], beams[p][1])
-        )
+        best_prefix = max(beams, key=lambda p: _log_add(beams[p][0], beams[p][1]))
         tokens = vocab.decode(list(best_prefix))
         decoded.append(tokens)
 
@@ -187,6 +181,7 @@ def _log_add(a: float, b: float) -> float:
 def _log_stable(x: float) -> float:
     """log(1 + exp(x)) for small x."""
     import math
+
     if x < -50:
         return 0.0
     return math.log1p(math.exp(x))
@@ -195,6 +190,7 @@ def _log_stable(x: float) -> float:
 # ---------------------------------------------------------------------------
 # Edit distance (Levenshtein)
 # ---------------------------------------------------------------------------
+
 
 def _edit_distance(hyp: list[str], ref: list[str]) -> int:
     """Compute Levenshtein edit distance between two token sequences."""
@@ -207,20 +203,16 @@ def _edit_distance(hyp: list[str], ref: list[str]) -> int:
         for j in range(1, m + 1):
             cost = 0 if hyp[i - 1] == ref[j - 1] else 1
             curr[j] = min(
-                prev[j] + 1,       # deletion
-                curr[j - 1] + 1,   # insertion
-                prev[j - 1] + cost, # substitution
+                prev[j] + 1,  # deletion
+                curr[j - 1] + 1,  # insertion
+                prev[j - 1] + cost,  # substitution
             )
         prev, curr = curr, prev
     return prev[m]
 
 
 def symbol_error_rate(hyp: list[str], ref: list[str]) -> float:
-    """SER = edit_distance(hyp, ref) / len(ref).
-
-    Returns 0.0 when both sequences are empty; returns float('inf') when
-    ref is empty but hyp is not (pure insertions).
-    """
+    """Token-level SER for a single pair (used by evaluation notebooks)."""
     if not ref:
         return 0.0 if not hyp else float("inf")
     return _edit_distance(hyp, ref) / len(ref)
@@ -272,6 +264,7 @@ def melodic_ser(hyp: list[str], ref: list[str]) -> float:
 # Full evaluation
 # ---------------------------------------------------------------------------
 
+
 @torch.inference_mode()
 def evaluate(
     cfg: Config,
@@ -306,13 +299,13 @@ def evaluate(
     float
         Aggregate SER on the requested split (melodic SER is logged only).
     """
-    decode_fn = (
-        lambda lp, ol, v: beam_search_decode(lp, ol, v, beam_width)
-        if beam_width > 1
-        else greedy_decode(lp, ol, v)
-    )
     if beam_width > 1:
         log.info("Using beam search decoding (beam_width=%d)", beam_width)
+
+        def decode_fn(lp, ol, v):
+            return beam_search_decode(lp, ol, v, beam_width)
+    else:
+        decode_fn = greedy_decode
     checkpoint_path = Path(checkpoint_path)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     use_amp = device.type == "cuda"
@@ -339,8 +332,12 @@ def evaluate(
     ).to(device)
     model.load_state_dict(ckpt["model_state_dict"])
     model.eval()
-    log.info("Loaded checkpoint: %s (epoch %d, val_SER=%.4f)",
-             checkpoint_path, ckpt.get("epoch", -1), ckpt.get("val_ser", -1))
+    log.info(
+        "Loaded checkpoint: %s (epoch %d, val_SER=%.4f)",
+        checkpoint_path,
+        ckpt.get("epoch", -1),
+        ckpt.get("val_ser", -1),
+    )
 
     # ── Data ───────────────────────────────────────────────────────────────
     train_ds, val_ds, test_ds = make_splits(
@@ -357,19 +354,19 @@ def evaluate(
         filter_multi_staff=cfg.filter_multi_staff,
         max_source_height=cfg.max_source_height,
         extra_data_dirs=cfg.extra_data_dirs or None,
-        extra_scanned_dirs=(
-            cfg.extra_scanned_dirs if cfg.use_scanned else None
-        ) or None,
+        extra_scanned_dirs=(cfg.extra_scanned_dirs if cfg.use_scanned else None) or None,
         finetune_data_dirs=cfg.finetune_data_dirs or None,
-        finetune_scanned_dirs=(
-            cfg.finetune_scanned_dirs if cfg.use_scanned else None
-        ) or None,
+        finetune_scanned_dirs=(cfg.finetune_scanned_dirs if cfg.use_scanned else None) or None,
     )
     ds_map = {"train": train_ds, "val": val_ds, "test": test_ds}
     ds = ds_map[split]
     loader = DataLoader(
-        ds, batch_size=cfg.batch_size, shuffle=False,
-        num_workers=cfg.num_workers, collate_fn=collate_fn, pin_memory=True,
+        ds,
+        batch_size=cfg.batch_size,
+        shuffle=False,
+        num_workers=cfg.num_workers,
+        collate_fn=collate_fn,
+        pin_memory=True,
     )
     log.info("Evaluating on '%s' split (%d samples)", split, len(ds))
 
@@ -395,9 +392,9 @@ def evaluate(
         # Reconstruct per-sample ground truth
         offset = 0
         for i, length in enumerate(label_lens):
-            l = length.item()
-            ref = vocab.decode(labels[offset : offset + l].tolist())
-            offset += l
+            label_len = length.item()
+            ref = vocab.decode(labels[offset : offset + label_len].tolist())
+            offset += label_len
 
             ed = _edit_distance(preds[i], ref)
             ser = ed / max(len(ref), 1)
@@ -420,16 +417,16 @@ def evaluate(
         sample_results.sort(key=lambda x: x[1], reverse=True)  # worst first
         log.info("Per-sample SER (worst → best):")
         for sid, ser, pred, ref in sample_results[:20]:  # top 20
-            log.info("  %s  SER=%.4f  pred_len=%d  ref_len=%d",
-                     sid, ser, len(pred), len(ref))
+            log.info("  %s  SER=%.4f  pred_len=%d  ref_len=%d", sid, ser, len(pred), len(ref))
 
-    log.info("Aggregate SER on '%s': %.4f  (%d edits / %d symbols)",
-             split, aggregate_ser, total_edit, total_len)
+    log.info("Aggregate SER on '%s': %.4f  (%d edits / %d symbols)", split, aggregate_ser, total_edit, total_len)
     if report_melodic:
         mel_ser = total_mel_edit / max(total_mel_len, 1)
         log.info(
-            "Melodic SER on '%s': %.4f  (%d edits / %d melodic symbols, "
-            "structural tokens stripped)",
-            split, mel_ser, total_mel_edit, total_mel_len,
+            "Melodic SER on '%s': %.4f  (%d edits / %d melodic symbols, structural tokens stripped)",
+            split,
+            mel_ser,
+            total_mel_edit,
+            total_mel_len,
         )
     return aggregate_ser

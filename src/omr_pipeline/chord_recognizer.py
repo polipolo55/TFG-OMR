@@ -1,8 +1,4 @@
-"""
-chord_recognizer.py
-===================
-CRNN-based chord-strip recognition.  Drop-in replacement for the EasyOCR
-chord recognizer that ``ocr_chords.py`` used to provide.
+"""CRNN-based chord-strip recognition.
 
 The chord CRNN is trained on synthetic Real Book-style chord strips
 (``data_processing.generate_chord_crops``) using a character-level CTC
@@ -18,11 +14,11 @@ Output strings use Real Book conventions: ``-`` for minor, ``maj`` for
 major 7, ``ø`` for half-diminished, ``dim`` for diminished, ``+`` for
 augmented, ``/`` for slash bass.
 """
+
 from __future__ import annotations
 
 import logging
 import os
-import sys
 from pathlib import Path
 
 import cv2
@@ -31,9 +27,9 @@ import torch
 from torch import Tensor
 from torch.amp import autocast
 
-_SRC = Path(__file__).resolve().parent.parent
-if str(_SRC) not in sys.path:
-    sys.path.insert(0, str(_SRC))
+from ._bootstrap import ensure_src_path
+
+ensure_src_path()
 
 log = logging.getLogger(__name__)
 
@@ -105,7 +101,9 @@ def _load_chord_model(checkpoint_path: Path) -> dict:
     _chord_model_cache[key] = entry
     log.info(
         "Chord CRNN loaded from %s (epoch %d, val_CER=%.4f)",
-        checkpoint_path, ckpt.get("epoch", -1), ckpt.get("val_cer", -1.0),
+        checkpoint_path,
+        ckpt.get("epoch", -1),
+        ckpt.get("val_cer", -1.0),
     )
     return entry
 
@@ -113,6 +111,7 @@ def _load_chord_model(checkpoint_path: Path) -> dict:
 # ---------------------------------------------------------------------------
 # Preprocessing — matches ChordDataset exactly (no augmentation at inference)
 # ---------------------------------------------------------------------------
+
 
 def _trim_binder_hole(img: np.ndarray) -> np.ndarray:
     """Trim left-edge columns dominated by binder-hole ink.
@@ -142,10 +141,7 @@ def _trim_binder_hole(img: np.ndarray) -> np.ndarray:
     return img
 
 
-
-def _preprocess_strip(
-    img: np.ndarray, img_height: int, max_width: int
-) -> tuple[Tensor, int]:
+def _preprocess_strip(img: np.ndarray, img_height: int, max_width: int) -> tuple[Tensor, int]:
     """Grayscale uint8 → trim binder-hole → resize → /255 → per-image norm → (1, H, W) tensor."""
     if img.ndim == 3:
         img = img[:, :, 0]
@@ -171,6 +167,7 @@ def _preprocess_strip(
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 @torch.inference_mode()
 def recognize_chords_crnn(
@@ -244,22 +241,11 @@ def recognize_chords_crnn(
         log_probs, out_lens = model(batch, width_t)
     token_lists = greedy_decode(log_probs, out_lens, vocab)
 
-    # Character-level vocab → join chars (no separator).  Each "token" is a
-    # single character; the model emits spaces between chords explicitly.
-    #
-    # Real Book chord strips contain visual clutter the synthetic CRNN was
-    # not trained on (binder holes, slash repeat marks, page numbers, the
-    # "(bossa)" annotation, staff line bleed).  The model emits valid chord
-    # characters interspersed with noise.  ``clean_chord_line`` filters the
-    # output against the jazz-chord grammar, keeping only tokens that parse
-    # as real chords.
+    # Drop bare roots (e.g. "B", "Eb") — usually clutter false-positives.
+    import re as _re
+
     from .chord_postprocess import clean_chord_line
 
-    # Single-root noise filter: plain "B", "F", "Eb" etc. (root or root+accidental
-    # with no quality/extension/alteration) are almost never chords in jazz lead
-    # sheets — they're usually CRNN false-positives from clutter (binder hole →
-    # "B", page number digit → "F", etc.).  Drop them.
-    import re as _re
     _SINGLE_ROOT_RE = _re.compile(r"^[A-G][#b]?$")
 
     results: list[str] = []

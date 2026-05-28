@@ -25,6 +25,7 @@ Usage::
     poetry run python src/data_processing/generate_chord_crops.py \
         --output data/chord_synth --num-train 30000 --num-val 2000 --workers 8
 """
+
 from __future__ import annotations
 
 import argparse
@@ -81,10 +82,10 @@ def render_one(
     rng = random.Random(seed)
     n_chords = rng.randint(*_CHORDS_RANGE)
     chords = sample_progression(rng, n_chords)
-    body  = " ".join(c.lily for c in chords)
+    body = " ".join(c.lily for c in chords)
     label = " ".join(c.label for c in chords)
 
-    dpi  = rng.choice(_DPI_CHOICES)
+    dpi = rng.choice(_DPI_CHOICES)
     size = rng.choice(_STAFF_SIZES)
     # Paper width scales with chord count so chords aren't cramped.  LilyPond
     # uses ragged-right, so this is an upper bound — actual ink width is
@@ -123,6 +124,7 @@ def render_one(
 # ---------------------------------------------------------------------------
 # Multiprocess driver
 # ---------------------------------------------------------------------------
+
 
 def generate_split(
     split_name: str,
@@ -168,20 +170,19 @@ def generate_split(
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--output",    default="data/chord_synth",
-                        help="Root output directory.")
-    parser.add_argument("--num-train", type=int, default=30000,
-                        help="Number of training samples to attempt.")
-    parser.add_argument("--num-val",   type=int, default=2000,
-                        help="Number of validation samples to attempt.")
-    parser.add_argument("--workers",   type=int, default=max(1, (multiprocessing.cpu_count() or 4) - 1),
-                        help="Multiprocessing pool size.")
-    parser.add_argument("--seed-base", type=int, default=0,
-                        help="Base seed for training data; val uses seed-base + 10_000_000.")
-    parser.add_argument("--log-level", default="INFO",
-                        choices=["DEBUG", "INFO", "WARNING", "ERROR"])
+    parser.add_argument("--output", default="data/chord_synth", help="Root output directory.")
+    parser.add_argument("--num-train", type=int, default=30000, help="Number of training samples to attempt.")
+    parser.add_argument("--num-val", type=int, default=2000, help="Number of validation samples to attempt.")
+    parser.add_argument(
+        "--workers", type=int, default=max(1, (multiprocessing.cpu_count() or 4) - 1), help="Multiprocessing pool size."
+    )
+    parser.add_argument(
+        "--seed-base", type=int, default=0, help="Base seed for training data; val uses seed-base + 10_000_000."
+    )
+    parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -192,8 +193,7 @@ def main() -> None:
     out_root = Path(args.output)
     out_root.mkdir(parents=True, exist_ok=True)
 
-    log.info("Generating chord training set (%d samples, %d workers)",
-             args.num_train, args.workers)
+    log.info("Generating chord training set (%d samples, %d workers)", args.num_train, args.workers)
     train_seeds = range(args.seed_base, args.seed_base + args.num_train)
     generate_split("train", train_seeds, out_root, args.workers)
 

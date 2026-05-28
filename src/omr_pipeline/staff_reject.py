@@ -14,6 +14,7 @@ Three gates filter out detected "staves" that aren't real music:
 Thresholds come from the ``calibrate-reject`` CLI subcommand; see
 ``docs/superpowers/specs/2026-05-20-non-music-strip-rejection-design.md``.
 """
+
 from __future__ import annotations
 
 import json
@@ -29,6 +30,7 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Public data structures
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class RejectThresholds:
@@ -66,7 +68,7 @@ def load_thresholds() -> RejectThresholds:
     if not path:
         return DEFAULT_THRESHOLDS
     try:
-        with open(path, "r", encoding="utf-8") as fh:
+        with open(path, encoding="utf-8") as fh:
             raw = json.loads(fh.read())
     except (OSError, json.JSONDecodeError) as exc:
         log.warning("threshold file %r unreadable (%s); using defaults", path, exc)
@@ -79,6 +81,7 @@ def load_thresholds() -> RejectThresholds:
 # ---------------------------------------------------------------------------
 # Geometric signals
 # ---------------------------------------------------------------------------
+
 
 def _line_span_min(binary: np.ndarray, line_ys: list[int]) -> float:
     """Minimum across the 5 lines of the fraction of columns with ink on that line.
@@ -151,7 +154,8 @@ def _get_ocr_reader():
     """Lazy-load a single EasyOCR Reader; cached for the lifetime of the process."""
     global _OCR_READER
     if _OCR_READER is None:
-        import easyocr   # lazy import — heavy
+        import easyocr  # lazy import — heavy
+
         _OCR_READER = easyocr.Reader(["en"], gpu=False, verbose=False)
     return _OCR_READER
 
@@ -170,21 +174,22 @@ def _text_area_frac(grayscale: np.ndarray) -> float:
     horizontal_list, free_list = reader.detect(grayscale)
     total = 0.0
     # horizontal_list[0] is a list of [x_min, x_max, y_min, y_max]
-    for box in (horizontal_list[0] if horizontal_list else []):
+    for box in horizontal_list[0] if horizontal_list else []:
         x0, x1, y0, y1 = box
         total += max(0, x1 - x0) * max(0, y1 - y0)
     # free_list[0] is a list of polygons [[x,y], [x,y], [x,y], [x,y]]
-    for poly in (free_list[0] if free_list else []):
+    for poly in free_list[0] if free_list else []:
         if len(poly) >= 3:
             xs = [p[0] for p in poly]
             ys = [p[1] for p in poly]
-            total += (max(xs) - min(xs)) * (max(ys) - min(ys))   # bbox approx
+            total += (max(xs) - min(xs)) * (max(ys) - min(ys))  # bbox approx
     return float(total) / float(h * w)
 
 
 # ---------------------------------------------------------------------------
 # CTC confidence signal
 # ---------------------------------------------------------------------------
+
 
 def _mean_logprob(log_probs, out_len: int) -> float:
     """Mean log-probability of the argmax class across the first ``out_len`` frames."""
@@ -199,16 +204,6 @@ def _mean_logprob(log_probs, out_len: int) -> float:
 # ---------------------------------------------------------------------------
 # Composed evaluators
 # ---------------------------------------------------------------------------
-
-def _strip_line_ys(music_binary: np.ndarray) -> list[int] | None:
-    """Re-run staff-line detection inside a single strip.
-
-    Wrapper around ``staff_detect.local_primary_staff_lines`` to keep this
-    module's import surface narrow.
-    """
-    from .staff_detect import local_primary_staff_lines
-
-    return local_primary_staff_lines(music_binary)
 
 
 def evaluate_pre_crnn(system, thresholds: RejectThresholds | None = None) -> RejectionResult:
@@ -225,7 +220,9 @@ def evaluate_pre_crnn(system, thresholds: RejectThresholds | None = None) -> Rej
     if binary is None or binary.size == 0:
         return RejectionResult(passed=False, reason="geometry_no_strip", diagnostics=diag)
 
-    line_ys = _strip_line_ys(binary)
+    from .staff_detect import local_primary_staff_lines
+
+    line_ys = local_primary_staff_lines(binary)
     if not line_ys or len(line_ys) < 5:
         return RejectionResult(passed=False, reason="geometry_no_staff_lines", diagnostics=diag)
 
@@ -244,7 +241,7 @@ def evaluate_pre_crnn(system, thresholds: RejectThresholds | None = None) -> Rej
     if music_image is not None and music_image.size > 0:
         try:
             diag["text_area_frac"] = _text_area_frac(music_image)
-        except Exception as exc:   # OCR failures should not kill the pipeline
+        except Exception as exc:  # OCR failures should not kill the pipeline
             log.warning("OCR text-area gate failed: %s", exc)
             diag["text_area_frac"] = 0.0
 
@@ -284,7 +281,8 @@ def evaluate_post_crnn(
         if overridable and diag["mean_logprob"] >= th.confident_override_logprob:
             log.info(
                 "CTC override @ logprob=%.4f rescues %s rejection",
-                diag["mean_logprob"], pre_result.reason,
+                diag["mean_logprob"],
+                pre_result.reason,
             )
             # Surface the overridden reason in diagnostics so the API consumer
             # can tell a rescued segment apart from a clean pass.

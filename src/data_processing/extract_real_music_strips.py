@@ -35,6 +35,7 @@ Usage::
         --export data/music_real \\
         --output-finetune data/finetune/realbook/clean
 """
+
 from __future__ import annotations
 
 import argparse
@@ -51,10 +52,10 @@ _SRC = Path(__file__).resolve().parent.parent
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
+from omr_pipeline.grammar_fix import fix_sequence
+from omr_pipeline.inference import recognize_music
 from omr_pipeline.preprocess import load_pdf_page, preprocess_page
 from omr_pipeline.staff_detect import detect_systems
-from omr_pipeline.inference import recognize_music
-from omr_pipeline.grammar_fix import fix_sequence
 
 log = logging.getLogger(__name__)
 
@@ -77,9 +78,7 @@ def _likely_has_header(music_strip_gray: np.ndarray) -> bool:
     if w < 100 or h < 30:
         return True
 
-    _, binary = cv2.threshold(
-        music_strip_gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
-    )
+    _, binary = cv2.threshold(music_strip_gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     binary = (binary > 0).astype(np.uint8)
 
     left_w = max(30, int(w * 0.05))
@@ -163,7 +162,10 @@ def extract_one_page(
     fixed_preds: list[str] = []
     for raw_pred in raw_preds:
         fixed, _, _ = fix_sequence(
-            raw_pred, global_key=None, global_time=None, force_clef=True,
+            raw_pred,
+            global_key=None,
+            global_time=None,
+            force_clef=True,
         )
         fixed_preds.append(fixed)
 
@@ -178,12 +180,14 @@ def extract_one_page(
         if not _likely_has_header(img):
             pred = _strip_header_tokens(pred)
 
-        records.append({
-            "filename": filename,
-            "predicted": pred,
-            "label": None,
-            "status": "pending",
-        })
+        records.append(
+            {
+                "filename": filename,
+                "predicted": pred,
+                "label": None,
+                "status": "pending",
+            }
+        )
     return records
 
 
@@ -225,9 +229,7 @@ def export_finetune(labels_jsonl: Path, out_dir: Path) -> int:
                 log.warning("Strip not found: %s", src_png)
                 continue
 
-            (sample_dir / f"{stem}.lmx").write_text(
-                rec["label"].strip(), encoding="utf-8"
-            )
+            (sample_dir / f"{stem}.lmx").write_text(rec["label"].strip(), encoding="utf-8")
             exported += 1
 
     log.info("Exported %d fine-tune samples → %s", exported, out_dir)
@@ -245,10 +247,7 @@ def _re_predict(data_root: Path, checkpoint_arg: str | None, dpi: int) -> None:
         log.error("labels.jsonl not found: %s", labels_path)
         return
 
-    checkpoint_path = (
-        Path(checkpoint_arg) if checkpoint_arg
-        else Path("models/latest/best_model.pt")
-    )
+    checkpoint_path = Path(checkpoint_arg) if checkpoint_arg else Path("models/latest/best_model.pt")
     if not checkpoint_path.exists():
         log.error("Checkpoint not found: %s", checkpoint_path)
         return
@@ -257,8 +256,7 @@ def _re_predict(data_root: Path, checkpoint_arg: str | None, dpi: int) -> None:
         records = [json.loads(line) for line in f if line.strip()]
 
     pending = [r for r in records if r.get("status") == "pending"]
-    log.info("Re-predicting %d pending strips (keeping %d done/skip)",
-             len(pending), len(records) - len(pending))
+    log.info("Re-predicting %d pending strips (keeping %d done/skip)", len(pending), len(records) - len(pending))
 
     batch_size = 16
     updated = 0
@@ -292,29 +290,29 @@ def main() -> None:
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
 
     # Extraction mode
-    p.add_argument("--pdf", default="data/real_book/full_realbook.pdf",
-                   help="Path to Real Book PDF")
-    p.add_argument("--output", default="data/music_real",
-                   help="Output root for strips/ and labels.jsonl")
-    p.add_argument("--page-step", type=int, default=10,
-                   help="Extract every Nth page (default: 10)")
+    p.add_argument("--pdf", default="data/real_book/full_realbook.pdf", help="Path to Real Book PDF")
+    p.add_argument("--output", default="data/music_real", help="Output root for strips/ and labels.jsonl")
+    p.add_argument("--page-step", type=int, default=10, help="Extract every Nth page (default: 10)")
     p.add_argument("--start", type=int, default=0)
-    p.add_argument("--end", type=int, default=None,
-                   help="Last page (exclusive); default: full document")
+    p.add_argument("--end", type=int, default=None, help="Last page (exclusive); default: full document")
     p.add_argument("--dpi", type=int, default=200)
-    p.add_argument("--checkpoint", default=None,
-                   help="CRNN checkpoint path (default: models/latest/best_model.pt)")
+    p.add_argument("--checkpoint", default=None, help="CRNN checkpoint path (default: models/latest/best_model.pt)")
 
     # Export mode
-    p.add_argument("--export", default=None,
-                   help="If set: export labeled records from this data root instead of extracting")
-    p.add_argument("--output-finetune", default="data/finetune/realbook/clean",
-                   help="Destination for fine-tune data export")
+    p.add_argument(
+        "--export", default=None, help="If set: export labeled records from this data root instead of extracting"
+    )
+    p.add_argument(
+        "--output-finetune", default="data/finetune/realbook/clean", help="Destination for fine-tune data export"
+    )
 
     # Re-predict mode
-    p.add_argument("--re-predict", default=None,
-                   help="If set: re-run predictions on all pending strips in this data root "
-                        "(updates labels.jsonl without touching done/skip records)")
+    p.add_argument(
+        "--re-predict",
+        default=None,
+        help="If set: re-run predictions on all pending strips in this data root "
+        "(updates labels.jsonl without touching done/skip records)",
+    )
 
     p.add_argument("--log-level", default="INFO")
     args = p.parse_args()
@@ -345,10 +343,7 @@ def main() -> None:
     out_strips.mkdir(parents=True, exist_ok=True)
     labels_path = out_root / "labels.jsonl"
 
-    checkpoint_path = (
-        Path(args.checkpoint) if args.checkpoint
-        else Path("models/latest/best_model.pt")
-    )
+    checkpoint_path = Path(args.checkpoint) if args.checkpoint else Path("models/latest/best_model.pt")
     if not checkpoint_path.exists():
         log.error("Checkpoint not found: %s", checkpoint_path)
         sys.exit(1)
@@ -368,6 +363,7 @@ def main() -> None:
 
     try:
         import fitz
+
         doc = fitz.open(pdf_path)
         n_pages = doc.page_count
         doc.close()
@@ -381,6 +377,7 @@ def main() -> None:
 
     try:
         from tqdm import tqdm
+
         pages_iter = tqdm(page_ids, desc="pages")
     except ImportError:
         pages_iter = page_ids
@@ -398,7 +395,9 @@ def main() -> None:
 
     log.info(
         "Extracted %d strips from %d new pages → %s",
-        len(new_records), len(page_ids) - len(seen_pages), labels_path,
+        len(new_records),
+        len(page_ids) - len(seen_pages),
+        labels_path,
     )
 
 

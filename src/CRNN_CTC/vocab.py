@@ -93,11 +93,7 @@ class Vocabulary:
     def decode(self, indices: list[int]) -> list[str]:
         """Convert integer indices back to token strings, skipping blank/pad."""
         _skip = (self.blank_idx, self.pad_idx)
-        return [
-            self._idx2tok[i]
-            for i in indices
-            if 0 <= i < len(self._idx2tok) and i not in _skip
-        ]
+        return [self._idx2tok[i] for i in indices if 0 <= i < len(self._idx2tok) and i not in _skip]
 
     def __contains__(self, token: str) -> bool:
         return token in self._tok2idx
@@ -105,7 +101,7 @@ class Vocabulary:
     # -- I/O ----------------------------------------------------------------
 
     @classmethod
-    def from_file(cls, path: str | Path) -> "Vocabulary":
+    def from_file(cls, path: str | Path) -> Vocabulary:
         """Load vocabulary from a text file (one token per line).
 
         Lines are preserved verbatim (no ``strip``) so single-character
@@ -132,7 +128,7 @@ class Vocabulary:
         return set()
 
     @classmethod
-    def build_from_lmx_dirs(cls, data_dirs: list[str | Path], workers: int | None = None) -> "Vocabulary":
+    def build_from_lmx_dirs(cls, data_dirs: list[str | Path], workers: int | None = None) -> Vocabulary:
         """
         Scan all ``.lmx`` files under the given *data_dirs* and build a
         vocabulary from the union of all observed tokens, sorted alphabetically,
@@ -143,6 +139,7 @@ class Vocabulary:
         so the model can generalise to unseen pitch/octave combinations.
         """
         import os
+
         if workers is None:
             workers = max(1, (os.cpu_count() or 4) // 2)
 

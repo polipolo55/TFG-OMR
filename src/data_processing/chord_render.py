@@ -20,6 +20,7 @@ This module is the *single source of truth* for chord notation conventions
 on the training side.  The chord CRNN's vocabulary, dataset, and inference
 decoder all consume the visual labels produced here.
 """
+
 from __future__ import annotations
 
 import random
@@ -31,23 +32,23 @@ from dataclasses import dataclass
 
 ROOTS: list[tuple[str, str, int]] = [
     # (lily_input, visual, weight)
-    ("c",   "C",   10),
-    ("cis", "C#",   3),
-    ("des", "Db",   5),
-    ("d",   "D",   10),
-    ("dis", "D#",   2),
-    ("ees", "Eb",   7),
-    ("e",   "E",   10),
-    ("f",   "F",   10),
-    ("fis", "F#",   5),
-    ("ges", "Gb",   5),
-    ("g",   "G",   10),
-    ("gis", "G#",   2),
-    ("aes", "Ab",   7),
-    ("a",   "A",   10),
-    ("ais", "A#",   1),
-    ("bes", "Bb",   7),
-    ("b",   "B",   10),
+    ("c", "C", 10),
+    ("cis", "C#", 3),
+    ("des", "Db", 5),
+    ("d", "D", 10),
+    ("dis", "D#", 2),
+    ("ees", "Eb", 7),
+    ("e", "E", 10),
+    ("f", "F", 10),
+    ("fis", "F#", 5),
+    ("ges", "Gb", 5),
+    ("g", "G", 10),
+    ("gis", "G#", 2),
+    ("aes", "Ab", 7),
+    ("a", "A", 10),
+    ("ais", "A#", 1),
+    ("bes", "Bb", 7),
+    ("b", "B", 10),
 ]
 
 
@@ -67,77 +68,52 @@ ROOTS: list[tuple[str, str, int]] = [
 #
 # Visual labels NEVER contain the root.  Final label = root_visual + visual_quality.
 
+
 @dataclass(frozen=True)
 class QualitySpec:
-    lily: str           # e.g. ":m7"
-    visual: str         # e.g. "-7"
+    lily: str  # e.g. ":m7"
+    visual: str  # e.g. "-7"
     weight: int
-    notes: str          # e.g. "c es g bes"
-    markup: str         # LilyPond markup, e.g. r'\markup { \concat { "-" \super "7" } }'
+    notes: str  # e.g. "c es g bes"
+    markup: str  # LilyPond markup, e.g. r'\markup { \concat { "-" \super "7" } }'
 
 
 QUALITIES: list[QualitySpec] = [
     # Triads -----------------------------------------------------------------
-    QualitySpec("",       "",      30, "c e g",
-                r'\markup { }'),
-    QualitySpec(":m",     "-",     12, "c es g",
-                r'\markup { "-" }'),
-    QualitySpec(":dim",   "dim",    3, "c es ges",
-                r'\markup { \super "dim" }'),
-    QualitySpec(":aug",   "+",      3, "c e gis",
-                r'\markup { \super "+" }'),
-    QualitySpec(":sus",   "sus",    3, "c f g",
-                r'\markup { \super "sus" }'),
-
+    QualitySpec("", "", 30, "c e g", r"\markup { }"),
+    QualitySpec(":m", "-", 12, "c es g", r'\markup { "-" }'),
+    QualitySpec(":dim", "dim", 3, "c es ges", r'\markup { \super "dim" }'),
+    QualitySpec(":aug", "+", 3, "c e gis", r'\markup { \super "+" }'),
+    QualitySpec(":sus", "sus", 3, "c f g", r'\markup { \super "sus" }'),
     # 6ths -------------------------------------------------------------------
-    QualitySpec(":6",     "6",      4, "c e g a",
-                r'\markup { \super "6" }'),
-    QualitySpec(":m6",    "-6",     2, "c es g a",
-                r'\markup { \concat { "-" \super "6" } }'),
-
+    QualitySpec(":6", "6", 4, "c e g a", r'\markup { \super "6" }'),
+    QualitySpec(":m6", "-6", 2, "c es g a", r'\markup { \concat { "-" \super "6" } }'),
     # 7ths -------------------------------------------------------------------
-    QualitySpec(":7",     "7",     35, "c e g bes",
-                r'\markup { \super "7" }'),
-    QualitySpec(":m7",    "-7",    35, "c es g bes",
-                r'\markup { \concat { "-" \super "7" } }'),
-    QualitySpec(":maj7",  "maj7",  28, "c e g b",
-                r'\markup { \concat { "maj" \super "7" } }'),
-    QualitySpec(":m7.5-", "ø",      8, "c es ges bes",
-                r'\markup { \super "ø" }'),
-    QualitySpec(":dim7",  "dim7",   4, "c es ges beses",
-                r'\markup { \concat { "dim" \super "7" } }'),
-    QualitySpec(":sus4.7", "7sus",  3, "c f g bes",
-                r'\markup { \super "7sus" }'),
-
+    QualitySpec(":7", "7", 35, "c e g bes", r'\markup { \super "7" }'),
+    QualitySpec(":m7", "-7", 35, "c es g bes", r'\markup { \concat { "-" \super "7" } }'),
+    QualitySpec(":maj7", "maj7", 28, "c e g b", r'\markup { \concat { "maj" \super "7" } }'),
+    QualitySpec(":m7.5-", "ø", 8, "c es ges bes", r'\markup { \super "ø" }'),
+    QualitySpec(":dim7", "dim7", 4, "c es ges beses", r'\markup { \concat { "dim" \super "7" } }'),
+    QualitySpec(":sus4.7", "7sus", 3, "c f g bes", r'\markup { \super "7sus" }'),
     # 9ths -------------------------------------------------------------------
-    QualitySpec(":9",     "9",      8, "c e g bes d'",
-                r'\markup { \super "9" }'),
-    QualitySpec(":m9",    "-9",     3, "c es g bes d'",
-                r'\markup { \concat { "-" \super "9" } }'),
-    QualitySpec(":maj9",  "maj9",   3, "c e g b d'",
-                r'\markup { \concat { "maj" \super "9" } }'),
-
+    QualitySpec(":9", "9", 8, "c e g bes d'", r'\markup { \super "9" }'),
+    QualitySpec(":m9", "-9", 3, "c es g bes d'", r'\markup { \concat { "-" \super "9" } }'),
+    QualitySpec(":maj9", "maj9", 3, "c e g b d'", r'\markup { \concat { "maj" \super "9" } }'),
     # 7 + altered 9 ----------------------------------------------------------
-    QualitySpec(":7.9-",  "7b9",    6, "c e g bes des'",
-                r'\markup { \concat { \super "7" \super "b9" } }'),
-    QualitySpec(":7.9+",  "7#9",    3, "c e g bes dis'",
-                r'\markup { \concat { \super "7" \super "#9" } }'),
-
+    QualitySpec(":7.9-", "7b9", 6, "c e g bes des'", r'\markup { \concat { \super "7" \super "b9" } }'),
+    QualitySpec(":7.9+", "7#9", 3, "c e g bes dis'", r'\markup { \concat { \super "7" \super "#9" } }'),
     # 11ths, 13ths -----------------------------------------------------------
-    QualitySpec(":11",    "11",     1, "c e g bes d' f'",
-                r'\markup { \super "11" }'),
-    QualitySpec(":m11",   "-11",    1, "c es g bes d' f'",
-                r'\markup { \concat { "-" \super "11" } }'),
-    QualitySpec(":13",    "13",     2, "c e g bes d' a'",
-                r'\markup { \super "13" }'),
-    QualitySpec(":maj13", "maj13",  1, "c e g b d' a'",
-                r'\markup { \concat { "maj" \super "13" } }'),
+    QualitySpec(":11", "11", 1, "c e g bes d' f'", r'\markup { \super "11" }'),
+    QualitySpec(":m11", "-11", 1, "c es g bes d' f'", r'\markup { \concat { "-" \super "11" } }'),
+    QualitySpec(":13", "13", 2, "c e g bes d' a'", r'\markup { \super "13" }'),
+    QualitySpec(":maj13", "maj13", 1, "c e g b d' a'", r'\markup { \concat { "maj" \super "13" } }'),
 ]
 
 
 # ---------------------------------------------------------------------------
 # Build the LilyPond chord-exception list
 # ---------------------------------------------------------------------------
+
 
 def _build_exception_list() -> str:
     """Build the body of RealBookChordsList for the LY template."""
@@ -223,11 +199,13 @@ def make_ly_source(
 # Chord sampling
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class Chord:
     """One sampled chord with its LilyPond input and visual label."""
-    lily: str           # e.g. "cis:m7" or "f:maj7/c"
-    label: str          # e.g. "C#-7" or "Fmaj7/C"
+
+    lily: str  # e.g. "cis:m7" or "f:maj7/c"
+    label: str  # e.g. "C#-7" or "Fmaj7/C"
 
 
 def _weighted_choice(rng: random.Random, items: list, weights: list[int]):
@@ -242,9 +220,7 @@ def sample_chord(
 ) -> Chord:
     """Sample a single random jazz chord with realistic frequency weights."""
     # Root
-    root_lily, root_vis, _ = _weighted_choice(
-        rng, ROOTS, [w for _, _, w in ROOTS]
-    )
+    root_lily, root_vis, _ = _weighted_choice(rng, ROOTS, [w for _, _, w in ROOTS])
     # Quality
     qual = _weighted_choice(rng, QUALITIES, [q.weight for q in QUALITIES])
 
@@ -253,9 +229,7 @@ def sample_chord(
 
     # Optional slash bass — appended to BOTH lily input and visual label
     if rng.random() < slash_bass_prob:
-        bass_lily, bass_vis, _ = _weighted_choice(
-            rng, ROOTS, [w for _, _, w in ROOTS]
-        )
+        bass_lily, bass_vis, _ = _weighted_choice(rng, ROOTS, [w for _, _, w in ROOTS])
         if bass_vis != root_vis:  # don't render C/C
             lily = f"{lily}/{bass_lily}"
             label = f"{label}/{bass_vis}"
@@ -276,6 +250,7 @@ def sample_progression(
 # ---------------------------------------------------------------------------
 # All visible characters in any rendered label — used to seed the vocabulary
 # ---------------------------------------------------------------------------
+
 
 def all_label_characters() -> set[str]:
     """Return the full character set that can appear in any chord label.

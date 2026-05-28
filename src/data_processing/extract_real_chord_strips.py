@@ -26,6 +26,7 @@ Usage::
         --output data/chord_real \
         --page-step 10
 """
+
 from __future__ import annotations
 
 import argparse
@@ -42,9 +43,9 @@ _SRC = Path(__file__).resolve().parent.parent
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
+from omr_pipeline.chord_recognizer import recognize_chords_crnn
 from omr_pipeline.preprocess import load_pdf_page, preprocess_page
 from omr_pipeline.staff_detect import detect_systems
-from omr_pipeline.chord_recognizer import recognize_chords_crnn
 
 log = logging.getLogger(__name__)
 
@@ -84,25 +85,25 @@ def extract_one_page(
     for img, idx, pred in zip(chord_imgs, keep_indices, predictions):
         filename = f"page{page_idx:04d}_staff{idx}.png"
         Image.fromarray(img).save(out_strips / filename, optimize=True)
-        records.append({
-            "filename": filename,
-            "predicted": pred,
-            "label": None,        # filled in by labeling UI
-            "status": "pending",  # pending | done | skip
-        })
+        records.append(
+            {
+                "filename": filename,
+                "predicted": pred,
+                "label": None,  # filled in by labeling UI
+                "status": "pending",  # pending | done | skip
+            }
+        )
     return records
 
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    p.add_argument("--pdf",       default="data/real_book/full_realbook.pdf")
-    p.add_argument("--output",    default="data/chord_real")
-    p.add_argument("--page-step", type=int, default=10,
-                   help="Extract every Nth page (default: 10)")
-    p.add_argument("--start",     type=int, default=0)
-    p.add_argument("--end",       type=int, default=None,
-                   help="Last page (exclusive); default: full document")
-    p.add_argument("--dpi",       type=int, default=200)
+    p.add_argument("--pdf", default="data/real_book/full_realbook.pdf")
+    p.add_argument("--output", default="data/chord_real")
+    p.add_argument("--page-step", type=int, default=10, help="Extract every Nth page (default: 10)")
+    p.add_argument("--start", type=int, default=0)
+    p.add_argument("--end", type=int, default=None, help="Last page (exclusive); default: full document")
+    p.add_argument("--dpi", type=int, default=200)
     p.add_argument("--log-level", default="INFO")
     args = p.parse_args()
 
@@ -131,6 +132,7 @@ def main() -> None:
         log.info("Resuming — already have records for %d pages", len(seen_pages))
 
     import fitz
+
     doc = fitz.open(pdf_path)
     n_pages = doc.page_count
     doc.close()
@@ -153,7 +155,12 @@ def main() -> None:
 
     log.info(
         "Extracted %d strips from %d pages (every %dth, %d–%d) → %s",
-        len(new_records), len(page_ids), args.page_step, args.start, end, labels_path,
+        len(new_records),
+        len(page_ids),
+        args.page_step,
+        args.start,
+        end,
+        labels_path,
     )
 
 

@@ -29,11 +29,6 @@ map at the output is a 1-D sequence along the width axis.  With an input
 height of 128 px, a typical approach is to use pooling strides that divide
 128 down to 1 (e.g., 5 pool layers with stride 2 → 128 / 2^5 = 4, then a
 final pool of (4, 1)).
-
-**This module provides the scaffolding and shape contract.**
-The CNN/RNN details are clearly separated so you can swap architectures
-(e.g., ResNet18 backbone, deeper LSTM) without touching the rest of the
-pipeline.
 """
 
 from __future__ import annotations
@@ -43,10 +38,10 @@ import torch.nn as nn
 import torchvision.models as tv_models
 from torch import Tensor
 
-
 # ---------------------------------------------------------------------------
 # CNN backbone — VGG-style
 # ---------------------------------------------------------------------------
+
 
 class CNNBackbone(nn.Module):
     """VGG-style feature extractor: (B, 1, H=128, W) → (B, cnn_out_channels, 1, W').
@@ -68,28 +63,24 @@ class CNNBackbone(nn.Module):
             nn.ReLU(inplace=True),
             nn.Dropout2d(drop),
             nn.MaxPool2d(kernel_size=(2, 2)),  # h/2, w/2
-
             # Block 2 — (64, 64, W/2) → (128, 32, W/4)
             nn.Conv2d(64, 128, kernel_size=3, padding=1),
             nn.BatchNorm2d(128),
             nn.ReLU(inplace=True),
             nn.Dropout2d(drop),
             nn.MaxPool2d(kernel_size=(2, 2)),  # h/2, w/2
-
             # Block 3 — (128, 32, W/4) → (256, 16, W/4)
             nn.Conv2d(128, 256, kernel_size=3, padding=1),
             nn.BatchNorm2d(256),
             nn.ReLU(inplace=True),
             nn.Dropout2d(drop),
             nn.MaxPool2d(kernel_size=(2, 1)),  # h/2, w stays
-
             # Block 4 — (256, 16, W/4) → (256, 8, W/4)
             nn.Conv2d(256, 256, kernel_size=3, padding=1),
             nn.BatchNorm2d(256),
             nn.ReLU(inplace=True),
             nn.Dropout2d(drop),
             nn.MaxPool2d(kernel_size=(2, 1)),  # h/2, w stays
-
             # Block 5 — (256, 8, W/4) → (cnn_out, 1, W/4)
             nn.Conv2d(256, cnn_out_channels, kernel_size=3, padding=1),
             nn.BatchNorm2d(cnn_out_channels),
@@ -105,6 +96,7 @@ class CNNBackbone(nn.Module):
 # ---------------------------------------------------------------------------
 # ResNet18 backbone
 # ---------------------------------------------------------------------------
+
 
 class ResNetBackbone(nn.Module):
     """ResNet18-based feature extractor: (B, 1, H=128, W) → (B, 512, 1, W').
@@ -132,7 +124,12 @@ class ResNetBackbone(nn.Module):
 
         # 1. conv1: stride (2,1) — reduce height, keep width
         base.conv1 = nn.Conv2d(
-            1, 64, kernel_size=7, stride=(2, 1), padding=3, bias=False,
+            1,
+            64,
+            kernel_size=7,
+            stride=(2, 1),
+            padding=3,
+            bias=False,
         )
         # 2. maxpool: keep (2,2) — gives w/2
         base.maxpool = nn.MaxPool2d(kernel_size=3, stride=(2, 2), padding=1)
@@ -142,11 +139,14 @@ class ResNetBackbone(nn.Module):
         self._patch_layer_stride(base.layer4, stride=(2, 1))
 
         self.features = nn.Sequential(
-            base.conv1, base.bn1, base.relu, base.maxpool,
-            base.layer1,   # 64  ch, stride (1,1)
-            base.layer2,   # 128 ch, stride (2,2) → w/4
-            base.layer3,   # 256 ch, stride (2,1) → w/4 still
-            base.layer4,   # 512 ch, stride (2,1) → w/4 still
+            base.conv1,
+            base.bn1,
+            base.relu,
+            base.maxpool,
+            base.layer1,  # 64  ch, stride (1,1)
+            base.layer2,  # 128 ch, stride (2,2) → w/4
+            base.layer3,  # 256 ch, stride (2,1) → w/4 still
+            base.layer4,  # 512 ch, stride (2,1) → w/4 still
             nn.Dropout2d(cnn_dropout) if cnn_dropout > 0 else nn.Identity(),
             nn.AdaptiveAvgPool2d((1, None)),  # collapse h → 1, keep w
         )
@@ -159,16 +159,22 @@ class ResNetBackbone(nn.Module):
         # Patch conv1 (the 3×3 that carries the stride)
         old = block0.conv1
         block0.conv1 = nn.Conv2d(
-            old.in_channels, old.out_channels,
-            kernel_size=old.kernel_size, stride=stride,
-            padding=old.padding, bias=False,
+            old.in_channels,
+            old.out_channels,
+            kernel_size=old.kernel_size,
+            stride=stride,
+            padding=old.padding,
+            bias=False,
         )
         # Patch the downsample shortcut (1×1 conv + BN)
         if block0.downsample is not None:
             old_ds = block0.downsample[0]
             block0.downsample[0] = nn.Conv2d(
-                old_ds.in_channels, old_ds.out_channels,
-                kernel_size=1, stride=stride, bias=False,
+                old_ds.in_channels,
+                old_ds.out_channels,
+                kernel_size=1,
+                stride=stride,
+                bias=False,
             )
 
     def forward(self, x: Tensor) -> Tensor:
@@ -199,15 +205,14 @@ def build_backbone(name: str, cnn_out_channels: int = 256, cnn_dropout: float = 
         Spatial dropout probability.
     """
     if name not in _BACKBONES:
-        raise ValueError(
-            f"Unknown backbone {name!r}. Choose from {sorted(_BACKBONES)}"
-        )
+        raise ValueError(f"Unknown backbone {name!r}. Choose from {sorted(_BACKBONES)}")
     return _BACKBONES[name](cnn_out_channels, cnn_dropout)
 
 
 # ---------------------------------------------------------------------------
 # Full CRNN
 # ---------------------------------------------------------------------------
+
 
 class CRNN(nn.Module):
     """Convolutional Recurrent Neural Network with CTC output.
@@ -304,37 +309,10 @@ class CRNN(nn.Module):
 
     @staticmethod
     def _compute_output_lengths(
-        input_widths: Tensor, padded_w: int, output_w: int,
+        input_widths: Tensor,
+        padded_w: int,
+        output_w: int,
     ) -> Tensor:
         """Scale original image widths by the CNN's width reduction ratio."""
         ratio = output_w / padded_w
         return (input_widths.float() * ratio).long().clamp(min=1)
-
-
-# ---------------------------------------------------------------------------
-# Quick sanity check
-# ---------------------------------------------------------------------------
-
-def _smoke_test() -> None:
-    """Run a forward pass with dummy data to verify shapes."""
-    B, H, W = 4, 128, 800
-    vocab_size = 95  # 93 tokens + blank + pad
-
-    for backbone in ("resnet18", "vgg"):
-        print(f"\n{'='*60}")
-        print(f"Testing backbone: {backbone}")
-        print(f"{'='*60}")
-        model = CRNN(vocab_size=vocab_size, cnn_dropout=0.2, backbone=backbone)
-
-        x = torch.randn(B, 1, H, W)
-        widths = torch.tensor([800, 700, 600, 500])
-
-        log_probs, out_lens = model(x, widths)
-        print(f"Input:        ({B}, 1, {H}, {W})")
-        print(f"log_probs:    {log_probs.shape}")   # (T, B, vocab_size)
-        print(f"output_lens:  {out_lens}")
-        print(f"Total params: {sum(p.numel() for p in model.parameters()):,}")
-
-
-if __name__ == "__main__":
-    _smoke_test()

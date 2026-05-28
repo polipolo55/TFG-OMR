@@ -12,6 +12,7 @@ Flow per upload:
 Set ``OMR_DEBUG_DIR`` to save intermediate crops for inspection.
 PDF rasterisation DPI follows ``OMR_PDF_DPI`` (default 300).
 """
+
 from __future__ import annotations
 
 import base64
@@ -22,12 +23,12 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from .preprocess import load_image, load_pdf_page, pdf_load_dpi, preprocess_page
 from . import staff_detect as _staff_detect
-from .staff_detect import System, detect_systems
-from .inference import recognize_music
 from .chord_recognizer import recognize_chords_crnn
 from .grammar_fix import fix_sequence
+from .inference import recognize_music
+from .preprocess import load_image, load_pdf_page, pdf_load_dpi, preprocess_page
+from .staff_detect import System, detect_systems
 
 log = logging.getLogger(__name__)
 
@@ -66,6 +67,7 @@ def _save_debug(music_imgs: list[np.ndarray], chord_imgs: list[np.ndarray]) -> N
 # Per-page recognition
 # ---------------------------------------------------------------------------
 
+
 def _process_systems(
     systems: list[System],
     checkpoint_path: Path | None,
@@ -90,11 +92,7 @@ def _process_systems(
 
     for sys in systems:
         pre = sys.pre_result
-        skip = (
-            isinstance(pre, RejectionResult)
-            and not pre.passed
-            and (pre.reason or "") in _UNRECOVERABLE
-        )
+        skip = isinstance(pre, RejectionResult) and not pre.passed and (pre.reason or "") in _UNRECOVERABLE
         crnn_skip_mask.append(skip)
         if skip or sys.music_image is None or sys.music_image.size == 0:
             music_imgs.append(np.zeros((10, 10), dtype=np.uint8))
@@ -116,14 +114,18 @@ def _process_systems(
     fixed_music: list[str] = []
     for pred in music_preds:
         fixed, global_key, global_time = fix_sequence(
-            pred, global_key=global_key, global_time=global_time,
+            pred,
+            global_key=global_key,
+            global_time=global_time,
             force_clef=True,
         )
         fixed_music.append(fixed)
 
     _empty_diag = {
-        "line_span_min": 0.0, "spacing_cov": 0.0,
-        "interline_ink_frac": 0.0, "text_area_frac": 0.0,
+        "line_span_min": 0.0,
+        "spacing_cov": 0.0,
+        "interline_ink_frac": 0.0,
+        "text_area_frac": 0.0,
     }
 
     segments: list[dict] = []
@@ -142,7 +144,10 @@ def _process_systems(
             post = RejectionResult(passed=False, reason=pre.reason, diagnostics=diag)
         else:
             post = evaluate_post_crnn(
-                sys, music_logprobs[i], int(music_outlens[i]), pre,
+                sys,
+                music_logprobs[i],
+                int(music_outlens[i]),
+                pre,
             )
 
         mx, my, mw, mh = sys.music_bbox
@@ -156,19 +161,23 @@ def _process_systems(
             lmx_tokens_out = lmx_str.split() if lmx_str else []
             chord_tokens_out = chord_str.split() if chord_str else []
 
-        segments.append({
-            "staff_bbox": [mx, my, mw, mh],
-            "chord_bbox": chord_bbox,
-            "lmx_tokens": lmx_tokens_out,
-            "chords": chord_tokens_out,
-            "rejected": rejected_reason,
-            "reject_diagnostics": post.diagnostics,
-        })
+        segments.append(
+            {
+                "staff_bbox": [mx, my, mw, mh],
+                "chord_bbox": chord_bbox,
+                "lmx_tokens": lmx_tokens_out,
+                "chords": chord_tokens_out,
+                "rejected": rejected_reason,
+                "reject_diagnostics": post.diagnostics,
+            }
+        )
         log.info(
             "Segment %d @ bbox=%s: rejected=%s tokens=%d diag=%s",
-            i, [mx, my, mw, mh], rejected_reason, len(lmx_tokens_out),
-            {k: (round(v, 4) if isinstance(v, float) else v)
-             for k, v in post.diagnostics.items()},
+            i,
+            [mx, my, mw, mh],
+            rejected_reason,
+            len(lmx_tokens_out),
+            {k: (round(v, 4) if isinstance(v, float) else v) for k, v in post.diagnostics.items()},
         )
 
     return segments
@@ -177,6 +186,7 @@ def _process_systems(
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 def run_pipeline(
     file_data: bytes,
@@ -218,11 +228,13 @@ def run_pipeline(
         log.warning("No staff systems detected")
         return {
             "error": "No staff systems detected in the image.",
-            "pages": [{
-                "index": 0,
-                "page_image_data_url": page_url,
-                "segments": [],
-            }],
+            "pages": [
+                {
+                    "index": 0,
+                    "page_image_data_url": page_url,
+                    "segments": [],
+                }
+            ],
             "meta": {**base_meta, "num_systems": 0},
         }
 
@@ -231,23 +243,19 @@ def run_pipeline(
     # 4. Recognise + grammar fix
     segments = _process_systems(systems, checkpoint_path)
 
-    geometry_rejected = sum(
-        1 for s in segments
-        if s.get("rejected") and str(s["rejected"]).startswith("geometry_")
-    )
+    geometry_rejected = sum(1 for s in segments if s.get("rejected") and str(s["rejected"]).startswith("geometry_"))
     ocr_rejected = sum(1 for s in segments if s.get("rejected") == "ocr_text_density")
-    ctc_rejected = sum(
-        1 for s in segments
-        if s.get("rejected") in ("ctc_low_confidence", "ctc_zero_length")
-    )
+    ctc_rejected = sum(1 for s in segments if s.get("rejected") in ("ctc_low_confidence", "ctc_zero_length"))
 
     return {
         "error": None,
-        "pages": [{
-            "index": 0,
-            "page_image_data_url": page_url,
-            "segments": segments,
-        }],
+        "pages": [
+            {
+                "index": 0,
+                "page_image_data_url": page_url,
+                "segments": segments,
+            }
+        ],
         "meta": {
             **base_meta,
             "num_systems": len(systems),

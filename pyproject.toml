@@ -6,7 +6,7 @@ authors = [
     {name = "Pol Casanovas"}
 ]
 readme = "README.md"
-requires-python = "~3.14"
+requires-python = ">=3.14,<3.15"
 dependencies = [
     "opencv-python (>=4.13.0.92,<5.0.0.0)",
     "music21 (>=9.9.1,<10.0.0)",
@@ -36,4 +36,20 @@ dev = [
     "notebook (>=7.5.3,<8.0.0)",
     "jupyterlab (>=4.5.7,<5.0.0)",
     "ipykernel (>=7.2.0,<8.0.0)",
+    "ruff (>=0.15.0,<1.0.0)",
 ]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 120
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# Imports follow deliberate sys.path bootstrap for script-style entry points.
+"src/api/main.py" = ["E402"]
+"src/data_processing/extract_real_chord_strips.py" = ["E402"]
+"src/data_processing/extract_real_music_strips.py" = ["E402"]
+"src/data_processing/generate_chord_crops.py" = ["E402"]

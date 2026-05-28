@@ -61,17 +61,25 @@ log = logging.getLogger(__name__)
 # LilyPond then prints spurious naturals for every key-signature note.
 # ---------------------------------------------------------------------------
 
-_STEP_LILY   = {"C": "c", "D": "d", "E": "e", "F": "f",
-                "G": "g", "A": "a", "B": "b"}
-_ACC_LILY    = {"b": "es", "bb": "eses", "#": "is", "x": "isis", "": ""}
-_DUR_LILY    = {"breve": r"\breve", "whole": "1", "half": "2", "quarter": "4",
-                "eighth": "8", "sixteenth": "16", "32nd": "32", "64th": "64",
-                # PrIMuS aliases — some samples spell these out
-                "thirty_second": "32", "sixty_fourth": "64",
-                # PrIMuS breve spelling (must match semantic_to_lmx._DUR_LMX)
-                "double_whole": r"\breve",
-                # longa (4 whole notes); LilyPond calls it \longa
-                "quadruple_whole": r"\longa"}
+_STEP_LILY = {"C": "c", "D": "d", "E": "e", "F": "f", "G": "g", "A": "a", "B": "b"}
+_ACC_LILY = {"b": "es", "bb": "eses", "#": "is", "x": "isis", "": ""}
+_DUR_LILY = {
+    "breve": r"\breve",
+    "whole": "1",
+    "half": "2",
+    "quarter": "4",
+    "eighth": "8",
+    "sixteenth": "16",
+    "32nd": "32",
+    "64th": "64",
+    # PrIMuS aliases — some samples spell these out
+    "thirty_second": "32",
+    "sixty_fourth": "64",
+    # PrIMuS breve spelling (must match semantic_to_lmx._DUR_LMX)
+    "double_whole": r"\breve",
+    # longa (4 whole notes); LilyPond calls it \longa
+    "quadruple_whole": r"\longa",
+}
 
 
 def _parse_pitch(pitch_str: str) -> str:
@@ -89,8 +97,8 @@ def _parse_pitch(pitch_str: str) -> str:
         acc_str = "x"
 
     lily_step = _STEP_LILY[step]
-    lily_acc  = _ACC_LILY.get(acc_str, "")
-    octave    = int(oct_str)
+    lily_acc = _ACC_LILY.get(acc_str, "")
+    octave = int(oct_str)
 
     # LilyPond middle C = c'  (octave 4)
     # c   = C3, c'  = C4, c'' = C5, c, = C2, c,, = C1
@@ -112,7 +120,7 @@ def _parse_duration(dur_str: str) -> str:
     """
     # Strip trailing dots
     stripped = dur_str.rstrip(".")
-    dots     = "." * (len(dur_str) - len(stripped))
+    dots = "." * (len(dur_str) - len(stripped))
     lily_dur = _DUR_LILY.get(stripped)
     if lily_dur is None:
         raise ValueError(f"Unknown duration: {dur_str!r}")
@@ -128,7 +136,7 @@ def _is_valid_png(path: Path) -> bool:
             return False
         with Image.open(path) as img:
             img.load()
-    except (OSError, ValueError, UnidentifiedImageError):
+    except OSError, ValueError, UnidentifiedImageError:
         return False
     return True
 
@@ -143,11 +151,11 @@ def _parse_key(ks_str: str) -> str:
     elif ks_str.endswith("m"):
         mode, root = "minor", ks_str[:-1]
     else:
-        mode, root = "major", ks_str   # bare 'C' = C major
+        mode, root = "major", ks_str  # bare 'C' = C major
 
-    step    = root[0].lower()
+    step = root[0].lower()
     acc_str = root[1:]
-    acc     = _ACC_LILY.get(acc_str, "")
+    acc = _ACC_LILY.get(acc_str, "")
     return rf"\key {step}{acc} \{mode}"
 
 
@@ -159,30 +167,27 @@ def semantic_to_lily_music(semantic_path: Path) -> str:
     Uses the semantic file as single source of truth for pitch spelling so
     accidentals always match the original PrIMuS engraving.
     """
-    text   = semantic_path.read_text(encoding="utf-8")
+    text = semantic_path.read_text(encoding="utf-8")
     tokens = text.split()
 
     lily_tokens: list[str] = []
-    pending_tie = False   # append ~ to the next note
+    pending_tie = False  # append ~ to the next note
 
     for tok in tokens:
         try:
             if tok.startswith("clef-"):
-                clef_id = normalize_clef_id_for_lead_sheet(tok[len("clef-"):])
+                clef_id = normalize_clef_id_for_lead_sheet(tok[len("clef-") :])
                 if clef_id not in CLEF_LY:
-                    raise ValueError(
-                        f"Unknown clef token: {tok!r}. "
-                        f"Add it to CLEF_LY in CRNN_CTC/lilypond_render.py."
-                    )
+                    raise ValueError(f"Unknown clef token: {tok!r}. Add it to CLEF_LY in CRNN_CTC/lilypond_render.py.")
                 lily_clef = CLEF_LY[clef_id]
                 lily_tokens.append(rf"\clef {lily_clef}")
 
             elif tok.startswith("keySignature-"):
-                ks_str = tok[len("keySignature-"):]
+                ks_str = tok[len("keySignature-") :]
                 lily_tokens.append(_parse_key(ks_str))
 
             elif tok.startswith("timeSignature-"):
-                ts_str = tok[len("timeSignature-"):]
+                ts_str = tok[len("timeSignature-") :]
                 if ts_str == "C":
                     lily_tokens.append(r"\time 4/4")
                 elif ts_str in ("C/", "C|"):
@@ -192,15 +197,15 @@ def semantic_to_lily_music(semantic_path: Path) -> str:
 
             elif tok.startswith("note-"):
                 # format: note-{Pitch}_{duration}  or  note-{Pitch}_{duration}_fermata
-                inner      = tok[len("note-"):]
+                inner = tok[len("note-") :]
                 pitch_str, dur_str = inner.split("_", 1)
                 # Handle fermata suffix (e.g. "eighth_fermata" → "eighth")
                 has_fermata = dur_str.endswith("_fermata")
                 if has_fermata:
                     dur_str = dur_str[: -len("_fermata")]
                 lily_pitch = _parse_pitch(pitch_str)
-                lily_dur   = _parse_duration(dur_str)
-                note_tok   = lily_pitch + lily_dur
+                lily_dur = _parse_duration(dur_str)
+                note_tok = lily_pitch + lily_dur
                 if has_fermata:
                     note_tok += r"\fermata"
                 if pending_tie:
@@ -209,7 +214,7 @@ def semantic_to_lily_music(semantic_path: Path) -> str:
                 lily_tokens.append(note_tok)
 
             elif tok.startswith("rest-"):
-                dur_str  = tok[len("rest-"):]
+                dur_str = tok[len("rest-") :]
                 # Handle fermata suffix on rests too
                 has_fermata = dur_str.endswith("_fermata")
                 if has_fermata:
@@ -294,6 +299,7 @@ def make_lily_source(
 # Per-sample processing
 # ---------------------------------------------------------------------------
 
+
 def process_sample(
     sample_dir: Path,
     output_dir: Path,
@@ -313,15 +319,15 @@ def process_sample(
 
     Returns True on success, False on failure.
     """
-    sample_id    = sample_dir.name
-    sem_path     = sample_dir / f"{sample_id}.semantic"
+    sample_id = sample_dir.name
+    sem_path = sample_dir / f"{sample_id}.semantic"
 
     if not sem_path.exists():
         # Using returning a string instead of False to pass an error message to the parent
         return f"No .semantic file in {sample_dir.name}"
 
     out_sample = output_dir / sample_id
-    out_png    = out_sample / f"{sample_id}.png"
+    out_png = out_sample / f"{sample_id}.png"
 
     if out_png.exists() and not force:
         if _is_valid_png(out_png):
@@ -376,6 +382,7 @@ def process_sample(
     if with_lmx:
         try:
             from data_processing.semantic_to_lmx import convert_sample
+
             result = convert_sample(out_sample)
             if not result:
                 return f"LMX generation failed to produce output for {sample_id}"
@@ -388,6 +395,7 @@ def process_sample(
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -457,9 +465,9 @@ def main() -> None:
 
     # Collect all sample directories (immediate children of package_* dirs)
     sample_dirs = sorted(
-        d for d in args.source.rglob("*")
-        if d.is_dir() and not d.name.startswith(".")
-        and (d / f"{d.name}.semantic").exists()
+        d
+        for d in args.source.rglob("*")
+        if d.is_dir() and not d.name.startswith(".") and (d / f"{d.name}.semantic").exists()
     )
 
     if not sample_dirs:
@@ -477,12 +485,9 @@ def main() -> None:
         error_log.unlink()
 
     ok = fail = 0
-    dpi_arg: int | tuple[int, ...] = (
-        args.dpi[0] if len(args.dpi) == 1 else tuple(args.dpi)
-    )
-    _worker = partial(process_sample, output_dir=args.output, dpi=dpi_arg,
-                      force=args.force, with_lmx=not args.no_lmx)
-    
+    dpi_arg: int | tuple[int, ...] = args.dpi[0] if len(args.dpi) == 1 else tuple(args.dpi)
+    _worker = partial(process_sample, output_dir=args.output, dpi=dpi_arg, force=args.force, with_lmx=not args.no_lmx)
+
     with multiprocessing.Pool(processes=args.workers) as pool:
         with tqdm(total=len(sample_dirs), desc="Rendering") as pbar:
             # imap returns results in order, imap_unordered is faster

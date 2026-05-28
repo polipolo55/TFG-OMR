@@ -9,14 +9,14 @@ the system reproducible and within the compute budget of a single
 consumer GPU.
 The chapter is deliberately separate from the design chapter so that
 the conceptual architecture can be read independently of any particular
-library or framework choice.
+library or framework choice.\todo{Add a one-line summary of concrete training-time numbers up front (vocab size, total training samples after filtering, wall-clock time on RTX~3060, final checkpoint size) so the reader sees the scale of the realised system before diving into the sections.}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Technology Stack}
 \label{sec:impl-stack}
 
 Table~\ref{tab:tech-stack} lists the principal libraries used in each
-layer of the system.
+layer of the system.\todo{Use \textbackslash Cref{tab:tech-stack} mid-sentence; same change for the other three Table\textasciitilde\textbackslash ref usages in this chapter (lines ~194, ~369, ~643).}\todo{Only PyTorch is versioned in the table; pin concrete versions (or a version-range) for OpenCV, NumPy, PyMuPDF, albumentations, FastAPI, LilyPond, torchvision so the table is genuinely reproducibility-grade.}
 The selection criterion in every case was the smallest, most
 widely-used library compatible with the design constraints; no
 component was chosen for novelty.
@@ -59,7 +59,7 @@ support, distributed training, or specialised cloud infrastructure.
 \label{sec:impl-repo}
 
 The project source tree is organised by responsibility rather than by
-file type.
+file type.\todo{Verify this verbatim tree against the current \code{src/} layout (e.g.\ presence of \code{lilypond\_render.py}, \code{staff\_reject.py}, \code{calibrate\_reject} subcommand referenced in CLAUDE.md) — the tree omits several modules mentioned elsewhere in the chapter and may already be stale.}
 
 \begin{quote}\small
 \begin{verbatim}
@@ -152,7 +152,7 @@ of paths.
 Every stage uses the Python \code{multiprocessing} module for CPU
 parallelism, with the worker pool size set by a CLI flag (default 8).
 The Python global interpreter lock makes threading useless for these
-CPU-bound stages.
+CPU-bound stages.\todo{Drop or shorten this GIL aside — it justifies a library choice (more Ch.4-flavoured) and is widely understood; this chapter should report numbers (e.g.\ worker count, throughput) instead.}
 
 \subsection{Render: PrIMuS to LilyJAZZ}
 
@@ -301,7 +301,7 @@ layer3    stride (2, 1)
 layer4    stride (2, 1)
 AdaptiveAvgPool2d -> output height 1
 \end{verbatim}
-\end{quote}
+\end{quote}\todo{Replace the verbatim block with a small table (stage / stride\_h / stride\_w / cumulative downsample) or a tikz schematic of the feature-map shapes — verbatim is fine in code but reads awkwardly in a memoir; same comment for the \code{src/} tree verbatim earlier.}
 
 The cumulative effect is an input of shape $(B, 1, 128, W)$ producing
 an output of shape $(B, 512, 1, W/4)$.
@@ -386,7 +386,7 @@ to \code{config.json} at training start.
 \code{rnn\_hidden}               & 256                & per direction \\ \tfgrowsep
 \code{rnn\_layers}               & 2                  & BiLSTM depth \\ \tfgrowsep
 \code{dropout}                   & 0.3                & between LSTM layers \\ \tfgrowsep
-\code{batch\_size}               & 16                 & fits in 12\,GB at \code{img\_height=128} \\ \tfgrowsep
+\code{batch\_size}               & 16                 & fits in 12\,GB at \code{img\_height=128} \\ \tfgrowsep\todo{Quantify the VRAM/batch trade-off: peak GPU memory at batch 16, what happens at batch 32, and whether gradient accumulation was considered — currently ``fits in 12\,GB'' is asserted without a measurement.}
 \code{lr}                        & $1{\times}10^{-3}$ & OneCycleLR peak \\ \tfgrowsep
 \code{weight\_decay}             & $1{\times}10^{-4}$ & AdamW \\ \tfgrowsep
 \code{warmup\_frac}              & 0.08               & of total steps \\ \tfgrowsep
@@ -433,7 +433,7 @@ and occasional slash-repeat marks.
 
 Twelve thousand training strips and twelve hundred validation strips
 are generated for the default configuration; the chord training script
-consumes them via a CSV manifest.
+consumes them via a CSV manifest.\todo{Add chord-network hyperparameters (LR, batch size, epochs, optimiser, fine-tuning epochs, real/synthetic mixing weights schedule) — currently the section gives architecture details but no training recipe, unlike the melody network which has Table~\ref{tab:hyperparams}.}
 
 \subsection{Chord network architecture}
 
@@ -566,7 +566,7 @@ is fast, deterministic, and accurate enough on the well-formatted Real
 Book input.
 A future revision could replace it with a learned segmenter, but the
 current implementation has not been the bottleneck of any failure mode
-observed during evaluation.
+observed during evaluation.\todo{Re-justifying an architectural choice (``deliberately not a neural network'') belongs in Ch.4. Cut this paragraph or reduce it to the implementation fact (kernel size, opening width, clustering tolerances).}
 
 \subsection{Music recognition}
 
@@ -584,7 +584,7 @@ each time step, collapse consecutive duplicates, remove blank.
 Beam search can be enabled by setting \code{OMR\_BEAM\_WIDTH=N} or
 passing \code{--beam-width N} to the CLI; empirically, beam search
 yields fewer than one edit per thousand SER improvement on monophonic
-input, so greedy is the recommended default.
+input, so greedy is the recommended default.\todo{Move the empirical greedy-vs-beam comparison to Ch.6 (Results) and cross-reference it here; this paragraph should only state the implementation default and how to override it.}
 
 \subsection{Chord recognition}
 
@@ -698,7 +698,7 @@ it accepts a file, displays the rendered page with detected staff
 bounding boxes overlaid, and shows the recognised LMX token sequence
 and chord list for each segment.
 The UI is not the principal deliverable of the thesis; it is a
-debugging aid that doubles as a demonstration interface.
+debugging aid that doubles as a demonstration interface.\todo{Add concrete API-engineering details: FastAPI/Uvicorn versions, request size limits, default worker count, expected per-page latency on the target GPU, and JSON response schema (or a pointer to a schema figure). Currently this section reads like an overview, not an implementation report.}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Reproducibility}
@@ -729,4 +729,4 @@ Poetry's \code{poetry.lock} file pins every dependency to an exact
 version, including transitive dependencies.
 The project environment is reproducible across machines with a single
 \code{poetry install} command.
-The lock file is committed to version control alongside the source.
+The lock file is committed to version control alongside the source.\todo{Reproducibility section is missing: (a) random-seed strategy (numpy/torch/python seeds, \code{torch.use\_deterministic\_algorithms}, cuDNN flags); (b) checkpoint file format (what keys are stored beyond weights + config — optimiser state? RNG state?); (c) LilyPond version and LilyJAZZ commit hash, since renders are part of the reproducibility chain. Ch.3 cross-references this section, so it must be detailed.}

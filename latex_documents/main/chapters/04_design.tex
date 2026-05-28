@@ -14,10 +14,11 @@ reader is asked to interpret library names and configuration flags.
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Problem Decomposition}
 \label{sec:design-pipeline}
+\todo{Chapter lacks a \emph{Staff detection} design section: the pipeline figure shows a ``Staff detect'' block but no subsection explains the chosen approach (heuristic / YOLO / RT-DETR), its alternatives, or its accuracy target. Major omission for a five-stage pipeline.}
 
 The end-to-end transcription task is decomposed into five sequential
 stages, with a clearly defined contract between each pair.
-Figure~\ref{fig:pipeline-design} summarises the data flow.
+Figure~\ref{fig:pipeline-design} summarises the data flow.\todo{Use \Cref{fig:pipeline-design} mid-sentence instead of Figure~\ref; apply consistently throughout the chapter.}\todo{Inter-stage contracts are described in prose but never given as a typed schema (e.g.\ image dims, dtype, JSON shape). Add an explicit interface table or per-stage I/O contract block.}
 
 \begin{enumerate}
     \item \textbf{Preprocessing} takes the input bytes (a PDF page or a
@@ -120,6 +121,7 @@ Third, both major surveys of the field~\cite{calvoZaragozaUnderstandingOMR2020,s
 explicitly recommend modular decomposition for OMR systems that target
 specific notation styles, because it allows each module to be replaced
 or retrained independently as the target domain evolves.
+\todo{Missing \emph{Alternatives considered} subsection for the pipeline decomposition: name $\geq$2 rejected designs (e.g.\ end-to-end full-page transformer; SMT++ tree-decoder) with reasons. FIB rubric requirement.}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Data Strategy}
@@ -152,7 +154,7 @@ equal probability; cautionary accidentals are added in roughly half of
 samples; the global staff size is drawn uniformly from a six-element
 range, varying note size and horizontal density;
 and unbeamed eighth notes appear in a small fraction of samples to
-expose the model to both beamed and unbeamed groupings.
+expose the model to both beamed and unbeamed groupings.\todo{Concrete probabilities (``equal probability'', ``half of samples'', ``six-element range'', ``small fraction'') are implementation details. Either keep as ranges with justification or move exact values to Ch.5.}
 
 \subsection{Domain augmentation: from clean renders to scanned pages}
 
@@ -172,6 +174,7 @@ This is the same recipe followed by every recent end-to-end OMR
 system~\cite{calvoZaragozaCameraPrimus2018,mayerPracticalEndToEnd2024,riosVilaSMTPlusPlus2024,yangLEGATO2025};
 the specific list of distortions used here is calibrated against a
 sample of real Real Book scans.
+\todo{Missing \emph{Alternatives considered} for augmentation strategy: e.g.\ GAN-based domain transfer, CycleGAN scan-style, no augmentation + larger model. Justify rejection of each.}
 
 \subsection{Domain restriction: filtering the training set}
 
@@ -306,7 +309,7 @@ tags; it is the same representation used by the
 OLIMPIC reference work~\cite{mayerPracticalEndToEnd2024}, keeping the
 present results directly comparable; and its flat, whitespace-separated
 form is directly compatible with CTC training, with no
-linearisation logic required at the model boundary.
+linearisation logic required at the model boundary.\todo{Missing explicit \emph{Alternatives considered} subsection: MusicXML, PrIMuS agnostic/semantic, \code{**kern}, ABC each need a one-line rejection reason here, not just a forward pointer to Ch.\,2.}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Model Design}
@@ -391,7 +394,7 @@ symbolic output.
 A transformer of comparable capacity would in principle perform at
 least as well but at substantially higher data and compute costs that
 are not justified for monophonic input
-(\Cref{sec:soa-transformer}).
+(\Cref{sec:soa-transformer}).\todo{This is the chapter that should carry the CRNN--CTC technical case. Promote to an explicit \emph{Alternatives considered} subsection naming $\geq$2 rejected designs (e.g.\ encoder--decoder transformer/TrOMR, tree-decoder SMT++) with reasons, rather than deferring to Ch.\,2.}
 
 \subsection{Backbone choice}
 
@@ -408,7 +411,7 @@ convergence; its pre-trained weights from ImageNet provide a reasonable
 initialisation for the first convolutional layers, even though the
 downstream task is monochrome rather than colour; and its parameter
 count fits comfortably within the VRAM budget of a single consumer GPU
-(see \Cref{ch:mgmt}).
+(see \Cref{ch:mgmt}).\todo{Backbone choice needs an explicit \emph{Alternatives considered}: ResNet34/50, EfficientNet, MobileNet, ViT/Swin patches---each with a one-line reason for rejection.}
 
 \subsection{Temporal resolution and width compression}
 
@@ -431,7 +434,7 @@ The convolutional features are fed to a stacked bidirectional
 LSTM~\cite{hochreiterLongShortTermMemory1997}.
 Two layers are used, with 256 hidden units per direction; this gives
 the model bidirectional context over the entire staff while keeping
-parameter count modest.
+parameter count modest.\todo{Exact hyperparameters (``256 hidden units'', ``two layers'', \SI{40}{\percent} header strip, \SI{10}{\percent} splits, etc.) belong in Ch.\,5. Here state the design rationale (``small enough to fit on one consumer GPU''); move concrete values to implementation.}
 A single-layer LSTM was found to under-fit on dense passages
 (see ablations in \Cref{ch:results}); a three-layer LSTM gave no
 measurable gain over two layers and slowed training.
@@ -485,7 +488,7 @@ and a chord-strip image for each detected system; the two are processed
 in parallel and their outputs are joined into a single JSON segment
 keyed by the system's bounding box on the page.
 No cross-attention or shared representation links the two networks;
-this is a deliberate simplicity choice.
+this is a deliberate simplicity choice.\todo{Two-stream split is a major decision but the rejected alternative (single multi-task network with shared backbone, or full-page transformer) is only sketched. Add an \emph{Alternatives considered} listing $\geq$2 with reasons.}
 
 \subsection{Chord vocabulary and notation conventions}
 
@@ -568,7 +571,7 @@ subtle and statistically rare in the corpus, so the model
 under-predicts them.
 The training loader duplicates---in the training split only---every
 sample whose label contains a rare token, with a configurable
-multiplier.
+multiplier.\todo{``Training loader'' / ``configurable multiplier'' drifts into Ch.\,5 territory. Ch.\,4 should state the design choice (oversample rare-token samples instead of class-weighted loss) and \emph{why}; leave the loader mechanism for the implementation chapter.}
 This is a class-imbalance fix applied at the sample level rather than
 in the loss function, which CTC does not easily admit.
 
@@ -610,7 +613,7 @@ The grammar fixer is purely deterministic: it never invents new musical
 content, only repairs structural defects in the model's output.
 A learned alternative---training the model end-to-end against a
 grammar-aware loss---is conceivable but adds complexity and offers
-limited gain for a vocabulary as small and as well-structured as LMX.
+limited gain for a vocabulary as small and as well-structured as LMX.\todo{Grammar fixer needs an explicit \emph{Alternatives considered} block listing $\geq$2 rejected designs (e.g.\ constrained CTC decoding with grammar-aware beam, FST-based decoder, learned seq2seq corrector) with reasons---not only a sentence on grammar-aware loss.}
 Keeping grammar enforcement out of the loss also keeps the model's
 output legible: every token in the raw prediction is interpretable in
 the same way as the corresponding ground-truth token.
@@ -618,6 +621,7 @@ the same way as the corresponding ground-truth token.
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Evaluation Design}
 \label{sec:design-eval}
+\todo{No quantitative acceptance / success target. State the SER threshold (e.g.\ ``target SER\,$<$\,X\,\% on clean test, $<$\,Y\,\% on real scans'') that defines whether the design has succeeded; otherwise Ch.\,6 has nothing to compare against.}
 
 \subsection{Primary metric: Symbol Error Rate}
 

@@ -1,5 +1,9 @@
 \chapter{Results and Evaluation}
 \label{ch:results}
+\todo{AUDIT (CRITICAL cross-chapter coherence): \S\ref{sec:res-domaingap} is essentially empty (three unresolved \texttt{\textbackslash todo} placeholders, no numbers, no figures), yet Ch.~8 (\texttt{08\_conclusions.tex} lines 62--66) explicitly cites this section as the evidence that Objective~7 is ``partially met''. The conclusion is currently unsupported by any content in this chapter. Either (a) execute the three experiments below before submission, or (b) downgrade the Objective~7 claim in Ch.~8 from ``partially met'' to ``not met / future work'' and remove the cross-reference. As it stands, a tribunal reading Ch.~8 will follow the \texttt{\textbackslash Cref} link and find no results.}
+\todo{AUDIT (high-level): Missing experimental-protocol section. Before any results, add a numbered \S{} that consolidates: (i) datasets and exact split sizes (train/val/test, scanned vs clean), (ii) hardware (RTX 3060, RAM, CPU), (iii) software versions (PyTorch, Python 3.14, LilyPond), (iv) random-seed protocol and number of repetitions per number reported, (v) formal metric definitions (aggregate SER, melodic SER, edit distance) -- currently scattered or assumed.}
+\todo{AUDIT (high-level): No comparison to State of the Art. Add at minimum a qualitative comparison (Audiveris and/or SmartScore output) on the same real Real Book page used in \S\ref{sec:res-domaingap}; even a single side-by-side figure would satisfy the FIB rubric requirement.}
+\todo{AUDIT (high-level): All numbers in this chapter are single point estimates with no variance or confidence intervals. Report mean $\pm$ std across at least 3 random seeds for the headline SER figures in \Cref{tab:results-headline}, or explicitly state that only one run was performed and justify why.}
 
 This chapter reports the quantitative and qualitative results of the
 training and evaluation procedures described in
@@ -18,6 +22,7 @@ from the perfect and near-median tails of the SER distribution.
 \Cref{sec:res-domaingap} addresses the synthetic-to-real
 domain gap and the effect of the fine-tuning stage on real Real Book
 pages.
+\todo{AUDIT: This sentence overpromises -- \S\ref{sec:res-domaingap} currently contains no fine-tuning results, only placeholders. Either rephrase the chapter overview to say ``discusses the synthetic-to-real gap as a future-work item'' or fill in the section before the deposit.}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Training Trajectory}
@@ -53,6 +58,7 @@ evaluation.
     \label{fig:training-curves}
 \end{figure}
 
+\todo{AUDIT (concision): ``Two observations are worth highlighting.'' is signposting filler. Cut and let the two observations stand on their own; the paragraph is also approx.\ 30\,\% longer than it needs to be -- the discussion of weight decay / dropout / jitter belongs in Ch.~5 (Implementation), not in a results-trajectory paragraph.}
 Two observations are worth highlighting.
 First, validation SER converges much faster than the loss curve
 suggests: by epoch 10 it is already below \SI{2}{\percent}, and the
@@ -77,11 +83,13 @@ Evaluation is performed on the held-out test split (\num{4604} samples
 drawn from the union of clean and scan-augmented images of the PrIMuS
 corpus~\cite{calvoZaragozaCameraPrimus2018,PrIMuSDataset}) using greedy
 CTC decoding.
+\todo{AUDIT (protocol detail): state how the 4604-sample test split was constructed -- random seed, fraction of the post-filter corpus, whether the same sample ids are used for the clean and scanned variants (which the table strongly implies but does not state). Also state whether the validation split is disjoint from this test split.}
 Aggregate SER, computed as the sum of edit distances divided by the
 sum of ground-truth lengths following the standard token-level
 protocol~\cite{SymbolErrorRate,hajicOMRMetricsEvaluation2019}, is
 \SI{1.28}{\percent} on the scanned test split and \SI{1.19}{\percent}
 on the clean test split.
+\todo{AUDIT (metric definitions): give a single-line formal definition of aggregate SER (e.g.\ $\mathrm{SER}=\sum_i d(\hat y_i,y_i)/\sum_i |y_i|$ with $d$ = Levenshtein on the LMX token alphabet) and of \emph{melodic} SER (which tokens are stripped before edit-distance: \texttt{measure}, \texttt{tied:start}, \texttt{tied:stop}); referring to ``the standard token-level protocol'' is not specific enough for a TFG.}
 \Cref{tab:results-headline} consolidates the headline numbers
 that the remainder of this chapter then decomposes; later sections
 refer back to it rather than re-quoting the numbers in full.
@@ -149,6 +157,7 @@ improve further.
 Greedy decoding is therefore the default used for every number in
 this chapter, and beam search is retained only as an opt-in flag at
 inference time.
+\todo{AUDIT (missing inference-time results): no chapter section reports end-to-end latency or throughput (staves/second, total seconds for a 32-measure page), nor peak GPU/CPU memory at inference. A deployment-oriented system chapter expects at minimum a small table: cold-start time, per-staff inference time (greedy vs.\ beam-5), and full-page pipeline wall time. The numbers are cheap to obtain and strengthen Objective~6.}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Error Decomposition}
@@ -216,6 +225,7 @@ in the single digits per token over thousands of test samples.
     \label{fig:common-edits}
 \end{figure}
 
+\todo{AUDIT (Results vs Conclusions): the ``design choice \ldots is validated by these numbers'' framing is a Ch.~8 claim, not a Ch.~6 finding. Results report what was observed; the validation/justification of the architectural decision belongs in the discussion/conclusions chapter. Either neutralise to ``these numbers are consistent with the design rationale in \Cref{sec:design-grammar}'' or move the claim to Ch.~8.}
 Two consequences follow.
 First, the design choice to handle barline regularisation in the
 deterministic grammar fixer (\Cref{sec:design-grammar}) rather
@@ -234,6 +244,7 @@ but with single-digit counts over the full test split.
 The model is therefore reading pitches and octaves essentially
 perfectly; the residual error budget is structural and rhythmic, not
 melodic (see \Cref{sec:design-model}).
+\todo{AUDIT (error analysis depth): the claim ``pitch substitutions exist but with single-digit counts'' deserves a small confusion table (top-5 source $\to$ target token pairs for substitutions, with counts). Without it the reader has to trust the prose. The data already exists in the evaluation output -- this is a low-effort, high-evidence addition.}
 
 \subsection{SER versus sequence length}
 
@@ -278,6 +289,7 @@ and near-median tails of the SER distribution.
 Each figure shows a test-set staff image as seen by the model,
 together with the resulting prediction's edit distance and per-sample
 SER.
+\todo{AUDIT (qualitative coverage): the two examples shown are both \emph{synthetic} (scan-augmented LilyJAZZ). Add at least one qualitative example on a \emph{real} Real Book scan -- without this, the chapter has no figure demonstrating model behaviour on the input distribution the system is actually meant for. This is also the natural place to host the side-by-side comparison vs.\ Audiveris/SmartScore requested by the top-of-chapter SoA marker.}
 
 Each of the two examples below pairs the \term{input} image presented
 to the model---a scan-augmented LilyJAZZ render from the held-out
@@ -310,6 +322,7 @@ token list.
     matches it note-for-note.
     Approximately \SI{71}{\percent} of test samples fall in this
     category.}
+    \todo{AUDIT (caption): this caption is doing analysis (``approximately 71\,\% of test samples fall in this category''), which duplicates body text in \S\ref{sec:res-ser}. Captions should describe what the figure shows, not re-state aggregate statistics. Trim to the first two sentences.}
     \label{fig:qual-perfect}
 \end{figure}
 
@@ -348,6 +361,7 @@ underlying notation cleanly in both cases.
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Model Weight Distribution}
 \label{sec:res-weights}
+\todo{AUDIT (relevance): this section is a training-diagnostic, not an evaluation result. It contributes nothing to the chapter's argument (no comparison across checkpoints, no link to SER). Consider either (a) moving it to an appendix, (b) deleting it, or (c) reframing it as a sanity check inside \S\ref{sec:res-training} in 2--3 sentences without its own figure.}
 
 A diagnostic useful when comparing trained checkpoints is the
 marginal distribution of the model's weights at convergence.
@@ -391,6 +405,7 @@ This is a benign artefact and does not affect inference.
 % ─────────────────────────────────────────────────────────────────────────────
 \section{The Synthetic-to-Real Domain Gap}
 \label{sec:res-domaingap}
+\todo{AUDIT (BLOCKER): this entire section is a stub -- one paragraph of motivation followed by three nested \texttt{\textbackslash todo} placeholders and no figures, no tables, no numbers. This is the single highest-priority gap in the chapter. See the chapter-level CRITICAL marker about Ch.~8 Objective~7 -- the conclusion's claim of ``partially met'' rests entirely on whatever ends up here. Minimum acceptable content for the deposit: a zero-shot SER number on $\geq$\,30 annotated real staves, one bar chart, and an honest paragraph stating whether fine-tuning was attempted.}
 
 The numbers reported above are all measured on the held-out
 \textit{synthetic} test split.
@@ -431,3 +446,4 @@ Real Book scans can be closed by fine-tuning on a small hand-labelled
 set---is the subject of the \code{\textbackslash todo} placeholders
 in \Cref{sec:res-domaingap}, which will be completed as
 those experiments conclude.
+\todo{AUDIT (deposit blocker): the final paragraph of the chapter must not refer to ``\texttt{\textbackslash todo} placeholders'' in the deposited PDF. Rewrite this paragraph either to summarise the actual real-scan results once \S\ref{sec:res-domaingap} is filled in, or to honestly frame the real-scan evaluation as scoped-out future work without alluding to backlog markers.}

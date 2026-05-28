@@ -1,20 +1,20 @@
 \chapter{State of the Art}
 \label{ch:soa}
 
-OMR has evolved through three broadly distinguishable generations: the
-heuristic modular pipelines that defined the field from the 1990s through
-the early 2010s; the convolutional--recurrent sequence models trained with
-Connectionist Temporal Classification (CRNN--CTC) that arose with deep
-learning; and the most recent end-to-end transformer architectures, which
-scale to polyphonic and full-page input at the cost of substantially
-larger labelled corpora.
+Following the two published surveys of the
+field~\cite{calvoZaragozaUnderstandingOMR2020,shatriOPTICALMUSICRECOGNITION},
+this chapter groups prior OMR work into three broadly distinguishable
+generations: the heuristic modular pipelines that defined the field from
+the 1990s through the early 2010s; the convolutional--recurrent sequence
+models trained with Connectionist Temporal Classification (CRNN--CTC) that
+arose with deep learning; and the most recent end-to-end transformer
+architectures, which scale to polyphonic and full-page input at the cost of
+substantially larger labelled corpora.
 This chapter surveys those paradigms, reviews the principal datasets and
 symbolic output representations used in the literature, and finally
 positions this thesis with respect to recent work that targets jazz lead
 sheets specifically.
-The two published surveys of the
-field~\cite{calvoZaragozaUnderstandingOMR2020,shatriOPTICALMUSICRECOGNITION}
-serve as the structural backbone for the discussion.
+The two surveys above serve as the structural backbone for the discussion.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{The Classical OMR Pipeline}
@@ -61,14 +61,14 @@ families of staff-removal algorithms and contributed a skeletonisation-based
 method; the \term{CVC-MUSCIMA} corpus~\cite{fornesCVCMUSCIMAGroundTruth2012}
 was constructed expressly to benchmark this stage.
 
-\term{Audiveris}~\cite{audiverisAudiveris} is the most widely deployed
-open-source modular OMR engine.
+\term{Audiveris}~\cite{audiverisAudiveris} is a widely used open-source
+modular OMR engine.
 Its processing chain combines morphological operations for staff and beam
 handling, template matching for fixed-shape symbols, a small convolutional
 classifier for ambiguous glyphs, and external OCR for lyrics, exporting
 MusicXML~4.
-The dominant commercial systems---SmartScore, PhotoScore, and
-SharpEye---follow the same general decomposition but are
+Established commercial systems such as SmartScore, PhotoScore, and
+SharpEye follow the same general decomposition but are
 proprietary~\cite{calvoZaragozaUnderstandingOMR2020}.
 
 Two structural weaknesses limit the modular approach for the input class
@@ -105,10 +105,13 @@ representations, including two purpose-built token formats.
 The \term{agnostic} encoding lists visual primitives without musical
 interpretation; the \term{semantic} encoding lists musical events such as
 \code{note-C4\_eighth} or \code{keySignature-DM} directly.
-The CRNN--CTC architecture trained on this corpus achieves Symbol Error
-Rates near \SI{1}{\percent} on the agnostic encoding and the low single
-digits on the semantic encoding, establishing the de facto baseline for
-monophonic OMR.
+The CRNN--CTC architecture trained on this corpus achieves a Symbol Error
+Rate of \SI{1.0}{\percent} on the agnostic encoding and \SI{0.8}{\percent}
+on the semantic encoding---with sequence-level error rates of
+\SI{17.9}{\percent} and \SI{12.5}{\percent}, respectively
+(\textcite{calvoZaragozaEndToEndNeural2018}, Sec.~5.2)---establishing the
+reference baseline that subsequent monophonic OMR work, including
+Camera-PrIMuS and the present thesis, builds upon.
 A follow-up release---Camera-PrIMuS~\cite{calvoZaragozaCameraPrimus2018}---augments
 the same incipits with synthetic photographic distortion and demonstrates
 that the same network retains useful accuracy on phone-captured real-world
@@ -120,42 +123,87 @@ to a music staff.
 \begin{figure}[htbp]
 \centering
 \begin{tikzpicture}[
-  box/.style={
-    draw, rounded corners=3pt,
-    minimum width=1.6cm, minimum height=1.1cm,
-    align=center, font=\small, text width=1.7cm,
-    inner sep=3pt
+  >={Stealth[round]},
+  io/.style={
+    draw, shape=regular polygon, regular polygon sides=6,
+    shape border rotate=90, inner sep=1pt, align=center,
+    font=\footnotesize\sffamily
   },
-  arr/.style={->, thick, >=stealth},
-  ann/.style={font=\scriptsize\itshape, text=black!55, align=center},
-  node distance=0.45cm
+  stage/.style={
+    draw, rectangle, rounded corners=4pt,
+    minimum width=4.6cm, minimum height=0.95cm,
+    align=center, font=\small\sffamily
+  },
+  store/.style={
+    draw, rectangle, align=center, font=\footnotesize\sffamily, inner sep=4pt
+  },
+  aux/.style={
+    draw, ellipse, align=center, font=\footnotesize\sffamily, inner sep=2pt
+  },
+  flow/.style={->, thick},
+  dflow/.style={->, thick, dotted},
+  note/.style={font=\scriptsize\itshape, text=black!55, align=left},
+  grp/.style={draw, dashed, rounded corners, inner sep=9pt},
+  glbl/.style={font=\scriptsize\itshape, text=black!60},
+  node distance=0.85cm and 1.6cm
 ]
-  \node[box, fill=blue!8]      (img)  {Staff\\image};
-  \node[box, fill=orange!18,   right=0.7cm of img]  (cnn)  {CNN\\backbone};
-  \node[box, fill=teal!18,     right=0.7cm of cnn]  (lstm) {Bi-LSTM};
-  \node[box, fill=violet!18,   right=0.7cm of lstm] (lin)  {Linear\\+\,softmax};
-  \node[box, fill=red!10,      right=0.7cm of lin]  (ctc)  {CTC\\decoder};
-  \node[box, fill=blue!8,      right=0.7cm of ctc]  (out)  {Token\\sequence};
+  % ── Main vertical pipeline ───────────────────────────────────────────────
+  \node[io]                       (img)     {Staff image\\$H\times W$, grayscale};
+  \node[stage, below=of img]      (cnn)     {Convolutional backbone (ResNet18)};
+  \node[stage, below=of cnn]      (reshape) {Column reshape\\\footnotesize collapse height; width $\to W/4$ frames};
+  \node[stage, below=1.4cm of reshape] (lstm) {Bidirectional LSTM};
+  \node[stage, below=1.4cm of lstm]    (lin)  {Linear $+$ softmax\\\footnotesize per-frame distribution over $|V|{+}1$};
+  \node[stage, below=of lin]      (ctc)     {CTC decoding\\\footnotesize collapse repeats, drop blanks};
+  \node[io,    below=of ctc]      (out)     {LMX token\\sequence};
 
-  \draw[arr] (img)  -- (cnn);
-  \draw[arr] (cnn)  -- (lstm);
-  \draw[arr] (lstm) -- (lin);
-  \draw[arr] (lin)  -- (ctc);
-  \draw[arr] (ctc)  -- (out);
+  % ── Group labels (placed bottom-right, inside the dashed phases) ─────────
+  \node[glbl, anchor=east] (lenc) at ($(reshape.south east)+(0,-0.42)$) {Visual encoder};
+  \node[glbl, anchor=east] (lctx) at ($(lstm.south east)+(0,-0.42)$)    {Sequence model};
+  \node[glbl, anchor=east] (ltr)  at ($(ctc.south east)+(0,-0.42)$)     {CTC transcription};
 
-  \node[ann, below=0.2cm of cnn]  {feature column\\per time step};
-  \node[ann, below=0.2cm of lstm] {contextualised\\hidden states};
-  \node[ann, below=0.2cm of lin]  {per-frame vocab\\distribution};
-  \node[ann, below=0.2cm of ctc]  {blank-collapsed\\tokens};
+  % ── Side knowledge ───────────────────────────────────────────────────────
+  \node[aux, right=2.2cm of lin] (vocab) {Vocabulary\\$|V|$ tokens $+$ blank};
+
+  % ── Annotations on the left (tensor flow) ────────────────────────────────
+  \node[note, left=0.45cm of cnn]     (n1) {grayscale\\strip input};
+  \node[note, left=0.45cm of reshape] (n2) {feature map\\$C'\times H'\times \frac{W}{4}$};
+  \node[note, left=0.45cm of lstm]    (n3) {context-rich\\frame states};
+  \node[note, left=0.45cm of ctc]     (n4) {alignment over\\$\frac{W}{4}$ frames};
+
+  % ── Dashed phase boxes (behind the nodes) ────────────────────────────────
+  \begin{scope}[on background layer]
+    \node[grp, fit=(cnn)(reshape)(lenc)] (genc) {};
+    \node[grp, fit=(lstm)(lctx)]          (gctx) {};
+    \node[grp, fit=(lin)(ctc)(ltr)]       (gtr)  {};
+  \end{scope}
+
+  % ── Data-flow arrows ─────────────────────────────────────────────────────
+  \draw[flow] (img)     -- (cnn);
+  \draw[flow] (cnn)     -- (reshape);
+  \draw[flow] (reshape) -- (lstm);
+  \draw[flow] (lstm)    -- (lin);
+  \draw[flow] (lin)     -- (ctc);
+  \draw[flow] (ctc)     -- (out);
+  \draw[dflow] (vocab)  -- (lin) node[midway, above, font=\scriptsize\itshape, text=black!55] {};
+
+  % ── Outer system box + bold label ────────────────────────────────────────
+  \begin{scope}[on background layer]
+    \node[draw, fit=(img)(out)(genc)(gtr)(vocab)(n1)(n4), inner sep=12pt] (outer) {};
+  \end{scope}
+  \node[anchor=south west, font=\small\bfseries\sffamily, inner sep=4pt]
+        at (outer.south west) {End-to-end CRNN--CTC recognition};
 \end{tikzpicture}
 \caption[CRNN--CTC pipeline for monophonic OMR.]{%
-  The CRNN--CTC pipeline applied to a music staff.
-  The image is treated as a sequence of vertical feature columns extracted
-  by a convolutional backbone (ResNet18 in this work); a bidirectional LSTM
-  contextualises each column; a linear projection produces a per-frame
-  probability distribution over the vocabulary; and CTC decoding collapses
-  the blank-padded alignment into a flat token sequence---without requiring
-  any explicit symbol segmentation.
+  The CRNN--CTC pipeline applied to a single music staff, drawn in three
+  phases. A \emph{visual encoder} (a ResNet18 convolutional backbone)
+  turns the grayscale staff strip into a feature map and reshapes it into a
+  left-to-right sequence of $W/4$ frames; a \emph{sequence model} (a
+  bidirectional LSTM) contextualises each frame; and the \emph{CTC
+  transcription} stage projects every frame to a distribution over the
+  vocabulary (plus the blank symbol) and collapses the blank-padded
+  alignment into a flat token sequence, without any explicit symbol
+  segmentation. Solid arrows carry the data flow; the dotted arrow marks the
+  fixed vocabulary that defines the output layer.
   Architecture introduced by \textcite{calvoZaragozaEndToEndNeural2018}.}
 \label{fig:soa-crnn-pipeline}
 \end{figure}
@@ -164,7 +212,7 @@ to a music staff.
 \section{End-to-End Transformer Architectures}
 \label{sec:soa-transformer}
 
-From 2024 onward the OMR community has converged on attentional
+From 2024 onward several leading OMR systems have adopted attentional
 encoder--decoder transformers for tasks that exceed the scope of monophonic
 single-staff recognition.
 The \term{Sheet Music Transformer}
@@ -174,13 +222,14 @@ transcription end-to-end: a vision-transformer encoder produces a flattened
 patch sequence which a stacked decoder autoregressively maps to the
 linearised target representation, dispensing with CTC entirely.
 \term{SMT++}~\cite{riosVilaSMTPlusPlus2024} extends the approach to
-full-page pianoform input and currently defines the state of the art on
-that task.
+full-page pianoform input and, at its 2024 release, defined the state of
+the art on that task.
 \term{LEGATO}~\cite{yangLEGATO2025}---released in mid-2025---takes the
 trend further with a vision-LLM backbone, an ABC-notation decoder, and over
-214\,000 typeset pages of pretraining, reporting absolute error reductions
-of \SI{47}{\percent}--\SI{68}{\percent} over previous state of the art on
-hard typeset benchmarks.
+214\,000 typeset pages of pretraining, reporting on its most challenging
+evaluation set absolute error reductions of up to \SI{68}{\percent} on the
+tree-edit metric TEDn and \SI{47.6}{\percent} on OMR-NED over the previous
+state of the art.
 
 \Cref{fig:soa-transformer-pipeline} shows the generic encoder--decoder
 structure shared by these systems.
@@ -188,71 +237,97 @@ structure shared by these systems.
 \begin{figure}[htbp]
 \centering
 \begin{tikzpicture}[
-  box/.style={
-    draw, rounded corners=3pt,
-    minimum width=1.9cm, minimum height=1.1cm,
-    align=center, font=\small, text width=2.0cm,
-    inner sep=4pt
+  >={Stealth[round]},
+  io/.style={
+    draw, shape=regular polygon, regular polygon sides=6,
+    shape border rotate=90, inner sep=1pt, align=center,
+    font=\footnotesize\sffamily
   },
-  wide/.style={
-    draw, rounded corners=3pt,
-    minimum width=2.7cm, minimum height=1.1cm,
-    align=center, font=\small, text width=2.8cm,
-    inner sep=4pt
+  stage/.style={
+    draw, rectangle, rounded corners=4pt,
+    minimum width=3.7cm, minimum height=0.85cm,
+    align=center, font=\footnotesize\sffamily
   },
-  arr/.style={->, thick, >=stealth},
-  darr/.style={->, thick, >=stealth, dashed, black!45},
-  lbl/.style={font=\scriptsize\itshape, text=black!55, align=center}
+  store/.style={
+    draw, rectangle, align=center, font=\footnotesize\sffamily, inner sep=4pt
+  },
+  flow/.style={->, thick},
+  cflow/.style={->, very thick},
+  dflow/.style={->, thick, dashed},
+  glbl/.style={font=\footnotesize\itshape, text=black!60},
+  albl/.style={font=\scriptsize\itshape, text=black!55, align=center},
+  node distance=0.75cm and 2.6cm
 ]
-  %% ── Encoder row ──────────────────────────────────────────────────
-  \node[box,  fill=orange!12]                    (img) {Sheet music\\image};
-  \node[wide, fill=orange!22, right=0.9cm of img](enc) {Vision Transformer\\Encoder (ViT)};
-  \node[box,  fill=gray!14,   right=0.9cm of enc](mem) {Context\\memory};
+  % ── Encoder column (left) ────────────────────────────────────────────────
+  \node[io]                      (img)   {Sheet music\\image};
+  \node[stage, below=of img]     (patch) {Patch embedding\\$+$ positional encoding};
+  \node[stage, below=of patch]   (enc)   {Transformer encoder\\(self-attention) $\times N$};
+  \node[store, below=of enc]     (mem)   {Encoder memory\\(patch embeddings)};
 
-  \draw[arr] (img) -- (enc);
-  \draw[arr] (enc) -- (mem);
+  % ── Decoder column (right); the decoder layer is anchored at the encoder
+  %    memory's height so the cross-attention arrow is exactly horizontal ───
+  \node[stage] (declayer) at ($(mem)+(6.8cm,0)$)
+        {Transformer decoder\\(masked self-attn,\\cross-attn, FFN) $\times N$};
+  \node[io,    above=of declayer] (sos) {$\langle$SOS$\rangle$ $+$\\previous tokens};
+  \node[stage, below=of declayer] (lin) {Linear $+$ softmax};
+  \node[io,    below=of lin]      (nxt) {Next token};
+  \node[io,    below=of nxt]      (seq) {Output token seq.\\(\code{**kern}/ABC/LMX)};
 
-  %% ── Decoder row — 3.0 cm below encoder centres ───────────────────
-  \node[box,  fill=green!12,  below=3.0cm of img] (prev)
-      {\texttt{<SOS>} +\\prev.\ tokens};
-  \node[wide, fill=green!22, right=0.9cm of prev] (dec)
-      {Autoregressive\\Transformer Decoder};
-  \node[box,  fill=blue!10,  right=0.9cm of dec]  (nxt) {Next\\token};
+  % ── Group labels (bottom-right, inside the dashed phases) ────────────────
+  \node[glbl, anchor=east] (lenc) at ($(mem.south east)+(0,-0.42)$) {Encoder};
+  \node[glbl, anchor=west] (ldec) at ($(seq.south)+(0.55,-0.12)$) {Decoder};
 
-  \draw[arr] (prev) -- (dec);
-  \draw[arr] (dec)  -- (nxt);
+  % ── Dashed phase boxes (behind nodes) ────────────────────────────────────
+  \begin{scope}[on background layer]
+    \node[draw, dashed, rounded corners, inner sep=10pt, fit=(img)(mem)(lenc)] (genc) {};
+    \node[draw, dashed, rounded corners, inner sep=10pt, fit=(sos)(seq)(ldec)] (gdec) {};
+  \end{scope}
 
-  %% ── Cross-attention ──────────────────────────────────────────────
-  %% mem.south → drop 1.0 cm (corner) → left → dec.north
-  \coordinate (ca-corner) at ($(mem.south) + (0,-1.0)$);
-  \draw[arr, blue!65, line width=1.1pt]
-      (mem.south) -- (ca-corner) -| (dec.north);
-  %% Label sits above the horizontal segment, centred between mem and dec
-  \node[lbl, text=blue!65, above=3pt]
-      at ($(ca-corner)!0.5!(dec.north |- ca-corner)$) {cross-attention};
+  % ── Encoder data flow ────────────────────────────────────────────────────
+  \draw[flow] (img)   -- (patch);
+  \draw[flow] (patch) -- (enc);
+  \draw[flow] (enc)   -- (mem);
 
-  %% ── Autoregressive feedback ──────────────────────────────────────
-  %% nxt.south → drop 0.65 cm → left → prev.south (U-shape below all)
-  \draw[darr]
-      (nxt.south)  -- ++(0,-0.65)
-      -- ($(prev.south) + (0,-0.65)$)
-      -- (prev.south);
-  %% Label below the horizontal segment, centred between prev and nxt
-  \node[lbl] at ($(nxt.south)!0.5!(prev.south) + (0,-1.05)$)
-      {autoregressive (step $t \to t\!+\!1$)};
+  % ── Decoder data flow ────────────────────────────────────────────────────
+  \draw[flow] (sos)      -- (declayer);
+  \draw[flow] (declayer) -- (lin);
+  \draw[flow] (lin)      -- (nxt);
+  \draw[flow] (nxt)      -- (seq);
 
+  % ── Cross-attention (encoder memory → decoder) ───────────────────────────
+  \draw[cflow] (mem.east) -- (declayer.west)
+      node[albl, midway, above] {cross-attention};
+
+  % ── Autoregressive feedback (next token → previous tokens), routed clear
+  %    of the decoder dashed box on the right ─────────────────────────────
+  \coordinate (fb)  at ($(nxt.east)+(1.7cm,0)$);
+  \draw[dflow] (nxt.east) -- (fb) |- (sos.east);
+  \node[albl, anchor=west] (arlbl)
+        at ($(fb)!0.5!(fb |- sos.east)+(0.12,0)$) {autoregressive\\($t \to t{+}1$)};
+
+  % ── Outer system box + bold label ────────────────────────────────────────
+  \begin{scope}[on background layer]
+    \node[draw, fit=(genc)(gdec)(fb)(arlbl), inner sep=14pt] (outer) {};
+  \end{scope}
+  \node[anchor=south west, font=\small\bfseries\sffamily, inner sep=4pt]
+        at (outer.south west) {Encoder--decoder transformer (SMT family)};
 \end{tikzpicture}
 \caption[Encoder--decoder transformer architecture for OMR (SMT style).]{%
   The encoder--decoder transformer used in OMR systems such as
   SMT~\cite{riosVilaSheetMusicTransformer2024} and
-  SMT++~\cite{riosVilaSMTPlusPlus2024}.
-  A Vision Transformer (ViT) encoder maps the sheet music image to a
-  sequence of patch embeddings; an autoregressive decoder then generates
-  the output token sequence one token at a time, attending at each step to
-  the full encoder memory via cross-attention.
+  SMT++~\cite{riosVilaSMTPlusPlus2024}, drawn in two phases.
+  The \emph{encoder} splits the sheet-music image into patches, adds
+  positional encodings, and applies $N$ self-attention layers to produce an
+  encoder memory of patch embeddings. The \emph{decoder} generates the
+  output sequence one token at a time: at each step it embeds the
+  previously emitted tokens, runs $N$ decoder layers (masked self-attention,
+  cross-attention into the encoder memory, and a feed-forward block), and
+  projects the result to the next token. The thick arrow is the
+  cross-attention link; the dashed arrow is the autoregressive feedback that
+  appends each predicted token to the decoder input at step $t{+}1$.
   Unlike CRNN--CTC, no explicit segmentation or conditional-independence
-  assumption is imposed---the decoder can, in principle, model arbitrary
-  long-range token dependencies.}
+  assumption is imposed, and the target may be any linear encoding
+  (\code{**kern}, ABC, or LMX).}
 \label{fig:soa-transformer-pipeline}
 \end{figure}
 
@@ -263,7 +338,8 @@ already attains sub-percent SER and the headroom for further gain is in
 domain robustness rather than model capacity---CRNN--CTC remains the right
 point on the cost/capability curve.
 The quantitative justification of this choice is developed in
-\Cref{ch:mgmt}.
+\Cref{ch:design}, and the project-management criteria behind it
+in \Cref{sec:mgmt-justification}.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Datasets for OMR Training}
@@ -288,8 +364,8 @@ Camera-PrIMuS~\cite{calvoZaragozaCameraPrimus2018} & Monophonic, distorted      
 DeepScoresV2~\cite{tuggenerDeepScoresV22020}      & Polyphonic, typeset           & 255\,385 pages, $\sim$151\,M symbols   & per-symbol bboxes + masks  & Music object detection \\ \tfgrowsep
 CVC-MUSCIMA~\cite{fornesCVCMUSCIMAGroundTruth2012} & Polyphonic, handwritten      & 1\,000 pages                           & staff-removal masks        & Staff removal / writer ID \\ \tfgrowsep
 MUSCIMA++~\cite{hajicMuscimaPP2017}               & Polyphonic, handwritten       & 140 pages, $\sim$91\,k symbols         & MuNG notation graph        & Symbol + relation recognition \\ \tfgrowsep
-DoReMi~\cite{shatriDoReMi2021}                    & Polyphonic, typeset (Dorico)  & $\sim$6\,432 pages, $\sim$1\,M objects\todo{verify: exact page and object counts from DoReMi arXiv 2107.07786} & MusicXML + MuNG-style      & Universal OMR research \\ \tfgrowsep
-OLiMPiC~\cite{mayerPracticalEndToEnd2024}         & Pianoform, typeset + scan     & $\sim$17\,945 synth, 2\,931 scanned\todo{verify: confirm split counts against Mayer et al. 2024 Table 1}    & MusicXML / LMX             & End-to-end pianoform OMR \\
+DoReMi~\cite{shatriDoReMi2021}                    & Polyphonic, typeset (Dorico)  & 6\,432 pages, 911\,771 symbols & MusicXML + MuNG-style      & Universal OMR research \\ \tfgrowsep
+OLiMPiC~\cite{mayerPracticalEndToEnd2024}         & Pianoform, typeset + scan     & 17\,945 synth, 2\,931 scanned    & MusicXML / LMX             & End-to-end pianoform OMR \\
 \bottomrule
 \end{tabularx}
 \caption{Principal labelled corpora used in modern OMR research.
@@ -300,11 +376,13 @@ this work.}
 \end{table}
 
 Two observations shape the data strategy of this thesis.
-First, none of these corpora captures the LilyJAZZ-style engraving of
-\textit{The Real Book}, and none labels chord symbols as first-class
-objects; the only directly comparable corpus emerged contemporaneously
-with this work~\cite{martinezSevillaJazzLeadSheets2025} and remains too
-small to train a CRNN--CTC model from scratch.
+First, to the author's knowledge none of these corpora captures the
+LilyJAZZ-style engraving of \textit{The Real Book}, and none labels chord
+symbols as first-class objects; the only directly comparable corpus emerged
+contemporaneously with this work~\cite{martinezSevillaJazzLeadSheets2025}
+and, at 293 annotated sheets, is far below the scale of the tens of
+thousands of samples used to train the CRNN--CTC models surveyed above, and
+so is too small to train such a model from scratch.
 Second, every recent end-to-end system---SMT, SMT++, OLiMPiC, LEGATO, and
 Camera-PrIMuS itself---follows the same recipe of synthetic pretraining
 followed by fine-tuning on a small annotated target set.
@@ -317,13 +395,16 @@ This is the recipe applied here.
 The output of an OMR system is a symbolic description of the score; the
 choice of representation shapes both the modelling architecture and the
 achievable error rate.
-\textbf{MusicXML} is the de facto interchange standard between notation
-editors and preserves polyphony, layout, lyrics, and chord symbols
-losslessly, but its verbosity inflates sequence length and vocabulary size
-when fed to a sequence model.
-\textbf{MEI} is even more expressive but inherits the same penalty.
-\textbf{Humdrum} \code{**kern} and \textbf{ABC notation} are far more
-compact and are used as targets of recent
+\Cref{tab:omr-formats} summarises the principal options.
+\textbf{MusicXML}~\cite{goodMusicXML2001} is the de facto interchange
+standard between notation editors and preserves polyphony, layout, lyrics,
+and chord symbols losslessly, but its verbosity inflates sequence length
+and vocabulary size when fed to a sequence model.
+\textbf{MEI} (Music Encoding Initiative)~\cite{rolandMEI2002} is even more
+expressive but inherits the same penalty.
+\textbf{Humdrum} \code{**kern}~\cite{huronHumdrum2002} and
+\textbf{ABC notation}~\cite{walshawABC2011} are far more compact and are
+used as targets of recent
 transformer-based work~\cite{riosVilaSheetMusicTransformer2024,yangLEGATO2025},
 at the cost of reduced expressiveness for complex multi-voice layout.
 The PrIMuS \textbf{agnostic} and \textbf{semantic} formats are compact and
@@ -338,6 +419,31 @@ substantially more compact than the parent format, and was designed
 specifically as a CRNN- and transformer-friendly target; the OLiMPiC
 reference implementation provides a Python \code{Linearizer}/\code{Delinearizer}
 pair that converts between the two representations directly.
+
+\begin{table}[htbp]
+\centering
+\small
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabularx}{\textwidth}{@{} l L L l L @{}}
+\toprule
+\textbf{Format} & \textbf{Compactness} & \textbf{Expressiveness} & \textbf{To MusicXML} & \textbf{Representative use} \\
+\midrule
+MusicXML~\cite{goodMusicXML2001}            & Low (verbose XML)        & Full: polyphony, layout, lyrics, chords & Native    & Notation-editor interchange \\ \tfgrowsep
+MEI~\cite{rolandMEI2002}                    & Low                      & Full, plus scholarly markup             & Lossy     & Digital musicology \\ \tfgrowsep
+Humdrum \code{**kern}~\cite{huronHumdrum2002} & High                   & Medium: pitch/rhythm focus              & Lossy     & Analysis; SMT/LEGATO target \\ \tfgrowsep
+ABC~\cite{walshawABC2011}                   & High                     & Medium: melody/lead-sheet focus         & Lossy     & LEGATO decoder target \\ \tfgrowsep
+PrIMuS agnostic/semantic~\cite{calvoZaragozaEndToEndNeural2018} & High & Low: monophonic single-staff         & No        & Monophonic CRNN--CTC \\ \tfgrowsep
+LMX~\cite{mayerPracticalEndToEnd2024}       & High                     & Inherits MusicXML                       & Lossless  & End-to-end OMR (this work) \\
+\bottomrule
+\end{tabularx}
+\caption{Symbolic output representations used in OMR, compared on
+compactness as a sequence-model target, expressiveness, fidelity of
+conversion back to MusicXML, and representative use. LMX combines the
+compactness of the linear formats with lossless round-tripping to
+MusicXML, which is why it is adopted in this work.}
+\label{tab:omr-formats}
+\end{table}
 
 This work adopts LMX with a project-specific grammar that drops features
 outside the jazz lead-sheet domain (tuplets, slurs, articulations, double
@@ -368,7 +474,8 @@ across encodings.
 
 Two recent metrics partially address these shortcomings.
 \textbf{TEDn} (normalised tree edit distance on the parsed MusicXML tree)
-weights structural errors appropriately and is the primary metric in
+weights structural errors appropriately; it was introduced by
+Mayer et al.~\cite{mayerPracticalEndToEnd2024} and is the primary metric in
 OLiMPiC and SMT++.
 \textbf{OMR-NED}~\cite{martinezSevillaOMRNED2025} extends SER with
 per-element categories so that error distribution---not only error
@@ -385,11 +492,11 @@ Despite the cultural importance of jazz fake-books, OMR of jazz lead sheets
 received almost no dedicated attention in the published literature before
 2025.
 Both major surveys~\cite{calvoZaragozaUnderstandingOMR2020,shatriOPTICALMUSICRECOGNITION}
-list chord-symbol handling among the gaps in the field, and no
-general-purpose OMR engine treats chord symbols as a first-class output
-class.
+list chord-symbol handling among the gaps in the field, and---as of 2026,
+to the author's knowledge---no general-purpose OMR engine treats chord
+symbols as a first-class output class.
 
-The earliest dedicated work is an undergraduate honours thesis at
+An early dedicated work is an undergraduate honours thesis at
 UCF~\cite{reedHonorsLeadSheets2018}, which built a non-deep modular
 pipeline for chord-symbol recognition on printed and handwritten lead
 sheets and used the recovered chord progressions to attempt
@@ -420,10 +527,11 @@ future work can compare and combine.
 Modular pipelines remain useful for full-page typeset classical scores but
 do not generalise to the visual and semantic peculiarities of jazz lead
 sheets.
-End-to-end deep models---CRNN--CTC for monophonic input, transformers for
-polyphonic and full-page input---now define the methodological frontier
-and converge on a common recipe of synthetic pretraining followed by
-fine-tuning on a small annotated target set.
+End-to-end deep models---CRNN--CTC for monophonic input
+(\Cref{sec:soa-crnn}), transformers for polyphonic and full-page input
+(\Cref{sec:soa-transformer})---have largely displaced modular pipelines in
+recent work and converge on a common recipe of synthetic pretraining
+followed by fine-tuning on a small annotated target set.
 Symbolic output formats have moved toward MusicXML-linear encodings
 (prominently LMX), and evaluation practice is gradually shifting from raw
 SER toward structurally aware metrics.

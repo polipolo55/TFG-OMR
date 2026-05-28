@@ -1,3 +1,5 @@
 \chapter{Qualitative Predictions}
 
+\todo{AUDIT (orphan appendix \& content placement): (a) Not referenced from any chapter---add a forward pointer from \Cref{sec:res-errors} such as ``representative worst-case predictions are shown in \Cref{app:qual}'' and a corresponding \texttt{\textbackslash label\{app:qual\}} here. (b) Qualitative worst-case figures are arguably \emph{main-body} content for an error-analysis section, not appendix material; consider whether the 5 figures should live in \Cref{sec:res-errors} instead, with only the long-form full table moved here.}
+
 \todo{Add \texttt{fig:qual-worst-5}---the five highest-SER predictions from the test set. Generate with: \texttt{poetry run python src/cli.py evaluate --split test --export-worst 5 --output-dir figures/worst/}. Include input strip, predicted tokens, ground-truth tokens, and edit operations for each.}

@@ -1,6 +1,14 @@
 \chapter{Conclusions and Future Work}
 \label{ch:conclusions}
 
+\todo{AUDIT (MAJOR FIB defect): No \textbf{technical-competences map} is provided. The FIB tribunal rubric requires that the GEI/Computacio technical competences declared in the TFG inscription (e.g.\ CCO1.1, CCO2.1, CES1.x, CT codes) be explicitly mapped to the chapters/sections where each is demonstrated. Add a dedicated \texttt{\textbackslash section\{Technical Competences Achieved\}} with a table (competence code -> short name -> evidence section/figure). Without this, the tribunal will dock the rubric explicitly. Cross-check with the competences declared in your TFG inscription form.}
+
+\todo{AUDIT (chapter length): At ~169 lines the chapter risks reading as a one-page recap. Target 4--6 pages by adding: (i) the competences map above, (ii) a Limitations subsection (currently limitations are scattered through paragraphs 5--6 of \S\ref{sec:conclusions}, not enumerated), (iii) a brief Methodological Reflection (~half a page: what was learned about iterative experimentation, dataset-driven debugging, calibration of confidence gates, etc.).}
+
+\todo{AUDIT (missing section): No explicit \textbf{Limitations} subsection. The current narrative mentions scope limits in passing but the tribunal expects an itemised list (e.g.\ monophonic only, treble only, single-page only, no real-data ground truth, CTC-gate threshold checkpoint-bound, EasyOCR chord vocabulary, etc.). Add \texttt{\textbackslash subsection\{Limitations\}} with 5--8 bullets.}
+
+\todo{AUDIT (missing section): No \textbf{Methodological Reflection}. Add ~half a page describing the iterative design loop (synthetic-first, calibrate-then-evaluate, decouple-melody-from-chord), what would be done differently in hindsight, and how the GEP/PM artefacts (Gantt, risk register) tracked against reality.}
+
 \section{Conclusions}
 \label{sec:conclusions}
 
@@ -58,13 +66,14 @@ Objective~5 (quantitative error analysis) is met by the per-token
 breakdown of \Cref{sec:res-errors}, which decomposes the residual
 SER into substitution, insertion, and deletion classes.
 Objective~6 (complete inference pipeline with chord OCR returning
-structured JSON) is met by the FastAPI service.
+structured JSON) is met by the FastAPI service.\todo{AUDIT: ``met by the FastAPI service'' is too brief and lacks a \texttt{\textbackslash Cref} to the implementation section/endpoint description (e.g.\ \Cref{ch:impl} or \texttt{sec:impl-api}). Add the cross-reference so the claim is auditable.}
 Objective~7 (domain-gap quantification and fine-tuning on real
 Real Book pages) is \textit{partially} met: the synthetic
 domain gap is bounded by the scanned-split evaluation, but the
 fine-tuning stage on a manually annotated set of Real Book pages
-remains an open extension (\Cref{sec:res-domaingap}).
+remains an open extension (\Cref{sec:res-domaingap}).\todo{AUDIT (cross-chapter inconsistency): \S\ref{sec:res-domaingap} in Ch.~6 is currently empty (three unresolved \texttt{\textbackslash todo} placeholders, no figures, no numbers). Claiming Objective~7 is ``partially met'' while citing that section is unsupported. Either (a) execute the experiments and populate \S\ref{sec:res-domaingap}, or (b) downgrade this claim to ``not met / deferred to future work'' and drop the \texttt{\textbackslash Cref}. Tribunal will follow the link and find nothing.}
 
+\todo{AUDIT (critical assessment is shallow): The four ``lessons learned'' below are positive findings, not a \textbf{critical} assessment. Add a paragraph that openly discusses what did NOT work or remains unsatisfying: e.g.\ residual scan-domain gap not measured on genuine pages, no comparison to commercial OMR (Audiveris, SmartScore), chord OCR via EasyOCR is a stopgap rather than a learned solution, CTC-confidence reject gate is checkpoint-bound and must be recalibrated. The tribunal rewards self-criticism.}
 Four lessons learned are worth recording for follow-up work.
 \textit{First}, the LMX token format is decisively more practical
 than full MusicXML for staff-level sequence-to-sequence modelling:
@@ -105,7 +114,7 @@ item in the future-work plan that follows.
 \label{sec:future-work}
 
 \begin{itemize}
-  \item \textbf{Polyphonic OMR.}
+  \item \textbf{Polyphonic OMR.}\todo{AUDIT (future-work concreteness): Future-work items are well-written but only one (real-data fine-tuning) gives a numeric target. Add a concrete scoping line to each remaining item: e.g.\ for Polyphonic, ``annotate N polyphonic staves from corpus X and target SER $\le$ Y\,\%''; for Full-page segmentation, ``train YOLOv8-n on the IMSLP-layout subset of MUSCIMA++ with $\ge$ 1k pages''; for Transformer decoder, ``reproduce SMT on the present LMX vocab with batch=8 on a 12\,GB GPU''. ``Explore X'' is vague; ``fine-tune model M on dataset D of size N'' is what the rubric rewards.}
         The current label grammar and CTC loss assume a single
         voice per staff.
         Extending the system to polyphonic input would require a

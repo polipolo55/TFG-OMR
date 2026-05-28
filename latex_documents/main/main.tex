@@ -15,6 +15,7 @@
 % ── Graphics & figures ─────────────────────────────────────────────────────────
 \usepackage{graphicx}
 \usepackage{svg}
+\usepackage{float}        % enables the [H] "here, exactly" float placement specifier
 
 % ── Tables ─────────────────────────────────────────────────────────────────────
 \usepackage{booktabs}
@@ -33,6 +34,11 @@
 \usepackage{pgfgantt}
 \usepackage{pdflscape}
 
+% ── TikZ libraries (architecture block diagrams in the SoA chapter) ────────────
+% pgfgantt has already pulled in TikZ; here we enable the shape, layout, grouping
+% and arrow libraries used by the CRNN--CTC and transformer figures.
+\usetikzlibrary{shapes.geometric,positioning,calc,fit,backgrounds,arrows.meta}
+
 % ── Cover page (regulatory PDF) ────────────────────────────────────────────────
 \usepackage{pdfpages}
 
@@ -48,9 +54,16 @@
 
 % ── TODO helper ────────────────────────────────────────────────────────────────
 % Usage: \todo{What needs to be written here.}
-\newcommand{\todo}[1]{%
-  \textcolor{orange}{\bfseries [TODO\ifx&#1&\else: \textit{#1}\fi]}%
+% \long allows multi-paragraph notes. Empty test uses \detokenize so that
+% fragile commands like \Cref{} inside the note don't trip up the test.
+% No \textit{} wrap on #1 (also fragile around \Cref).
+\long\def\todo#1{%
+  \begingroup
+    \color{orange}\bfseries
+    [TODO\ifx\relax\detokenize{#1}\relax\else: #1\fi]%
+  \endgroup
 }
+
 
 % ── Table style helpers ────────────────────────────────────────────────────────
 % Shared by every table in the thesis.
@@ -112,6 +125,7 @@
 
 % ── Appendices ─────────────────────────────────────────────────────────────────
 \appendix
+\input{appendices/app_notation}
 \input{appendices/app_a}
 \input{appendices/app_b}
 \input{appendices/app_c}

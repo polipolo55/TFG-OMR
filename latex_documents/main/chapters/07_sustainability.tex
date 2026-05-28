@@ -4,6 +4,7 @@
 This chapter records the sustainability dimension of the project,
 following the matrix and reflection framework set out in the FIB
 GEP sustainability guide~\cite{gepSustainabilityReport2018}.
+\todo{FIB rubric expects explicit mapping to UN Sustainable Development Goals (e.g. SDG 4 Education, SDG 9 Industry/Innovation, SDG 11 Cultural Heritage, SDG 12 Responsible Consumption). Add a short paragraph or column in the matrix naming the SDGs each dimension addresses.}
 \Cref{sec:sust-selfassessment} reports the self-assessment
 that opened the project; \Cref{sec:sust-matrix} fills the
 three-dimensional sustainability matrix (economic, environmental,
@@ -21,6 +22,7 @@ After completing the GEP sustainability questionnaire, my strongest
 area was identified as the \textbf{economic} dimension of software
 projects, especially cost estimation, trade-off analysis, and
 management control.
+\todo{First-person voice throughout this section ("my strongest", "I am comfortable", "I generally", "I had not", "I also realised", "I now see"). Bachelor's thesis convention is impersonal/passive: rephrase to "the author's strongest area", "the questionnaire revealed", "this project's reflection process surfaced", etc.}
 I am comfortable reasoning about whether a technical decision is
 financially realistic within a constrained project, and about how
 planning choices affect viability and long-term maintenance cost.
@@ -58,15 +60,11 @@ quantities rather than in adjectives.
 
 \textit{Second}, architecture choices should be justified with both
 performance and efficiency criteria.
-The comparison table in \Cref{sec:mgmt-justification}
-includes ``computational feasibility'' and ``data requirements''
-as first-class criteria alongside accuracy, which is the direct
-operationalisation of this commitment.
-The decision to retain ResNet18 as the CNN backbone---rather than
-a larger ResNet50 or a vision transformer---is in part an
-environmental decision: the smaller backbone trains faster, fits
-on consumer hardware, and reaches saturation accuracy on the
-monophonic target.
+The comparison table in \Cref{sec:mgmt-justification} includes
+``computational feasibility'' and ``data requirements'' as
+first-class criteria alongside accuracy, and the backbone selected
+in \Cref{sec:design-model} carries the environmental dividends
+quantified in \Cref{sec:sust-environmental}.
 
 \textit{Third}, the discussion of who benefits from the resulting
 tool, and under what limitations, must be explicit rather than
@@ -106,6 +104,7 @@ impact once the system is in service).
     \caption{Sustainability matrix for the project.
     PPP refers to the design-and-development stage; the useful-life
     column refers to deployment and downstream impact.}
+    \todo{Caption is a full sentence with explanation. TFG style guide expects a noun-phrase caption with the long explanation moved to body text, e.g.\ ``Three-dimensional sustainability matrix (PPP vs.\ useful life).'' Same check for other captions in the chapter.}
     \label{tab:sustainability-matrix}
     \small
     \setlength{\tabcolsep}{5pt}
@@ -133,18 +132,15 @@ impact once the system is in service).
 \label{sec:sust-economic}
 
 \textbf{PPP (design and development).}
-The total project cost is estimated at \EUR{}16\,097.16
-(\Cref{sec:mgmt-budget}), dominated by specialised
-engineering time at roughly \SI{85}{\percent} of the total.
-This profile is typical of a research-intensive software
-project: hardware and tooling are commodity items whose
-amortised share of the budget is small compared with the labour
-required to design, train, and evaluate the model.
-The remaining cost components---general overheads, the risk-driven
-incidentals, and the contingency reserve---together account for
-the remaining fifteen per cent and are justified by the
-risk-register exercise of
-\Cref{sec:mgmt-risks}.
+The total project cost (\EUR{}16\,097.16; see
+\Cref{sec:mgmt-budget}) is dominated by specialised
+engineering time at roughly \SI{85}{\percent} of the total, a
+profile typical of research-intensive software projects in which
+labour outweighs material amortisation.
+The full breakdown---salaries, hardware amortisation, indirects,
+incidentals tied to the risk register, and the contingency
+reserve---is constructed in \Cref{sec:mgmt-budget}.
+\todo{Residual overlap with \Cref{sec:mgmt-budget}: the 85\% labour share is already stated in Ch.3. Either drop the percentage here and keep only the cross-reference, or recast this PPP cell as a sustainability \emph{interpretation} of the budget rather than a re-statement of it.}
 
 \textbf{Useful life and state of the art.}
 The current alternatives for lead-sheet digitisation are manual
@@ -190,6 +186,7 @@ the development workstation (a desktop with an NVIDIA RTX~3060
 GPU and a typical full-system draw of \SI{250}{\watt} during
 training) multiplied by the estimated cumulative training and
 data-generation time over the project's twenty-one-week schedule.
+\todo{Methodology lacks the actual numbers behind 57.5\,kWh. State the cumulative GPU-hours (training + data generation + inference) and show the multiplication explicitly, e.g. $230\,\text{h} \times 0.25\,\text{kW} = 57.5\,\text{kWh}$, so the figure is reproducible from the cited training logs.}
 At the Spanish electricity emission factor of approximately
 \SI{0.23}{\kilo\gram\per\kilo\watt\hour} of CO\textsubscript{2}
 reported by Red El\'ectrica de Espa\~na and
@@ -303,6 +300,7 @@ required to convert paper notation to a machine-readable form,
 and by facilitating the long-term preservation of music content
 that currently exists only as paper or low-resolution scanned
 PDF.
+\todo{Social dimension only names beneficiaries; it does not name groups \emph{excluded} or potentially harmed. Add at least one sentence on users the current system does not serve (e.g.\ players of non-Western notation, full-score/polyphonic users, visually impaired musicians needing audio-first output, users of handwritten or pre-engraved historical sources). The FIB rubric expects both sides.}
 
 \textbf{Boundaries.}
 Social value depends on transparent communication of the
@@ -369,6 +367,7 @@ The author's own scans of the Real Book are used only for
 fine-tuning and evaluation in a strictly academic context; the
 trained weights cannot be redistributed in a form that recovers
 the underlying copyrighted material.
+\todo{Ethics/IP section is too thin for the FIB rubric. (1) Name the exact PrIMuS licence (CC-BY-NC-SA? research-use-only?) rather than ``publicly distributed for research use''. (2) State explicitly that the Real Book is a copyrighted commercial publication (Hal Leonard) and explain why training on private scans is defensible under academic fair use / TDM exceptions (e.g.\ Spanish LPI art.~67 / EU DSM Directive art.~3). (3) Confirm the released weights and evaluation set do not embed reconstructable copyrighted pages.}
 
 \textit{No personal data, no safety-critical decisions.}
 The system does not process personal data at any stage---input
@@ -378,6 +377,7 @@ safety-critical automated decision-making.
 This narrows the ethical surface of the project to its
 intellectual-property dimension and to its honesty about its
 capabilities, which is the subject of the next practice.
+\todo{Add a short \emph{misuse cases} paragraph: e.g.\ users could digitise and redistribute copyrighted lead sheets at scale, bypass paid score libraries, or generate derivative works without rights-holder consent. Note how the open-source release mitigates (transparency, opt-in) versus exacerbates (lower barrier) each risk. The FIB ethics rubric expects misuse to be named, not only personal-data and safety.}
 
 \textit{Documented limitations.}
 The known limitations of the system---the monophonic contract,
@@ -415,6 +415,7 @@ the inference pipeline behind a single REST endpoint with no
 GPU requirement on the client side, which is precisely the
 deployment shape that makes the tool accessible to musicians,
 educators, and archivists who do not have local ML expertise.
+\todo{Unhedged future claim: ``makes the tool accessible to musicians, educators, and archivists''. The API is local-only and undeployed in this thesis; soften to ``is designed to be accessible'' or ``may make the tool accessible, subject to a hosted deployment''. Also check the chapter for other unhedged claims (``the project can improve quality of life'', ``Future users\dots\ can therefore evaluate'') and switch to ``may'' / ``is intended to''.}
 This shape was a planned design decision, but its sustainability
 significance only becomes visible once the technical work is
 complete: a model with the same accuracy and no accessible
@@ -424,6 +425,7 @@ regardless of its training-time efficiency.
 A residual concern, recorded here for completeness rather than as
 an unresolved issue, is the \textbf{lifecycle} of the trained model
 weights themselves.
+\todo{The Environmental dimension covers operational kWh and embodied hardware energy, but says nothing about end-of-life: GPU disposal/e-waste, model-weight archival storage cost, and the energy cost of \emph{retraining} when the model becomes obsolete. Add one or two sentences here or in \Cref{sec:sust-environmental} so the lifecycle perspective is complete (manufacture $\to$ operation $\to$ end-of-life).}
 Model files have a finite useful life---they become obsolete as
 new architectures are released, as datasets evolve, and as the
 target notation style drifts.

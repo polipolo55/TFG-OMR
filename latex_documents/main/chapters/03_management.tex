@@ -6,7 +6,7 @@ comparative justification of the chosen architecture against the
 plausible alternatives, the iterative methodology adopted to execute
 it, the work-breakdown structure and Gantt schedule, the risk register
 and contingency plans, and the economic budget with its control
-mechanism.
+mechanism.\todo{Art.~12 expects a brief IP/GDPR/data-licence subsection here (PrIMuS licence, Real Book copyright caveat, no personal data). Currently only covered in Ch.~7 sustainability commitment --- add a one-paragraph subsection or an explicit forward pointer.}
 The introductory framing of the project---academic context, scope,
 objectives, and stakeholders---is given in \Cref{ch:intro}
 and is not repeated here.
@@ -24,30 +24,16 @@ and is not repeated here.
 \section{Justification of the Chosen Architecture}
 \label{sec:mgmt-justification}
 
-\subsection{Existing alternatives}
-
-\Cref{sec:soa-classical}, \Cref{sec:soa-crnn}, and
-\Cref{sec:soa-transformer} surveyed the three principal
-families of OMR systems in the literature.
-Considered as candidate architectures for this thesis, they are:
-
-\begin{enumerate}
-    \item \textbf{Traditional modular pipelines} (staff
-          detection/removal, symbol segmentation, symbol
-          classification, reconstruction) with the well-known error
-          propagation issues catalogued by Dalitz et
-          al.~\cite{dalitzComparativeStudyStaff2008} and the modern
-          survey~\cite{calvoZaragozaUnderstandingOMR2020}.
-    \item \textbf{CRNN--CTC sequence models}, well-suited to
-          left-to-right staff-line transcription and the de facto
-          baseline for monophonic
-          OMR~\cite{calvoZaragozaEndToEndNeural2018,PrIMuSDataset}.
-    \item \textbf{Transformer-based end-to-end models}, stronger for
-          full-page and polyphonic
-          settings~\cite{riosVilaSheetMusicTransformer2024,riosVilaSMTPlusPlus2024,yangLEGATO2025}
-          but with substantially heavier data and compute
-          requirements.
-\end{enumerate}
+\Cref{ch:soa} surveys the three principal families of OMR
+systems in the literature---traditional modular pipelines,
+CRNN--CTC sequence models, and transformer-based end-to-end
+models---and \Cref{ch:design} develops the technical case for
+selecting the two-stream CRNN--CTC system used in this thesis.
+This section justifies that choice from the project-management
+standpoint, by applying six criteria that combine the technical
+target with the practical constraints of a Bachelor's thesis,
+and by recording the schedule and budget consequences of the
+decision.
 
 \subsection{Selection criteria}
 
@@ -124,37 +110,22 @@ one that locks the line of research into a single configuration.
     \end{tabularx}
 \end{table}
 
-Table~\ref{tab:alt-comparison} shows that CRNN--CTC is the best fit
+\Cref{tab:alt-comparison} shows that CRNN--CTC is the best fit
 for this stage: it provides enough modelling capacity for monophonic
 lead sheets while remaining trainable and debuggable within the
 available timeframe and hardware budget.
-A transformer would in principle yield higher accuracy on the
-monophonic line, but the data and compute costs of a from-scratch
-training run are incompatible with the resources of a single-person
-project.
-A traditional modular pipeline is cheap to implement but is
-penalised by error propagation across stages and by its sensitivity
-to the jazz engraving style; this option is in fact retained as the
-\textit{lower bound} baseline against which the CRNN--CTC results
-are compared in \Cref{ch:results}.
+The transformer alternatives are penalised principally by the data
+and compute requirements of a from-scratch training run on a single
+consumer GPU; a traditional modular pipeline is cheap to implement
+but is penalised by error propagation across stages and by its
+sensitivity to the jazz engraving style.
+The latter is in fact retained as the \textit{lower bound}
+baseline against which the CRNN--CTC results are compared in
+\Cref{ch:results}.
 
-\subsection{Chosen alternative}
+\subsection{Schedule and budget consequences}
 
-The selected architecture is a \textbf{two-stream CRNN--CTC system}
-in which a music CRNN--CTC transcribes the monophonic staff line and
-a second, independently trained CRNN--CTC performs OCR on the chord
-strip above the staff; its design is the subject of
-\Cref{ch:design} and its implementation of
-\Cref{ch:impl}.
-The decision balances modelling capacity against feasibility: the
-model is lighter than transformer alternatives, has strong prior
-art in OMR datasets, and supports robust sequence prediction
-without requiring per-symbol segmentation of the input image.
-Splitting the chord recogniser into a separate network keeps both
-vocabularies small and lets each branch be trained and debugged
-independently.
-
-Three concrete consequences follow from this choice.
+Three concrete consequences for the project plan follow from this choice.
 First, the training corpus can be built entirely from a single
 public dataset (PrIMuS) re-rendered in the target engraving style,
 which keeps the data-acquisition cost within the budget allocated
@@ -184,7 +155,7 @@ within the available time.
 \label{sec:mgmt-methodology}
 
 The project follows an \textbf{iterative and incremental}
-methodology with sprint-based checkpoints and supervisor reviews.
+methodology with sprint-based checkpoints and supervisor reviews.\todo{Methodology is declared as iterative/incremental but not justified vs.\ alternatives (waterfall, Kanban, pure Scrum). Add one sentence stating why iterative was chosen over waterfall given the data/model feedback loop --- the rubric explicitly asks for justification, not just declaration.}
 Each cycle is required to produce measurable
 artefacts---datasets, training logs, SER values, error
 analyses---rather than internal milestones whose progress cannot
@@ -210,7 +181,7 @@ A naïve waterfall reading of the work-package structure
 \textit{first} traversal of this loop for the \textit{only}
 traversal; in practice, sprint reviews regularly send the
 project back to a prior WP for incremental refinement, and the
-budget reserves time for that.
+budget reserves time for that.\todo{This paragraph (lines 168--184) is wordy ($\sim$170 words) and largely restates that ``the methodology is iterative''. Trim 30--40\,\%: keep the three-activity loop sentence and the one closing point that the WP order is a first-pass approximation; drop the redundant ``naïve waterfall'' framing.}
 
 Four practices enforce methodological rigour and are applied
 uniformly across the project.
@@ -228,14 +199,12 @@ against which to compare.
 
 \textit{Reproducibility.}
 Data generation, training, and evaluation are all driven by
-scripts rather than by interactive notebook sessions, and the
-full \code{Config} dataclass is embedded in every checkpoint
-(\Cref{sec:impl-reproducibility}).
-A consequence is that any experiment reported in
-\Cref{ch:results} can be re-run with a single CLI
-invocation from a clean clone of the repository on a different
-machine; this is enforced as Hard Constraint~3 in the project's
-contributor guide.
+scripts rather than by interactive notebook sessions, so any
+experiment reported in \Cref{ch:results} can be re-run from a
+clean clone of the repository on a different machine; the
+concrete mechanism (embedded \code{Config}, deterministic seeds,
+checkpoint format) is described in
+\Cref{sec:impl-reproducibility}.
 
 \textit{Quantitative control.}
 Symbol Error Rate is measured at every significant training
@@ -253,7 +222,7 @@ Each sprint ends with a review that can adjust scope, effort
 estimates, or risk responses for the next sprint.
 The review is held with the supervisor and consumes a fixed
 budget (three hours per sprint, accounted for in
-Table~\ref{tab:task-summary}); it produces a short written note
+Table~\ref{tab:task-summary})\todo{Use \texttt{\textbackslash Cref\{tab:task-summary\}} mid-sentence instead of \texttt{Table\textasciitilde\textbackslash ref}. Same applies to other \texttt{Table\textasciitilde\textbackslash ref}/\texttt{Figure\textasciitilde\textbackslash ref} occurrences in this chapter (lines around the Gantt, risk-register, HR-budget and budget-control paragraphs).}; it produces a short written note
 on whether the sprint hit its objectives, what evidence supports
 that judgement, and what is carried forward into the next
 sprint.
@@ -280,7 +249,7 @@ project.
 Execution control uses \textbf{fixed four-week sprints} aligned
 with the work packages (each WP1--WP4 is one sprint; WP5 closes
 the project over five weeks), with a biweekly supervisor check-in
-inside each sprint.
+inside each sprint.\todo{Cadence consistency: confirm that ``biweekly check-ins inside each 4-week sprint'' means two check-ins per sprint (mid-sprint + sprint review). Elsewhere (\S Methodology, last paragraph; T0.5 ``Supervisor meetings'' = 25\,h) it is described simply as ``biweekly milestone meetings''. State once, explicitly, that there is one mid-sprint check-in plus one end-of-sprint review = $\sim$10 meetings total.}
 Backlog priorities, risks, and effort estimates are reviewed at
 every sprint boundary and may be revised in either direction.
 
@@ -336,7 +305,7 @@ retrained.
 This is the work package where most of the closed-loop behaviour
 described in \Cref{sec:mgmt-methodology} actually
 happens; its 68-hour budget is split across roughly two sprints
-of refinement and ablations.
+of refinement and ablations.\todo{Inconsistency with the Gantt: WP4 occupies weeks 13--16 = one 4-week sprint (Sprint 4), not two. Either rephrase as ``two internal iterations within Sprint 4'' or fix the Gantt --- pick one and propagate.}
 
 \textit{WP5 -- Final evaluation and defence (85\,h).}
 This package contains the final evaluation on held-out data, the
@@ -350,13 +319,14 @@ compromising the core deliverable.
 
 \subsection{Tasks, dependencies, and resources}
 
-Table~\ref{tab:task-summary} lists the 31 tasks of the plan with
+\Cref{tab:task-summary} lists the 31 tasks of the plan with
 their effort estimates, dependencies, and principal resources.
 The estimates are expressed in hours per task and were validated
 against the author's available weekly workload of four to five
-effective working hours per day, which corresponds to
-approximately 24\,h per week of sustained project effort over the
-21-week schedule.
+effective working hours per day; together they amount to the
+509-hour total of \Cref{tab:task-summary}, distributed over
+the 21-week schedule at an average of approximately 24\,h per
+week.
 
 The dependency column distinguishes between strict
 dependencies---a task cannot begin until its predecessor is
@@ -546,7 +516,7 @@ to come out of the next sprint's allocation.
     (M5).
     Concurrency is limited to naturally compatible task pairs (for
     instance, evaluation-framework development during the first
-    training run).}
+    training run).}\todo{Caption is two sentences of meta-commentary about concurrency that repeat body text; trim to a noun-phrase caption per FIB style, e.g.\ ``Gantt chart for the 21-week project (Feb--Jun 2026), grouped by work package, with sprint-review milestones M1--M4 and final defence M5.''}
     \label{fig:gantt}
 \end{figure}
 \end{landscape}
@@ -557,7 +527,7 @@ to come out of the next sprint's allocation.
 
 The risk register identifies six principal risks that were
 foreseeable at the start of the project and for which explicit
-mitigations or alternative plans can be prepared in advance.
+mitigations or alternative plans can be prepared in advance.\todo{Risks lack \emph{detection criteria}: each entry says what to do if the risk materialises but not the observable signal that tells you it has (e.g.\ R4 = ``training loss plateaus above X after Y epochs''; R1 = ``labelling pace below Z pages/h after one week''). Add a one-line detection trigger per risk so the contingency plans are actionable.}
 Each risk is rated on two axes---likelihood and
 impact---using a three-level scale (low, medium, high), and is
 paired with an alternative plan, an estimate of how much
@@ -634,9 +604,10 @@ fits the baseline model comfortably but provides limited
 headroom for hyperparameter sweeps.
 If concurrent obligations occupy the workstation or if a
 significant resize of the model becomes necessary, the fallback
-is a short cloud-GPU rental (a single AWS or Lambda Labs
-session, of the order of \EUR{}20--50) that lets the project
-clear the bottleneck without impact on the core schedule.
+is a temporary cloud-GPU rental (an AWS or Lambda Labs session,
+priced as the worst-case multi-day rental in the incidentals of
+\Cref{tab:incidentals}) that lets the project clear the
+bottleneck without impact on the core schedule.
 Setup consumes up to five hours and is the only entry in the
 register that requires direct procurement.
 
@@ -656,6 +627,7 @@ of the lower-impact risks without triggering the
 budget-control mechanism described in
 \Cref{sec:mgmt-control}.
 
+\todo{Risk register would benefit from an extra \textbf{Detection trigger} column (or an inline ``trigger:\ldots'' clause per row) tying each risk to the observable signal that activates the contingency --- otherwise the table answers ``what to do'' but not ``when''. Pairs with the marker on line 530.}
 \begin{table}[h!]
     \centering
     \caption{Risk register with alternative plans and estimated
@@ -696,9 +668,9 @@ budget-control mechanism described in
             & None. \\ \tfgrowsep
         R6 & Computational resource constraints
             & Low/Med & Med
-            & Reduce model/data size or rent a short cloud-GPU window.
+            & Reduce model/data size or rent a temporary cloud-GPU window.
             & Up to 5\,h setup.
-            & Cloud GPU (\EUR{}20--50). \\
+            & Cloud GPU rental (see \Cref{tab:incidentals}). \\
         \bottomrule
     \end{tabularx}
 \end{table}
@@ -766,7 +738,7 @@ module~\cite{gepModule24EconomicManagement}.
 \end{table}
 
 Since the project is executed by a single person who carries out
-all four roles, each task in Table~\ref{tab:task-summary} is costed
+all four roles, each task in Table~\ref{tab:task-summary}\todo{Use \texttt{\textbackslash Cref\{tab:task-summary\}} mid-sentence (and same fix for the remaining \texttt{Table\textasciitilde\textbackslash ref\{tab:hr-budget\}}, \texttt{Table\textasciitilde\textbackslash ref\{tab:general-costs\}}, \texttt{Table\textasciitilde\textbackslash ref\{tab:risk-register\}}, and \texttt{Figure\textasciitilde\textbackslash ref\{fig:gantt\}} occurrences in this chapter --- the document already uses \texttt{\textbackslash Cref} elsewhere; mixing styles is inconsistent).} is costed
 at the loaded rate of the role that predominantly performs it
 (for example, T0.5 supervisor meetings and the GEP tasks at the
 Project Manager rate, the literature survey and error analysis at
@@ -776,7 +748,7 @@ Writer rate).
 Summing across roles produces a project-weighted blended rate of
 \EUR{}26.75/h on the 509-hour total, which differs slightly from
 the unweighted mean of the four rates (\EUR{}26.27/h) because the
-project's hour mix is not uniform across roles.
+project's hour mix is not uniform across roles.\todo{Blended-rate calculation is asserted but not shown: give the role $\to$ hours mapping (e.g.\ PM 130\,h + RA 78\,h + ML 216\,h + TW 85\,h = 509\,h) so a reader can verify the \EUR{}26.75/h figure and the \EUR{}13\,615.57 total. A two-line breakdown or a footnote suffices.}
 The resulting total of \EUR{}13\,615.57 is distributed across work
 packages as shown in Table~\ref{tab:hr-budget}.
 This figure dominates the budget: roughly \SI{85}{\percent} of
@@ -813,7 +785,7 @@ and hardware are commodity items.
 share of fixed assets and overheads attributable to the 21 weeks
 of the project: hardware amortisation on the workstation, monitor,
 and peripherals at a four-year linear rate prorated for the
-project duration; software licences (zero, since the entire
+project duration;\todo{Amortisation arithmetic is opaque: state the base values (e.g.\ desktop \EUR{}1\,200, monitor \EUR{}250, peripherals \EUR{}100), the useful life (4 yr), and the proration formula ($\mathrm{base}\times 21/(52\times 4)$) so that the \EUR{}125.69 total in \Cref{tab:general-costs} can be reconstructed by the reader.} software licences (zero, since the entire
 toolchain---Python, PyTorch, OpenCV, LilyPond, PyMuPDF,
 albumentations, FastAPI, Poetry---is open source); and overheads
 covering electricity and internet connectivity, derived from the
@@ -839,12 +811,18 @@ risk register cannot anticipate by definition.
 
 \textit{Incidentals.}
 The incidentals figure of \EUR{}150.96
-(Table~\ref{tab:incidentals}) is the expected-value sum of the
-four cost-bearing entries of the risk register
-(\Cref{sec:mgmt-risks}).
-Each entry is the full cost of activating the corresponding
-contingency action multiplied by the assigned probability of the
-risk materialising.
+(\Cref{tab:incidentals}) is the expected-value sum of the four
+cost-bearing entries of the risk register
+(\Cref{sec:mgmt-risks}).\todo{\Cref{tab:incidentals} lists R5 (scope reduction) as a 30\,\% probability with \EUR{}0 full cost --- contributing nothing. Either drop the R5 row (cleaner) or add one sentence explaining why a zero-cost entry is kept in the incidentals table (e.g.\ ``listed for traceability with the risk register''). As is, it looks like leftover scaffolding.}
+Each entry is the full cost of the priced contingency action
+multiplied by the probability that this specific
+action---rather than a no-cost effort reallocation---is required.
+These activation probabilities are therefore lower than the bare
+likelihood ratings of \Cref{tab:risk-register}: R1, for
+instance, is rated likelihood-high, but the priced cleaning
+cycle is triggered only when augmentation tuning alone is
+insufficient, an outcome estimated at roughly one in four
+materialisations.
 The total is small in absolute terms because most of the
 register's contingency actions consist of reallocating planned
 effort within the human-resources budget rather than acquiring
@@ -874,8 +852,11 @@ data-cleaning cycles incur direct monetary cost.
 \begin{table}[h!]
     \centering
     \caption{Incidentals derived from the risk register.
-    Each entry is the cost of activating the corresponding
-    alternative plan, weighted by the risk's likelihood.}
+    Each entry is the cost of the priced contingency action
+    weighted by the probability that this specific action
+    (rather than a no-cost effort reallocation) is required;
+    these activation probabilities are lower than the bare
+    likelihood ratings of \Cref{tab:risk-register}.}
     \label{tab:incidentals}
     \small
     \setlength{\tabcolsep}{5pt}

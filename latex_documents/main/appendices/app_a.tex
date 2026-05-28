@@ -1,3 +1,5 @@
 \chapter{Additional Tables and Hyperparameters}
 
+\todo{AUDIT (orphan appendix): This appendix is \texttt{\textbackslash input} from \texttt{main.tex} but is NEVER \texttt{\textbackslash ref}-ed from any chapter. An unreferenced appendix is a defect: per FIB tribunal convention, every appendix must be pointed at from the body (e.g.\ ``see \Cref{app:hyperparams} for the full grid''). Either (a) add \texttt{\textbackslash label\{app:hyperparams\}} here and a forward reference from \Cref{ch:impl} or \Cref{sec:res-ser}, or (b) drop the appendix entirely.}
+
 \todo{Add \texttt{tab:hyperparams-full}---the complete hyperparameter grid search results for \texttt{img\_height}, \texttt{batch\_size}, and BiLSTM hidden size. Source: output of \texttt{poetry run python scripts/hyperparameter\_search.py}.}

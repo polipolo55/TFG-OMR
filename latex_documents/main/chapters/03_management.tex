@@ -231,8 +231,21 @@ management work package (WP0) that runs in parallel throughout the
 project.
 Execution control uses \textbf{fixed four-week sprints} aligned
 with the work packages (each WP1--WP4 is one sprint; WP5 closes
-the project over five weeks), with a biweekly supervisor check-in
-inside each sprint.\todo{Cadence consistency: confirm that ``biweekly check-ins inside each 4-week sprint'' means two check-ins per sprint (mid-sprint + sprint review). Elsewhere (\S Methodology, last paragraph; T0.5 ``Supervisor meetings'' = 25\,h) it is described simply as ``biweekly milestone meetings''. State once, explicitly, that there is one mid-sprint check-in plus one end-of-sprint review = $\sim$10 meetings total.}
+the project over five weeks).
+Supervisor meetings keep a \textbf{biweekly} cadence within this
+structure: each sprint holds two meetings, a mid-sprint check-in at
+its midpoint and an end-of-sprint review at its boundary (the
+reviews are the milestones M1--M5 in \Cref{fig:gantt}).
+Over the 21 weeks this amounts to roughly ten meetings, the activity
+budgeted as T0.5 (25\,h) in \Cref{tab:task-summary} and
+referred to elsewhere simply as the biweekly milestone meetings.
+This four-week grouping is a deliberate revision of the two-week
+sprint cadence in the initial GEP plan: aligning each sprint with a
+single work package gave the train--evaluate--improve loop a coherent
+deliverable per sprint and accommodated the late addition of the
+chord-recognition track (training and fine-tuning the chord CRNN,
+detailed in the WP4 and WP5 descriptions below) without fragmenting
+the schedule.
 Backlog priorities, risks, and effort estimates are reviewed at
 every sprint boundary and may be revised in either direction.
 
@@ -529,14 +542,17 @@ to come out of the next sprint's allocation.
 
 The risk register identifies six principal risks that were
 foreseeable at the start of the project and for which explicit
-mitigations or alternative plans can be prepared in advance.\todo{Risks lack \emph{detection criteria}: each entry says what to do if the risk materialises but not the observable signal that tells you it has (e.g.\ R4 = ``training loss plateaus above X after Y epochs''; R1 = ``labelling pace below Z pages/h after one week''). Add a one-line detection trigger per risk so the contingency plans are actionable.}
+mitigations or alternative plans can be prepared in advance.
 Each risk is rated on two axes (likelihood and impact)
 using a three-level scale (low, medium, high), and is
-paired with an alternative plan, an estimate of how much
-schedule the activation of that plan would consume, and an
-estimate of any additional resources it would require.
+paired with a \emph{detection trigger} (the observable signal that
+tells the project the risk has materialised), an alternative plan,
+an estimate of how much schedule the activation of that plan would
+consume, and an estimate of any additional resources it would
+require.
 The register is summarised in \Cref{tab:risk-register}; the
-discussion below explains the reasoning behind each entry.
+discussion below explains the reasoning behind each entry and states
+its detection trigger explicitly.
 
 \textit{Limited ground-truth data on real Real Book pages
 (likelihood high, impact high).}
@@ -551,6 +567,9 @@ synthetic-to-real domain gap will remain partly open.
 The fallback consumes up to ten hours of reallocated effort but
 requires no additional resources, because the synthetic
 pipeline is already implemented.
+\textit{Detection trigger:} a labelling throughput below roughly ten
+usable staves per hour in the first labelling session, which would
+push the target annotation set past its allotted window.
 
 \textit{Staff-detection errors propagating downstream
 (likelihood medium, impact medium).}
@@ -562,6 +581,9 @@ purposes of measuring CRNN-only accuracy.
 This shifts hours from the conditional extension task (T5.3) to
 the final thesis-writing task (T5.4) but does not require new
 resources.
+\textit{Detection trigger:} the detector missing or mis-segmenting
+more than about one staff in ten on a spot-check set of real
+scanned pages.
 
 \textit{Encoding-design complexity (likelihood medium, impact medium).}
 The LMX vocabulary is the only output representation the model
@@ -574,6 +596,9 @@ incrementally after the model has reached a stable convergence
 profile.
 This consumes up to six hours of redesign within the project
 buffer and does not propagate further.
+\textit{Detection trigger:} a non-trivial fraction of dataset tokens
+mapping to \code{<unk>}, or the vocabulary needing structural revision
+after inspecting the first training run.
 
 \textit{Model underfitting or CTC misalignment
 (likelihood medium, impact high).}
@@ -586,6 +611,11 @@ time axis available to the CTC alignment is sufficient.
 This consumes up to ten hours from the project buffer and
 requires additional GPU time, accounted for in the incidentals
 table.
+\textit{Detection trigger:} validation SER plateauing above the
+\SI{2}{\percent} clean-split target (or the CTC loss failing to
+descend) after the first ten-to-fifteen epochs, or
+\code{zero\_infinity} silently masking samples whose CTC input length
+falls below their label length.
 
 \textit{Scope creep toward polyphony (likelihood medium, impact high).}
 A persistent risk in OMR research is the temptation to extend
@@ -598,6 +628,9 @@ feasibility discussion rather than implementation.
 If the temptation arises mid-project, up to eighteen hours of
 T5.3's budget can be recovered for the core monophonic
 deliverable.
+\textit{Detection trigger:} any implementation effort logged against
+polyphony, or T5.3 scope expanding beyond a feasibility discussion at
+a sprint review.
 
 \textit{Computational resource constraints
 (likelihood low-to-medium, impact medium).}
@@ -612,6 +645,10 @@ priced as the worst-case multi-day rental in the incidentals of
 bottleneck without impact on the core schedule.
 Setup consumes up to five hours and is the only entry in the
 register that requires direct procurement.
+\textit{Detection trigger:} a required training configuration
+exceeding the \SI{12}{\giga\byte} VRAM budget at the minimum viable
+batch size, or workstation contention stretching a single training
+run beyond about one day.
 
 \bigskip
 
@@ -629,7 +666,6 @@ of the lower-impact risks without triggering the
 budget-control mechanism described in
 \Cref{sec:mgmt-control}.
 
-\todo{Risk register would benefit from an extra \textbf{Detection trigger} column (or an inline ``trigger:\ldots'' clause per row) tying each risk to the observable signal that activates the contingency --- otherwise the table answers ``what to do'' but not ``when''. Pairs with the marker on line 530.}
 \begin{table}[h!]
     \centering
     \caption{Risk register with alternative plans and estimated
@@ -721,38 +757,50 @@ module~\cite{gepModule24EconomicManagement}.
 
 \begin{table}[h!]
     \centering
-    \caption{Roles considered for the project and their loaded
-    hourly rates.}
+    \caption{Roles considered for the project, their loaded hourly
+    rates, and the hours each role is charged across the 509-hour
+    plan. The role totals reconstruct the human-resources budget of
+    \Cref{tab:hr-budget} and the blended rate quoted below.}
     \label{tab:roles-cost}
     \small
     \setlength{\tabcolsep}{5pt}
     \renewcommand{\arraystretch}{1.35}
-    \begin{tabularx}{\linewidth}{@{} l r r r @{}}
+    \begin{tabularx}{\linewidth}{@{} L r r r r r @{}}
         \toprule
-        \textbf{Role} & \textbf{Gross (\EUR{}/year)} & \textbf{Loaded (\EUR{}/year)} & \textbf{\EUR{}/h} \\
+        \textbf{Role} & \textbf{Gross (\EUR{}/yr)} & \textbf{Loaded (\EUR{}/yr)} & \textbf{\EUR{}/h} & \textbf{Hours} & \textbf{Cost (\EUR{})} \\
         \midrule
-        Project Manager   & 38\,000 & 51\,300 & 29.15 \\ \tfgrowsep
-        Research Analyst  & 33\,000 & 44\,550 & 25.31 \\ \tfgrowsep
-        ML Engineer       & 36\,000 & 48\,600 & 27.61 \\ \tfgrowsep
-        Technical Writer  & 30\,000 & 40\,500 & 23.01 \\
+        Project Manager   & 38\,000 & 51\,300 & 29.15 & 92  & 2\,681.80 \\ \tfgrowsep
+        Research Analyst  & 33\,000 & 44\,550 & 25.31 & 72  & 1\,822.32 \\ \tfgrowsep
+        ML Engineer       & 36\,000 & 48\,600 & 27.61 & 255 & 7\,040.55 \\ \tfgrowsep
+        Technical Writer  & 30\,000 & 40\,500 & 23.01 & 90  & 2\,070.90 \\
+        \midrule
+        \textbf{Total}    &         &         &       & \textbf{509} & \textbf{13\,615.57} \\
         \bottomrule
     \end{tabularx}
 \end{table}
 
 Since the project is executed by a single person who carries out
 all four roles, each task in \Cref{tab:task-summary} is costed
-at the loaded rate of the role that predominantly performs it
-(for example, T0.5 supervisor meetings and the GEP tasks at the
-Project Manager rate, the literature survey and error analysis at
-the Research Analyst rate, the model and pipeline work at the ML
-Engineer rate, and the thesis-writing tasks at the Technical
-Writer rate).
-Summing across roles produces a project-weighted blended rate of
-\EUR{}26.75/h on the 509-hour total, which differs slightly from
-the unweighted mean of the four rates (\EUR{}26.27/h) because the
-project's hour mix is not uniform across roles.\todo{Blended-rate calculation is asserted but not shown: give the role $\to$ hours mapping (e.g.\ PM 130\,h + RA 78\,h + ML 216\,h + TW 85\,h = 509\,h) so a reader can verify the \EUR{}26.75/h figure and the \EUR{}13\,615.57 total. A two-line breakdown or a footnote suffices.}
-The resulting total of \EUR{}13\,615.57 is distributed across work
-packages as shown in \Cref{tab:hr-budget}.
+at the loaded rate of the role that predominantly performs it:
+the GEP tasks (T0.1--T0.4), the supervisor meetings (T0.5), and the
+end-of-sprint reviews (T1.5, T2.5, T3.5, T4.5) at the Project Manager
+rate; the literature survey, dataset exploration, and error-analysis
+tasks at the Research Analyst rate; the dataset-rendering, model, and
+pipeline tasks at the ML Engineer rate; and the thesis-writing tasks
+(T0.6, T5.4) together with defence preparation (T5.5) at the Technical
+Writer rate.
+Aggregating the task hours by role gives \num{92}\,h Project Manager,
+\num{72}\,h Research Analyst, \num{255}\,h ML Engineer, and
+\num{90}\,h Technical Writer (\num{509}\,h in total), the allocation
+tabulated in the last two columns of \Cref{tab:roles-cost}.
+Summing the corresponding costs yields the \EUR{}13\,615.57
+human-resources total, which divided by the 509 hours gives a
+project-weighted blended rate of \EUR{}26.75/h; this differs slightly
+from the unweighted mean of the four rates (\EUR{}26.27/h) because the
+ML~Engineer role, the most expensive after the Project Manager,
+carries half the project's hours.
+The same \EUR{}13\,615.57 total is distributed across work
+packages in \Cref{tab:hr-budget}.
 This figure dominates the budget: roughly \SI{85}{\percent} of
 the project cost is engineering time, which is the expected
 profile for a research-intensive software project where tooling
@@ -787,7 +835,13 @@ and hardware are commodity items.
 share of fixed assets and overheads attributable to the 21 weeks
 of the project: hardware amortisation on the workstation, monitor,
 and peripherals at a four-year linear rate prorated for the
-project duration;\todo{Amortisation arithmetic is opaque: state the base values (e.g.\ desktop \EUR{}1\,200, monitor \EUR{}250, peripherals \EUR{}100), the useful life (4 yr), and the proration formula ($\mathrm{base}\times 21/(52\times 4)$) so that the \EUR{}125.69 total in \Cref{tab:general-costs} can be reconstructed by the reader.} software licences (zero, since the entire
+project duration (the workstation---a Ryzen~7 7800X3D with 32\,GB of
+DDR5 memory and an NVIDIA RTX~3060 12\,GB---is valued at \EUR{}1\,000,
+the monitor at \EUR{}200, and the peripherals at \EUR{}45, for a
+\EUR{}1\,245 base; charged linearly over a four-year, \num{208}-week
+useful life for the 21 project weeks this gives
+$\EUR{}1\,245\times 21/208 \approx \EUR{}125.69$);
+software licences (zero, since the entire
 toolchain, Python, PyTorch, OpenCV, LilyPond, PyMuPDF,
 albumentations, FastAPI, and Poetry, is open source); and overheads
 covering electricity and internet connectivity, derived from the
@@ -813,9 +867,13 @@ risk register cannot anticipate by definition.
 
 \textit{Incidentals.}
 The incidentals figure of \EUR{}150.96
-(\Cref{tab:incidentals}) is the expected-value sum of the four
-cost-bearing entries of the risk register
-(\Cref{sec:mgmt-risks}).\todo{\Cref{tab:incidentals} lists R5 (scope reduction) as a 30\,\% probability with \EUR{}0 full cost --- contributing nothing. Either drop the R5 row (cleaner) or add one sentence explaining why a zero-cost entry is kept in the incidentals table (e.g.\ ``listed for traceability with the risk register''). As is, it looks like leftover scaffolding.}
+(\Cref{tab:incidentals}) is the expected-value sum of the three
+cost-bearing entries of the risk register---R1, R4, and R6
+(\Cref{sec:mgmt-risks}).
+R5 is listed in the same table at zero cost for traceability with the
+risk register: its contingency is a no-cost reallocation of planned
+effort, so it contributes nothing to the total but is kept visible
+alongside the priced entries.
 Each entry is the full cost of the priced contingency action
 multiplied by the probability that this specific
 action, rather than a no-cost effort reallocation, is required.

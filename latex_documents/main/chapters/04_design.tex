@@ -142,7 +142,7 @@ Time signatures & One of $\{4/4,\,3/4,\,2/4,\,2/2,\,6/8,\,6/4,\,5/4,\,12/8\}$. \
 \tfgrowsep
 Pitch range & Octaves $3$--$7$ inclusive (treble plus altissimo). \\
 \tfgrowsep
-Note values & Whole through 64th, with augmentation dots and ties. \\
+Note values & Whole through 64th, with augmentation dots, ties, and fermata holds. \\
 \tfgrowsep
 Accidentals & \code{flat}, \code{sharp}, \code{natural}; display-only, single. \\
 \tfgrowsep
@@ -552,10 +552,10 @@ provides natively.
 \subsection{Domain augmentation: from clean renders to scanned pages}
 
 Even after the engraving style is corrected, a model trained only on
-clean LilyJAZZ renders generalises poorly to real scans: the feature
-distribution shifts substantially when crisp black symbols on a white
-background are replaced by blurred, uneven, noisy images with variable
-contrast and geometric distortion.
+clean LilyJAZZ renders generalises poorly to real scans: the synthetic
+feature distribution sits far from that of degraded, unevenly-lit,
+geometrically distorted scans, exactly the domain gap framed in
+\Cref{sec:problem-formulation}.
 The system therefore generates a second, augmented version of every
 training image that simulates the distortions characteristic of
 real-world scans: page warping and lens distortion, scan misalignment,
@@ -618,15 +618,14 @@ multi-staff renders, non-treble clefs, exotic time signatures.
 Three filters are applied at dataset construction time to restrict
 training to the in-scope distribution: multi-staff samples are dropped,
 samples with non-treble clefs are dropped, and samples with time
-signatures outside the eight-element jazz common-time set
-($4/4$, $3/4$, $2/4$, $2/2$, $6/8$, $6/4$, $5/4$, $12/8$) are dropped.
+signatures outside the eight-element jazz common-time set of
+\Cref{tab:domain-contract} are dropped.
 This is a contract, not a workaround. Disabling the filters would
 force the model to spend capacity on visual patterns that never appear
 at inference, without improving its performance on the target
 distribution.
-The same contract is enforced by the grammar fixer at inference time,
-which rewrites any predicted clef other than G2 to G2 and rejects
-time signatures outside the allowed set.
+The same contract is enforced at inference time by the grammar fixer
+(\Cref{sec:design-grammar}).
 No alternative filter set was weighed at design time: the Real Book
 domain itself fixes the contract (treble clef, monophonic line,
 common-time jazz meters), and the filters merely transcribe that
@@ -692,6 +691,12 @@ ACCIDENTAL:= "flat" | "sharp" | "natural"
 TIE       := "tied:start" ... "tied:stop"
 \end{verbatim}
 \end{quote}
+
+A note carries up to three optional trailing markers after its duration
+and dots: an accidental, a \code{tied:stop}
+closing a tie opened by an earlier \code{tied:start}, and a
+\code{fermata} hold marker, which attaches to the immediately preceding
+note or rest. All three are absent on the common case of a plain note.
 
 \begin{figure}[t]
     \centering
@@ -765,8 +770,9 @@ and the out-of-vocabulary token (index 2).
 The remaining indices, sorted alphabetically, encode the LMX tokens
 that appear in the training corpus: pitch letters \code{pitch:A}
 through \code{pitch:G}, octave numbers \code{octave:0} through
-\code{octave:8}, the eight duration words, the dot token, the three
-accidentals, the \code{measure} and \code{rest} structural tokens, the
+\code{octave:8}, the seven duration words, the dot token, the three
+accidentals, the \code{fermata} hold marker, the \code{measure} and
+\code{rest} structural tokens, the
 tie tokens, the clef token \code{clef:G2}, key tokens
 \code{key:fifths:-6} through \code{key:fifths:7}, and the time-signature
 tokens.

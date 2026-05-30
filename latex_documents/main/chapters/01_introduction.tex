@@ -169,7 +169,7 @@ The \textbf{general objective} of this project is to develop, evaluate, and docu
 proof-of-concept end-to-end OMR system for monophonic jazz lead sheets, and to
 demonstrate that a CRNN-CTC architecture trained on synthetic data can bridge the
 domain gap between clean rendered images and degraded scans, achieving an aggregate
-Symbol Error Rate (SER) of at most \SI{5}{\percent} on a held-out scan-simulated test
+Symbol Error Rate (SER) of at most \SI{3}{\percent} on a held-out scan-simulated test
 split so that the outcome can be assessed quantitatively in \Cref{ch:conclusions}.
 
 The \textbf{specific objectives} are:
@@ -191,7 +191,7 @@ The \textbf{specific objectives} are:
     \item Design, implement, and train a CRNN-CTC model for monophonic staff-line
           recognition, and evaluate it rigorously using the SER~\cite{SymbolErrorRate}
           metric, targeting an aggregate SER of at most \SI{2}{\percent} on the clean
-          test split and at most \SI{5}{\percent} on the scan-simulated test split.
+          test split and at most \SI{3}{\percent} on the scan-simulated test split.
 
     \item Perform quantitative error analysis to characterise systematic failure modes
           and guide iterative data and model refinements.
@@ -251,8 +251,7 @@ The project is bounded by the following scope definition.
 
 \textbf{In scope:}
 \begin{itemize}
-    \item Input handling for a single-page PDF or a single raster image; the first page
-          of a multi-page PDF is processed.
+    \item Input handling for a single-page PDF or a single raster image.
     \item Monophonic (single-voice) melody lines in treble clef, as found in jazz lead
           sheets.
     \item Synthetic training data construction via LilyPond rendering of PrIMuS

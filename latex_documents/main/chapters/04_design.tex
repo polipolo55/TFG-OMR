@@ -19,6 +19,94 @@ Third, the project runs on a single consumer GPU within a Bachelor's
 thesis time budget, which caps model capacity, training time, and the
 number of architectural alternatives that can be explored empirically.
 
+Each major decision in this chapter is argued in its own section and
+paired with the alternatives that were weighed and rejected.
+\Cref{tab:decision-register} collects those decisions in one place as
+a roadmap; the section reference in each row points to the full
+argument.
+
+\begin{table}[ht]
+\centering
+\caption[Design-decision register.]{%
+Register of the major design decisions, the option chosen, the main
+alternatives weighed and rejected, and the primary reason. Each row is
+argued in full in the referenced section.}
+\label{tab:decision-register}
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\linewidth}{@{} >{\raggedright\arraybackslash}p{2.5cm} >{\raggedright\arraybackslash}p{2.4cm} L L @{}}
+\toprule
+\textbf{Decision} & \textbf{Choice} & \textbf{Main alternatives rejected} & \textbf{Primary reason} \\
+\midrule
+Pipeline structure (\S\ref{sec:design-pipeline})
+  & Modular five-stage pipeline
+  & Full-page transformer (LEGATO); tree-decoder transformer (SMT++)
+  & No full-page Real Book corpus; opaque, page-wide failure modes. \\
+\tfgrowsep
+Staff detection (\S\ref{sec:design-staffdetect})
+  & Classical morphology
+  & Learned detector (YOLO, RT-DETR); projection-profile slicer
+  & Regular staff geometry; no annotation budget; robust to chord text. \\
+\tfgrowsep
+Non-music rejection (\S\ref{sec:design-staff-reject})
+  & Geometric + OCR + CTC-confidence gate
+  & OCR-only rule; learned binary classifier
+  & Brittleness; labelling cost out of proportion to the gain. \\
+\tfgrowsep
+Training corpus (\S\ref{sec:design-data})
+  & PrIMuS re-rendered in LilyJAZZ
+  & OLiMPiC; MUSCIMA++; DeepScoresV2
+  & Pianoform, handwritten, or detection-format mismatch. \\
+\tfgrowsep
+Domain realism (\S\ref{sec:design-data})
+  & Hand-crafted scan augmentation
+  & No-augmentation larger model; CycleGAN; real-only
+  & Distribution shift, not capacity; stability and explicit control. \\
+\tfgrowsep
+Output format (\S\ref{sec:lmx-format})
+  & LMX
+  & MusicXML; PrIMuS \code{.semantic}; \code{**kern}; ABC
+  & Compact, round-trippable to MusicXML, comparable to OLiMPiC. \\
+\tfgrowsep
+Model family (\S\ref{sec:design-model})
+  & CRNN--CTC
+  & Encoder--decoder transformer; tree decoder; pure-CNN
+  & Data and compute budget; monotonic, length-bounded alignment. \\
+\tfgrowsep
+Backbone (\S\ref{sec:design-model})
+  & ResNet18, from scratch
+  & ResNet34/50; EfficientNet/MobileNet; ViT/Swin; VGG
+  & Capacity is not the bottleneck; data-hunger; convergence speed. \\
+\tfgrowsep
+Sequence layer (\S\ref{sec:design-model})
+  & Bidirectional LSTM
+  & GRU; temporal convolution / self-attention
+  & Marginal saving; recurrence fits the bounded-context regime. \\
+\tfgrowsep
+Decoding (\S\ref{sec:design-decoder})
+  & Greedy CTC
+  & Beam search; grammar-constrained beam; WFST
+  & Marginal accuracy gain over cost; grammar handled in a post-pass. \\
+\tfgrowsep
+Grammar enforcement (\S\ref{sec:design-grammar})
+  & Deterministic post-pass
+  & Grammar-aware beam / loss; WFST; learned corrector
+  & Small finite grammar; debuggable; avoids a second learned component. \\
+\tfgrowsep
+Chord recognition (\S\ref{sec:design-twostream})
+  & Separate CRNN stream
+  & Multi-task shared backbone; full-page transformer; general OCR
+  & Disjoint visual features; stylised-glyph OCR errors. \\
+\tfgrowsep
+Rare tokens (\S\ref{sec:design-training})
+  & Sample-level oversampling
+  & Class-weighted CTC; focal CTC; synthetic over-generation
+  & CTC admits no per-class weights; rarity is frequency, not difficulty. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Target Domain and Acceptance Criteria}
 \label{sec:design-domain}

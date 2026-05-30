@@ -193,9 +193,17 @@ A chord symbol is compact free-form text with up to four parts, listed in
 \Cref{tab:chord-anatomy}: an obligatory \emph{root}, an optional \emph{quality}, optional
 \emph{extensions or alterations}, and an optional \emph{slash bass}.
 The parts combine left to right.
-Reading \texttt{F\#m7b5}, for example: root F\(\sharp\), quality \texttt{m7} (minor
-seventh), alteration \texttt{b5}, together the half-diminished chord; and \texttt{C/E}
-is a C major triad voiced over an E in the bass.
+Reading \texttt{C7b9}, for example: root C, quality \texttt{7} (dominant
+seventh), alteration \texttt{b9}; and \texttt{C/E} is a C major triad voiced
+over an E in the bass.
+
+The Real Book uses a stylised dialect of this notation: minor is written with
+a hyphen (\texttt{G-7}, not \texttt{Gm7}), major seventh with \texttt{maj}
+(\texttt{Fmaj7}), diminished with \texttt{dim}, augmented with \texttt{+}, and
+half-diminished most often as \texttt{-7b5} (with \texttt{m7b5} and the
+\texttt{ø} glyph as rarer variants).  The chord recogniser of this thesis
+targets that dialect; \Cref{sec:design-twostream} describes how the variants
+are handled.
 
 \begin{table}[htbp]
     \centering
@@ -211,8 +219,8 @@ is a C major triad voiced over an E in the bass.
         \textbf{Part} & \textbf{Meaning} & \textbf{Examples} \\
         \midrule
         Root                     & pitch class A--G, optional accidental & \texttt{C}, \texttt{F\#}, \texttt{Bb} \\
-        Quality                  & chord-type abbreviation               & \texttt{maj7}, \texttt{m7}, \texttt{7}, \texttt{m7b5}, \texttt{dim7} \\
-        Extensions / alterations & added or altered chord tones          & \texttt{\#9}, \texttt{b5}, \texttt{13} \\
+        Quality                  & chord-type abbreviation               & \texttt{maj7}, \texttt{-7}, \texttt{7}, \texttt{-7b5}, \texttt{dim7} \\
+        Extensions / alterations & added or altered chord tones          & \texttt{\#9}, \texttt{b9}, \texttt{13} \\
         Slash bass               & non-root note placed in the bass      & \texttt{/E} in \texttt{C/E} \\
         \bottomrule
     \end{tabular}

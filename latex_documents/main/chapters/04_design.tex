@@ -1103,16 +1103,29 @@ this is a deliberate simplicity choice.
 Chord symbols in the Real Book follow a stylised convention that
 differs from many notation packages: minor chords are written with a
 hyphen (\code{G-7} rather than \code{Gm7}), major-seventh chords with
-\code{maj} (\code{Fmaj7}), half-diminished with the
-\code{ø} glyph (\code{Bø}), and diminished with the spelled-out
+\code{maj} (\code{Fmaj7}), and diminished with the spelled-out
 \code{dim} suffix (\code{Cdim7}).
-The character vocabulary covers the seven root letters, two
-accidentals, the quality letters needed to spell \code{maj},
-\code{dim}, and \code{sus} (the set $\{a, d, i, j, m, s, u\}$), the
-symbols \code{-}, \code{+}, \code{ø} for minor,
-augmented, and half-diminished, the digits used in extensions
-($1$, $3$, $6$, $7$, $9$), and the separator characters (space and
-slash).
+Half-diminished is the one quality the Real Book itself spells
+inconsistently: the dominant printed form is \code{-7b5}
+(e.g.\ \code{G-7b5}), with \code{m7b5} and the \code{ø} glyph appearing
+more rarely.
+Rather than treat these as three classes, the design folds them into a
+single canonical token: the synthetic renderer draws all three printed
+forms (weighted to their observed corpus frequencies) but labels every
+one with the same \code{ø} token, so the recogniser learns to map any
+half-diminished spelling to one symbol regardless of how a given page
+draws it.
+
+The character vocabulary the recogniser predicts therefore covers the
+seven root letters, two accidentals, the quality letters needed to spell
+\code{maj}, \code{dim}, and \code{sus} (the set $\{a, d, i, j, m, s, u\}$),
+the symbols \code{-}, \code{+}, \code{ø} for minor, augmented, and
+half-diminished, the digits used in extensions ($1$, $3$, $6$, $7$, $9$),
+and the separator characters (space and slash).
+The canonical \code{ø} token is expanded back to the Real Book printed
+form \code{-7b5} by the chord post-processor when the final JSON is
+serialised; this is why the serialised output can contain a literal
+\code{5} that is never itself a prediction class.
 Out-of-scope chord features (\code{alt}, double accidentals,
 parenthesised alterations) are absent from the vocabulary and are
 mapped to nearest in-vocabulary spellings during label

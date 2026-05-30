@@ -111,18 +111,54 @@ QUALITIES: list[QualitySpec] = [
 
 
 # ---------------------------------------------------------------------------
+# Half-diminished print variants
+# ---------------------------------------------------------------------------
+# Real Real Book pages overwhelmingly print half-diminished as "-7b5"
+# (≈85 % of half-dim occurrences in the hand-labelled corpus), occasionally
+# "m7b5", and only rarely the "ø" glyph.  All three carry the SAME canonical
+# label "ø" (the `visual` of the half-dim QualitySpec); only the rendered
+# glyphs differ, so the CRNN learns to map every printed form to one token.
+# Weights mirror the observed corpus frequencies.
+
+_HALFDIM_LILY = ":m7.5-"
+
+HALFDIM_STYLES: list[tuple[str, str, int]] = [
+    # (style, markup, weight)
+    ("-7b5", r'\markup { \concat { "-" \super "7" \super "b5" } }', 85),
+    ("m7b5", r'\markup { \concat { "m" \super "7" \super "b5" } }', 10),
+    ("ø", r'\markup { \super "ø" }', 5),
+]
+_HALFDIM_MARKUP = {s: m for s, m, _ in HALFDIM_STYLES}
+
+
+def choose_halfdim_style(rng: random.Random) -> str:
+    """Pick a half-diminished print style with corpus-matched weights."""
+    styles = [s for s, _, _ in HALFDIM_STYLES]
+    weights = [w for _, _, w in HALFDIM_STYLES]
+    return rng.choices(styles, weights=weights, k=1)[0]
+
+
+# ---------------------------------------------------------------------------
 # Build the LilyPond chord-exception list
 # ---------------------------------------------------------------------------
 
 
-def _build_exception_list() -> str:
-    """Build the body of RealBookChordsList for the LY template."""
+def _build_exception_list(halfdim_markup: str | None = None) -> str:
+    """Build the body of RealBookChordsList for the LY template.
+
+    ``halfdim_markup`` overrides the markup used for the half-diminished
+    chord shape so the same chord (and the same canonical ``ø`` label) can be
+    drawn as ``-7b5``, ``m7b5``, or ``ø``.  ``None`` keeps the default ``ø``.
+    """
     lines: list[str] = []
     for q in QUALITIES:
         if not q.notes:
             continue
+        markup = q.markup
+        if halfdim_markup is not None and q.lily == _HALFDIM_LILY:
+            markup = halfdim_markup
         # ``<c e g>1-\markup { ... }`` — the `-` attaches the markup
-        lines.append(f"  <{q.notes}>1-{q.markup}")
+        lines.append(f"  <{q.notes}>1-{markup}")
     return "\n".join(lines)
 
 
@@ -172,6 +208,7 @@ def make_ly_source(
     paper_height: int = 30,
     paper_width: int = 280,
     staff_size_directive: str = "",
+    halfdim_style: str = "ø",
 ) -> str:
     """Build a full LilyPond source for a chord strip.
 
@@ -185,9 +222,13 @@ def make_ly_source(
     staff_size_directive
         Optional ``#(set-global-staff-size N)`` directive; varies the chord
         text size for augmentation.
+    halfdim_style
+        Which printed form to draw for half-diminished chords (``"-7b5"``,
+        ``"m7b5"``, or ``"ø"``); see :func:`choose_halfdim_style`.  The label
+        is unaffected — every form maps to the canonical ``ø`` token.
     """
     return LY_TEMPLATE.format(
-        chord_exceptions=_build_exception_list(),
+        chord_exceptions=_build_exception_list(_HALFDIM_MARKUP[halfdim_style]),
         chord_body=chord_body,
         paper_height=paper_height,
         paper_width=paper_width,

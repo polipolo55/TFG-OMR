@@ -48,7 +48,11 @@ if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
 from CRNN_CTC.lilypond_render import crop_content, run_lilypond
-from data_processing.chord_render import make_ly_source, sample_progression
+from data_processing.chord_render import (
+    choose_halfdim_style,
+    make_ly_source,
+    sample_progression,
+)
 
 log = logging.getLogger(__name__)
 
@@ -96,6 +100,7 @@ def render_one(
         body,
         paper_width=paper_width,
         staff_size_directive=staff_size_directive,
+        halfdim_style=choose_halfdim_style(rng),
     )
 
     name = f"{seed:08d}"

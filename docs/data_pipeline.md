@@ -239,7 +239,7 @@ Notable absences: `2`, `4`, `5`, `8`, `l`, `t`, `°`.
 - `sus4` → `sus` after `4` is dropped; both align with the `sus` training label.
 - `alt` cannot be represented; label `G7alt` as `G7`.
 - `°` is not in vocab; always use `dim` / `dim7`.
-- `5` is not in vocab; `-7b5` and `m7b5` are canonicalized to `ø` by `RealChordDataset._canon()` before the vocab filter, so half-dim labels survive.
+- `5` is not in vocab; `-7b5` and `m7b5` are canonicalized to `ø` by `RealChordDataset._canon()` before the vocab filter, so half-dim labels survive. The synthetic renderer still *draws* all three printed forms (see below), so the model recognises whichever the page uses while predicting the single `ø` token.
 
 ### Stage 1 — Synthetic Data Generation
 
@@ -259,8 +259,17 @@ on the training side — both `visual_quality` strings and LilyPond rendering li
 | Half-dim | `ø` | 8 |
 | … | … | … |
 
+**Half-diminished print variants.** Real Book pages spell half-diminished
+inconsistently — predominantly `-7b5`, occasionally `m7b5`, and rarely the `ø`
+glyph. `chord_render.py` (`HALFDIM_STYLES`, `choose_halfdim_style`) picks one of
+the three glyph forms per strip with corpus-matched weights (≈85 / 10 / 5) while
+keeping the label fixed at the canonical `ø`. The label vocabulary is therefore
+unchanged; only the rendered image varies, so the CRNN learns to map every
+printed half-dim form to one token.
+
 `generate_chord_crops.py` generates strips of 1–5 sampled chords per image, rendered
-with LilyJAZZ font, with Albumentations augmentation + synthetic Real Book clutter
+with LilyJAZZ font (passing a per-strip `halfdim_style`), with Albumentations
+augmentation + synthetic Real Book clutter
 (`_add_realbook_clutter`: binder-hole shadow, staff-line bleed, slash repeat marks).
 
 ```bash
@@ -358,7 +367,9 @@ to avoid the checkpoint being written to `src/models/chord/` instead.
 **Label canonicalization** (`RealChordDataset._canon()`):
 - `m7b5` / `-7b5` / `min7b5` → `ø`
 - `Cm7` → `C-7` (minor written with `m`)
-- Characters not in the chord vocabulary are silently dropped
+- `sus4` / `sus2` → `sus`
+- Characters not in the chord vocabulary are dropped, and the dropped
+  characters are logged once with counts (no longer silent)
 - Whitespace collapsed
 
 **Weighted sampling:** real strips weight 1.0, synthetic weight `--synth-weight` (default 0.4).

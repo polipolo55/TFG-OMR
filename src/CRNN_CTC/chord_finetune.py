@@ -95,15 +95,30 @@ class RealChordDataset(Dataset):
         # Minor with 'm' instead of '-': "Cm7" → "C-7", "Cm" → "C-"
         # Python regex needs fixed-width lookbehind, so use two alternations.
         _M_TO_DASH_RE = _re.compile(r"(?:(?<=[A-G])|(?<=[A-G][#b]))m(?=\d|\b)")
+        # Suspended chords are canonically "sus" (no degree): "sus4"/"sus2" → "sus".
+        _SUS_DEGREE_RE = _re.compile(r"sus[24]")
+
+        dropped_chars: dict[str, int] = {}
 
         def _canon(label: str) -> str:
             # 1. Normalise half-dim notation to ø
             label = _HALFDIM_RE.sub("ø", label)
             # 2. "Cm7" → "C-7" (some users may write minor with m)
             label = _M_TO_DASH_RE.sub("-", label)
-            # 3. Drop any character not in the chord vocabulary (%, |, parens, …)
-            label = "".join(c for c in label if c in vocab_chars)
-            # 4. Collapse runs of whitespace into a single space, trim
+            # 3. "Csus4"/"Csus2" → "Csus" (the synthetic renderer uses bare "sus")
+            label = _SUS_DEGREE_RE.sub("sus", label)
+            # 4. Drop any character not in the chord vocabulary (%, |, parens, …),
+            #    recording what was dropped so silent data loss stays visible.
+            kept: list[str] = []
+            for c in label:
+                if c in vocab_chars:
+                    kept.append(c)
+                elif not c.isspace():
+                    dropped_chars[c] = dropped_chars.get(c, 0) + 1
+                else:
+                    kept.append(c)
+            label = "".join(kept)
+            # 5. Collapse runs of whitespace into a single space, trim
             return " ".join(label.split())
 
         self._samples: list[tuple[str, str]] = []
@@ -127,6 +142,11 @@ class RealChordDataset(Dataset):
                 self._samples.append((rec["filename"], label))
         if n_dropped:
             log.warning("Dropped %d real samples with empty/non-vocab labels", n_dropped)
+        if dropped_chars:
+            log.warning(
+                "Canonicalisation removed out-of-vocab characters from real labels: %s",
+                ", ".join(f"{c!r}×{n}" for c, n in sorted(dropped_chars.items())),
+            )
 
         if not self._samples:
             raise RuntimeError(f"No labeled real samples in {labels_jsonl} (status=done with non-null label)")

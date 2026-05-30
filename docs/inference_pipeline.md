@@ -195,7 +195,7 @@ CRNN-CTC model trained on synthetic Real Book-style chord images.
 |--------|---------|
 | `-` | minor (e.g. `G-7`) |
 | `maj` | major 7 (e.g. `Fmaj7`) |
-| `ø` | half-diminished (e.g. `Bø`) |
+| `ø` | half-diminished — the CRNN predicts the `ø` token, which `chord_postprocess` expands to the Real Book printed form `-7b5` in the final output (e.g. `B-7b5`) |
 | `dim` / `dim7` | diminished (e.g. `Cdim7`) |
 | `+` | augmented (e.g. `C+7`) |
 | `/` | slash bass (e.g. `Fmaj7/A`) |

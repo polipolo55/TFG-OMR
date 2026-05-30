@@ -130,14 +130,20 @@ def _normalise_token(token: str) -> str:
     alt = m.group(5) or ""
     slsh = m.group(6) or ""
 
-    # Normalise quality synonyms
+    # Normalise quality synonyms.  Half-diminished is emitted by the CRNN as
+    # the canonical "ø" token and expanded here to the Real Book printed form
+    # "-7b5" (the dominant half-dim spelling in the corpus).
     qual_map: dict[str, str] = {
         "min": "m",
         "M": "maj",
         "o": "dim",
         "°": "dim",
-        "ø": "m7b5",
+        "ø": "-7b5",
     }
+    if qual == "ø" and ext in ("", "7"):
+        # "-7b5" already carries the 7 — drop a redundant extension so the
+        # rare "ø7" decode does not become "-7b57".
+        ext = ""
     qual = qual_map.get(qual, qual)
 
     # 'Gmaj' + ext='7' → 'Gmaj7';  'Gmaj' + ext='maj7' (duplicate) → just 'Gmaj7'

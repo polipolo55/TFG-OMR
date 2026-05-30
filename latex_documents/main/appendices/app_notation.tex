@@ -5,23 +5,25 @@ Western staff notation is a two-dimensional visual code: it lays pitch along the
 vertical axis of the page and time along the horizontal axis.
 A note's \emph{height} on the staff fixes which pitch sounds; its \emph{horizontal}
 placement and its drawn shape fix when the note starts and how long it lasts.
-Reading a score is therefore the inverse of the problem this thesis automates---recovering
-a symbolic pitch-and-time sequence from that two-dimensional image (\Cref{ch:design}).
-This appendix introduces, for readers without a musical background, the notation elements
-that recovery must account for; familiarity with them underpins the vocabulary design,
-the data pipeline, and the error analysis of later chapters.
-Readers already fluent in Western staff notation may skip this appendix without loss.
+Reading a score is therefore the inverse of the problem this thesis automates:
+recovering a symbolic pitch-and-time sequence from that two-dimensional image
+(\Cref{ch:design}).
+This appendix introduces, for readers without a musical background, the notation
+elements that recovery must account for; familiarity with them informs the
+vocabulary design, the data pipeline, and the error analysis of later chapters.
+Readers already fluent in Western staff notation may skip this appendix without
+loss.\todo{cite a standard notation reference (Gould, \emph{Behind Bars}; or Read, \emph{Music Notation}) somewhere in this appendix to ground the definitions.}
 
 \section{The Staff, Clef, and Pitch}
 
 Music is written on a \term{staff}: five horizontal lines and the four spaces between
 them.
-A note's vertical position on this grid encodes its pitch---moving a notehead up by one
+A note's vertical position on this grid encodes its pitch: moving a notehead up by one
 line-or-space raises it by one diatonic step, i.e.\ to the next letter name.
 
 The reference point is the \term{clef} at the left edge of the staff.
-Lead sheets use the \term{treble clef} (or \term{G clef}) exclusively---the only clef this
-thesis targets (\Cref{sec:scope})---whose spiral encircles the second line from the
+Lead sheets use the \term{treble clef} (or \term{G clef}) exclusively, the only clef
+this thesis targets (\Cref{sec:scope}); its spiral encircles the second line from the
 bottom and fixes it as G4, the G above middle C.
 From that anchor the five lines spell, bottom to top, E4--G4--B4--D5--F5 (mnemonic
 \emph{Every Good Boy Deserves Fudge}) and the four spaces spell F4--A4--C5--E5
@@ -125,8 +127,8 @@ own value, so a dotted quarter equals a quarter plus an eighth.
 \end{table}
 
 \term{Rests} mark silence and follow the same value hierarchy as notes, each with its own
-glyph; a \term{whole-measure rest}---a filled block hanging under a staff line---empties an
-entire measure regardless of the time signature.
+glyph; a \term{whole-measure rest}, a filled block hanging under a staff line, empties
+an entire measure regardless of the time signature.
 \Cref{fig:note-durations} shows the note values side by side.
 
 \begin{figure}[H]
@@ -192,8 +194,8 @@ A chord symbol is compact free-form text with up to four parts, listed in
 \emph{extensions or alterations}, and an optional \emph{slash bass}.
 The parts combine left to right.
 Reading \texttt{F\#m7b5}, for example: root F\(\sharp\), quality \texttt{m7} (minor
-seventh), alteration \texttt{b5}---together the half-diminished chord; and \texttt{C/E} is a
-C major triad voiced over an E in the bass.
+seventh), alteration \texttt{b5}, together the half-diminished chord; and \texttt{C/E}
+is a C major triad voiced over an E in the bass.
 
 \begin{table}[htbp]
     \centering
@@ -218,16 +220,16 @@ C major triad voiced over an E in the bass.
 
 Because chord symbols are text rather than staff glyphs, recovering them is an
 \term{optical character recognition} (OCR) problem distinct from the staff-pattern
-recognition used for the melody---the split that motivates the two-stream architecture of
+recognition used for the melody. This split motivates the two-stream architecture of
 \Cref{ch:design}.
 
 \section{The Lead-Sheet Format}
 
 A jazz lead sheet assembles the elements above into a minimal score: one or more
-\term{systems} of single-voice treble-clef staff carrying the melody (each opening with a
-clef, key signature, and time signature), chord symbols above the staff, and---sometimes---structural
-marks such as repeat signs, section labels (\textit{A}, \textit{B}, \textit{Bridge}), or
-style indications.
+\term{systems} of single-voice treble-clef staff carrying the melody (each opening with
+a clef, key signature, and time signature), chord symbols above the staff, and
+sometimes structural marks such as repeat signs, section labels (\textit{A},
+\textit{B}, \textit{Bridge}), or style indications.
 Many of these marks are absent from informal editions, including large parts of
 \textit{The Real Book}.
 \Cref{fig:leadsheet-example} shows a clean synthetic rendering in the LilyJAZZ style used
@@ -238,7 +240,7 @@ elements labelled.
     \centering
     \includegraphics[width=1\textwidth]{figures/fig_leadsheet_excerpt}
     \caption{A four-bar jazz lead-sheet excerpt in C major (4/4), rendered in
-    LilyJAZZ style---the same engraving used to generate the synthetic training
+    LilyJAZZ style, the same engraving used to generate the synthetic training
     dataset.
     Chord symbols above the staff (\texttt{Cmaj7}, \texttt{Am7}, \texttt{Dm7},
     \texttt{G7}) encode the I--vi--ii--V harmonic progression; the melody line

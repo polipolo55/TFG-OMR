@@ -1,5 +1,55 @@
 \chapter{Qualitative Predictions}
+\label{app:qual}
 
-\todo{AUDIT (orphan appendix \& content placement): (a) Not referenced from any chapter---add a forward pointer from \Cref{sec:res-errors} such as ``representative worst-case predictions are shown in \Cref{app:qual}'' and a corresponding \texttt{\textbackslash label\{app:qual\}} here. (b) Qualitative worst-case figures are arguably \emph{main-body} content for an error-analysis section, not appendix material; consider whether the 5 figures should live in \Cref{sec:res-errors} instead, with only the long-form full table moved here.}
+\todo{AUDIT (orphan appendix \& content placement): (a) The chapter introduction of \Cref{ch:results} and \Cref{sec:res-ser,sec:res-qualitative} already forward-point to this appendix, so it is reachable from the body. (b) Reconsider scope: a small number of qualitative figures (3--5) belongs in \Cref{sec:res-qualitative}; only the long-form per-sample listings and the full edit-operation table justify an appendix. If only 5 figures are produced, this appendix may be deleted and the figures folded into the Results chapter.}
 
-\todo{Add \texttt{fig:qual-worst-5}---the five highest-SER predictions from the test set. Generate with: \texttt{poetry run python src/cli.py evaluate --split test --export-worst 5 --output-dir figures/worst/}. Include input strip, predicted tokens, ground-truth tokens, and edit operations for each.}
+This appendix collects qualitative predictions that complement the
+aggregate metrics of \Cref{ch:results}. Each example pairs the input
+staff image with the predicted LMX sequence (or a LilyPond re-render of
+it), together with the ground-truth tokens and the edit operations
+required to reconcile them. The selection targets the right tail of the
+SER distribution to illustrate the failure modes summarised in
+\Cref{sec:res-errors}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Worst-Case Predictions on the Synthetic Test Split}
+\label{sec:qual-worst}
+
+\todo{Generate the artefact from notebook \texttt{notebooks/02\_evaluate\_model.ipynb}, section 6.1 ``Worst predictions'' (cell that computes \texttt{worst = np.argsort(ed\_vals)[::-1][:8]} and calls \texttt{show\_predictions(... render=True)}). Re-run that cell with the top-5 worst samples, then save each rendered figure (input strip on top, LilyPond re-render of the prediction on the bottom) as \texttt{latex\_documents/main/figures/worst/worst\_N\_input.png} and \texttt{latex\_documents/main/figures/worst/worst\_N\_pred.png} for $N \in \{1,\dots,5\}$. For each, also export a small text block listing predicted tokens, ground-truth tokens, and edit operations (S/I/D) using \texttt{\_edit\_ops(pred, ref)} defined in section 6.2 of the same notebook.}
+
+\begin{figure}[htbp]
+    \centering
+    % \begin{subfigure}{\textwidth}
+    %     \centering
+    %     \includegraphics[width=\textwidth]{figures/worst/worst_1_input}
+    %     \caption{Input: scan-augmented staff strip from the synthetic test split.}
+    %     \label{fig:qual-worst-1-input}
+    % \end{subfigure}\\[0.6em]
+    % \begin{subfigure}{\textwidth}
+    %     \centering
+    %     \includegraphics[width=\textwidth]{figures/worst/worst_1_pred}
+    %     \caption{LilyPond re-render of the predicted LMX sequence.}
+    %     \label{fig:qual-worst-1-pred}
+    % \end{subfigure}
+    \todo{Replace this placeholder with the two subfigures above once \texttt{figures/worst/worst\_1\_input.png} and \texttt{figures/worst/worst\_1\_pred.png} have been generated.}
+    \caption{Worst-case test prediction (rank 1 of 5 by per-sample SER):
+    input strip (top) and LilyPond re-render of the prediction (bottom),
+    with SER \texttt{<value>} and edit distance \texttt{<value>}. The
+    discrepancies are dominated by \texttt{<category>} tokens, consistent
+    with the global breakdown of \Cref{sec:res-errors}.}
+    \label{fig:qual-worst-1}
+\end{figure}
+
+\todo{Repeat the figure block above for ranks 2--5, labels \texttt{fig:qual-worst-2} \dots \texttt{fig:qual-worst-5}. Keep the caption template identical except for the rank, SER, edit distance, and dominant error category. Reference all five from the surrounding prose with a single \texttt{\textbackslash crefrange\{fig:qual-worst-1\}\{fig:qual-worst-5\}}.}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Per-Sample Edit Operations}
+\label{sec:qual-edits}
+
+\todo{Produce a \texttt{booktabs} table listing the five worst-case predictions with one row per sample and the following columns: rank, sample id (PrIMuS source filename), per-sample SER, edit distance, number of substitutions, insertions, deletions, and a short free-text note on the dominant failure mode (e.g.\ ``missed barline in dense beamed run''). Generate the numbers in notebook \texttt{notebooks/02\_evaluate\_model.ipynb}: take the same \texttt{worst} indices from section 6.1, look up each \texttt{results[i]} record (\texttt{sid}, \texttt{ser}, \texttt{ed}) populated in cell 9, and run \texttt{\_edit\_ops(pred, ref)} from section 6.2 to count S/I/D per sample. Place the table immediately below this paragraph with caption template ``Edit-operation breakdown for the five worst-case predictions on the synthetic test split.'' and label \texttt{tab:qual-worst-edits}.}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Qualitative Prediction on a Real Real Book Page}
+\label{sec:qual-real}
+
+\todo{If the domain-gap section (\Cref{sec:res-domaingap}) ends up producing a single-page real-scan figure as its headline qualitative artefact, do \emph{not} duplicate it here. Either (a) drop this section entirely and reference \Cref{sec:res-domaingap} from the appendix preamble, or (b) keep this section as the extended version with 2--3 additional Real Book pages beyond the one in the main body. Generate any additional pages with \texttt{poetry run python src/cli.py run --input data/real\_pages/<page>.png --output results/<page>.json} and visualise with the same overlay script used for the body figure.}

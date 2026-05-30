@@ -11,10 +11,8 @@ arose with deep learning; and the most recent end-to-end transformer
 architectures, which scale to polyphonic and full-page input at the cost of
 substantially larger labelled corpora.
 This chapter surveys those paradigms, reviews the principal datasets and
-symbolic output representations used in the literature, and finally
-positions this thesis with respect to recent work that targets jazz lead
-sheets specifically.
-The two surveys above serve as the structural backbone for the discussion.
+symbolic output representations used in the literature, and positions this
+thesis with respect to recent work that targets jazz lead sheets specifically.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{The Classical OMR Pipeline}
@@ -95,8 +93,9 @@ standard for scene-text and handwritten-text recognition.
 The model treats a staff image as a sequence of vertical strips, extracts
 local visual features through a convolutional backbone, contextualises them
 with a bidirectional recurrent network, and decodes the resulting per-frame
-distribution into a token sequence using the CTC alignment---eliminating
-the need for per-symbol segmentation.
+distribution into a token sequence using the CTC
+alignment~\cite{gravesConnectionistTemporal2006}, removing the need for
+per-symbol segmentation.\todo{optional cite for the scene-text CRNN precedent (Shi et al.\ 2017) -- no bib entry exists yet}
 
 Alongside the architecture, Calvo-Zaragoza and Rizo released the
 \term{PrIMuS} corpus~\cite{PrIMuSDataset,calvoZaragozaEndToEndNeural2018}: 87\,678 real-music monophonic
@@ -107,16 +106,16 @@ interpretation; the \term{semantic} encoding lists musical events such as
 \code{note-C4\_eighth} or \code{keySignature-DM} directly.
 The CRNN--CTC architecture trained on this corpus achieves a Symbol Error
 Rate of \SI{1.0}{\percent} on the agnostic encoding and \SI{0.8}{\percent}
-on the semantic encoding---with sequence-level error rates of
-\SI{17.9}{\percent} and \SI{12.5}{\percent}, respectively
-(\textcite{calvoZaragozaEndToEndNeural2018}, Sec.~5.2)---establishing the
-reference baseline that subsequent monophonic OMR work, including
-Camera-PrIMuS and the present thesis, builds upon.
-A follow-up release---Camera-PrIMuS~\cite{calvoZaragozaCameraPrimus2018}---augments
-the same incipits with synthetic photographic distortion and demonstrates
-that the same network retains useful accuracy on phone-captured real-world
-inputs.
-This is the precise template that the present thesis follows.
+on the semantic encoding, with sequence-level error rates of
+\SI{17.9}{\percent} and \SI{12.5}{\percent} respectively
+(\textcite{calvoZaragozaEndToEndNeural2018}, Sec.~5.2).
+This established the reference baseline that subsequent monophonic OMR
+work, including Camera-PrIMuS and the present thesis, builds upon.
+A follow-up release, Camera-PrIMuS~\cite{calvoZaragozaCameraPrimus2018},
+augments the same incipits with synthetic photographic distortion and
+demonstrates that the same network retains useful accuracy on
+phone-captured real-world inputs.
+The present thesis follows this template.
 \Cref{fig:soa-crnn-pipeline} illustrates the CRNN--CTC pipeline as applied
 to a music staff.
 
@@ -138,7 +137,7 @@ linearised target representation, dispensing with CTC entirely.
 \term{SMT++}~\cite{riosVilaSMTPlusPlus2024} extends the approach to
 full-page pianoform input and, at its 2024 release, defined the state of
 the art on that task.
-\term{LEGATO}~\cite{yangLEGATO2025}---released in mid-2025---takes the
+\term{LEGATO}~\cite{yangLEGATO2025}, released in mid-2025, takes the
 trend further with a vision-LLM backbone, an ABC-notation decoder, and over
 214\,000 typeset pages of pretraining, reporting on its most challenging
 evaluation set absolute error reductions of up to \SI{68}{\percent} on the
@@ -152,9 +151,9 @@ structure shared by these systems.
 
 These architectures, however, demand resources that exceed the budget of
 a Bachelor's thesis.
-For a strictly monophonic target domain---where the CRNN--CTC baseline
+For a strictly monophonic target domain, where the CRNN--CTC baseline
 already attains sub-percent SER and the headroom for further gain is in
-domain robustness rather than model capacity---CRNN--CTC remains the right
+domain robustness rather than model capacity, CRNN--CTC remains the right
 point on the cost/capability curve.
 The quantitative justification of this choice is developed in
 \Cref{ch:design}, and the project-management criteria behind it
@@ -203,8 +202,8 @@ contemporaneously with this work~\cite{martinezSevillaJazzLeadSheets2025}
 and, at 293 annotated sheets, is far below the scale of the tens of
 thousands of samples used to train the CRNN--CTC models surveyed above, and
 so is too small to train such a model from scratch.
-Second, every recent end-to-end system---SMT, SMT++, OLiMPiC, LEGATO, and
-Camera-PrIMuS itself---follows the same recipe of synthetic pretraining
+Second, every recent end-to-end system (SMT, SMT++, OLiMPiC, LEGATO, and
+Camera-PrIMuS itself) follows the same recipe of synthetic pretraining
 followed by fine-tuning on a small annotated target set.
 This is the recipe applied here.
 
@@ -270,8 +269,8 @@ outside the jazz lead-sheet domain (tuplets, slurs, articulations, double
 accidentals, non-treble clefs); the full grammar is described in
 \Cref{sec:lmx-format}.
 LMX was preferred over the PrIMuS native formats because it round-trips
-losslessly to MusicXML---the format expected by downstream music
-applications---and because using the same representation as the OLiMPiC
+losslessly to MusicXML, the format expected by downstream music
+applications, and because using the same representation as the OLiMPiC
 reference work~\cite{mayerPracticalEndToEnd2024} keeps the present results
 directly comparable.
 
@@ -298,8 +297,8 @@ weights structural errors appropriately; it was introduced by
 Mayer et al.~\cite{mayerPracticalEndToEnd2024} and is the primary metric in
 OLiMPiC and SMT++.
 \textbf{OMR-NED}~\cite{martinezSevillaOMRNED2025} extends SER with
-per-element categories so that error distribution---not only error
-rate---is legible from the metric itself.
+per-element categories so that error distribution, not only error
+rate, is legible from the metric itself.
 This thesis reports SER as the primary metric for backward comparability
 and complements it with a category-level error breakdown in
 \Cref{ch:results}.
@@ -312,17 +311,17 @@ Despite the cultural importance of jazz fake-books, OMR of jazz lead sheets
 received almost no dedicated attention in the published literature before
 2025.
 Both major surveys~\cite{calvoZaragozaUnderstandingOMR2020,shatriOPTICALMUSICRECOGNITION}
-list chord-symbol handling among the gaps in the field, and---as of 2026,
-to the author's knowledge---no general-purpose OMR engine treats chord
+list chord-symbol handling among the gaps in the field, and, as of 2026
+and to the author's knowledge, no general-purpose OMR engine treats chord
 symbols as a first-class output class.
 
 An early dedicated work is an undergraduate honours thesis at
 UCF~\cite{reedHonorsLeadSheets2018}, which built a non-deep modular
-pipeline for chord-symbol recognition on printed and handwritten lead
+pipeline fo r chord-symbol recognition on printed and handwritten lead
 sheets and used the recovered chord progressions to attempt
 formal-structure reconstruction.
-The closest published precedent is
-\textbf{Martínez-Sevilla et al.}~\cite{martinezSevillaJazzLeadSheets2025},
+The closest published precedent is Martínez-Sevilla et
+al.~\cite{martinezSevillaJazzLeadSheets2025},
 presented at ISMIR 2025 and roughly contemporaneous with the final stages
 of this thesis.
 That work introduces a 293-sheet dataset of \textit{handwritten} jazz lead
@@ -347,9 +346,9 @@ future work can compare and combine.
 Modular pipelines remain useful for full-page typeset classical scores but
 do not generalise to the visual and semantic peculiarities of jazz lead
 sheets.
-End-to-end deep models---CRNN--CTC for monophonic input
-(\Cref{sec:soa-crnn}), transformers for polyphonic and full-page input
-(\Cref{sec:soa-transformer})---have largely displaced modular pipelines in
+End-to-end deep models (CRNN--CTC for monophonic input in
+\Cref{sec:soa-crnn}, transformers for polyphonic and full-page input in
+\Cref{sec:soa-transformer}) have largely displaced modular pipelines in
 recent work and converge on a common recipe of synthetic pretraining
 followed by fine-tuning on a small annotated target set.
 Symbolic output formats have moved toward MusicXML-linear encodings
@@ -359,5 +358,5 @@ Jazz lead-sheet OMR remained essentially open until 2025; this thesis and
 the concurrent ISMIR 2025
 work~\cite{martinezSevillaJazzLeadSheets2025} represent the first two
 focused attempts to fill that niche.
-The architectural choices made in this thesis---detailed in
-\Cref{ch:design}---are motivated by the findings surveyed above.
+The architectural choices made in this thesis, detailed in
+\Cref{ch:design}, are motivated by the findings surveyed above.

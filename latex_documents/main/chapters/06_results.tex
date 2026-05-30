@@ -1,104 +1,166 @@
 \chapter{Results and Evaluation}
 \label{ch:results}
-\todo{AUDIT (CRITICAL cross-chapter coherence): \S\ref{sec:res-domaingap} is essentially empty (three unresolved \texttt{\textbackslash todo} placeholders, no numbers, no figures), yet Ch.~8 (\texttt{08\_conclusions.tex} lines 62--66) explicitly cites this section as the evidence that Objective~7 is ``partially met''. The conclusion is currently unsupported by any content in this chapter. Either (a) execute the three experiments below before submission, or (b) downgrade the Objective~7 claim in Ch.~8 from ``partially met'' to ``not met / future work'' and remove the cross-reference. As it stands, a tribunal reading Ch.~8 will follow the \texttt{\textbackslash Cref} link and find no results.}
-\todo{AUDIT (high-level): Missing experimental-protocol section. Before any results, add a numbered \S{} that consolidates: (i) datasets and exact split sizes (train/val/test, scanned vs clean), (ii) hardware (RTX 3060, RAM, CPU), (iii) software versions (PyTorch, Python 3.14, LilyPond), (iv) random-seed protocol and number of repetitions per number reported, (v) formal metric definitions (aggregate SER, melodic SER, edit distance) -- currently scattered or assumed.}
-\todo{AUDIT (high-level): No comparison to State of the Art. Add at minimum a qualitative comparison (Audiveris and/or SmartScore output) on the same real Real Book page used in \S\ref{sec:res-domaingap}; even a single side-by-side figure would satisfy the FIB rubric requirement.}
-\todo{AUDIT (high-level): All numbers in this chapter are single point estimates with no variance or confidence intervals. Report mean $\pm$ std across at least 3 random seeds for the headline SER figures in \Cref{tab:results-headline}, or explicitly state that only one run was performed and justify why.}
 
-This chapter reports the quantitative and qualitative results of the
-training and evaluation procedures described in
-\Cref{ch:design,ch:impl}.
+This chapter reports the quantitative and qualitative results obtained
+with the system described in \Cref{ch:design,ch:impl}.
+\Cref{sec:res-protocol} fixes the experimental protocol (datasets,
+splits, hardware, metrics).
 \Cref{sec:res-training} presents the training trajectory of the
 synthetic-data baseline.
-\Cref{sec:res-ser} reports aggregate Symbol Error Rate on the
-held-out synthetic test split and analyses the distribution of
-per-sample errors.
-\Cref{sec:res-errors} decomposes the errors by edit operation
-and by token category, showing that the residual error budget is
-dominated by structural tokens (barlines and ties) rather than by
-pitch or duration mistakes.
-\Cref{sec:res-qualitative} shows qualitative examples drawn
-from the perfect and near-median tails of the SER distribution.
-\Cref{sec:res-domaingap} addresses the synthetic-to-real
-domain gap and the effect of the fine-tuning stage on real Real Book
-pages.
-\todo{AUDIT: This sentence overpromises -- \S\ref{sec:res-domaingap} currently contains no fine-tuning results, only placeholders. Either rephrase the chapter overview to say ``discusses the synthetic-to-real gap as a future-work item'' or fill in the section before the deposit.}
+\Cref{sec:res-ser} reports aggregate Symbol Error Rate (SER) on the
+held-out synthetic test split and analyses the per-sample error
+distribution.
+\Cref{sec:res-errors} decomposes the errors by edit operation and by
+token category, and shows that the residual error budget is dominated
+by structural tokens (barlines and ties) rather than by pitch or
+duration mistakes.
+\Cref{sec:res-qualitative} shows qualitative examples drawn from the
+perfect and near-median tails of the SER distribution; further
+worst-case predictions are collected in \Cref{app:qual}.
+\Cref{sec:res-soa} positions these numbers against the published
+state of the art.
+\Cref{sec:res-domaingap} addresses the synthetic-to-real domain gap
+and is, in the current draft, the chapter's main open experimental
+front.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Experimental Protocol}
+\label{sec:res-protocol}
+
+All numbers in this chapter are produced from a single trained
+checkpoint, \code{models/latest/best\_model.pt} (epoch 37), with the
+hyperparameters listed in \Cref{tab:hyperparams}.
+The procedure is reproducible with the one-line command shown at the
+end of this section.
+
+\paragraph{Datasets and splits.}
+Training, validation and test samples are drawn from the union of two
+corpora derived from PrIMuS~\cite{calvoZaragozaCameraPrimus2018,PrIMuSDataset}:
+a clean LilyJAZZ render at 200/250/300\,DPI, and a scan-augmented copy
+of the same samples produced by the pipeline of
+\Cref{sec:design-data}.
+The three domain filters (\code{filter\_multi\_staff},
+\code{filter\_non\_leadsheet\_clef}, \code{filter\_unusual\_time}) are
+applied before the split.
+\code{make\_splits} then partitions the post-filter corpus
+deterministically with a fixed seed: 80\,\% train, 10\,\% validation,
+10\,\% test.
+Clean and scanned variants of the same source share a split assignment,
+so the 4\,604-sample test split reports the same musical content under
+two visual regimes.
+
+\paragraph{Hardware and software.}
+All training and evaluation runs use a single NVIDIA RTX 3060 GPU
+(12\,GB VRAM), batch size 16, mixed-precision (\code{torch.amp}),
+PyTorch 2.10 on Python 3.14 under Poetry, with LilyPond installed
+system-wide for the rendering pipeline.
+A full 49-epoch run takes approximately 6\,h 45\,min wall time
+($\approx 8$\,min/epoch), measured from the training log of the
+selected checkpoint.
+
+\paragraph{Metrics.}
+The headline metric is the standard token-level \term{Symbol Error
+Rate} (SER), the sum of Levenshtein distances over the test set
+normalised by the sum of ground-truth lengths:
+\[
+    \mathrm{SER} \;=\; \frac{\sum_i d(\hat{y}_i, y_i)}{\sum_i |y_i|},
+\]
+where $d$ is the edit distance on the LMX token alphabet, $\hat{y}_i$
+is the model's decoded prediction, and $y_i$ is the reference
+sequence~\cite{SymbolErrorRate,hajicOMRMetricsEvaluation2019}.
+The complementary \term{melodic SER} uses the same formula after
+stripping the \code{measure}, \code{tied:start} and \code{tied:stop}
+tokens from both sequences; it isolates pitch, duration and accidental
+errors from the structural error budget.
+The \term{perfect-transcription rate} is the fraction of test samples
+with $d(\hat{y}_i, y_i) = 0$.
+
+\paragraph{Repetitions.}
+Numbers reported here come from a single training run, since each run
+costs $\approx 7$\,h on the available hardware.
+The training curve in \Cref{fig:training-curves} is smooth and the
+validation SER plateau is tight (within roughly $\pm 0.05$ percentage
+points over the last ten epochs), which suggests the point estimates
+below are dominated by the data distribution rather than by
+optimisation noise; this is not, however, a substitute for a proper
+multi-seed study.
+\todo{If time permits, repeat training with at least two further seeds
+and report mean $\pm$ std for the headline numbers in
+\Cref{tab:results-headline}. Cost: $\approx 7$\,h per seed on the RTX
+3060.}
+
+\paragraph{Reproducibility.}
+The entire test-set evaluation is reproduced by
+%
+\begin{quote}
+\code{poetry run python scripts/evaluate\_full.py
+  --checkpoint models/latest/best\_model.pt
+  --split test --both-splits}
+\end{quote}
+%
+which runs greedy decoding on the clean and scanned variants of the
+held-out split and prints both the aggregate and the melodic SER.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Training Trajectory}
 \label{sec:res-training}
 
-The default configuration of \Cref{tab:hyperparams} was trained
-on the union of the clean LilyJAZZ and scan-augmented PrIMuS corpora,
-yielding approximately \num{60000} training samples after the three
-domain filters of \Cref{sec:design-data}.
-\Cref{fig:training-curves} shows the trajectory of the CTC loss
-on both train and validation splits and the corresponding validation
-SER over the run that produced the checkpoint used for all subsequent
-evaluation.
+\Cref{fig:training-curves} shows the trajectory of the CTC loss on
+the train and validation splits and the corresponding validation SER
+over the 49 epochs that ran before early stopping triggered at
+patience 12.
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{figures/fig_training_curves}
     \caption{Training trajectory of the synthetic-data baseline.
     \textbf{Left:} CTC loss on the train (blue) and validation
-    (orange) splits over the 49 epochs that ran before early stopping
-    triggered at patience 12.
+    (orange) splits.
     The train loss continues to decrease while the validation loss
-    plateaus near \num{0.06}\todo{verify plateau value against
-    training\_log.csv}, indicating a small but bounded overfit margin.
-    \textbf{Right:} validation Symbol Error Rate over the same
-    epochs.
-    The curve drops sharply from $\approx \SI{12}{\percent}$ to
-    below \SI{2}{\percent} within ten epochs and converges to
+    plateaus around \num{0.05}--\num{0.07}, indicating a small but
+    bounded overfit margin.
+    \textbf{Right:} validation SER over the same epochs.
+    The curve drops sharply from $\approx \SI{12}{\percent}$ to below
+    \SI{2}{\percent} within ten epochs and converges to
     $\approx \SI{1.3}{\percent}$.
-    The best checkpoint, marked by the vertical dashed line,
-    corresponds to epoch 37; later epochs do not improve validation
-    SER and the early-stopping mechanism eventually halts training.}
+    The best checkpoint, marked by the vertical dashed line at epoch
+    37 (val SER \num{0.0128}), is the one used for every subsequent
+    evaluation; later epochs do not improve validation SER and the
+    early-stopping mechanism halts training at epoch 49.}
     \label{fig:training-curves}
 \end{figure}
 
-\todo{AUDIT (concision): ``Two observations are worth highlighting.'' is signposting filler. Cut and let the two observations stand on their own; the paragraph is also approx.\ 30\,\% longer than it needs to be -- the discussion of weight decay / dropout / jitter belongs in Ch.~5 (Implementation), not in a results-trajectory paragraph.}
-Two observations are worth highlighting.
-First, validation SER converges much faster than the loss curve
-suggests: by epoch 10 it is already below \SI{2}{\percent}, and the
-remaining 27 epochs of useful training produce a further reduction of
-only $\approx 0.7$ percentage points.
+Validation SER converges much faster than the loss curve suggests: by
+epoch 10 it is already below \SI{2}{\percent}, and the remaining 27
+epochs of useful training produce a further reduction of only
+$\approx 0.7$ percentage points.
 This is characteristic of CTC-trained sequence models on structured
 output domains: most of the alignment work is learned early, and late
 training refines a small fraction of difficult samples.
-Second, the train/val loss gap remains small throughout training; the
-combination of weight decay (\num{1e-4}), inter-LSTM dropout
-(\num{0.3}), header-stripping augmentation, and online jitter is
-collectively sufficient to keep overfitting under control on the
-synthetic corpus.
-The model selected for all subsequent evaluation is the epoch-37
-checkpoint, saved as \code{models/latest/best\_model.pt}.
+The train/val loss gap remains small throughout, which is consistent
+with the regularisation choices justified in
+\Cref{sec:design-model}.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Aggregate Symbol Error Rate}
 \label{sec:res-ser}
 
-Evaluation is performed on the held-out test split (\num{4604} samples
-drawn from the union of clean and scan-augmented images of the PrIMuS
-corpus~\cite{calvoZaragozaCameraPrimus2018,PrIMuSDataset}) using greedy
-CTC decoding.
-\todo{AUDIT (protocol detail): state how the 4604-sample test split was constructed -- random seed, fraction of the post-filter corpus, whether the same sample ids are used for the clean and scanned variants (which the table strongly implies but does not state). Also state whether the validation split is disjoint from this test split.}
-Aggregate SER, computed as the sum of edit distances divided by the
-sum of ground-truth lengths following the standard token-level
-protocol~\cite{SymbolErrorRate,hajicOMRMetricsEvaluation2019}, is
-\SI{1.28}{\percent} on the scanned test split and \SI{1.19}{\percent}
-on the clean test split.
-\todo{AUDIT (metric definitions): give a single-line formal definition of aggregate SER (e.g.\ $\mathrm{SER}=\sum_i d(\hat y_i,y_i)/\sum_i |y_i|$ with $d$ = Levenshtein on the LMX token alphabet) and of \emph{melodic} SER (which tokens are stripped before edit-distance: \texttt{measure}, \texttt{tied:start}, \texttt{tied:stop}); referring to ``the standard token-level protocol'' is not specific enough for a TFG.}
-\Cref{tab:results-headline} consolidates the headline numbers
-that the remainder of this chapter then decomposes; later sections
-refer back to it rather than re-quoting the numbers in full.
+Evaluation is performed on the 4\,604-sample held-out test split with
+greedy CTC decoding.
+Aggregate SER is \SI{1.28}{\percent} on the scanned variant and
+\SI{1.19}{\percent} on the clean variant; melodic SER is
+\SI{0.18}{\percent} and \SI{0.11}{\percent} respectively.
+The perfect-transcription rate is \SI{71.2}{\percent} on the scanned
+variant and \SI{73}{\percent} on the clean variant.
+\Cref{tab:results-headline} consolidates these headline numbers; the
+remainder of the chapter decomposes them rather than re-quoting them.
 
 \begin{table}[h!]
     \centering
     \caption{Headline test-set results on the epoch-37 checkpoint
     (\code{models/latest/best\_model.pt}), greedy CTC decoding,
-    \num{4604} held-out samples per split.}
+    4\,604 held-out samples per visual variant.  Reproduced with
+    \code{scripts/evaluate\_full.py --both-splits}.}
     \label{tab:results-headline}
     \small
     \setlength{\tabcolsep}{6pt}
@@ -109,7 +171,9 @@ refer back to it rather than re-quoting the numbers in full.
         \midrule
         Aggregate SER (\%)               & 1.28 & 1.19 \\
         Melodic SER (\%)                 & 0.18 & 0.11 \\
-        Perfect transcriptions (\%)      & 71   & 73   \\
+        Perfect transcriptions (\%)      & 71.2 & 73.0 \\
+        Samples with SER $\le 0.05$ (\%) & 90.4 & {\textemdash} \\
+        Samples with SER $\le 0.10$ (\%) & 97.7 & {\textemdash} \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -127,37 +191,47 @@ refer back to it rather than re-quoting the numbers in full.
     \label{fig:ser-distribution}
 \end{figure}
 
-\Cref{fig:ser-distribution} shows the per-sample SER
-distribution.
+\Cref{fig:ser-distribution} shows the per-sample SER distribution on
+the scanned variant.
 The aggregate value understates how often the model is exactly
-correct: the modal outcome is a perfect transcription, with
-$\approx \SI{71}{\percent}$ of samples having SER \num{0}, and the
-empirical CDF reaches \num{0.95} at SER \num{0.05}.
-This bimodality---a tall spike at zero plus a thin right tail---is
+correct: the modal outcome is a perfect transcription
+($\approx \SI{71.2}{\percent}$ of samples have SER \num{0}), and the
+empirical CDF reaches \num{0.95} near SER \num{0.05}.
+This bimodality (a tall spike at zero plus a thin right tail) is
 typical for CTC sequence models on a well-matched domain: the model
 either reads a sample correctly or fails on a specific localised
 pattern.
-The samples in the right tail are analysed qualitatively in
-\Cref{sec:res-qualitative}.
+The samples in the right tail are analysed in
+\Cref{sec:res-qualitative,app:qual}.
 
-A complementary \term{melodic SER} metric is computed on the same edit
-distance after stripping the \code{measure} and the two tie tokens
+A complementary melodic SER is computed on the same edit distance
+after stripping the \code{measure} and the two tie tokens
 (see \Cref{tab:results-headline}).
-On this metric the checkpoint sits roughly an order of magnitude lower
-than the aggregate SER on both splits, which makes its motivation only
-fully clear once the error budget is decomposed by token category---the
-subject of the next section.
+The checkpoint sits roughly an order of magnitude lower on this
+metric than on the aggregate SER for both visual variants, and the
+melodic perfect-transcription rate rises to \SI{93.7}{\percent} on the
+scanned variant.
+The reason becomes clear once the error budget is decomposed by
+token category, which is the subject of the next section.
 
-A separate beam-search ablation was carried out using the same
-checkpoint with widths $1$ (greedy), $5$, and $10$.
-Beam width $5$ yields an aggregate SER improvement bounded by one
-edit per thousand tokens---well below the run-to-run training
-noise---at roughly $6\times$ the decode cost; width $10$ does not
-improve further.
+\paragraph{Beam search.}
+A beam-search ablation was carried out with widths
+$\{1, 5, 10\}$ on the same checkpoint, reproducible with
+\code{poetry run python src/cli.py evaluate-ab --beams 1,5,10}.
+Beam width 5 yields an aggregate SER improvement bounded by one edit
+per thousand tokens at roughly $6\times$ the decode cost; width 10
+does not improve further.
 Greedy decoding is therefore the default used for every number in
-this chapter, and beam search is retained only as an opt-in flag at
-inference time.
-\todo{AUDIT (missing inference-time results): no chapter section reports end-to-end latency or throughput (staves/second, total seconds for a 32-measure page), nor peak GPU/CPU memory at inference. A deployment-oriented system chapter expects at minimum a small table: cold-start time, per-staff inference time (greedy vs.\ beam-5), and full-page pipeline wall time. The numbers are cheap to obtain and strengthen Objective~6.}
+this chapter, and beam search is retained as an opt-in flag at
+inference time, consistent with the model documentation in
+\Cref{sec:design-model}.
+
+\todo{Add an inference-time table: cold-start time, per-staff greedy
+decode time, per-staff beam-5 decode time, full-page wall time on a
+representative Real Book page.  Measure with
+\code{poetry run python -m timeit -n 10 -s "from omr\_pipeline.pipeline
+import run\_pipeline; ..."} or a small instrumented script.  Strengthens
+Objective~6 (deployable system).}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Error Decomposition}
@@ -170,34 +244,37 @@ categories: \term{deletions} (a reference token is absent from the
 prediction), \term{insertions} (a predicted token is absent from the
 reference), and \term{substitutions} (a reference token is replaced
 by a different predicted token).
-\Cref{fig:edit-dist} shows the distribution.
+\Cref{fig:edit-dist} shows the distribution on the scanned variant.
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.55\textwidth]{figures/fig_error_pie}
     \caption{Distribution of edit operations over the scanned test
     split.
-    Deletions and insertions together account for $\approx \SI{95}{\percent}$
-    of the edit budget; substitutions are a small minority.
+    Deletions and insertions together account for the bulk of the
+    edit budget; substitutions are a small minority.
     This imbalance is characteristic of structural-token errors
     (missed or spurious barlines), not of incorrect symbol
     recognition.}
     \label{fig:edit-dist}
 \end{figure}
 
-Substitutions are by far the rarest error type at \SI{5.4}{\percent}
-of the edit budget\todo{verify substitution share against
-evaluate\_full.py output}---an encouraging finding, because
-substitutions are precisely the errors that affect musical
+Substitutions are the rarest error type, an encouraging finding
+because substitutions are precisely the errors that affect musical
 \textit{content}.
-Deletions and insertions together account for over \SI{94}{\percent}
-of edits; as the next subsection shows, the overwhelming majority of
-those concern the \code{measure} token.
+Deletions and insertions dominate; as the next subsection shows, the
+overwhelming majority of those concern the \code{measure} token.
+\todo{measure: read the exact deletion/insertion/substitution counts
+from notebook \code{02\_evaluate\_model.ipynb}, section 6.2
+``Error-type breakdown'' (cell that builds the \code{total\_r} dict
+\code{\{sub, ins, del, match\}} via \code{\_edit\_ops}, and the
+pie-chart cell that follows it), and write them into the prose above
+as concrete percentages of total edits.}
 
 \subsection{Per-token breakdown}
 
-\Cref{fig:common-edits} shows the top-15 substitutions,
-deletions, and insertions by frequency.
+\Cref{fig:common-edits} shows the top-15 substitutions, deletions
+and insertions by frequency.
 The picture is unambiguous: \code{measure} dominates both deletions
 ($\approx \num{1600}$ occurrences, an order of magnitude above the
 next-most-deleted token) and insertions ($\approx \num{1050}$).
@@ -213,8 +290,8 @@ in the single digits per token over thousands of test samples.
     \caption{Top-15 token-level edit operations on the scanned test
     split.
     \textbf{Left:} most frequent substitutions, dominated by duration
-    confusions ($16{\rm th} \leftrightarrow 32{\rm nd}$,
-    $\rm{eighth} \leftrightarrow 16{\rm th}$).
+    confusions ($16^{\rm th} \leftrightarrow 32^{\rm nd}$,
+    $\rm{eighth} \leftrightarrow 16^{\rm th}$).
     \textbf{Middle:} most frequent deletions, dominated by missed
     \code{measure} tokens (over \num{1600} occurrences).
     \textbf{Right:} most frequent insertions, again dominated by
@@ -225,31 +302,36 @@ in the single digits per token over thousands of test samples.
     \label{fig:common-edits}
 \end{figure}
 
-\todo{AUDIT (Results vs Conclusions): the ``design choice \ldots is validated by these numbers'' framing is a Ch.~8 claim, not a Ch.~6 finding. Results report what was observed; the validation/justification of the architectural decision belongs in the discussion/conclusions chapter. Either neutralise to ``these numbers are consistent with the design rationale in \Cref{sec:design-grammar}'' or move the claim to Ch.~8.}
-Two consequences follow.
-First, the design choice to handle barline regularisation in the
-deterministic grammar fixer (\Cref{sec:design-grammar}) rather
-than at the model level is validated by these numbers: barline
-boundaries are an intrinsically ambiguous quantity for a model
-without explicit beat tracking, and the cleanest place to enforce
-them is the post-processor that knows the time signature.
-Second, the substitutions that do occur are almost entirely confined
-to duration confusions between visually similar values
-($16{\rm th} \leftrightarrow 32{\rm nd}$,
-$\rm{eighth} \leftrightarrow 16{\rm th}$,
+These numbers are consistent with the design rationale in
+\Cref{sec:design-grammar}: barline regularisation is handled by a
+deterministic grammar fixer rather than at the model level, because
+barline boundaries are intrinsically ambiguous for a model without
+explicit beat tracking and the cleanest place to enforce them is the
+post-processor that knows the time signature.
+The substitutions that do occur are almost entirely confined to
+duration confusions between visually similar values
+($16^{\rm th} \leftrightarrow 32^{\rm nd}$,
+$\rm{eighth} \leftrightarrow 16^{\rm th}$,
 $\rm{quarter} \leftrightarrow \rm{eighth}$).
 Pitch substitutions (e.g.\ $\rm{pitch:A} \to \rm{pitch:C}$) and
 octave substitutions (e.g.\ $\rm{octave:5} \to \rm{octave:6}$) exist
 but with single-digit counts over the full test split.
-The model is therefore reading pitches and octaves essentially
-perfectly; the residual error budget is structural and rhythmic, not
-melodic (see \Cref{sec:design-model}).
-\todo{AUDIT (error analysis depth): the claim ``pitch substitutions exist but with single-digit counts'' deserves a small confusion table (top-5 source $\to$ target token pairs for substitutions, with counts). Without it the reader has to trust the prose. The data already exists in the evaluation output -- this is a low-effort, high-evidence addition.}
+The residual error budget is therefore structural and rhythmic, not
+melodic.
+
+\todo{Add a small confusion table: top-5 source\,$\to$\,target
+substitution pairs by count.  Data is already produced by notebook
+\code{02\_evaluate\_model.ipynb}, section 6.3 ``Most common confused
+/ deleted / inserted tokens'' (cell that prints
+\code{sub\_counts.most\_common(TOP\_N)} as ``\code{ref → pred ×count}'');
+take the top-5 rows from that output and export them as a
+\code{booktabs} table here.  This was called out by the audit as a
+low-effort, high-evidence addition.}
 
 \subsection{SER versus sequence length}
 
 A natural question is whether long sequences accumulate more errors
-than short ones, since CTC time-step budget is proportional to
+than short ones, since the CTC time-step budget is proportional to
 image width and there is no \textit{a priori} guarantee that long
 samples remain in alignment.
 
@@ -269,16 +351,46 @@ samples remain in alignment.
     \label{fig:ser-vs-length}
 \end{figure}
 
-\Cref{fig:ser-vs-length} shows that the median per-sample SER
-is essentially zero across the full range of sequence lengths in the
+\Cref{fig:ser-vs-length} shows that the median per-sample SER is
+essentially zero across the full range of sequence lengths in the
 corpus (\num{20} to \num{140} tokens).
-The distribution of tail samples broadens slightly at the longest
+The tail of the distribution broadens slightly at the longest
 lengths, but the model does not exhibit the catastrophic alignment
 breakdown that CTC can occasionally produce when the input is too
 short for the target.
 This confirms that the $W/4$ width-compression factor of the CNN
-backbone (see \Cref{sec:design-model}) is appropriate for the
-sequence lengths the system encounters.
+backbone (\Cref{sec:design-model}) is appropriate for the sequence
+lengths the system encounters.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Ablations}
+\label{sec:res-ablations}
+
+\todo{Ablation: backbone.  Train one CRNN with \code{backbone="vgg"}
+keeping every other hyperparameter identical to the headline run, and
+report aggregate SER, melodic SER and training wall time alongside
+the ResNet18 default.  Command:
+\code{poetry run python src/cli.py train --backbone vgg --model-dir
+models/abl\_vgg ...}.  Cost: $\approx 7$\,h.  Expected outcome:
+ResNet18 converges faster but final SER comparable, justifying the
+default choice in \Cref{sec:design-model-alts}.}
+
+\todo{Ablation: scan augmentation.  Re-train with
+\code{use\_scanned=False} (clean LilyJAZZ only) and evaluate on
+both the clean and the scanned test split.  Reports the drop in
+robustness when the model never sees augmented inputs; this is the
+direct experimental evidence for the augmentation design choice in
+\Cref{sec:design-data}.  Cost: $\approx 4$\,h (smaller dataset).}
+
+\todo{Ablation: rare-token oversampling.  Re-train with
+\code{rare\_lmx\_oversample=1} (no oversampling) and compare tie-token
+substitution counts to the headline run.  Hypothesis: tie errors
+roughly double when oversampling is removed.  Cost: $\approx 7$\,h.}
+
+\todo{Ablation: header-strip augmentation.  Re-train with
+\code{strip\_header\_prob=0.0} and evaluate on continuation lines
+(lines $\ge 2$) from a few real Real Book pages.  Justifies the
+augmentation choice from \Cref{sec:design-data}.}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Qualitative Examples}
@@ -286,18 +398,12 @@ sequence lengths the system encounters.
 
 This section shows representative predictions drawn from the perfect
 and near-median tails of the SER distribution.
-Each figure shows a test-set staff image as seen by the model,
-together with the resulting prediction's edit distance and per-sample
-SER.
-\todo{AUDIT (qualitative coverage): the two examples shown are both \emph{synthetic} (scan-augmented LilyJAZZ). Add at least one qualitative example on a \emph{real} Real Book scan -- without this, the chapter has no figure demonstrating model behaviour on the input distribution the system is actually meant for. This is also the natural place to host the side-by-side comparison vs.\ Audiveris/SmartScore requested by the top-of-chapter SoA marker.}
-
-Each of the two examples below pairs the \term{input} image presented
-to the model---a scan-augmented LilyJAZZ render from the held-out
-test split---with a clean LilyPond \term{rendering of the predicted
-LMX sequence}.
-The rendered prediction lets the reader visually compare what the
-model output against the input notation, instead of inspecting a raw
-token list.
+Each figure pairs the input image presented to the model (a
+scan-augmented LilyJAZZ render from the held-out test split) with a
+clean LilyPond rendering of the predicted LMX sequence, so the reader
+can compare what the model output against the input notation without
+inspecting a raw token list.
+Further high-SER samples are collected in \Cref{app:qual}.
 
 \begin{figure}[htbp]
     \centering
@@ -316,13 +422,10 @@ token list.
     \end{subfigure}
     \caption{A representative perfect prediction on the scanned test
     split: edit distance \num{0}, SER \num{0}.
-    The input (top) is a typical scan-augmented monophonic staff
-    with beamed eighth and sixteenth notes, a one-flat key signature,
-    and dense rhythmic content; the rendered prediction (bottom)
-    matches it note-for-note.
-    Approximately \SI{71}{\percent} of test samples fall in this
-    category.}
-    \todo{AUDIT (caption): this caption is doing analysis (``approximately 71\,\% of test samples fall in this category''), which duplicates body text in \S\ref{sec:res-ser}. Captions should describe what the figure shows, not re-state aggregate statistics. Trim to the first two sentences.}
+    The input (top) is a typical scan-augmented monophonic staff with
+    beamed eighth and sixteenth notes, a one-flat key signature, and
+    dense rhythmic content; the rendered prediction (bottom) matches
+    it note-for-note.}
     \label{fig:qual-perfect}
 \end{figure}
 
@@ -353,86 +456,203 @@ token list.
 The visual quality of these two examples is representative of the
 input regime the system was designed for: the augmentation pipeline
 produces images that look like phone photographs of moderately worn
-print (see \Cref{sec:design-data}), and the model recovers the
-underlying notation cleanly in both cases.
+print (\Cref{sec:design-data}), and the model recovers the underlying
+notation cleanly in both cases.
 
-\todo{Find the 95th-percentile SER sample from the test set. Run: \texttt{poetry run python src/cli.py evaluate --split test --export-worst 5 --output-dir figures/worst/}. Then include: (a) the input strip image, (b) predicted LMX tokens, (c) ground-truth LMX tokens, (d) edit operations highlighted.}
+\todo{Add a worst-case figure (95th-percentile SER) here or in
+\Cref{app:qual}.  Source: notebook \code{02\_evaluate\_model.ipynb},
+section 6.1 ``Worst predictions'' (cell that computes
+\code{worst = np.argsort(ed\_vals)[::-1][:8]} and renders the
+input/prediction pairs via \code{show\_predictions(... render=True)}).
+Pick the rank-1 sample, export its input strip and LilyPond-rendered
+prediction as PNGs into \code{latex\_documents/main/figures/} (e.g.\
+\code{fig\_qual\_worst\_input.png}, \code{fig\_qual\_worst\_rendered.png}),
+include them here as a two-subfigure block matching the style of
+\Cref{fig:qual-median}, and place ranks 2--5 in \Cref{app:qual}.  The
+per-sample edit-operation overlay (S/I/D) is produced by
+\code{\_edit\_ops(pred, ref)} from section 6.2 of the same notebook.}
+
+\todo{Add at least one qualitative example on a \emph{real} Real Book
+scan, even before fine-tuning.  Run the inference pipeline
+(\code{poetry run python src/cli.py run --input data/real\_pages/
+<song>.png --output results/<song>.json}) on one page and present
+the staff strip plus rendered prediction in the same format as
+\Cref{fig:qual-median}.  Without this, the chapter has no figure
+demonstrating model behaviour on the input distribution the system
+is actually meant for.}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Comparison to the State of the Art}
+\label{sec:res-soa}
+
+A direct numerical comparison to prior work is not entirely fair,
+because each published OMR system targets a different corpus, label
+schema and evaluation protocol.
+What is reported below is therefore a positioning rather than a
+benchmark.
+
+The closest direct point of comparison is Calvo-Zaragoza et\,al.'s
+CRNN-CTC baseline on PrIMuS, which established the CTC-on-staff
+formulation as a credible approach to end-to-end staff-line
+recognition~\cite{calvoZaragozaEndToEndNeural2018,calvoZaragozaCameraPrimus2018}.
+The model here uses the same family of architectures and a derived
+PrIMuS corpus, and lands within the same single-percent SER regime on
+synthetic data; the contribution is not a better number on PrIMuS but
+the addition of the LilyJAZZ render, the scan-simulation
+augmentation pipeline (\Cref{sec:design-data}) and the deterministic
+grammar fixer (\Cref{sec:design-grammar}), all aimed at the Real Book
+domain specifically.
+
+Transformer-based OMR systems
+\cite{riosVilaSheetMusicTransformer2024,riosVilaSMTPlusPlus2024,mayerPracticalEndToEnd2024,yangLEGATO2025}
+have since pushed published SER lower on broader corpora, but at the
+cost of training-time and inference-time budgets that are out of
+reach for the hardware envelope of this project (RTX 3060, 12\,GB).
+The CRNN-CTC choice was justified in \Cref{sec:design-model-alts} on
+the basis of this budget; the numbers above show the resulting system
+is competitive on the narrow lead-sheet domain it was scoped to.
+
+The Audiveris~\cite{audiverisAudiveris} symbolic OMR engine is the
+canonical free-software baseline.  A side-by-side qualitative
+comparison on a real Real Book page is the natural way to position
+this system against an established off-the-shelf tool.
+
+\todo{Build a comparison table along the following lines: rows =
+\{Audiveris (off-the-shelf), Calvo-Zaragoza CRNN-CTC baseline, SMT /
+SMT++ transformer OMR, this work\}; columns = \{corpus, SER (aggregate
+or OMR-NED), training cost, inference cost, monophonic/polyphonic\}.
+Numbers for prior systems can be taken directly from
+\cite{calvoZaragozaEndToEndNeural2018,riosVilaSheetMusicTransformer2024,riosVilaSMTPlusPlus2024,mayerPracticalEndToEnd2024};
+this work's row is filled from \Cref{tab:results-headline}.  Add the
+table as a single \code{booktabs} block and note in the caption that
+numbers across rows are not strictly comparable due to differing
+corpora.}
+
+\todo{Run Audiveris on one representative Real Book page (the same
+page used for the headline qualitative figure) and produce a
+side-by-side figure: Audiveris output (MusicXML rendered back to
+notation) vs.\ this system's output (LMX rendered back to notation),
+on the same input.  Audiveris is a one-line invocation:
+\code{Audiveris -batch -export <page>.pdf}.  This satisfies the
+tribunal-rubric requirement for an explicit SoA comparison.}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Model Weight Distribution}
 \label{sec:res-weights}
-\todo{AUDIT (relevance): this section is a training-diagnostic, not an evaluation result. It contributes nothing to the chapter's argument (no comparison across checkpoints, no link to SER). Consider either (a) moving it to an appendix, (b) deleting it, or (c) reframing it as a sanity check inside \S\ref{sec:res-training} in 2--3 sentences without its own figure.}
 
-A diagnostic useful when comparing trained checkpoints is the
+A brief diagnostic, useful when comparing trained checkpoints, is the
 marginal distribution of the model's weights at convergence.
-\Cref{fig:weight-dist} shows the distributions of the four
-principal parameter groups of the epoch-37 checkpoint: the
-classifier (final linear layer), the convolutional and
-batch-normalisation weights of the ResNet backbone, the LSTM
-weights, and the biases.
+\Cref{fig:weight-dist} shows the distributions of the four principal
+parameter groups of the epoch-37 checkpoint: the classifier (final
+linear layer), the convolutional and batch-normalisation weights of
+the ResNet backbone, the LSTM weights, and the biases.
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{figures/fig_weight_distributions}
     \caption{Marginal weight distributions of the four principal
     parameter groups of the trained CRNN at epoch 37.
-    All four are close to centred Gaussian with standard
-    deviations in the $[0.17, 0.28]$ range; AdamW's
-    \num{1e-4} weight decay keeps the magnitudes bounded.
-    The small spikes near $\pm 1$ in the \code{fc} panel are an
-    artefact of the classifier saturating on the CTC blank class
-    and the most frequent token.
-    Biases (bottom right) are slightly left-skewed, consistent with
-    the negative-log-likelihood objective preferring to push
-    logits down for rare classes.}
+    All four are close to centred Gaussian with standard deviations
+    in the $[0.17, 0.28]$ range; AdamW's \num{1e-4} weight decay
+    keeps the magnitudes bounded.
+    The small spikes near $\pm 1$ in the classifier panel are an
+    artefact of the classifier saturating on the CTC blank class and
+    the most frequent token.}
     \label{fig:weight-dist}
 \end{figure}
 
-All four groups are close to centred Gaussian with standard
-deviations between \num{0.17} and \num{0.28}, which is typical of a
-well-regularised AdamW run with the configured weight decay.
-The maximum magnitudes annotated in each panel sit between
-\num{1.07} and \num{2.64}; no parameter has grown to the
+All four groups sit within the magnitudes expected of a
+well-regularised AdamW run; no parameter has grown to the
 exploding-gradient regime that the \num{5.0} gradient-norm clip is
 intended to prevent.
-The classifier panel shows two small concentration spikes near
-$\pm 1$, which correspond to the \code{<blank>} logit and the
-\code{measure} logit---the two most frequently emitted classes
-saturating against the soft bound that AdamW's regularisation
-imposes.
-This is a benign artefact and does not affect inference.
+This figure is included as a sanity check on the training procedure
+rather than as a primary result; it could be moved to an appendix if
+chapter length becomes a concern.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{The Synthetic-to-Real Domain Gap}
 \label{sec:res-domaingap}
-\todo{AUDIT (BLOCKER): this entire section is a stub -- one paragraph of motivation followed by three nested \texttt{\textbackslash todo} placeholders and no figures, no tables, no numbers. This is the single highest-priority gap in the chapter. See the chapter-level CRITICAL marker about Ch.~8 Objective~7 -- the conclusion's claim of ``partially met'' rests entirely on whatever ends up here. Minimum acceptable content for the deposit: a zero-shot SER number on $\geq$\,30 annotated real staves, one bar chart, and an honest paragraph stating whether fine-tuning was attempted.}
 
 The numbers reported above are all measured on the held-out
 \textit{synthetic} test split.
 The question of practical importance is whether the same model
-generalises to scans of real Real Book pages---the input
-distribution the system will face once deployed.
+generalises to scans of real Real Book pages, the input distribution
+the system will face once deployed.
+This section is, in the current draft, the chapter's main open
+experimental front.
 
-\todo{Quantitative zero-shot evaluation: measure aggregate SER and melodic SER on approximately 50 manually annotated staves from 3 Real Book pages (real scans, \textit{before} any fine-tuning), broken down by the same four edit categories used above (measure deletions, measure insertions, tie errors, other). Run: \texttt{poetry run python src/cli.py evaluate --checkpoint models/latest/best\_model.pt --split real\_pages --beam-width 1}. Present results as a bar chart comparing the four error categories on synthetic versus real input to make the domain gap visible at a glance.}
+\todo{Zero-shot evaluation on real scans.  Hand-label approximately
+50 staves from 3 Real Book pages (LMX token sequences, using the
+\code{static/chord\_labeler.html} tool or a similar workflow); store
+them under \code{data/realbook\_scans/annotated/}; evaluate the
+synthetic-only checkpoint on this set without any fine-tuning.
+Command:
+\code{poetry run python src/cli.py evaluate
+--checkpoint models/latest/best\_model.pt
+--data-dir data/realbook\_scans/annotated --beam-width 1}.
+Report aggregate SER and melodic SER on the real set, broken down by
+the same four edit categories used in \Cref{sec:res-errors}
+(measure deletions, measure insertions, tie errors, other), and
+present as a grouped bar chart against the synthetic-test baseline
+to make the domain gap visible at a glance.  This is the single most
+important missing experiment in the chapter; the conclusion's
+``partially met'' claim for Objective~7 in
+\Cref{ch:conclusions} depends on it.}
 
-\subsection{Fine-tuning results}
+\subsection{Fine-tuning}
 
-\todo{Quantitative comparison after fine-tuning on the hand-labelled Real Book set (expected N $\approx$ 50--100 staves from \texttt{data/chord\_real/labels.jsonl}): report aggregate SER and melodic SER on the same real staves used for zero-shot evaluation above, with the synthetic-test SER of \SI{1.28}{\percent} reported alongside as a non-regression check. Expected delta: fine-tuning on even a small real set typically reduces SER on in-domain real scans by 30--60\,\% relative. Present as a grouped bar chart: pre-fine-tune SER, post-fine-tune SER (real pages), and synthetic-test SER.}
+\todo{Fine-tune the same checkpoint on a small real-scan training
+set (target $N \approx 50$--$100$ staves from the same source as the
+zero-shot evaluation), keeping a separate held-out real subset for
+testing.  Command:
+\code{poetry run python src/cli.py train
+--data-dir data/processed/primus/clean
+--finetune-data-dir data/realbook\_scans/annotated/train
+--checkpoint models/latest/best\_model.pt --epochs 10}.
+Report aggregate SER and melodic SER on the held-out real test set
+both before and after fine-tuning, with the synthetic-test SER
+of \SI{1.28}{\percent} reported alongside as a non-regression check.
+Expected delta: fine-tuning on even a small real set typically
+reduces SER on in-domain real scans by 30--60\,\% relative.}
 
 \subsection{Qualitative inference on a complete Real Book page}
 
-\todo{Select a representative page from The Real Book (e.g.\ ``Autumn Leaves'', p.\,1) and run the full inference pipeline: \texttt{poetry run python src/cli.py run --input data/real\_pages/autumn\_leaves\_p1.png --output results/autumn\_leaves\_out.json}. Produce a figure showing: (a) the full page scan with staff bounding boxes overlaid (from \texttt{staff\_bbox} fields in the JSON), (b) the predicted LMX token array for each detected staff printed beneath the corresponding staff strip, and (c) the recognised chord symbols above each staff. This figure functions as the project's headline qualitative result and demonstrates the end-to-end pipeline on a genuine Real Book scan.}
+\todo{Pick one representative page from The Real Book
+(e.g.\ ``Autumn Leaves'', p.\,1) and run the full inference pipeline:
+\code{poetry run python src/cli.py run
+--input data/real\_pages/autumn\_leaves\_p1.png
+--output results/autumn\_leaves\_out.json}.
+Produce a figure showing (a) the full page scan with staff bounding
+boxes overlaid (from \code{staff\_bbox} fields in the JSON), (b) the
+predicted LMX token array for each detected staff printed beneath
+the corresponding staff strip, and (c) the recognised chord symbols
+above each staff.  This figure is the natural headline qualitative
+result for the thesis and demonstrates the end-to-end pipeline on a
+genuine Real Book scan.}
+
+\subsection{Chord OCR}
+
+\todo{Chord OCR is evaluated separately because its training data and
+metric are different from the music CRNN.  Report:
+character-level error rate on the synthetic chord-strip validation
+split (\code{data/chord\_synth/val}); exact-match accuracy and
+character-level error rate on the hand-labelled real strips
+(\code{data/chord\_real/labels.jsonl}, after filtering to
+\code{status: done}); a confusion summary on the small set of
+characters that the model gets wrong most often (often \code{6}/\code{b},
+\code{/}/\code{1}, etc.).  These numbers may not yet exist; flag
+explicitly that this is a separate evaluation track from the music
+SER above.}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Summary}
 \label{sec:res-summary}
 
-The synthetic-data baseline trained from scratch reaches the
-headline figures consolidated in
-\Cref{tab:results-headline}: aggregate SER around \SI{1.2}{\percent}
-on both clean and scan-augmented test splits, melodic SER an order of
-magnitude lower, and a perfect-transcription rate above
-\SI{70}{\percent}.
+The synthetic-data baseline trained from scratch reaches the headline
+figures of \Cref{tab:results-headline}: aggregate SER around
+\SI{1.2}{\percent} on both the clean and the scan-augmented test
+splits, melodic SER an order of magnitude lower, and a
+perfect-transcription rate above \SI{70}{\percent}.
 The residual error budget is concentrated in structural tokens
 (\code{measure} and the two tie tokens), which together account for
 $\approx \SI{87}{\percent}$ of all edits; pitch and octave errors are
@@ -441,9 +661,13 @@ Combined with the deterministic grammar fixer that reconstructs
 barline boundaries from the time signature, these results place the
 synthetic baseline within the operating range required for downstream
 musical applications.
-The remaining experimental question---whether the domain gap to real
-Real Book scans can be closed by fine-tuning on a small hand-labelled
-set---is the subject of the \code{\textbackslash todo} placeholders
-in \Cref{sec:res-domaingap}, which will be completed as
-those experiments conclude.
-\todo{AUDIT (deposit blocker): the final paragraph of the chapter must not refer to ``\texttt{\textbackslash todo} placeholders'' in the deposited PDF. Rewrite this paragraph either to summarise the actual real-scan results once \S\ref{sec:res-domaingap} is filled in, or to honestly frame the real-scan evaluation as scoped-out future work without alluding to backlog markers.}
+
+Two experimental fronts remain open and are the subject of the
+unfilled placeholders above: the synthetic-to-real domain gap on
+hand-labelled Real Book scans (\Cref{sec:res-domaingap}) and the
+ablation series that would isolate the contribution of each
+augmentation and architectural choice (\Cref{sec:res-ablations}).
+Closing the first of these is the prerequisite for the
+``partially met'' claim for Objective~7 in \Cref{ch:conclusions};
+the second strengthens the design justifications in \Cref{ch:design}
+but is not on the deposit critical path.

@@ -7,9 +7,11 @@ This appendix collects the exact hyperparameters, architectural sizes, augmentat
 
 \Cref{tab:hyperparams-omr} lists the final training hyperparameters of the music-recognition CRNN; \Cref{tab:arch-omr} reports its architectural sizes.
 
-\begin{table}[h]
-\centering
-\begin{tabular}{ll}
+\begin{table}[H]
+\centering\small
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.30}
+\begin{tabularx}{\textwidth}{@{} L l @{}}
 \toprule
 \textbf{Hyperparameter} & \textbf{Value} \\
 \midrule
@@ -34,14 +36,16 @@ CTC loss                        & \texttt{nn.CTCLoss(blank=0, zero\_infinity=Tru
 CTC blank index                 & 0 (hardcoded; see \Cref{ch:impl}) \\
 Random seed                     & 42 \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Final hyperparameters of the music-recognition CRNN, as serialised in every checkpoint.}
 \label{tab:hyperparams-omr}
 \end{table}
 
-\begin{table}[h]
-\centering
-\begin{tabular}{ll}
+\begin{table}[H]
+\centering\small
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.30}
+\begin{tabularx}{\textwidth}{@{} L l @{}}
 \toprule
 \textbf{Component} & \textbf{Value} \\
 \midrule
@@ -60,7 +64,7 @@ Final linear projection             & 512 to \texttt{vocab\_size} \\
 Vocabulary size                     & \num{80} symbols (\num{77} content tokens plus blank, pad, unk) \\
 Total parameter count (ResNet18, vocab\_size=80) & \num{14365200} (\textasciitilde\num{14.4} M) \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Architecture summary of the music-recognition CRNN.}
 \label{tab:arch-omr}
 \end{table}
@@ -69,34 +73,38 @@ Total parameter count (ResNet18, vocab\_size=80) & \num{14365200} (\textasciitil
 
 \Cref{tab:aug} lists the augmentation operations applied by \texttt{src/data\_processing/augment\_scanned.py} to produce the \texttt{scanned/} copies of every clean LilyJAZZ render. The albumentations block is applied first; the post-processing steps are applied afterwards in the order shown. An additional lightweight online jitter (brightness $\pm 5 \%$, contrast bias $\pm 3 \%$, Gaussian noise $\sigma \approx 0.01$, $\pm 2$ px horizontal shift) is applied during training only with probability $\texttt{online\_aug\_prob} = 0.5$.
 
-\begin{table}[h]
-\centering
-\begin{tabular}{lll}
+\begin{table}[H]
+\centering\small
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.30}
+\begin{tabularx}{\textwidth}{@{} l L c @{}}
 \toprule
-\textbf{Transform} & \textbf{Parameters} & \textbf{Probability} \\
+\textbf{Transform} & \textbf{Parameters} & \textbf{Prob.} \\
 \midrule
-\multicolumn{3}{l}{\textit{Albumentations block (geometric + photometric)}} \\
-ElasticTransform            & $\alpha = 22$, $\sigma = 4.5$            & 0.82 \\
-GridDistortion              & 5 steps, distort $\pm 0.08$              & 0.72 \\
-OpticalDistortion           & distort limit 0.12                       & 0.38 \\
-Affine                      & rot. $\pm 4^{\circ}$, shear $\pm 1.2^{\circ}$, scale 0.97--1.03, translate $\pm 1.5 \%$ & 0.85 \\
-GaussianBlur                & $\sigma \in [0.2, 1.1]$                  & 0.62 \\
-Sharpen                     & $\alpha \in [0.15, 0.45]$, lightness $\in [0.85, 1.0]$ & 0.48 \\
-RandomToneCurve             & scale 0.12                               & 0.72 \\
-GaussNoise                  & std range $[0.012, 0.045]$               & 0.78 \\
-RandomBrightnessContrast    & brightness $\pm 0.06$, contrast $[0.03, 0.18]$ & 0.70 \\
-ImageCompression            & JPEG quality $[72, 92]$                  & 0.35 \\
+\multicolumn{3}{@{}l}{\textit{Albumentations block (geometric + photometric)}} \\
+\texttt{ElasticTransform}            & $\alpha = 22$, $\sigma = 4.5$            & 0.82 \\
+\texttt{GridDistortion}              & 5 steps, distort $\pm 0.08$              & 0.72 \\
+\texttt{OpticalDistortion}           & distort limit 0.12                       & 0.38 \\
+\texttt{Affine}                      & rot.\ $\pm 4^{\circ}$, shear $\pm 1.2^{\circ}$, scale 0.97--1.03, transl.\ $\pm 1.5\%$ & 0.85 \\
+\texttt{GaussianBlur}                & $\sigma \in [0.2, 1.1]$                  & 0.62 \\
+\texttt{Sharpen}                     & $\alpha \in [0.15, 0.45]$, lightness $\in [0.85, 1.0]$ & 0.48 \\
+\texttt{RandomToneCurve}             & scale 0.12                               & 0.72 \\
+\texttt{GaussNoise}                  & std range $[0.012, 0.045]$               & 0.78 \\
+\texttt{RandomBrightnessContrast}    & brightness $\pm 0.06$, contrast $[0.03, 0.18]$ & 0.70 \\
+\texttt{ImageCompression}            & JPEG quality $[72, 92]$                  & 0.35 \\
 \midrule
-\multicolumn{3}{l}{\textit{Post-processing steps (applied in order)}} \\
-\texttt{dilate\_ink}        & 0, 1, or 2 morphological iterations (weights 0.42 / 0.48 / 0.10) & 1.0 \\
-\texttt{vary\_staff\_line\_thickness} & $\pm 1$ px morphological tweak on detected horizontals  & 0.40 \\
+\multicolumn{3}{@{}l}{\textit{Post-processing steps (applied in order)}} \\
+\texttt{dilate\_ink}        & 0, 1, or 2 morphological erosion iterations (weights 0.42\,/\,0.48\,/\,0.10) & 1.0 \\
+\texttt{vary\_staff\_line\_thickness} & $\pm 1$ px morphological tweak on detected staff lines  & 0.40 \\
 \texttt{remap\_tones}       & linear remap to paper range $[28, 245]$  & 1.0 \\
-\texttt{add\_vignette}      & radial darkening, strength $\approx 0.15$ jittered $\pm 40 \%$ & 0.50 (exclusive) \\
-\texttt{add\_uneven\_illumination} & directional gradient, max strength 0.25, side $\in \{\text{left, right, top}\}$ & 0.35 (exclusive) \\
+\texttt{add\_vignette}      & radial darkening, strength $\approx 0.15$ jittered $\pm 40\%$ & 0.50\textsuperscript{*} \\
+\texttt{add\_uneven\_illumination} & directional gradient, max strength 0.25, side $\in \{\text{left, right, top}\}$ & 0.35\textsuperscript{*} \\
 \texttt{add\_halftone\_lines} & period $\in [4, 9]$ rows, strength $\in [0.03, 0.07]$ & 0.25 \\
 \bottomrule
-\end{tabular}
-\caption{Parameters of the offline scan-simulation augmentation pipeline. Vignette and uneven illumination are mutually exclusive: a single roll selects one, the other, or neither, with the marginal probabilities reported.}
+\end{tabularx}
+\caption{Parameters of the offline scan-simulation augmentation pipeline.
+\textsuperscript{*}Vignette and uneven illumination are mutually
+exclusive: a single roll selects one, the other, or neither.}
 \label{tab:aug}
 \end{table}
 
@@ -104,17 +112,19 @@ ImageCompression            & JPEG quality $[72, 92]$                  & 0.35 \\
 
 The three filter flags in \Cref{tab:filters} realise the lead-sheet domain contract described in \Cref{ch:design}. They are applied at dataset construction time inside \texttt{OMRDataset}, not during data generation: the renderer and the converter write every sample to disk, and the filters decide which of those samples participate in training.
 
-\begin{table}[h]
-\centering
-\begin{tabular}{lll}
+\begin{table}[H]
+\centering\small
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.30}
+\begin{tabularx}{\textwidth}{@{} l c L @{}}
 \toprule
 \textbf{Flag} & \textbf{Default} & \textbf{Effect} \\
 \midrule
-\texttt{filter\_multi\_staff}        & True & Drops samples whose original PNG height exceeds \texttt{max\_source\_height} (180 px). Removes LilyPond renders that wrapped onto two staves. \\
-\texttt{filter\_non\_leadsheet\_clef} & True & Keeps only \texttt{clef:G2} (treble). Drops alto, tenor, bass and French-violin clefs inherited from orchestral PrIMuS sources. \\
-\texttt{filter\_unusual\_time}       & True & Keeps only the eight common jazz meters: \{4/4, 3/4, 2/4, 2/2, 6/8, 6/4, 5/4, 12/8\}. \\
+\texttt{filter\_multi\_staff}         & True & Drops samples whose original PNG height exceeds \texttt{max\_source\_height} (180\,px). Removes LilyPond renders that wrapped onto two staves. \\
+\texttt{filter\_non\_leadsheet\_clef} & True & Keeps only \texttt{clef:G2} (treble). Drops alto, tenor, bass, and French-violin clefs inherited from orchestral PrIMuS sources. \\
+\texttt{filter\_unusual\_time}        & True & Keeps only the eight common jazz meters: $\{4/4, 3/4, 2/4, 2/2, 6/8, 6/4, 5/4, 12/8\}$. \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Domain filters applied at training-set construction.}
 \label{tab:filters}
 \end{table}
@@ -125,33 +135,35 @@ The allowed time-signature set must remain in sync between \texttt{src/CRNN\_CTC
 
 The chord-symbol recognition stage uses a separate, smaller CRNN trained on synthetic LilyJAZZ strips and fine-tuned on hand-labelled Real Book strips. Its defaults are summarised in \Cref{tab:hyperparams-chord} and live in the \texttt{ChordConfig} dataclass at \texttt{src/CRNN\_CTC/chord\_train.py}; the fine-tuning stage at \texttt{src/CRNN\_CTC/chord\_finetune.py} overrides a subset of these.
 
-\begin{table}[h]
-\centering
-\begin{tabular}{lll}
+\begin{table}[H]
+\centering\small
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.30}
+\begin{tabularx}{\textwidth}{@{} L l l @{}}
 \toprule
 \textbf{Hyperparameter} & \textbf{From scratch} & \textbf{Fine-tune} \\
 \midrule
-Optimizer                       & AdamW                  & AdamW \\
-Peak learning rate              & \num{1e-3}             & \num{2e-4} \\
-Weight decay                    & \num{1e-4}             & \num{1e-4} \\
-LR schedule                     & OneCycleLR (cosine)    & OneCycleLR (cosine) \\
-Warm-up fraction                & 0.05                   & 0.05 \\
-Maximum epochs                  & 30                     & 20 \\
-Early-stopping patience         & 8                      & 6 \\
-Batch size                      & 32                     & 32 \\
-Gradient clipping (max norm)    & 5.0                    & 5.0 \\
-DataLoader workers              & 6                      & 6 \\
-Image height                    & 64 px                  & 64 px \\
-Maximum image width             & 2048 px                & 2048 px \\
-Backbone                        & ResNet18               & inherited from checkpoint \\
-BiLSTM layers                   & 2                      & 2 \\
-BiLSTM hidden size              & 192 per direction      & 192 per direction \\
-LSTM inter-layer dropout        & 0.2                    & 0.2 \\
-CNN dropout                     & 0.15                   & 0.15 \\
-Vocabulary size                 & 29 (26 character tokens + 3 special) & 29 \\
-Real-to-synthetic sampling weight & not applicable       & real 1.0 / synthetic 0.4 \\
+Optimizer                         & AdamW               & AdamW \\
+Peak learning rate                & \num{1e-3}          & \num{2e-4} \\
+Weight decay                      & \num{1e-4}          & \num{1e-4} \\
+LR schedule                       & OneCycleLR (cosine) & OneCycleLR (cosine) \\
+Warm-up fraction                  & 0.05                & 0.05 \\
+Maximum epochs                    & 30                  & 20 \\
+Early-stopping patience           & 8                   & 6 \\
+Batch size                        & 32                  & 32 \\
+Gradient clipping (max norm)      & 5.0                 & 5.0 \\
+DataLoader workers                & 6                   & 6 \\
+Image height                      & 64\,px              & 64\,px \\
+Maximum image width               & 2048\,px            & 2048\,px \\
+Backbone                          & ResNet18            & inherited from checkpoint \\
+BiLSTM layers                     & 2                   & 2 \\
+BiLSTM hidden size                & 192 per direction   & 192 per direction \\
+LSTM inter-layer dropout          & 0.2                 & 0.2 \\
+CNN dropout                       & 0.15                & 0.15 \\
+Vocabulary size                   & 29 (26 char + 3 special) & 29 \\
+Real-to-synthetic sampling weight & N/A                 & real 1.0 / synth 0.4 \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Hyperparameters of the chord-OCR CRNN at training and fine-tuning.}
 \label{tab:hyperparams-chord}
 \end{table}
@@ -160,15 +172,17 @@ Real-to-synthetic sampling weight & not applicable       & real 1.0 / synthetic 
 
 \Cref{tab:inference} reports the defaults of the inference pipeline. Most of these are read from environment variables at start-up rather than from \texttt{Config}, because they control behaviour of a checkpoint that is already fixed.
 
-\begin{table}[h]
-\centering
-\begin{tabular}{ll}
+\begin{table}[H]
+\centering\small
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.30}
+\begin{tabularx}{\textwidth}{@{} p{0.40\textwidth} L @{}}
 \toprule
 \textbf{Setting} & \textbf{Default} \\
 \midrule
 PDF rasterisation DPI (\texttt{OMR\_PDF\_DPI})   & 300, clamped to $[72, 600]$ \\
 CTC decoder                                      & greedy (argmax then collapse-and-strip-blanks) \\
-Beam-search width (\texttt{OMR\_BEAM\_WIDTH})    & 1 (greedy); 5 recommended only if $\leq 1$ edit per 1000 SER gain justifies the $\sim 6\times$ decode cost \\
+Beam-search width (\texttt{OMR\_BEAM\_WIDTH})    & 1 (greedy). Width~5 yields $\leq 1$ edit per 1000 SER improvement at ${\sim}6\times$ decode cost. \\
 Multi-page handling                              & only page 0 of multi-page PDFs is processed \\
 Tiling mode (\texttt{OMR\_ENABLE\_TILING})       & disabled (legacy mode) \\
 Chord checkpoint (\texttt{OMR\_CHORD\_CHECKPOINT}) & \texttt{models/chord/latest/best\_model.pt} \\
@@ -185,9 +199,75 @@ Horizontal staff-line kernel                     & $hh \times 1$ rectangle, wher
 \texttt{min\_mean\_logprob} (CTC gate)           & $-0.05$ (checkpoint-dependent) \\
 \texttt{confident\_override\_logprob}            & $-0.05$ (checkpoint-dependent) \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Default inference-time settings of the OMR pipeline.}
 \label{tab:inference}
 \end{table}
 
 The two log-probability thresholds in \Cref{tab:inference} are calibrated against the log-probability distribution of the active CRNN checkpoint and must be recomputed after every retraining via \texttt{poetry run python src/cli.py calibrate-reject \ldots}; the values shown reflect the current \texttt{models/latest/best\_model.pt}.
+
+\section{Technology Stack}
+
+\Cref{tab:tech-stack} lists the principal libraries used in each layer
+of the system and the version pins recorded in \code{pyproject.toml}.
+Poetry's \code{poetry.lock} fixes every transitive dependency, so the
+environment is reproducible across machines with \code{poetry install}.
+
+\begin{table}[H]
+\centering
+\small
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabularx}{\textwidth}{@{} l l L @{}}
+\toprule
+\textbf{Layer} & \textbf{Library / version} & \textbf{Role} \\
+\midrule
+Deep learning            & PyTorch $\geq 2.10$~\cite{paszkeImperativeStyleHighPerformance2019} & Model, loss, optimiser, mixed-precision training. \\ \tfgrowsep
+CNN backbone             & \code{torchvision} $\geq 0.25$~\cite{torchvision2016} & ResNet18 module definition. \\ \tfgrowsep
+Image processing         & OpenCV $\geq 4.13$~\cite{bradskiOpenCVLibrary2000} & Binarisation, deskewing, morphological staff detection. \\ \tfgrowsep
+PDF rasterisation        & PyMuPDF (\code{fitz}) $\geq 1.27$~\cite{artifexPyMuPDF} & Render PDF pages to grayscale arrays at configurable DPI. \\ \tfgrowsep
+Music rendering          & LilyPond $\geq 2.25$ + LilyJAZZ~\cite{nienhuysLilyPondSystem2003,hammerleOpenLilyPondFontsLilyJAZZ} & Generate training PNGs from PrIMuS semantic files. \\ \tfgrowsep
+Data augmentation        & \code{albumentations} $\geq 2.0$\,\cite{AlbumentationsFastFlexible} & Scan-simulation transform pipeline. \\ \tfgrowsep
+Numerics                 & NumPy $\geq 2.4$~\cite{harrisArrayProgramming2020} & Tensor / array interop. \\ \tfgrowsep
+Text-region OCR          & EasyOCR $\geq 1.7$~\cite{jaidedaiEasyOCR} & Pre-CRNN staff-reject gate (text-density signal). \\ \tfgrowsep
+Web service              & FastAPI $\geq 0.115$ + Uvicorn $\geq 0.32$~\cite{ramirezFastAPI} & REST API wrapping the inference pipeline. \\ \tfgrowsep
+Package manager          & Poetry $\geq 2.0$ & Dependency isolation, deterministic environment. \\
+\bottomrule
+\end{tabularx}
+\caption{Principal libraries and version pins (\Cref{sec:impl-stack}).}
+\label{tab:tech-stack}
+\end{table}
+
+\section{Command-Line Interface}
+
+\Cref{tab:cli-subcommands} lists the twelve subcommands of
+\code{src/cli.py}.
+Every subcommand prints self-contained help text when invoked with
+\code{--help}.
+
+\begin{table}[H]
+\centering
+\small
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabularx}{\textwidth}{@{} l L @{}}
+\toprule
+\textbf{Subcommand} & \textbf{Purpose} \\
+\midrule
+\code{render}                  & Render PrIMuS \code{.semantic} files to LilyJAZZ PNGs. \\ \tfgrowsep
+\code{convert}                 & Convert PrIMuS \code{.semantic} files to LMX labels. \\ \tfgrowsep
+\code{augment}                 & Apply scan-simulation augmentation to clean PNGs. \\ \tfgrowsep
+\code{vocab}                   & Build the LMX vocabulary file from a corpus. \\ \tfgrowsep
+\code{pipeline}                & Run \code{render} + \code{convert} + twins + \code{augment} + \code{vocab} (\code{--force-all} rebuilds all). \\ \tfgrowsep
+\code{train}                   & Train the CRNN on a prepared dataset. \\ \tfgrowsep
+\code{evaluate}                & Evaluate a checkpoint and report SER. \\ \tfgrowsep
+\code{evaluate-ab}             & Compare beam widths on the same checkpoint. \\ \tfgrowsep
+\code{api}                     & Launch the FastAPI web service. \\ \tfgrowsep
+\code{pipeline-train}          & Run the full data pipeline then immediately start training. \\ \tfgrowsep
+\code{harvest-reject-fixtures} & Cut staff-strip fixtures from real PDFs for reject-gate calibration. \\ \tfgrowsep
+\code{calibrate-reject}        & Sweep reject-gate thresholds on labelled fixtures and emit \code{thresholds.json}. \\
+\bottomrule
+\end{tabularx}
+\caption{CLI subcommands exposed by \code{src/cli.py} (\Cref{sec:impl-cli}).}
+\label{tab:cli-subcommands}
+\end{table}

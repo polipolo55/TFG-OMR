@@ -6,17 +6,16 @@ high-level decision was taken.
 The companion chapter on implementation (\Cref{ch:impl}) describes
 \textit{how} the design is realised in code.
 
-Three considerations shape every decision below.
-First, the target domain (\Cref{sec:design-domain}) is narrow:
-monophonic treble-clef lead sheets in the Real Book style.
-A general-purpose OMR system is out of scope.
-Restricting the domain frees the design from a long tail of notation features
-that would otherwise consume disproportionate effort.
-Second, no labelled corpus of real jazz lead sheets exists, which
-rules out fully supervised end-to-end training from real data and pushes
-the design toward synthetic supervision with domain transfer.
-Third, the project runs on a single consumer GPU within a Bachelor's
-thesis time budget, which caps model capacity, training time, and the
+Three constraints shape every decision in this chapter.
+The target domain (\Cref{sec:design-domain}) is narrow: monophonic
+treble-clef lead sheets in the Real Book style, nothing broader.
+Restricting the scope frees the design from a long tail of notation
+features that would otherwise consume disproportionate effort.
+No labelled corpus of real jazz lead sheets exists, which rules out
+fully supervised end-to-end training from real data and pushes the
+design toward synthetic supervision with domain transfer.
+And the project runs on a single consumer GPU within a Bachelor's
+thesis time budget, capping model capacity, training time, and the
 number of architectural alternatives that can be explored empirically.
 
 Each major decision in this chapter is argued in its own section and
@@ -117,6 +116,8 @@ melody line in treble clef with chord symbols printed above the staff.
 The notation contract is summarised in \Cref{tab:domain-contract}; it
 defines both the inputs the design must handle and the inputs that
 fall outside its scope.
+Readers unfamiliar with any of the notation terms in the table are
+directed to \Cref{app:notation-primer}.
 
 \begin{table}[ht]
 \centering
@@ -166,8 +167,8 @@ complex output vocabulary, which is an open research direction rather
 than a Bachelor's-thesis deliverable.
 
 \paragraph{Quantitative acceptance criteria.}
-A design has to commit to falsifiable targets before \Cref{ch:results}
-can adjudicate whether the system works.
+The design must commit to falsifiable targets so that \Cref{ch:results}
+can adjudicate whether they are met.
 The thresholds below are calibrated against published baselines on
 PrIMuS-like clean data, where end-to-end CRNN--CTC systems report
 aggregate Symbol Error Rates in the
@@ -661,7 +662,7 @@ This thesis adopts LMX rather than reinventing a project-specific
 format, restricting its grammar to the subset needed for monophonic
 jazz lead sheets (no tuplets, no slurs, single accidentals only,
 treble clef only).
-The remainder of this section defines that subset and justifies the
+The rest of this section defines that subset and justifies the
 encoding choices that interact with the model.
 
 \subsection{Grammar}

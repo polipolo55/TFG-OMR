@@ -2,18 +2,15 @@
 \label{ch:impl}
 
 This chapter describes how the design of \Cref{ch:design} is realised
-in code: the libraries chosen at each layer, the structure of the
-repository, the concrete configuration values used in production, and
-the engineering decisions that keep the system reproducible and within
-the compute budget of a single consumer GPU.
-The split between design and implementation is deliberate: the
-conceptual architecture in \Cref{ch:design} should be readable
-independently of any particular library or framework choice, while the
-present chapter commits to specific versions, magic numbers, and
-implementation-forced trade-offs.
-A separate section (\Cref{sec:impl-performance}) collects the
-computational-complexity arguments and the speed/throughput
-optimisations applied across the pipeline.
+in code: the libraries chosen at each layer, the repository structure,
+the concrete configuration values, and the engineering choices that
+keep the system reproducible within the compute budget of a single
+consumer GPU.
+The conceptual architecture in \Cref{ch:design} is intentionally
+library-agnostic; this chapter fills in the specific versions, magic
+numbers, and trade-offs that follow from the hardware and the toolchain.
+Computational-complexity arguments and speed optimisations are
+collected in \Cref{sec:impl-performance}.
 
 The realised system, at the scale reported in \Cref{ch:results},
 renders \num{87677} PrIMuS lines, adds \num{26168} header-less twin
@@ -38,6 +35,7 @@ The selection criterion in every case was the smallest, most
 widely-used library compatible with the design constraints stated in
 \Cref{ch:design}; no component was chosen for novelty.
 
+
 \begin{table}[htbp]
 \centering
 \small
@@ -47,15 +45,15 @@ widely-used library compatible with the design constraints stated in
 \toprule
 \textbf{Layer} & \textbf{Library / version} & \textbf{Role} \\
 \midrule
-Deep learning            & PyTorch $\geq 2.10$\todo{cite PyTorch (Paszke et al.\ 2019)} & Model, loss, optimiser, mixed-precision training. \\ \tfgrowsep
-CNN backbone             & \code{torchvision} $\geq 0.25$\todo{cite torchvision} & ResNet18 module definition. \\ \tfgrowsep
-Image processing         & OpenCV $\geq 4.13$\todo{cite OpenCV (Bradski 2000)} & Binarisation, deskewing, morphological staff detection. \\ \tfgrowsep
-PDF rasterisation        & PyMuPDF (\code{fitz}) $\geq 1.27$\todo{cite PyMuPDF} & Render PDF pages to grayscale arrays at configurable DPI. \\ \tfgrowsep
-Music rendering          & LilyPond $\geq 2.25$ + LilyJAZZ\todo{cite LilyPond and LilyJAZZ} & Generate training PNGs from PrIMuS semantic files. \\ \tfgrowsep
+Deep learning            & PyTorch $\geq 2.10$~\cite{paszkeImperativeStyleHighPerformance2019} & Model, loss, optimiser, mixed-precision training. \\ \tfgrowsep
+CNN backbone             & \code{torchvision} $\geq 0.25$~\cite{torchvision2016} & ResNet18 module definition. \\ \tfgrowsep
+Image processing         & OpenCV $\geq 4.13$~\cite{bradskiOpenCVLibrary2000} & Binarisation, deskewing, morphological staff detection. \\ \tfgrowsep
+PDF rasterisation        & PyMuPDF (\code{fitz}) $\geq 1.27$~\cite{artifexPyMuPDF} & Render PDF pages to grayscale arrays at configurable DPI. \\ \tfgrowsep
+Music rendering          & LilyPond $\geq 2.25$ + LilyJAZZ~\cite{nienhuysLilyPondSystem2003,hammerleOpenLilyPondFontsLilyJAZZ} & Generate training PNGs from PrIMuS semantic files. \\ \tfgrowsep
 Data augmentation        & \code{albumentations} $\geq 2.0$\,\cite{AlbumentationsFastFlexible} & Scan-simulation transform pipeline. \\ \tfgrowsep
-Numerics                 & NumPy $\geq 2.4$\todo{cite NumPy (Harris et al.\ 2020)} & Tensor / array interop. \\ \tfgrowsep
-Text-region OCR          & EasyOCR $\geq 1.7$\todo{cite EasyOCR} & Pre-CRNN staff-reject gate (text-density signal). \\ \tfgrowsep
-Web service              & FastAPI $\geq 0.115$ + Uvicorn $\geq 0.32$\todo{cite FastAPI / Starlette} & REST API wrapping the inference pipeline. \\ \tfgrowsep
+Numerics                 & NumPy $\geq 2.4$~\cite{harrisArrayProgramming2020} & Tensor / array interop. \\ \tfgrowsep
+Text-region OCR          & EasyOCR $\geq 1.7$~\cite{jaidedaiEasyOCR} & Pre-CRNN staff-reject gate (text-density signal). \\ \tfgrowsep
+Web service              & FastAPI $\geq 0.115$ + Uvicorn $\geq 0.32$~\cite{ramirezFastAPI} & REST API wrapping the inference pipeline. \\ \tfgrowsep
 Package manager          & Poetry $\geq 2.0$ & Dependency isolation, deterministic environment. \\
 \bottomrule
 \end{tabularx}
@@ -81,20 +79,19 @@ dependencies are listed in \code{pyproject.toml} and locked in
 \label{sec:impl-repo}
 
 The project source tree is organised by responsibility rather than by
-file type.
-Three structural principles are enforced.
+file type, with three structural rules.
 First, all music-notation mapping tables (clef IDs, key-signature
 encodings, duration tokens) live in a single module,
-\code{CRNN\_CTC/lilypond\_render.py}, and are imported by every other
-module that needs them; this prevents the rendering pipeline and the
-label converter from drifting out of sync.
+\code{CRNN\_CTC/lilypond\_render.py}, imported by every module that
+needs them; this stops the rendering pipeline and the label converter
+drifting out of sync.
 Second, the inference pipeline (\code{omr\_pipeline/}) depends on the
 training code only through the \code{Vocabulary} and \code{CRNN}
 classes, so it can be deployed without the training tree.
-Third, the CLI module (\code{cli.py}) is the only entry point: every
-multi-step operation (data generation, training, evaluation, vocab
-building, threshold calibration) is exposed as a subcommand sharing the
-same flag names and defaults.
+Third, \code{cli.py} is the only entry point: every multi-step
+operation (data generation, training, evaluation, vocab building,
+threshold calibration) is a subcommand sharing the same flag names and
+defaults.
 
 \begin{quote}\small
 \begin{verbatim}
@@ -137,76 +134,112 @@ src/
 \label{sec:impl-data}
 
 The data pipeline of \Cref{sec:design-data} is implemented as five
-offline stages orchestrated by \code{pipeline} and
-\code{pipeline-train}: \code{render}, \code{convert}, header-less
-twin generation (\code{generate\_headerless\_twins.py}), \code{augment},
-and \code{vocab}.
-Incremental runs skip up-to-date outputs; \code{--force-all} re-runs
-every stage (re-render, re-convert, re-twin, re-augment).
-\Cref{fig:data-pipeline-impl} shows the flow.
+offline stages orchestrated by \code{pipeline} and \code{pipeline-train}:
+\code{render}, \code{convert}, header-less twin generation
+(\code{generate\_headerless\_twins.py}), \code{augment}, and \code{vocab}.
+Incremental runs skip stages whose outputs are already up to date;
+\code{--force-all} rebuilds everything from scratch.
+\Cref{fig:data-pipeline-impl} shows the full flow.
 Every stage uses the Python \code{multiprocessing} module for CPU
 parallelism, with the worker-pool size set by a CLI flag (default 8 on
 the target machine).
-The choice of process-based parallelism over threading is dictated by
-the Global Interpreter Lock; the engineering trade-off it implies is
-discussed in \Cref{sec:impl-performance}.
+The choice of process-based parallelism over threading follows from the
+Global Interpreter Lock; the trade-off is discussed in
+\Cref{sec:impl-performance}.
 
 \begin{figure}[ht]
-  \centering
-  \begin{tikzpicture}[
-    box/.style={
-      draw, rounded corners=3pt,
-      minimum width=4.6cm, minimum height=1.0cm,
-      align=center, font=\footnotesize,
-      inner sep=4pt
-    },
-    arr/.style={->, thick, >=stealth},
-    annot/.style={font=\scriptsize\itshape, align=left},
-    node distance=0.65cm
-  ]
-    \node[box, fill=blue!8]                              (raw)    {PrIMuS raw data\\\scriptsize(\code{.semantic} + audio)};
-    \node[box, fill=orange!15, below=of raw]             (render) {\code{generate\_realbook.py}\\\scriptsize LilyPond render $\to$ PNG};
-    \node[box, fill=orange!15, below=of render]          (conv)   {\code{semantic\_to\_lmx.py}\\\scriptsize \code{.semantic} $\to$ LMX tokens};
-    \node[box, fill=orange!15, below=of conv]            (twins)  {\code{generate\_headerless\_twins}\\\scriptsize \code{\_\_nh} twins};
-    \node[box, fill=orange!15, below=of twins]           (aug)    {\code{augment\_scanned.py}\\\scriptsize scan simulation};
-    \node[box, fill=orange!15, below=of aug]             (vocab)  {\code{vocab}\\\scriptsize token union};
-    \node[box, fill=green!15,  below=of vocab]           (split)  {Dataset splits\\\scriptsize train / val / test};
+\centering
+\begin{tikzpicture}[
+  >={Stealth[round]},
+  io/.style={
+    draw, shape=regular polygon, regular polygon sides=6,
+    shape border rotate=90, inner sep=2pt, align=center,
+    font=\scriptsize\sffamily
+  },
+  stage/.style={
+    draw, rectangle, rounded corners=3pt,
+    minimum width=4.8cm, minimum height=0.95cm,
+    align=center, font=\small\sffamily,
+    inner sep=4pt
+  },
+  flow/.style={->, thick},
+  note/.style={font=\scriptsize\itshape, text=black!55},
+  node distance=0.6cm
+]
+  % ── Nodes ────────────────────────────────────────────────────────────────
+  \node[io]                       (raw)    {PrIMuS\\raw data};
+  \node[stage, below=of raw]      (render) {LilyJAZZ render\\\footnotesize\ttfamily generate\_realbook.py};
+  \node[stage, below=of render]   (conv)   {Semantic-to-LMX conversion\\\footnotesize\ttfamily semantic\_to\_lmx.py};
+  \node[stage, below=of conv]     (twins)  {Header-less twin generation\\\footnotesize\ttfamily generate\_headerless\_twins.py};
+  \node[stage, below=of twins]    (aug)    {Scan-simulation augmentation\\\footnotesize\ttfamily augment\_scanned.py};
+  \node[stage, below=of aug]      (vocab)  {Vocabulary construction\\\footnotesize\ttfamily cli.py~vocab};
+  \node[io, below=of vocab]       (split)  {Train / val\\/ test splits};
 
-    \draw[arr] (raw)    -- (render);
-    \draw[arr] (render) -- (conv);
-    \draw[arr] (conv)   -- (twins);
-    \draw[arr] (twins)  -- (aug);
-    \draw[arr] (aug)    -- (vocab);
-    \draw[arr] (vocab)  -- (split);
+  % ── Output annotations ───────────────────────────────────────────────────
+  \node[note, right=0.9cm of conv]  (n1) {PNG\,+\,\texttt{.lmx} label pairs};
+  \node[note, right=0.9cm of twins] (n2) {\texttt{\_\_nh} header-less variants};
+  \node[note, right=0.9cm of aug]   (n3) {distorted copies in \texttt{scanned/}};
+  \node[note, right=0.9cm of vocab] (n4) {\texttt{data/vocab/primus\_lmx.txt}};
 
-    \node[annot, right=0.25cm of render.south east, anchor=west, yshift=-0.05cm] {(PNG + LMX labels)};
-    \node[annot, right=0.25cm of twins.south east,  anchor=west, yshift=-0.05cm] {(header-less twins)};
-    \node[annot, right=0.25cm of aug.south east,    anchor=west, yshift=-0.05cm] {(augmented PNG + labels)};
-  \end{tikzpicture}
-  \caption{The data pipeline: PrIMuS semantic files are re-rendered
-  in LilyJAZZ, converted to LMX labels, augmented with header-less
-  twins, scan-simulated, and indexed into a vocabulary file before
-  train/val/test splitting at load time.}
-  \label{fig:data-pipeline-impl}
+  % ── Arrows ───────────────────────────────────────────────────────────────
+  \draw[flow] (raw)    -- (render);
+  \draw[flow] (render) -- (conv);
+  \draw[flow] (conv)   -- (twins);
+  \draw[flow] (twins)  -- (aug);
+  \draw[flow] (aug)    -- (vocab);
+  \draw[flow] (vocab)  -- (split);
+
+  % ── Outer system box + bold label ────────────────────────────────────────
+  % fit= is unreliable when notes extend rightward; use explicit coordinates.
+  % twins.west gives the leftmost stage edge; n4.east the rightmost note edge.
+  \begin{scope}[on background layer]
+    \draw ([xshift=-0.4cm, yshift=0.4cm]  raw.north   -| twins.west)
+          rectangle
+          ([xshift=0.5cm,  yshift=-0.4cm] split.south -| n4.east);
+  \end{scope}
+  % title north must be below the rectangle bottom (split.south - 0.4cm);
+  % use -0.45cm so there is a small gap, matching the other pipeline figures
+  \node[anchor=north, font=\small\bfseries\sffamily, inner sep=3pt]
+    at ($([xshift=-0.4cm] split.south -| twins.west)!0.5!([xshift=0.5cm] split.south -| n4.east)+(0,-0.45cm)$)
+    {Data preparation pipeline};
+
+\end{tikzpicture}
+\caption[Data preparation pipeline.]{Five offline stages that convert PrIMuS
+  raw data into training-ready image/label pairs.
+  The \code{pipeline} and \code{pipeline-train} subcommands run all five
+  stages in sequence; incremental runs skip any stage whose outputs are already
+  up to date.}
+\label{fig:data-pipeline-impl}
 \end{figure}
 
 \subsection{Render: PrIMuS to LilyJAZZ}
 
-The \code{render} subcommand walks the PrIMuS package directories,
-parses each \code{.semantic} file, normalises the clef to G2 (writing
-the original pitches at their equivalent treble-clef position when
-the source clef is C1, C2, or F3), constructs a LilyPond source file,
-and invokes the \code{lilypond} subprocess at \SI{200}{DPI}.
+The \code{render} subcommand walks the PrIMuS package directories and,
+for each \code{.semantic} file, normalises the clef to G2 (transposing
+pitches to the treble-clef equivalent when the source clef is C1, C2,
+or F3), constructs a LilyPond source file, and invokes the
+\code{lilypond} subprocess at \SI{200}{DPI}.
 The output PNG is auto-cropped to remove white margins.
+
+Four per-sample parameters are drawn independently to cover the visual
+range described in \Cref{sec:design-data}.
+The global staff size is sampled uniformly from
+$\{17, 18, 19, 20, 21, 22\}$ points, which varies notehead size and
+horizontal note spacing.
+Common-time and cut-time signatures are rendered as numerals with
+probability \num{0.5} and as the corresponding C glyph otherwise.
+Cautionary accidentals are added with probability \num{0.5}.
+Beaming is beat-grouped in \SI{85}{\percent} of samples and left
+unbeamed in the remaining \SI{15}{\percent}, matching the typical ratio
+in Real Book editions.
 
 The LilyJAZZ font stylesheet is not bundled with LilyPond and must be
 installed manually into the LilyPond \code{share} directory before
-rendering can begin; the installation procedure is documented in
-\code{docs/data\_pipeline.md} and the system assumes its presence at
-runtime.
-LilyPond~$\geq$~2.25 also requires a small API patch to LilyJAZZ:
-the deprecated \code{set-global-fonts} call is rewritten using the new
-\code{property-defaults.fonts.*} interface.
+rendering can begin; the installation procedure is in
+\code{docs/data\_pipeline.md}.
+LilyPond~$\geq$~2.25 also requires a small patch to LilyJAZZ: the
+deprecated \code{set-global-fonts} call is rewritten using the
+\code{property-defaults.fonts.*} API introduced in that version.
 
 \subsection{Convert: PrIMuS \texttt{.semantic} to LMX}
 
@@ -272,20 +305,9 @@ calibrated against a sample of real Real Book scans.}
 \label{tab:aug-pipeline}
 \end{table}
 
-\begin{figure}[ht]
-  \centering
-  \fbox{\parbox[c][5cm][c]{0.85\textwidth}{\centering \todo{FIGURE: Six
-  side-by-side staff strips.  Left: clean LilyPond render.  Then five
-  progressively augmented versions: (1)~Gaussian blur ($\sigma=1.5$),
-  (2)~elastic warp, (3)~ink-bleed simulation, (4)~JPEG compression
-  artefacts, (5)~all combined.  Generate with:
-  \texttt{poetry run python scripts/generate\_augment\_samples.py
-  --n-samples 1 --show-steps}.  Target: 6 panels,
-  width=\textbackslash textwidth, height $\approx$ 2\,cm each.}}}
-  \caption{One clean LilyJAZZ render and five scan-simulated copies
-  produced by the \code{augment} stage.}
-  \label{fig:augment-samples}
-\end{figure}
+Representative outputs of the augmentation pipeline are shown in
+\Cref{fig:aug-gallery}; the present section focuses on the
+implementation details that produce them.
 
 A second, lighter augmentation layer is applied online during training
 inside \code{Dataset.\_\_getitem\_\_}: per-sample brightness and
@@ -304,14 +326,11 @@ training corpus, collects the unique tokens, sorts them
 alphabetically, and writes them to a plain-text file with one token
 per line.
 The three special tokens (\code{<blank>}, \code{<pad>}, \code{<unk>})
-are deliberately absent from the file: they are injected at indices
-0, 1, and 2 by the \code{Vocabulary} class at load time, so line
-$N$ in the file maps to index $N+3$.
-The full pitch (A--G) and octave (0--8) ranges are reserved in the
-vocabulary even when some entries are absent from the corpus, so that
-the model's softmax output has a stable shape across data-pipeline
-reruns and out-of-distribution pitch predictions decode gracefully
-rather than collapsing to \code{<unk>}.
+are absent from the file; the \code{Vocabulary} class injects them at
+indices 0, 1, and 2 at load time, so line $N$ in the file maps to
+index $N+3$.
+The rationale for the index layout and the guaranteed pitch/octave
+reservations is described in \Cref{sec:lmx-format}.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Model Implementation}
@@ -327,12 +346,10 @@ probabilities ready for the CTC loss.
 
 \subsection{ResNet18 backbone modifications}
 
-The model uses the \code{torchvision.models.resnet18} architecture
-\textit{without} ImageNet pre-trained weights (the call is
-\code{resnet18(weights=None)}).
-Training a monochrome staff recogniser from scratch is feasible on
-this corpus and avoids the channel-averaging hack that pre-trained
-weights would otherwise require for the single-channel input layer.
+The model uses \code{torchvision.models.resnet18} without ImageNet
+pre-trained weights (\code{resnet18(weights=None)}); the rationale
+for training from scratch on the single-channel monochrome input is
+in \Cref{sec:design-model}.
 Two modifications turn the standard ResNet18 into a CRNN backbone.
 First, \code{conv1} is replaced with a $7\times7$ convolution accepting
 single-channel input.
@@ -400,9 +417,8 @@ code path.
 
 \subsection{Training loop}
 
-The training loop is a single-process, single-GPU implementation built
-on PyTorch's standard primitives, with the following per-epoch
-schedule:
+The training loop is a standard single-GPU PyTorch loop.
+Each epoch runs the following steps in order:
 
 \begin{enumerate}
     \item Iterate over the training \code{DataLoader} configured with
@@ -600,9 +616,10 @@ real strips carry weight $1.0$, synthetic strips weight $0.4$ (the
 default \code{--synth-weight}).  The synthetic admixture prevents
 catastrophic forgetting of rare chord qualities under-represented in
 the small real set.
-Labels go through a \term{canonicalisation} step before the
-vocabulary filter: \code{-7b5}/\code{m7b5}/\code{min7b5} are
-rewritten to the canonical \code{ø} token; \code{Cm7} becomes
+Labels go through the \term{canonicalisation} step defined in
+\Cref{sec:design-twostream} before the vocabulary filter:
+\code{-7b5}/\code{m7b5}/\code{min7b5} are rewritten to the
+canonical \code{ø} token; \code{Cm7} becomes
 \code{C-7}; \code{sus4}/\code{sus2} become \code{sus}; and any chord
 token containing an out-of-vocabulary character is dropped (with a
 warning) rather than silently corrupted by mid-token character
@@ -612,66 +629,12 @@ removal.
 \section{Inference Pipeline Implementation}
 \label{sec:impl-inference}
 
-\begin{figure}[ht]
-  \centering
-  \begin{tikzpicture}[
-    box/.style={
-      draw, rounded corners=3pt,
-      minimum width=2.6cm, minimum height=0.95cm,
-      align=center, font=\footnotesize, text width=2.6cm,
-      inner sep=2pt
-    },
-    arr/.style={->, thick, >=stealth},
-    node distance=0.55cm
-  ]
-    %% ── Top: input, preprocess, staff detect ─────────────────────────
-    \node[box, fill=blue!8]                              (in)   {PDF /\\image};
-    \node[box, fill=blue!8,   below=of in]               (pre)  {Preprocess\\\scriptsize deskew, binarise, resize};
-    \node[box, fill=blue!8,   below=of pre]              (det)  {Staff detection\\\scriptsize horizontal projection};
-
-    %% ── Music stream (left branch) ───────────────────────────────────
-    \node[box, fill=orange!18, below left=0.9cm and 0.6cm of det]  (mcrn) {Music CRNN};
-    \node[box, fill=orange!18, below=of mcrn]                      (mdec) {Greedy / beam\\CTC decode};
-    \node[box, fill=orange!18, below=of mdec]                      (lmx)  {LMX tokens};
-
-    %% ── Chord stream (right branch) ──────────────────────────────────
-    \node[box, fill=teal!18,   below right=0.9cm and 0.6cm of det] (ccrn) {Chord CRNN};
-    \node[box, fill=teal!18,   below=of ccrn]                      (cdec) {Greedy / beam\\CTC decode};
-    \node[box, fill=teal!18,   below=of cdec]                      (chl)  {Chord labels};
-
-    %% ── Merge: grammar fix → JSON ────────────────────────────────────
-    \node[box, fill=violet!18, below=1.1cm of det, yshift=-5.6cm] (gf)  {Grammar fixer};
-    \node[box, fill=blue!8,    below=of gf]                       (out) {JSON output};
-
-    %% ── Arrows: top column ───────────────────────────────────────────
-    \draw[arr] (in)  -- (pre);
-    \draw[arr] (pre) -- (det);
-
-    %% Fork from staff detect to both streams
-    \draw[arr] (det.south) -- ++(0,-0.25) -| node[above, font=\scriptsize, pos=0.25] {staff strips} (mcrn.north);
-    \draw[arr] (det.south) -- ++(0,-0.25) -| (ccrn.north);
-
-    \draw[arr] (mcrn) -- (mdec);
-    \draw[arr] (mdec) -- (lmx);
-    \draw[arr] (ccrn) -- (cdec);
-    \draw[arr] (cdec) -- (chl);
-
-    %% Merge to grammar fixer
-    \draw[arr] (lmx.south) -- ++(0,-0.25) -| (gf.north);
-    \draw[arr] (chl.south) -- ++(0,-0.25) -| (gf.north);
-
-    \draw[arr] (gf) -- (out);
-  \end{tikzpicture}
-  \caption{The two-stream inference flow.  Music recognition and chord
-  recognition run as independent CRNN--CTC streams; their outputs are
-  joined per staff and validated by the grammar fixer before
-  serialisation as JSON.}
-  \label{fig:infer-twostream}
-\end{figure}
-
-The inference pipeline is a single function, \code{run\_pipeline},
-that accepts the raw bytes of a PDF or image plus the original
-filename and returns a structured JSON dictionary.
+The five-stage data flow was established in \Cref{sec:design-pipeline}
+and illustrated in \Cref{fig:pipeline-design}; the present section
+describes how each stage is realised in code.
+The pipeline is a single function, \code{run\_pipeline}, that accepts
+the raw bytes of a PDF or image plus the original filename and returns
+a structured JSON dictionary.
 It is invoked by the FastAPI endpoint of \Cref{sec:impl-api}; no
 separate CLI subcommand is exposed for single-page inference because
 the typical use-case is uploading a page through the web UI.
@@ -774,12 +737,12 @@ positives.
 
 \subsection{Grammar fixer}
 
-The grammar fixer is a stateful walker over the raw token list.  It
-tracks the current measure's accumulated beat count against the
-active time signature, the active key signature, and the in-progress
-note (whether a pitch has been emitted that is awaiting an octave or
-a duration).
-Rules are applied as the walker encounters each token:
+The grammar fixer is implemented as a stateful walker over the raw
+token list, realising the design contract of \Cref{sec:design-grammar}.
+The walker tracks the accumulated beat count against the active time
+signature, the active key signature, and whether a pitch token has
+been emitted that is still awaiting its octave and duration.
+The concrete state-transition rules applied per token are:
 
 \begin{itemize}
     \item A pitch token starts a new note; the walker waits for an
@@ -810,10 +773,8 @@ grammar of \Cref{sec:lmx-format}.
 \section{Command-Line Interface}
 \label{sec:impl-cli}
 
-The CLI is the unified entry point for every offline operation the
-system performs.
-It is implemented as a single \code{argparse} dispatcher in
-\code{src/cli.py} with the twelve subcommands listed in
+Every offline operation goes through \code{src/cli.py}, a single
+\code{argparse} dispatcher with the twelve subcommands listed in
 \Cref{tab:cli-subcommands}.
 
 \begin{table}[htbp]
@@ -877,9 +838,8 @@ overlaid, the recognised LMX token sequence per segment, and the
 extracted chord list.
 The UI is a debugging aid that doubles as a demonstration interface;
 it is not the principal deliverable.
-\todo{Measure: median wall-clock latency per page on the target GPU
-for a representative Real Book page, and document the FastAPI
-request-body size limit currently in use.}
+\todo{Run \texttt{notebooks/02\_evaluate\_model.ipynb} §9.2 to get
+median page latency; replace this line with the result.}
 The full response schema is documented in
 \code{docs/api.md}; the JSON top level carries \code{pages[]},
 \code{meta\{\}}, and a top-level \code{error} field that is non-null
@@ -889,13 +849,11 @@ only on pipeline failure.
 \section{Computational Performance and Speed Optimisations}
 \label{sec:impl-performance}
 
-This section makes explicit the complexity arguments that motivated
-the design of \Cref{ch:design} and the engineering choices that
-implement them.  It is organised in three parts:
-algorithmic-complexity choices baked into the model and the decoder,
-engineering optimisations applied to the training and inference
-loops, and the throughput / latency / accuracy trade-offs the system
-exposes.
+This section covers the computational-complexity reasoning behind the
+design of \Cref{ch:design} and the concrete engineering choices that
+follow from it: which operations are cheap by construction, which
+required active work to keep within budget, and how the
+throughput/latency/accuracy trade-offs are exposed to the operator.
 
 \subsection{Algorithmic-complexity choices}
 \label{sec:impl-perf-algorithmic}
@@ -1051,10 +1009,8 @@ latency is paid once at process start, not per request.
 \paragraph{End-to-end per-page wall time.}
 On the target RTX~3060, the end-to-end inference cost of a typical
 \num{8}-staff Real Book page is approximately
-\todo{measure: total wall-clock for \texttt{run\_pipeline()} on a
-representative page at the default DPI; break down by stage:
-preprocessing, staff detection, rejection gate, music CRNN, chord
-CRNN, grammar fix, JSON serialisation}.
+\todo{Run \texttt{notebooks/02\_evaluate\_model.ipynb} §9.2
+and paste the median from the summary cell here.}.
 
 \paragraph{Cost breakdown across stages.}
 The morphological staff detection runs in milliseconds on CPU and is
@@ -1065,8 +1021,8 @@ component because it runs the full CRAFT detection model on each
 candidate strip.
 Once a strip is accepted, the music CRNN forward pass and greedy CTC
 decoding together cost roughly
-\todo{measure: per-strip CRNN forward + greedy decode latency at
-$W \approx 1500$}.
+\todo{Run \texttt{notebooks/02\_evaluate\_model.ipynb} §9.1
+and paste the median per-strip latency here.}.
 The chord CRNN runs on a strip of half the staff height and a small
 fraction of the strip width, so its forward-pass cost is correspondingly
 smaller; its total throughput is dominated by the per-batch overhead of

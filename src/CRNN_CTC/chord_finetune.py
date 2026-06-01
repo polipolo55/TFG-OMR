@@ -107,19 +107,25 @@ class RealChordDataset(Dataset):
             label = _M_TO_DASH_RE.sub("-", label)
             # 3. "Csus4"/"Csus2" → "Csus" (the synthetic renderer uses bare "sus")
             label = _SUS_DEGREE_RE.sub("sus", label)
-            # 4. Drop any character not in the chord vocabulary (%, |, parens, …),
-            #    recording what was dropped so silent data loss stays visible.
-            kept: list[str] = []
-            for c in label:
-                if c in vocab_chars:
-                    kept.append(c)
-                elif not c.isspace():
-                    dropped_chars[c] = dropped_chars.get(c, 0) + 1
-                else:
-                    kept.append(c)
-            label = "".join(kept)
+            # 4. Per chord token: strip harmless OOV punctuation (parens, %, |, …),
+            #    but if an OOV *alphanumeric* survives (e.g. the '5' in a raw
+            #    "C7b5", or the 'g' in "Caug") the chord cannot be represented,
+            #    so DROP THE WHOLE SAMPLE rather than splice a char out (which
+            #    silently corrupts the label) or drop one token (which desyncs
+            #    the chord count against the image). Dropped chars are logged.
+            out_tokens: list[str] = []
+            for tok in label.split():
+                cleaned = "".join(c for c in tok if (c in vocab_chars) or c.isalnum())
+                if not cleaned:
+                    continue
+                bad = [c for c in cleaned if c not in vocab_chars]
+                if bad:
+                    for c in bad:
+                        dropped_chars[c] = dropped_chars.get(c, 0) + 1
+                    return ""
+                out_tokens.append(cleaned)
             # 5. Collapse runs of whitespace into a single space, trim
-            return " ".join(label.split())
+            return " ".join(out_tokens)
 
         self._samples: list[tuple[str, str]] = []
         n_dropped = 0
@@ -144,7 +150,8 @@ class RealChordDataset(Dataset):
             log.warning("Dropped %d real samples with empty/non-vocab labels", n_dropped)
         if dropped_chars:
             log.warning(
-                "Canonicalisation removed out-of-vocab characters from real labels: %s",
+                "Dropped samples whose labels contained out-of-vocab chord characters "
+                "(re-label or extend the vocab to keep them): %s",
                 ", ".join(f"{c!r}×{n}" for c, n in sorted(dropped_chars.items())),
             )
 
@@ -236,6 +243,17 @@ def finetune(args) -> Path:
         max_image_width=max_image_width,
         augment=True,
     )
+    # Clean (un-augmented) view over the SAME files/order for validation, so
+    # best-model selection is measured on stable images rather than per-epoch
+    # random jitter (which makes the tiny real-val CER noisy).
+    real_ds_eval = RealChordDataset(
+        strips_dir=Path(args.real_strips_dir),
+        labels_jsonl=Path(args.real_labels),
+        vocab=vocab,
+        img_height=img_height,
+        max_image_width=max_image_width,
+        augment=False,
+    )
 
     # Split real into train/val (small val so we don't waste real data)
     n_real = len(real_ds)
@@ -247,7 +265,7 @@ def finetune(args) -> Path:
     from torch.utils.data import Subset
 
     real_train = Subset(real_ds, train_idx)
-    real_val = Subset(real_ds, val_idx)
+    real_val = Subset(real_ds_eval, val_idx)
     log.info("Real split: %d train / %d val", len(real_train), len(real_val))
 
     synth_train = ChordDataset(

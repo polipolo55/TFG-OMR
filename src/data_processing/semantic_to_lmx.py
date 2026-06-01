@@ -349,7 +349,7 @@ def semantic_to_lmx_tokens(
 # ---------------------------------------------------------------------------
 
 
-def convert_sample(sample_dir: Path) -> list[str] | None:
+def convert_sample(sample_dir: Path, *, force: bool = False) -> list[str] | None:
     """
     Read the ``.semantic`` file from *sample_dir*, convert to LMX, and write
     a ``.lmx`` file alongside the other annotations.
@@ -363,6 +363,14 @@ def convert_sample(sample_dir: Path) -> list[str] | None:
     if not sem_path.exists():
         log.warning("No .semantic file in %s — skipping", sample_dir)
         return None
+
+    if not force and lmx_path.exists():
+        try:
+            if lmx_path.stat().st_mtime >= sem_path.stat().st_mtime:
+                text = lmx_path.read_text(encoding="utf-8").strip()
+                return text.split() if text else None
+        except OSError:
+            pass
 
     # Read semantic tokens (tab-separated in PrIMuS files)
     text = sem_path.read_text(encoding="utf-8")
@@ -389,9 +397,21 @@ def convert_sample(sample_dir: Path) -> list[str] | None:
     return lmx_tokens
 
 
-def _convert_worker(sample_dir: Path) -> bool:
-    """Wrapper for multiprocessing (returns success bool)."""
-    return convert_sample(sample_dir) is not None
+def _convert_worker(args: tuple[Path, bool]) -> tuple[str, str]:
+    """Wrapper for multiprocessing. Returns ``(sample_id, status)`` with status ok|skip|fail."""
+    sample_dir, force = args
+    sample_id = sample_dir.name
+    sem_path = sample_dir / f"{sample_id}.semantic"
+    lmx_path = sample_dir / f"{sample_id}.lmx"
+    if not force and lmx_path.exists() and sem_path.exists():
+        try:
+            if lmx_path.stat().st_mtime >= sem_path.stat().st_mtime:
+                return sample_id, "skip"
+        except OSError:
+            pass
+    if convert_sample(sample_dir, force=force) is not None:
+        return sample_id, "ok"
+    return sample_id, "fail"
 
 
 # ---------------------------------------------------------------------------
@@ -424,6 +444,11 @@ def main() -> None:
         "--verbose",
         action="store_true",
         help="Show DEBUG messages",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-convert even when .lmx is newer than .semantic",
     )
     args = parser.parse_args()
 
@@ -458,32 +483,36 @@ def main() -> None:
     if error_log.exists():
         error_log.unlink()
 
-    ok = fail = 0
+    ok = fail = skip = 0
+    work = [(sd, args.force) for sd in sample_dirs]
+
+    def _tally(sample_id: str, status: str) -> None:
+        nonlocal ok, fail, skip
+        if status == "ok":
+            ok += 1
+        elif status == "skip":
+            skip += 1
+        else:
+            fail += 1
+            with open(error_log, "a") as err_f:
+                err_f.write(f"FAILED: {sample_id}\n")
 
     if args.workers <= 1:
-        # Single-process (easier to debug)
         with tqdm(total=len(sample_dirs), desc="Converting") as pbar:
-            for sd in sample_dirs:
-                if _convert_worker(sd):
-                    ok += 1
-                else:
-                    fail += 1
-                    with open(error_log, "a") as err_f:
-                        err_f.write(f"FAILED: {sd.name}\n")
+            for item in work:
+                _tally(*_convert_worker(item))
                 pbar.update(1)
     else:
         with multiprocessing.Pool(processes=args.workers) as pool:
             with tqdm(total=len(sample_dirs), desc="Converting") as pbar:
-                for sd, success in zip(sample_dirs, pool.imap(_convert_worker, sample_dirs)):
-                    if success:
-                        ok += 1
-                    else:
-                        fail += 1
-                        with open(error_log, "a") as err_f:
-                            err_f.write(f"FAILED: {sd.name}\n")
+                for sample_id, status in pool.imap_unordered(_convert_worker, work):
+                    _tally(sample_id, status)
                     pbar.update(1)
 
-    log.info("Done. Converted: %d  Failed: %d", ok, fail)
+    if skip:
+        log.info("Skipped %d samples with up-to-date .lmx", skip)
+
+    log.info("Done. Converted: %d  Skipped: %d  Failed: %d", ok, skip, fail)
     if fail > 0:
         log.warning(f"See {error_log} for list of failed samples.")
 

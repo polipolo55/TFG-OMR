@@ -47,6 +47,9 @@ log = logging.getLogger("omr.cli")
 _FULL_RUN_RENDER_DPI: tuple[int, ...] = (200, 250, 300)
 _FULL_RUN_AUGMENT_SEED = 42
 _FULL_RUN_AUGMENT_COPIES = 1  # scanned tree mirrors clean sample ids (one PNG per id)
+_FULL_RUN_HEADERLESS_FRACTION = 0.35
+_FULL_RUN_HEADERLESS_DPI: tuple[int, ...] = (180, 200, 220)
+_FULL_RUN_HEADERLESS_SEED = 42
 
 
 def _get_default_workers() -> int:
@@ -54,6 +57,73 @@ def _get_default_workers() -> int:
     cpu_count = os.cpu_count() or 4  # Default to 4 if cpu_count() returns None
     # Leave at least 2 cores for the OS and other processes
     return max(1, cpu_count - 2)
+
+
+def _resolve_pipeline_force(args: argparse.Namespace) -> dict[str, bool]:
+    """Map ``--force-all`` and per-stage force flags to booleans for each pipeline step."""
+    force_all = getattr(args, "force_all", False)
+    force_render = force_all or getattr(args, "force_render", False)
+    return {
+        "force_render": force_render,
+        "force_convert": force_all or getattr(args, "force_convert", False),
+        "force_twins": force_all or getattr(args, "force_twins", False),
+        "force_augment": force_all or getattr(args, "force_augment", False) or force_render,
+    }
+
+
+def _add_pipeline_rebuild_args(parser: argparse.ArgumentParser) -> None:
+    """Force / header-less-twin options shared by ``pipeline`` and ``pipeline-train``."""
+    g_force = parser.add_argument_group("full rebuild")
+    g_force.add_argument(
+        "--force-all",
+        action="store_true",
+        help="Re-render, re-convert, regenerate all header-less twins, and re-augment every sample.",
+    )
+    g_force.add_argument(
+        "--force-render",
+        action="store_true",
+        help="Re-render every clean PNG (LilyPond). Implied by --force-all.",
+    )
+    g_force.add_argument(
+        "--force-convert",
+        action="store_true",
+        help="Re-run semantic→LMX even when .lmx is up to date. Implied by --force-all.",
+    )
+    g_force.add_argument(
+        "--force-twins",
+        action="store_true",
+        help="Re-render existing __nh twin PNGs. Implied by --force-all.",
+    )
+    g_force.add_argument(
+        "--force-augment",
+        action="store_true",
+        help="Re-augment scanned PNGs even if they exist. Implied by --force-all and --force-render.",
+    )
+    g_twins = parser.add_argument_group("header-less twins (__nh)")
+    g_twins.add_argument(
+        "--no-headerless-twins",
+        action="store_true",
+        help="Skip the continuation-staff twin step (not recommended for full training runs).",
+    )
+    g_twins.add_argument(
+        "--headerless-fraction",
+        type=float,
+        default=_FULL_RUN_HEADERLESS_FRACTION,
+        help=f"Share of treble samples to twin (default: {_FULL_RUN_HEADERLESS_FRACTION}).",
+    )
+    g_twins.add_argument(
+        "--headerless-dpi",
+        type=int,
+        nargs="+",
+        default=list(_FULL_RUN_HEADERLESS_DPI),
+        help=f"DPI choices for twin renders (default: {' '.join(map(str, _FULL_RUN_HEADERLESS_DPI))}).",
+    )
+    g_twins.add_argument(
+        "--headerless-seed",
+        type=int,
+        default=_FULL_RUN_HEADERLESS_SEED,
+        help=f"RNG seed for twin fraction selection (default: {_FULL_RUN_HEADERLESS_SEED}).",
+    )
 
 
 def cmd_render(args: argparse.Namespace) -> None:
@@ -100,6 +170,8 @@ def cmd_convert(args: argparse.Namespace) -> None:
         argv += ["--limit", str(args.limit)]
     if args.workers is not None:
         argv += ["--workers", str(args.workers)]
+    if getattr(args, "force", False):
+        argv.append("--force")
     if args.verbose:
         argv.append("--verbose")
 
@@ -333,6 +405,8 @@ def cmd_augment(args: argparse.Namespace) -> None:
         argv += ["--workers", str(args.workers)]
     if args.limit is not None:
         argv += ["--limit", str(args.limit)]
+    if getattr(args, "force", False):
+        argv.append("--force")
 
     old_argv = sys.argv
     sys.argv = ["augment_scanned"] + argv
@@ -340,6 +414,25 @@ def cmd_augment(args: argparse.Namespace) -> None:
         _augment_main()
     finally:
         sys.argv = old_argv
+
+
+# ── headerless-twins ──────────────────────────────────────────────────────
+
+
+def cmd_headerless_twins(args: argparse.Namespace) -> None:
+    """Generate header-less (__nh) continuation-staff twin samples."""
+    from data_processing.generate_headerless_twins import run_headerless_twins
+
+    force = _resolve_pipeline_force(args)["force_twins"] or getattr(args, "force", False)
+    run_headerless_twins(
+        Path(args.data_dir),
+        fraction=args.headerless_fraction,
+        dpi_choices=tuple(args.headerless_dpi),
+        workers=args.workers,
+        seed=args.headerless_seed,
+        force=force,
+        limit=args.limit,
+    )
 
 
 # ── api ────────────────────────────────────────────────────────────────────
@@ -360,7 +453,7 @@ def cmd_api(args: argparse.Namespace) -> None:
 
 
 def cmd_pipeline(args: argparse.Namespace) -> None:
-    """Run the full data pipeline (render → convert → augment → vocab).
+    """Run the full data pipeline (render → convert → twins → augment → vocab).
 
     New layout (no package-specific wiring):
         raw PrIMuS:          data/raw/primus/...
@@ -369,6 +462,7 @@ def cmd_pipeline(args: argparse.Namespace) -> None:
         vocabulary:          data/vocab/primus_lmx.txt
     """
     extra_vocab = getattr(args, "extra_vocab_data_dir", None) or None
+    force = _resolve_pipeline_force(args)
 
     # 1. Render raw PrIMuS → clean dataset (PNG + .semantic/.agnostic/.mid + .lmx)
     log.info("--- Rendering PrIMuS → clean dataset ---")
@@ -378,24 +472,41 @@ def cmd_pipeline(args: argparse.Namespace) -> None:
         dpi=getattr(args, "render_dpi", _FULL_RUN_RENDER_DPI),
         limit=args.limit,
         workers=args.workers,
-        force=getattr(args, "force_render", False),
+        force=force["force_render"],
         no_lmx=False,
         verbose=args.verbose,
     )
     cmd_render(render_args)
 
-    # 2. (Optional) Re-run semantic → LMX conversion over clean dataset
-    #    This is safe even if generate_realbook already produced .lmx files.
+    # 2. Re-run semantic → LMX conversion over clean dataset (skips up-to-date unless forced)
     log.info("--- Converting .semantic → .lmx in clean dataset ---")
     convert_args = argparse.Namespace(
         source=args.clean_dir,
         limit=args.limit,
         workers=args.workers,
         verbose=args.verbose,
+        force=force["force_convert"],
     )
     cmd_convert(convert_args)
 
-    # 3. Augment clean images → scanned/augmented dataset (labels copied over)
+    # 3. Header-less continuation-staff twins (__nh) — before augment so twins get scanned variants
+    if not getattr(args, "no_headerless_twins", False):
+        log.info("--- Generating header-less (__nh) twin samples ---")
+        twins_args = argparse.Namespace(
+            data_dir=args.clean_dir,
+            headerless_fraction=getattr(args, "headerless_fraction", _FULL_RUN_HEADERLESS_FRACTION),
+            headerless_dpi=getattr(args, "headerless_dpi", list(_FULL_RUN_HEADERLESS_DPI)),
+            headerless_seed=getattr(args, "headerless_seed", _FULL_RUN_HEADERLESS_SEED),
+            workers=args.workers,
+            limit=args.limit,
+            force_all=getattr(args, "force_all", False),
+            force_twins=force["force_twins"],
+        )
+        cmd_headerless_twins(twins_args)
+    else:
+        log.info("--- Skipping header-less twins (--no-headerless-twins) ---")
+
+    # 4. Augment clean images → scanned/augmented dataset (labels copied over)
     log.info("--- Augmenting clean images → scanned dataset ---")
     augment_args = argparse.Namespace(
         source=args.clean_dir,
@@ -404,10 +515,11 @@ def cmd_pipeline(args: argparse.Namespace) -> None:
         seed=getattr(args, "augment_seed", _FULL_RUN_AUGMENT_SEED),
         workers=args.workers,
         limit=args.limit,
+        force=force["force_augment"],
     )
     cmd_augment(augment_args)
 
-    # 4. Build unified vocabulary over the clean dataset
+    # 5. Build unified vocabulary over the clean dataset
     log.info("--- Building unified LMX vocabulary ---")
     vocab_args = argparse.Namespace(
         data_dir=str(args.clean_dir),
@@ -745,6 +857,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Parallel workers for conversion (default: cpu_count - 2)",
     )
     p_conv.add_argument("--verbose", action="store_true", help="Per-sample conversion logging")
+    p_conv.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-convert even when .lmx is newer than .semantic",
+    )
     p_conv.set_defaults(func=cmd_convert)
 
     # ── augment ───────────────────────────────────────────────────────
@@ -771,6 +888,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--workers", type=int, default=_get_default_workers(), help="Parallel workers (default: cpu_count - 2)"
     )
     p_aug.add_argument("--limit", type=int, default=None, help="Process at most N samples (for testing)")
+    p_aug.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-augment scanned PNGs even if they already exist (use after re-rendering clean)",
+    )
     p_aug.set_defaults(func=cmd_augment)
 
     # ── vocab ─────────────────────────────────────────────────────────
@@ -931,7 +1053,7 @@ def build_parser() -> argparse.ArgumentParser:
     # ── pipeline ──────────────────────────────────────────────────────
     p_pipe = sub.add_parser(
         "pipeline",
-        help="Run full data pipeline (render → convert → augment → vocab)",
+        help="Run full data pipeline (render → convert → twins → augment → vocab)",
     )
     p_pipe.add_argument(
         "--raw-primus-dir",
@@ -976,11 +1098,7 @@ def build_parser() -> argparse.ArgumentParser:
             f"{' '.join(str(d) for d in _FULL_RUN_RENDER_DPI)})."
         ),
     )
-    p_pipe.add_argument(
-        "--force-render",
-        action="store_true",
-        help="Re-render every sample even if PNG exists (use after pipeline code changes).",
-    )
+    _add_pipeline_rebuild_args(p_pipe)
     p_pipe.add_argument(
         "--augment-copies",
         type=int,
@@ -1028,11 +1146,7 @@ def build_parser() -> argparse.ArgumentParser:
             f"(default: {' '.join(str(d) for d in _FULL_RUN_RENDER_DPI)})."
         ),
     )
-    p_ptrain.add_argument(
-        "--force-render",
-        action="store_true",
-        help="Re-render all samples (see pipeline).",
-    )
+    _add_pipeline_rebuild_args(p_ptrain)
     p_ptrain.add_argument("--augment-copies", type=int, default=_FULL_RUN_AUGMENT_COPIES)
     p_ptrain.add_argument("--augment-seed", type=int, default=_FULL_RUN_AUGMENT_SEED)
     p_ptrain.add_argument("--limit", type=int, default=None)

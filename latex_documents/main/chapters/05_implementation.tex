@@ -466,7 +466,7 @@ Hard~Constraint~3 of the project's contributor guide.
 \code{early\_stopping\_patience} & 12                 & epochs without val SER improvement \\ \tfgrowsep
 \code{val\_frac}                 & 0.10               & validation split fraction \\ \tfgrowsep
 \code{test\_frac}                & 0.10               & test split fraction \\ \tfgrowsep
-\code{strip\_header\_prob}       & 0.40               & header-strip augmentation rate (training only) \\ \tfgrowsep
+\code{strip\_header\_prob}       & 0.0                & deprecated/inert; header-less continuation staves are first-class \code{\_\_nh} twin samples (see \Cref{sec:design-training}) \\ \tfgrowsep
 \code{online\_aug\_prob}         & 0.50               & in-loader jitter rate (training only) \\ \tfgrowsep
 \code{rare\_lmx\_oversample}     & 2                  & multiplier for samples with tie tokens \\ \tfgrowsep
 \code{num\_workers}              & 10                 & DataLoader worker processes \\
@@ -551,9 +551,12 @@ default \code{--synth-weight}).  The synthetic admixture prevents
 catastrophic forgetting of rare chord qualities under-represented in
 the small real set.
 Labels go through a \term{canonicalisation} step before the
-vocabulary filter: \code{m7b5} is rewritten to the \code{ø} glyph,
-\code{Cm7} to \code{C-7}, and characters not in the chord vocabulary
-are dropped silently.
+vocabulary filter: \code{-7b5}/\code{m7b5}/\code{min7b5} are
+rewritten to the canonical \code{ø} token; \code{Cm7} becomes
+\code{C-7}; \code{sus4}/\code{sus2} become \code{sus}; and any chord
+token containing an out-of-vocabulary character is dropped (with a
+warning) rather than silently corrupted by mid-token character
+removal.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Inference Pipeline Implementation}

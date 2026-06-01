@@ -387,10 +387,15 @@ direct experimental evidence for the augmentation design choice in
 substitution counts to the headline run.  Hypothesis: tie errors
 roughly double when oversampling is removed.  Cost: $\approx 7$\,h.}
 
-\todo{Ablation: header-strip augmentation.  Re-train with
-\code{strip\_header\_prob=0.0} and evaluate on continuation lines
-(lines $\ge 2$) from a few real Real Book pages.  Justifies the
-augmentation choice from \Cref{sec:design-data}.}
+\todo{Ablation: header-less twin samples.  Re-train without the
+\code{\_\_nh} twin samples and evaluate on continuation lines
+(lines $\ge 2$) from a few real Real Book pages to quantify how much
+the header-less twin samples help. (Note: \code{strip\_header\_prob}
+is deprecated/inert; the augmentation is now provided as first-class
+twin samples generated at data time by
+\code{generate\_headerless\_twins.py} — see \Cref{sec:design-training}.
+The ablation is therefore: include vs.\ exclude the \code{\_\_nh} dir.
+Cost: $\approx 7$\,h.)}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Qualitative Examples}

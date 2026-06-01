@@ -402,9 +402,10 @@ This is the ``large data volume'' the competence statement refers
 to, and the design choices that exploit it are explicit:
 synthetic supervision rather than manual annotation;
 sample-level oversampling of rare tokens rather than class-weighted
-loss (\Cref{sec:design-training}); a header-stripping augmentation
-applied at the training-distribution level to teach the model the
-continuation-line case; and a deterministic split protocol
+loss (\Cref{sec:design-training}); first-class header-less twin
+samples to teach the model the continuation-line case without the
+image-label desync that a training-time pixel crop would introduce;
+and a deterministic split protocol
 (\Cref{sec:impl-reproducibility}) that keeps validation and test
 disjoint across reruns.
 

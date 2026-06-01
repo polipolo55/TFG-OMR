@@ -71,16 +71,15 @@ proprietary~\cite{calvoZaragozaUnderstandingOMR2020}.
 
 Two structural weaknesses limit the modular approach for the input class
 targeted in this thesis.
-First, errors accumulate irreversibly across stages: a single missed staff
+Errors accumulate irreversibly across stages: a single missed staff
 line corrupts every downstream pitch assignment for that staff, and a
 mis-segmented chord symbol cannot be recovered by modules that have already
 committed to a different reading.
-Second, the visual heuristics that drive each module are tuned for classical
+The visual heuristics driving each module are also tuned for classical
 engraving styles; the rounded noteheads, loosely-spaced beams, and
-hand-lettered chord symbols characteristic of \textit{The Real Book} fall
-outside the operating envelope of the morphological filters those pipelines
-rely on.
-This motivates the move to learning-based, end-to-end recognition.
+hand-lettered chord symbols of \textit{The Real Book} fall
+outside the operating envelope those pipelines assume.
+Both weaknesses point toward end-to-end, learning-based recognition.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Deep Learning Paradigm: CRNN with CTC}
@@ -114,8 +113,7 @@ work, including Camera-PrIMuS and the present thesis, builds upon.
 A follow-up release, Camera-PrIMuS~\cite{calvoZaragozaCameraPrimus2018},
 augments the same incipits with synthetic photographic distortion and
 demonstrates that the same network retains useful accuracy on
-phone-captured real-world inputs.
-The present thesis follows this template.
+phone-captured real-world inputs; this thesis follows the same template.
 \Cref{fig:soa-crnn-pipeline} illustrates the CRNN--CTC pipeline as applied
 to a music staff.
 
@@ -343,20 +341,21 @@ future work can compare and combine.
 \section{Summary}
 \label{sec:soa-summary}
 
-Modular pipelines remain useful for full-page typeset classical scores but
-do not generalise to the visual and semantic peculiarities of jazz lead
-sheets.
-End-to-end deep models (CRNN--CTC for monophonic input in
-\Cref{sec:soa-crnn}, transformers for polyphonic and full-page input in
-\Cref{sec:soa-transformer}) have largely displaced modular pipelines in
-recent work and converge on a common recipe of synthetic pretraining
-followed by fine-tuning on a small annotated target set.
-Symbolic output formats have moved toward MusicXML-linear encodings
-(prominently LMX), and evaluation practice is gradually shifting from raw
-SER toward structurally aware metrics.
-Jazz lead-sheet OMR remained essentially open until 2025; this thesis and
-the concurrent ISMIR 2025
-work~\cite{martinezSevillaJazzLeadSheets2025} represent the first two
-focused attempts to fill that niche.
-The architectural choices made in this thesis, detailed in
-\Cref{ch:design}, are motivated by the findings surveyed above.
+Modular pipelines work well for typeset classical scores but do not
+transfer to jazz lead sheets, where the engraving style and chord-symbol
+semantics fall outside the heuristics those systems rely on.
+End-to-end deep learning has largely displaced them: CRNN--CTC achieves
+sub-percent error on monophonic input (\Cref{sec:soa-crnn}), while
+transformers scale to polyphonic and full-page tasks at substantially
+higher data cost (\Cref{sec:soa-transformer}).
+Both families follow the same training pattern: a large synthetic-corpus
+pretraining phase, followed by fine-tuning on a small set of
+annotated target-domain examples.
+Output representations have moved toward compact MusicXML-linear formats,
+most prominently LMX, and evaluation is shifting from raw SER toward
+structurally aware metrics.
+Jazz lead-sheet OMR received almost no dedicated attention until 2025;
+this thesis and the concurrent work of Martínez-Sevilla et
+al.~\cite{martinezSevillaJazzLeadSheets2025} are the first two focused
+efforts.
+The design choices in \Cref{ch:design} follow from this survey.

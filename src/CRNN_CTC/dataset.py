@@ -275,49 +275,13 @@ def _strip_header_tokens(tokens: list[str]) -> list[str]:
     return ["measure"] + tokens[i:]
 
 
-def _find_header_crop_x(img: np.ndarray) -> int | None:
-    """Estimate the pixel x-coordinate where the header region ends.
-
-    Uses morphological staff-line removal followed by vertical projection
-    to find the first content gap between the header glyphs (clef, key sig,
-    time sig) and the first note/rest.  Returns *None* if no clean gap is
-    found (the image should not be stripped in that case).
-    """
-    h, w = img.shape[:2]
-    if w < 40:
-        return None
-
-    gray = img if img.ndim == 2 else cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    _, binary = cv2.threshold(
-        (gray * 255).astype(np.uint8) if gray.dtype == np.float32 else gray,
-        0,
-        255,
-        cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU,
-    )
-
-    h_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (max(15, w // 10), 1))
-    staff_mask = cv2.morphologyEx(binary, cv2.MORPH_OPEN, h_kernel)
-    content = np.clip(binary.astype(np.int16) - staff_mask.astype(np.int16), 0, 255).astype(np.uint8)
-
-    col_ink = content.sum(axis=0).astype(np.float32) / 255.0
-    k = max(3, w // 100) | 1
-    col_ink = cv2.GaussianBlur(col_ink.reshape(1, -1), (k, 1), 0).flatten()
-
-    threshold = h * 0.02
-    min_x = int(w * 0.06)
-    max_x = int(w * 0.35)
-
-    gap_start = None
-    for c in range(min_x, min(max_x, w)):
-        if col_ink[c] < threshold:
-            if gap_start is None:
-                gap_start = c
-        else:
-            if gap_start is not None and (c - gap_start) >= 3:
-                return gap_start
-            gap_start = None
-
-    return None
+# NOTE: the old morphological _find_header_crop_x heuristic was removed. It
+# cropped at the first ink gap (~6% of width), which systematically over-cropped
+# past the true header into the first notes, desyncing the image from the
+# stripped tokens — and the header boundary cannot be located reliably from a
+# rendered staff. Header-less continuation staves are now produced as first-class
+# "__nh" twin samples at data time (see generate_headerless_twins.py), where the
+# image and label are aligned by construction.
 
 
 # ---------------------------------------------------------------------------
@@ -483,14 +447,12 @@ class OMRDataset(Dataset):
         img = _load_image(png_path, self.img_height, self.max_image_width)
         tokens = _load_lmx_tokens(lmx_path)
 
-        # Header-strip augmentation: randomly remove the visual header (clef,
-        # key, time glyphs) from the image and the corresponding label tokens
-        # so the model learns to recognise headerless continuation lines.
-        if self._strip_header_prob > 0 and random.random() < self._strip_header_prob:
-            crop_x = _find_header_crop_x(img)
-            if crop_x is not None and crop_x < img.shape[1] - 20:
-                img = img[:, crop_x:]
-                tokens = _strip_header_tokens(tokens)
+        # Header-less continuation staves are provided as first-class "__nh"
+        # twin samples generated at data time (see generate_headerless_twins.py),
+        # NOT by cropping here. The previous in-loop crop never aligned the
+        # removed pixels with the removed label tokens (the header boundary
+        # cannot be located reliably from the rendered image). self._strip_header_prob
+        # is retained on Config for checkpoint compatibility but no longer crops.
 
         # Online augmentation (training only): light per-epoch jitter on top
         # of the offline-augmented scanned PNG.  Without this every epoch
@@ -518,6 +480,7 @@ class OMRDataset(Dataset):
     @property
     def sample_ids(self) -> list[str]:
         return [s[0] for s in self._samples]
+
 
 
 # ---------------------------------------------------------------------------
@@ -652,11 +615,13 @@ def make_splits(
     """
     from torch.utils.data import Subset
 
+    # NOTE: fine-tune (real-domain) dirs are deliberately NOT merged into the
+    # split pool here. They are real Real Book pages used only to adapt the
+    # model; letting them fall into val/test would leak real data into the
+    # held-out sets and invalidate the synthetic-to-real domain-gap measurement.
+    # They are appended to the TRAIN set only, after the split (see below).
     extra_clean = list(extra_data_dirs or [])
-    extra_clean.extend(finetune_data_dirs or [])
-
     extra_scanned_combined = list(extra_scanned_dirs or [])
-    extra_scanned_combined.extend(finetune_scanned_dirs or [])
 
     full_ds = OMRDataset(
         data_dir,
@@ -702,6 +667,39 @@ def make_splits(
     train_ds: Dataset = Subset(full_ds, train_idx)
     if strip_header_prob > 0 or online_aug_prob > 0:
         train_ds = _AugSubset(train_ds, strip_header_prob, online_aug_prob)
+
+    # Append fine-tune (real-domain) samples to the TRAIN set only. Built as a
+    # separate OMRDataset so none of its samples can land in val/test.
+    ft_dirs = list(finetune_data_dirs or [])
+    if ft_dirs:
+        ft_scanned = list(finetune_scanned_dirs or [])
+        finetune_ds = OMRDataset(
+            ft_dirs[0],
+            vocab,
+            img_height=img_height,
+            max_image_width=max_image_width,
+            scanned_dir=ft_scanned[0] if ft_scanned else None,
+            filter_non_leadsheet_clef=filter_non_leadsheet_clef,
+            filter_unusual_time=filter_unusual_time,
+            filter_multi_staff=filter_multi_staff,
+            max_source_height=max_source_height,
+            extra_data_dirs=ft_dirs[1:] or None,
+            extra_scanned_dirs=ft_scanned[1:] or None,
+        )
+        ft_train: Dataset = finetune_ds
+        if strip_header_prob > 0 or online_aug_prob > 0:
+            ft_train = _AugSubset(
+                Subset(finetune_ds, list(range(len(finetune_ds)))),
+                strip_header_prob,
+                online_aug_prob,
+            )
+        from torch.utils.data import ConcatDataset
+
+        train_ds = ConcatDataset([train_ds, ft_train])
+        log.info(
+            "Fine-tune: appended %d real samples to TRAIN only (val/test stay synthetic)",
+            len(finetune_ds),
+        )
 
     log.info(
         "Split: train_loader=%d (unique ids %d)  val=%d  test=%d",

@@ -44,17 +44,22 @@ def _load_model(checkpoint_path: Path) -> dict:
     while repo_root.parent != repo_root and not (repo_root / "pyproject.toml").exists():
         repo_root = repo_root.parent
 
-    candidates = [
-        Path(cfg.vocab_path),
-        repo_root / cfg.vocab_path,
-        repo_root / "data" / "vocab" / "primus_lmx.txt",
-        checkpoint_path.parent.parent / "data" / "vocab" / "primus_lmx.txt",
-    ]
-    vocab_path = next((p for p in candidates if p.exists()), None)
-    if vocab_path is None:
-        raise FileNotFoundError(f"Vocab file not found; tried: {[str(p) for p in candidates]}")
+    # Prefer the token list embedded in the checkpoint (authoritative; immune to
+    # the vocab file being re-sorted at the same length). Fall back to the file.
+    if ckpt.get("vocab_tokens") is not None:
+        vocab = Vocabulary(list(ckpt["vocab_tokens"]))
+    else:
+        candidates = [
+            Path(cfg.vocab_path),
+            repo_root / cfg.vocab_path,
+            repo_root / "data" / "vocab" / "primus_lmx.txt",
+            checkpoint_path.parent.parent / "data" / "vocab" / "primus_lmx.txt",
+        ]
+        vocab_path = next((p for p in candidates if p.exists()), None)
+        if vocab_path is None:
+            raise FileNotFoundError(f"Vocab file not found; tried: {[str(p) for p in candidates]}")
 
-    vocab = Vocabulary.from_file(vocab_path)
+        vocab = Vocabulary.from_file(vocab_path)
 
     model = CRNN(
         vocab_size=ckpt.get("vocab_size", len(vocab)),

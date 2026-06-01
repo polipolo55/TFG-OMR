@@ -126,24 +126,27 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
         finetune_scanned_dirs=(cfg.finetune_scanned_dirs if cfg.use_scanned else None) or None,
     )
 
+    loader_kw: dict = {
+        "batch_size": cfg.batch_size,
+        "collate_fn": collate_fn,
+        "pin_memory": device.type == "cuda",
+        "persistent_workers": cfg.num_workers > 0,
+    }
+    if cfg.num_workers > 0:
+        loader_kw["prefetch_factor"] = 4
+
     train_loader = DataLoader(
         train_ds,
-        batch_size=cfg.batch_size,
         shuffle=True,
         num_workers=cfg.num_workers,
-        collate_fn=collate_fn,
-        pin_memory=True,
-        persistent_workers=cfg.num_workers > 0,
         drop_last=True,
+        **loader_kw,
     )
     val_loader = DataLoader(
         val_ds,
-        batch_size=cfg.batch_size,
         shuffle=False,
         num_workers=cfg.num_workers,
-        collate_fn=collate_fn,
-        pin_memory=True,
-        persistent_workers=cfg.num_workers > 0,
+        **loader_kw,
     )
 
     # ── Model ──────────────────────────────────────────────────────────────
@@ -304,6 +307,7 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
                     "patience_counter": 0,
                     "config": cfg,
                     "vocab_size": len(vocab),
+                    "vocab_tokens": vocab._idx2tok[3:],
                 },
                 best_ckpt,
             )
@@ -323,6 +327,7 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
                 "patience_counter": patience_counter,
                 "config": cfg,
                 "vocab_size": len(vocab),
+                "vocab_tokens": vocab._idx2tok[3:],
             },
             run_dir / "latest_checkpoint.pt",
         )

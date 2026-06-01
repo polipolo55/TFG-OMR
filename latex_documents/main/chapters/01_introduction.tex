@@ -11,7 +11,7 @@ images of musical scores into structured, machine-readable representations, much
 Optical Character Recognition (OCR) did for printed text~\cite{shatriOPTICALMUSICRECOGNITION}.
 
 This thesis describes the design, implementation, and quantitative evaluation of an
-end-to-end OMR system targeted at a concrete and practically significant input: the
+end-to-end OMR system targeted at a specific and practically significant input: the
 monophonic melody lines and chord symbols of jazz lead sheets, with a primary focus on
 \textit{The Real Book}, one of the most widely circulated fake-books in jazz practice and
 pedagogy~\cite{kernfeldStoryFakeBooks2006}.
@@ -63,7 +63,7 @@ entirely locked in paper or scanned-image form. The officially published edition
 as PDFs, but those PDFs are image-based: the musical content is not encoded as symbolic
 data, and standard music notation software cannot interpret them directly. Digitising
 \textit{The Real Book}, and the broader class of jazz lead sheets it represents, would
-unlock a range of practical applications: automatic transposition for B\(\flat\),
+enable several practical applications: automatic transposition for B\(\flat\),
 E\(\flat\), and F instruments; instant MIDI playback for practice and accompaniment;
 corpus-level harmonic analysis for musicologists; better search and cataloguing in
 digital music libraries; and easier preparation of educational materials for jazz
@@ -74,8 +74,7 @@ educators.
 General-purpose OMR systems have advanced substantially in recent
 years~\cite{shatriOPTICALMUSICRECOGNITION}, but they are designed and evaluated mostly on
 classical full-score notation in standard engraving styles (Finale, Sibelius, Dorico, or
-LilyPond's default font). Lead sheets diverge from this baseline in three ways that
-together define the challenges this thesis addresses.
+LilyPond's default font). Lead sheets present three challenges that this baseline does not address.
 
 \textbf{Engraving style.}
 Many editions of \textit{The Real Book} use fonts and layouts that deliberately imitate

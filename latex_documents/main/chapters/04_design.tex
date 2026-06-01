@@ -1178,19 +1178,26 @@ When fine-tuning data is added, it is injected only into the train
 split; no fine-tuning sample ever enters validation or test.
 Exact split fractions are stated in \Cref{ch:impl}.
 
-\subsection{Header-stripping augmentation}
+\subsection{Header-less continuation staves}
 
-Real Book pages often span multiple staves per system, and every
-staff after the first omits the clef, key, and time-signature header.
-To prevent the model from over-relying on the header, a fraction of
-training samples have their header pixels cropped out and the
-corresponding tokens removed from the label.
-This forces the model to learn pitch and rhythm in the absence of an
-explicit clef, which it can do because the staff geometry alone is
-sufficient given the treble-clef-only contract.
-The augmentation applies to training samples only: validation and test
-samples always retain their header so the held-out evaluation is
-comparable across runs.
+Real Book pages span multiple staves per system, and continuation staves
+typically do not reprint the clef and time signature.
+To teach the recogniser to read such staves, the synthetic corpus includes
+\textit{header-less} variants: a fraction of treble samples are re-rendered
+with the clef and time-signature glyphs hidden and paired with a label from
+which the corresponding tokens are removed.
+The key signature is retained, both because continuation staves normally
+reprint it and because hiding it would force explicit accidentals onto
+key-altered notes and so alter the body of the label.
+Because each header-less variant is a genuine render paired with its own
+label, the image and label are consistent by construction.
+This is preferable to cropping the header out of a full render at training
+time: the header occupies only a few percent of the staff width and its
+boundary cannot be located reliably from the rendered image, so a crop
+desynchronises the pixels from the removed tokens.
+The variants enter the training distribution as ordinary samples; the model
+then learns pitch and rhythm without an explicit clef, which the
+treble-only contract makes unambiguous.
 
 \subsection{Rare-token oversampling}
 

@@ -65,7 +65,7 @@ Book.  See "Known Limitations" below for what falls *outside* the contract.
 
 - **Position.** Above the staff, in the strip detected by
   `staff_detect.py::_associate_chords`.
-- **Format.** Standard jazz chord shorthand: `ROOT [acc] [quality] [extension] [alterations]* [/BASS]`.  Examples: `Cmaj7`, `F#m7b5`, `D7#9`, `Bb6/9`, `Am7/D`.
+- **Format.** Real Book chord shorthand: `ROOT [acc] [quality] [extension] [alterations]* [/BASS]`.  Minor uses a hyphen (`G-7`), half-diminished `-7b5` (the dominant printed form; `m7b5` and `ø` also appear and are normalised to the same canonical token), major-7 `maj7`.  Examples: `Cmaj7`, `G-7b5`, `D7#9`, `Bb6/9`, `Am7/D`.
 - **Root letters.** A through G, with optional flat (`b`) or sharp (`#`).
 - **OCR backend.** A dedicated CRNN trained on synthetic Real Book-style chord
   strips (LilyJAZZ font).  Character-level CTC output; fine-tuned on hand-labeled

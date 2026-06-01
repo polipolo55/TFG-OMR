@@ -57,7 +57,8 @@ _CHAR_REPAIRS: list[tuple[re.Pattern, str]] = [
 # ---------------------------------------------------------------------------
 
 # A single jazz chord token.  Groups:
-#   1 root letter, 2 accidental, 3 quality string, 4 extension digits, 5 alterations, 6 slash bass
+#   1 root letter, 2 accidental, 3 quality string, 4 extension digits,
+#   5 alterations, 6 trailing suspended (7sus/7sus4), 7 slash bass
 #
 # Longer quality alternatives before shorter ones (maj before m).
 _CHORD_RE = re.compile(
@@ -66,6 +67,7 @@ _CHORD_RE = re.compile(
     r"(maj|min|m(?:in)?|M|dim|aug|sus|-|\+|o|ø|°)?"  # quality — longer first!
     r"(maj\d{1,2}|\d{1,2})?"  # extension: maj7/maj9 or plain digit(s)
     r"((?:[#b]\d+)*)"  # alterations: b5 #9 b13 …
+    r"(sus\d?)?"  # trailing suspended marker, e.g. the "sus" in 7sus / 7sus4
     r"(/[A-G][#b]?)?",  # slash bass
     re.ASCII,
 )
@@ -128,7 +130,8 @@ def _normalise_token(token: str) -> str:
     qual = m.group(3) or ""
     ext = m.group(4) or ""
     alt = m.group(5) or ""
-    slsh = m.group(6) or ""
+    tsus = m.group(6) or ""
+    slsh = m.group(7) or ""
 
     # Normalise quality synonyms.  Half-diminished is emitted by the CRNN as
     # the canonical "ø" token and expanded here to the Real Book printed form
@@ -155,7 +158,7 @@ def _normalise_token(token: str) -> str:
     if ext == "1":
         ext = "7"
 
-    return root + acc + qual + ext + alt + slsh
+    return root + acc + qual + ext + alt + tsus + slsh
 
 
 def clean_chord_line(raw_ocr: str) -> str:

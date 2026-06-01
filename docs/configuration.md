@@ -50,7 +50,7 @@ These must stay in sync with `_COMMON_TIME_SIGS` in both `src/CRNN_CTC/dataset.p
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `strip_header_prob` | 0.4 | Probability of removing clef+key+time from image and label (training only) |
+| `strip_header_prob` | 0.0 | DEPRECATED/inert — no longer crops. Header-less continuation staves are now generated as `__nh` twin samples (`generate_headerless_twins.py`). Field kept for checkpoint compatibility. |
 | `online_aug_prob` | 0.5 | Probability of light per-sample jitter (brightness, noise, ±2 px shift) on top of the offline-augmented PNG (training only) |
 | `rare_lmx_oversample` | 2 | Oversampling factor for samples containing rare tokens |
 | `rare_lmx_tokens` | `("tied:start", "tied:stop")` | Tokens that trigger oversampling.  Ties are visually subtle on degraded scans and chronically under-predicted.  `key:fifths:0` was previously included here because PrIMuS only had 8 explicit C-major labels; the root cause was a converter bug (missing default key injection) that is now fixed — C major is ~22.6 % of the corpus after the fix (19,778 / 87,677 samples) and needs no oversampling. |

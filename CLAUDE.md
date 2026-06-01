@@ -102,8 +102,12 @@ CRNN checkpoint's log-prob distribution. After every CRNN re-train, re-run
   which is the only clef the Real Book uses.  Disabling it does not generalise the model;
   it only forces it to spend capacity on visual patterns that never appear at inference.
 
-- **`strip_header_prob` applies to training only.** The header strip (clef + key + time removal)
-  is a training augmentation. It never applies during validation, test evaluation, or inference.
+- **Header-less continuation staves are first-class `__nh` twin samples, not a crop.**
+  `generate_headerless_twins.py` renders a fraction of treble samples with the clef and
+  time-signature glyphs hidden (key signature kept) and writes a matching label with the
+  clef/time tokens removed, so image and label are aligned by construction. `strip_header_prob`
+  is DEPRECATED/inert (kept on `Config` only for checkpoint compatibility); it no longer crops.
+  Re-run the scanned-augmentation pass after generating twins so they get scanned variants.
 
 - **Vocabulary file excludes the three special tokens.** `<blank>`, `<pad>`, `<unk>` are not written
   to the vocab text file — they are injected at indices 0, 1, 2 by `Vocabulary` in code. Line N

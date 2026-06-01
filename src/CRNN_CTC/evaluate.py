@@ -73,8 +73,10 @@ def greedy_decode(
             if idx != prev:
                 collapsed.append(idx)
             prev = idx
-        # Remove blank symbol
-        collapsed = [idx for idx in collapsed if idx != vocab.blank_idx]
+        # Remove blank and any special tokens the model may have argmaxed
+        # into (pad/unk are unused output classes, not real symbols).
+        specials = {vocab.blank_idx, vocab.pad_idx, vocab.unk_idx}
+        collapsed = [idx for idx in collapsed if idx not in specials]
         tokens = vocab.decode(collapsed)
         decoded.append(tokens)
 
@@ -161,7 +163,8 @@ def beam_search_decode(
 
         # Select best beam
         best_prefix = max(beams, key=lambda p: _log_add(beams[p][0], beams[p][1]))
-        tokens = vocab.decode(list(best_prefix))
+        specials = {vocab.blank_idx, vocab.pad_idx, vocab.unk_idx}
+        tokens = vocab.decode([idx for idx in best_prefix if idx not in specials])
         decoded.append(tokens)
 
     return decoded
@@ -310,18 +313,26 @@ def evaluate(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     use_amp = device.type == "cuda"
 
-    # ── Vocabulary ─────────────────────────────────────────────────────────
-    vocab = Vocabulary.from_file(cfg.vocab_path)
-
     # ── Load model from checkpoint ─────────────────────────────────────────
     ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
+
+    # ── Vocabulary ─────────────────────────────────────────────────────────
+    # Prefer the token list embedded in the checkpoint: it is authoritative and
+    # immune to the vocab file being re-sorted/rebuilt at the same length (which
+    # would silently remap every index). Fall back to the file for older
+    # checkpoints, guarding on size.
+    if ckpt.get("vocab_tokens") is not None:
+        vocab = Vocabulary(list(ckpt["vocab_tokens"]))
+    else:
+        vocab = Vocabulary.from_file(cfg.vocab_path)
+        ckpt_vocab_size = ckpt.get("vocab_size")
+        if ckpt_vocab_size is not None and ckpt_vocab_size != len(vocab):
+            raise ValueError(
+                f"Vocab size mismatch: checkpoint was trained with {ckpt_vocab_size} "
+                f"tokens but current vocabulary has {len(vocab)}. "
+                f"Rebuild the vocabulary or use the matching vocab file."
+            )
     ckpt_vocab_size = ckpt.get("vocab_size")
-    if ckpt_vocab_size is not None and ckpt_vocab_size != len(vocab):
-        raise ValueError(
-            f"Vocab size mismatch: checkpoint was trained with {ckpt_vocab_size} "
-            f"tokens but current vocabulary has {len(vocab)}. "
-            f"Rebuild the vocabulary or use the matching vocab file."
-        )
     model = CRNN(
         vocab_size=ckpt_vocab_size or len(vocab),
         cnn_out_channels=cfg.cnn_out_channels,

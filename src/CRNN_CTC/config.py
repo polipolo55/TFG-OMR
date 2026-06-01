@@ -65,11 +65,13 @@ class Config:
     dropout: float = 0.3  # dropout between LSTM layers
 
     # ── Data augmentation ──────────────────────────────────────────────────
-    # strip_header_prob: during training, randomly remove the visual header
-    # (clef + key + time region) from this fraction of samples so the model
-    # learns to recognise continuation lines that lack a header — as they
-    # appear on lines 2+ of a Real Book page.  Applied to training only.
-    strip_header_prob: float = 0.4
+    # strip_header_prob: DEPRECATED / inert. Header-less continuation lines are
+    # now provided as first-class "__nh" twin samples generated at data time
+    # (see generate_headerless_twins.py), because the previous training-time
+    # crop could not align the removed header pixels with the removed label
+    # tokens. The field is kept (not removed) so existing checkpoints still
+    # deserialise their Config; it no longer drives any image crop.
+    strip_header_prob: float = 0.0
 
     # online_aug_prob: probability of applying lightweight per-sample jitter
     # (brightness ±5%, contrast bias ±3%, gaussian noise σ≈0.01, ±2 px

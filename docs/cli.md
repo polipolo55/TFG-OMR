@@ -105,7 +105,7 @@ poetry run python src/cli.py train \
   [--max-source-height 180]
   [--rare-lmx-oversample 2]
   [--rare-lmx-tokens tied:start,tied:stop]
-  [--strip-header-prob 0.4]    # 0 disables training-time header stripping
+  [--strip-header-prob 0.0]    # DEPRECATED/inert; header-less staves now come from __nh twin samples
   [--online-aug-prob 0.5]      # 0 disables online jitter
 ```
 
@@ -168,7 +168,7 @@ Visit `http://localhost:8000` for the upload UI. POST to `/api/omr/lead-sheet` f
 
 ## pipeline
 
-Run all data preparation stages in sequence: render → convert → augment → vocab.
+Run all data preparation stages in sequence: render → convert → header-less twins → augment → vocab.
 
 ```
 poetry run python src/cli.py pipeline \
@@ -176,8 +176,11 @@ poetry run python src/cli.py pipeline \
   [--clean-dir data/processed/primus/clean]
   [--scanned-dir data/processed/primus/scanned]
   [--vocab-path data/vocab/primus_lmx.txt]
-  [--render-dpi 200]
-  [--force-render]             # re-render even if PNG exists
+  [--render-dpi 200 250 300]
+  [--force-all]                # re-render, re-convert, re-twin, re-augment everything
+  [--force-render] [--force-convert] [--force-twins] [--force-augment]
+  [--no-headerless-twins]      # skip __nh continuation-staff twins (not recommended)
+  [--headerless-fraction 0.35]
   [--augment-copies 1]
   [--augment-seed 42]
   [--extra-vocab-data-dir <dir>]    # repeatable: extra .lmx dirs for vocab
@@ -201,7 +204,7 @@ poetry run python src/cli.py pipeline-train \
 
 ## Common Patterns
 
-### First-time full run
+### First-time full run (rebuild all data + train)
 ```bash
 poetry install
 poetry run python src/cli.py pipeline-train \
@@ -210,8 +213,12 @@ poetry run python src/cli.py pipeline-train \
   --scanned-dir data/processed/primus/scanned \
   --vocab-path data/vocab/primus_lmx.txt \
   --model-dir models/run1 \
-  --epochs 60 --batch-size 16 --workers 8
+  --force-all \
+  --workers $(nproc) \
+  --epochs 60 --batch-size 24 --num-workers 12
 ```
+
+`--force-all` re-renders every clean PNG, re-converts all `.lmx`, regenerates all `__nh` twins in the twin fraction, and re-augmentates every scanned PNG. Omit it for incremental rebuilds (skips up-to-date outputs).
 
 ### Resume interrupted training
 ```bash

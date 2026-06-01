@@ -63,9 +63,21 @@ only.  The default set up-weights:
 3. Convert to float32 in [0.0, 1.0]
 4. Per-image zero-mean, unit-variance normalization
 
-### Header Stripping Augmentation
+### Header-less continuation staves
 
-With probability `strip_header_prob=0.4` during training, the clef, key, and time-signature tokens are removed from the label AND the corresponding pixels are cropped from the image. This teaches the model to handle continuation lines (lines 2+ in a Real Book page, which typically omit clef/key/time).
+Continuation staves (lines 2+ of a Real Book page) typically omit the clef and
+time signature. These are provided to the model as **first-class header-less
+twin samples** generated at data time by `generate_headerless_twins.py`: a
+fraction of treble samples are re-rendered with the clef and time-signature
+glyphs hidden (LilyPond `\omit`) and labelled with the clef/time tokens removed.
+The key signature is kept, so the in-body accidentals — and thus the label body
+— are unchanged, and image and label stay aligned by construction.
+
+This replaces the earlier training-time crop (`strip_header_prob`, now inert):
+the header occupies only a few percent of staff width and its boundary cannot be
+located reliably from the rendered image, so cropping desynced the pixels from
+the removed tokens. After generating twins, re-run the scanned-augmentation pass
+so the twins get scanned variants too.
 
 ### Collation
 
@@ -109,7 +121,7 @@ Batch dict keys: `images`, `labels`, `label_lens`, `image_widths`
 | `val_frac` | 0.10 | validation split fraction |
 | `test_frac` | 0.10 | test split fraction |
 | `use_scanned` | True | include augmented images |
-| `strip_header_prob` | 0.4 | header-stripping augmentation |
+| `strip_header_prob` | 0.0 | DEPRECATED/inert — header-less staves now come from `__nh` twin samples |
 | `rare_lmx_oversample` | 2 | oversampling factor for ties |
 
 ## Checkpoint Files

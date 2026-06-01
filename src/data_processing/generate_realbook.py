@@ -29,7 +29,6 @@ import re
 import shutil
 import sys
 import tempfile
-from functools import partial
 from pathlib import Path
 
 import numpy as np
@@ -296,6 +295,56 @@ def make_lily_source(
 
 
 # ---------------------------------------------------------------------------
+# Header-less ("continuation staff") twin samples
+# ---------------------------------------------------------------------------
+# A fraction of real Real Book staves are continuation systems that do not
+# reprint the leading clef and time signature. To teach the recogniser to read
+# such staves, we generate first-class header-less *twin* samples: the SAME
+# music rendered with the clef and time-signature glyphs hidden, paired with a
+# label that drops the corresponding tokens. Because the twin is a real render
+# matched to a real label, the image and label are aligned by construction —
+# no fragile header-boundary detection is needed (an earlier crop-based
+# approach could not locate the boundary reliably).
+#
+# The key signature is intentionally KEPT (shown): hiding it would force
+# LilyPond to print explicit accidentals on key-altered notes, which would
+# change the in-body accidental tokens and require re-deriving the label.
+# Keeping the key signature leaves the body — and thus the label body —
+# untouched. (`\omit` hides a glyph while preserving its musical effect, so
+# note positions and accidentals are unchanged.)
+
+_NEW_STAFF_RE = re.compile(r"(\\new\s+Staff\s*\{)")
+
+# LMX header tokens that the header-less twin drops (clef + time signature).
+# `key:fifths:*` is deliberately NOT dropped (see above).
+_TWIN_DROP_EXACT = {"clef:G2", "time"}
+_TWIN_DROP_PREFIX = ("beats:", "beat-type:")
+
+
+def omit_header_in_ly(ly_source: str) -> str:
+    """Inject ``\\omit`` of the clef and time signature into a LilyPond source.
+
+    Hides the clef and time-signature glyphs (without changing the music) so
+    the staff renders as a header-less continuation line.
+    """
+    return _NEW_STAFF_RE.sub(
+        r"\1 \\omit Staff.Clef \\omit Staff.TimeSignature", ly_source, count=1
+    )
+
+
+def headerless_label_tokens(tokens: list[str]) -> list[str]:
+    """Return ``tokens`` with the clef and time-signature tokens removed.
+
+    Mirrors :func:`omit_header_in_ly`: the key signature is kept.
+    """
+    return [
+        t
+        for t in tokens
+        if t not in _TWIN_DROP_EXACT and not t.startswith(_TWIN_DROP_PREFIX)
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Per-sample processing
 # ---------------------------------------------------------------------------
 
@@ -392,6 +441,16 @@ def process_sample(
     return True
 
 
+def _render_sample_task(
+    args: tuple[Path, Path, int | tuple[int, ...], bool, bool],
+) -> tuple[str, bool | str]:
+    """Multiprocessing worker: returns ``(sample_id, result)`` for pickling."""
+    sample_dir, output_dir, dpi, force, with_lmx = args
+    return sample_dir.name, process_sample(
+        sample_dir, output_dir=output_dir, dpi=dpi, force=force, with_lmx=with_lmx
+    )
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -486,18 +545,18 @@ def main() -> None:
 
     ok = fail = 0
     dpi_arg: int | tuple[int, ...] = args.dpi[0] if len(args.dpi) == 1 else tuple(args.dpi)
-    _worker = partial(process_sample, output_dir=args.output, dpi=dpi_arg, force=args.force, with_lmx=not args.no_lmx)
+    with_lmx = not args.no_lmx
+    work_items = [(sd, args.output, dpi_arg, args.force, with_lmx) for sd in sample_dirs]
 
     with multiprocessing.Pool(processes=args.workers) as pool:
         with tqdm(total=len(sample_dirs), desc="Rendering") as pbar:
-            # imap returns results in order, imap_unordered is faster
-            for sd, result in zip(sample_dirs, pool.imap(_worker, sample_dirs)):
+            for sample_id, result in pool.imap_unordered(_render_sample_task, work_items):
                 if result is True:
                     ok += 1
                 else:
                     fail += 1
                     with open(error_log, "a") as err_f:
-                        err_f.write(f"FAILED: {sd.name} - {result}\n")
+                        err_f.write(f"FAILED: {sample_id} - {result}\n")
                 pbar.update(1)
 
     log.info("Done. Success: %d  Failed: %d", ok, fail)

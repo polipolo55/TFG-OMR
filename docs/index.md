@@ -85,6 +85,6 @@ src/
 3. **ResNet18 default** — better gradient flow and convergence than VGG
 4. **Domain filtering** — remove orchestral patterns foreign to jazz lead sheets
 5. **Scan simulation augmentation** — bridges synthetic-to-real domain gap
-6. **Header stripping (40%)** — teaches model to handle continuation lines without clef/key/time
+6. **Header-less twin samples** — first-class continuation-staff renders (clef+time hidden, key kept) teach the model to read lines 2+ without a header
 7. **Single lookup table file** (`lilypond_render.py`) — PNG render and LMX label always in sync
 8. **Unified CLI** — all stages accessible via one entry point with full config control

@@ -337,7 +337,7 @@ Start the API server and open `http://localhost:8000/labeler` in a browser.
 |-------------|---------|
 | `Fmaj7` | `Fmaj7` |
 | `G-7` or `Gm7` | `G-7` |
-| `Bø` or `Bm7b5` or `B-7b5` | `Bø` (or `Bm7b5` / `B-7b5` — auto-converted to `Bø`) |
+| `B-7b5` or `Bm7b5` or `Bø` | any of the three — all auto-converted to `Bø` by `_canon` |
 | `Cdim` or `C°` | `Cdim` (never `°`) |
 | `G7alt` or `G7alt.` | `G7` (alt not in vocab) |
 | `A7(11)` | `A711` (drop parens) |

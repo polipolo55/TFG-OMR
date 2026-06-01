@@ -270,13 +270,13 @@ def _validate_source_png(src_png: Path) -> tuple[bool, str]:
     return True, ""
 
 
-def _worker(args: tuple[Path, Path, int, int]) -> list[tuple[bool, str, str]]:
+def _worker(args: tuple[Path, Path, int, int, bool]) -> list[tuple[bool, str, str]]:
     """
     Multiprocessing worker function.
-    Given (sample_dir, root_out_dir, num_copies, base_seed), generates
+    Given (sample_dir, root_out_dir, num_copies, base_seed, force), generates
     all augmented copies for that sample.
     """
-    src_dir, output_dir, copies, seed_base = args
+    src_dir, output_dir, copies, seed_base, force = args
     sample_id = src_dir.name
     src_png = src_dir / f"{sample_id}.png"
     results: list[tuple[bool, str, str]] = []
@@ -286,7 +286,7 @@ def _worker(args: tuple[Path, Path, int, int]) -> list[tuple[bool, str, str]]:
         out_dir = output_dir / out_id
         out_png = out_dir / f"{out_id}.png"
 
-        if out_png.exists():
+        if out_png.exists() and not force:
             # Image already augmented — just re-sync labels (they may
             # have been regenerated since the last augmentation run).
             _copy_labels(src_dir, out_dir, sample_id, out_id)
@@ -405,6 +405,12 @@ def main() -> None:
         "from source to output without re-augmenting images.  Use after "
         "regenerating .lmx files in the source directory.",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-augment images even when the scanned PNG already exists.  "
+        "Required after re-rendering clean PNGs (--force-render).",
+    )
     args = parser.parse_args()
 
     # Configure logging only if the root logger has no handlers yet
@@ -472,7 +478,9 @@ def main() -> None:
         args.nice,
     )
 
-    work_items = [(d, args.output, args.copies, args.seed + i * 1000) for i, d in enumerate(sample_dirs)]
+    work_items = [
+        (d, args.output, args.copies, args.seed + i * 1000, args.force) for i, d in enumerate(sample_dirs)
+    ]
 
     ok = fail = 0
     with multiprocessing.Pool(

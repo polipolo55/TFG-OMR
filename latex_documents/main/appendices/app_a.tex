@@ -57,8 +57,8 @@ BiLSTM hidden size per direction    & 256 \\
 BiLSTM combined output size         & 512 \\
 Inter-layer LSTM dropout            & 0.3 \\
 Final linear projection             & 512 to \texttt{vocab\_size} \\
-Vocabulary size                     & approximately 270 tokens plus 3 special (blank, pad, unk) \\
-Total parameter count (ResNet18, vocab\_size=273) & \num{14464209} (\textasciitilde\num{14.5} M) \\
+Vocabulary size                     & \num{80} symbols (\num{77} content tokens plus blank, pad, unk) \\
+Total parameter count (ResNet18, vocab\_size=80) & \num{14365200} (\textasciitilde\num{14.4} M) \\
 \bottomrule
 \end{tabular}
 \caption{Architecture summary of the music-recognition CRNN.}

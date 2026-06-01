@@ -301,7 +301,7 @@ A single encoder--decoder transformer that consumes a full-page image
 and emits the entire transcription as a long token sequence.
 This eliminates the staff-detection and grammar-fix stages and shares
 representations across the whole page.
-Rejected for two reasons.
+Two problems ruled this out.
 First, training a full-page transformer to competitive accuracy
 requires either a corpus of full-page transcriptions (which does not
 exist for the Real Book) or a synthetic generator capable of laying
@@ -403,8 +403,8 @@ the last two cover earlier designs of the rejection gate of
 A learned staff detector trained on bounding-box annotations of staff
 regions. Modern detectors give competitive segmentation on cluttered
 pages~\cite{simonettaOpticalMusicRecognition2024}.
-Rejected: the annotation cost is non-trivial (hundreds to thousands of
-manually labelled pages) and the gain over the morphological detector
+The annotation cost alone is non-trivial (hundreds to thousands of
+manually labelled pages), and the gain over the morphological detector
 on Real Book pages is in the noise. A learned detector becomes
 attractive when the page layout is irregular (handwritten manuscripts,
 historical scores), which is outside the project's scope.
@@ -412,7 +412,7 @@ historical scores), which is outside the project's scope.
 \paragraph{Projection-profile slicer.}
 An earlier version of this project used a horizontal-projection slicer
 that cut the page at low-density rows.
-Rejected after testing on Real Book pages with chord symbols printed
+Dropped after testing on Real Book pages with chord symbols printed
 close to the staff: the chord text reduced the inter-staff gap and
 produced under-segmented two-staff strips.
 The morphological line detector is robust to chord-text density
@@ -529,7 +529,7 @@ of the corpus.
 \paragraph{MUSCIMA++.}
 MUSCIMA++~\cite{hajicMuscimaPP2017} is the most-cited handwritten-OMR
 corpus and the natural reference for symbol-level supervision.
-Rejected for two reasons.
+Two reasons rule it out.
 First, its visual distribution is handwritten music on staff paper,
 whereas the inference distribution is typeset jazz lead sheets: the
 engraving-style gap is in the wrong direction.
@@ -589,15 +589,14 @@ sample of real Real Book scans.
 \paragraph{No augmentation, larger model.}
 Train on clean LilyJAZZ renders only, relying on a deeper model and
 larger capacity to generalise to scans.
-Rejected because the synthetic-to-real domain gap on this task is
-known to be a feature-distribution shift, not a capacity bottleneck:
-adding parameters does not move the training distribution closer to
-the test distribution.
+The synthetic-to-real gap is a feature-distribution shift, not a
+capacity bottleneck: adding parameters does not move the training
+distribution closer to the test distribution.
 
 \paragraph{Learned domain transfer (CycleGAN, style transfer).}
 Train an unpaired image-to-image translator (e.g.\ CycleGAN) to map
 clean LilyJAZZ renders to the Real Book scan distribution.
-Rejected for three reasons: (i)~CycleGAN training is notoriously
+Three problems ruled this out: (i)~CycleGAN training is notoriously
 unstable and would consume a substantial fraction of the project's
 GPU budget; (ii)~the mapping that minimises a cycle loss does not
 necessarily preserve the structural details (notehead position,
@@ -608,8 +607,8 @@ failure mode appears at evaluation time.
 
 \paragraph{Real-only training (no synthetic).}
 Hand-label enough real Real Book pages to train from scratch.
-Rejected on cost: producing a fully labelled corpus of even a few
-thousand staves is well outside the time budget, and the resulting
+The cost rules this out: producing a fully labelled corpus of even a
+few thousand staves is well outside the time budget, and the resulting
 dataset would still be smaller than PrIMuS by orders of magnitude.
 
 \subsection{Domain restriction: filtering the training set}
@@ -786,10 +785,9 @@ gracefully rather than collapsing to \code{<unk>}.
 
 \paragraph{MusicXML.}
 The de-facto interchange format for score data.
-Rejected as the model's direct output because the XML markup is
-verbose: each note is wrapped in nested
-\code{<note>$\langle$pitch$\rangle$\dots} tags that contribute large
-numbers of tokens with no musical content.
+As a direct model output MusicXML is too verbose: each note is
+wrapped in nested \code{<note>$\langle$pitch$\rangle$\dots} tags that
+contribute large numbers of tokens with no musical content.
 MusicXML is instead the downstream target. LMX is round-trippable to
 MusicXML through a deterministic post-processor, isolating the
 model's learning task from the XML formatting overhead.
@@ -799,23 +797,24 @@ The native PrIMuS textual encoding.
 It is close to LMX in spirit but encodes pitch and accidentals
 jointly (\code{note-Bb5\_quarter} rather than a flat sequence) and uses
 a project-internal vocabulary not adopted by downstream tooling.
-Rejected because LMX is more compact, more easily round-trippable to
-MusicXML, and matches the OLIMPIC reference work, keeping the present
-results directly comparable.
+LMX is more compact, more easily round-trippable to MusicXML, and
+matches the OLIMPIC reference work, keeping the present results
+directly comparable.
 
 \paragraph{\code{**kern} (Humdrum).}
 A compact, pipe-delimited format widely used in musicology
 research~\cite{huronHumdrum2002,Humdrum}.
-Rejected because its tooling ecosystem outside musicology is thin and
-because its expression of accidentals and rhythm requires per-cell
-escape characters that complicate CTC training.
+Its tooling ecosystem outside musicology is thin, and its expression
+of accidentals and rhythm requires per-cell escape characters that
+complicate CTC training.
 
 \paragraph{ABC notation.}
 A line-oriented format originally designed for folk-tune
 exchange~\cite{walshawABC2011}.
-Rejected for the same reason as \code{**kern}: tooling support outside
-the folk-music community is limited, and its spacing and headers are
-stylistically opinionated in a way that LMX's flat token stream avoids.
+The same reasoning applies as for \code{**kern}: tooling support
+outside the folk-music community is limited, and its spacing and
+headers are stylistically opinionated in a way that LMX's flat token
+stream avoids.
 
 
 % ─────────────────────────────────────────────────────────────────────────────
@@ -857,7 +856,7 @@ A transformer encoder that ingests the staff image as a sequence of
 patches and a transformer decoder that emits LMX tokens
 auto-regressively, supervised by cross-entropy on the token
 sequence~\cite{riosVilaSheetMusicTransformer2024}.
-Rejected on three grounds.
+Three factors argued against this choice.
 First, transformer decoders need substantially more training data than
 CRNN--CTC to reach comparable accuracy on monophonic input, and the
 project does not have the budget to generate that volume of data.
@@ -927,7 +926,7 @@ widths and depth-wise convolutions are tuned for natural-image
 classification, not for a tall, narrow monochrome strip with
 asymmetric aspect ratio. Preliminary tests with EfficientNet-B0
 converged more slowly than ResNet18 and offered no inference-speed
-advantage on the project's hardware. Rejected.
+advantage on the project's hardware. Not adopted.
 
 \paragraph{Vision Transformer (ViT, Swin).}
 A patch-based transformer encoder. Rejected on the same training-data
@@ -977,11 +976,11 @@ in \Cref{ch:impl}.
 \paragraph{GRU in place of LSTM.}
 A gated recurrent unit uses two gates instead of the LSTM's three and
 trains slightly faster with a smaller parameter count.
-Rejected as the default because the recurrent stage is not the memory
-bottleneck at the chosen depth (the convolutional backbone dominates
-both parameters and compute), so the saving is marginal, and the LSTM
-is the more thoroughly characterised cell for CTC-based recognisers;
-there was no accuracy argument for deviating from it.
+Not the default: the recurrent stage is not the memory bottleneck at
+the chosen depth (the convolutional backbone dominates both parameters
+and compute), so the saving is marginal, and the LSTM is the more
+thoroughly characterised cell for CTC-based recognisers.
+There was no accuracy argument for deviating from it.
 
 \paragraph{Temporal convolution or self-attention instead of recurrence.}
 Replace the BiLSTM with a temporal-convolutional stack or a
@@ -1217,9 +1216,9 @@ which does not admit per-class weights in its standard formulation.
 
 \paragraph{Class-weighted CTC loss.}
 Adjust the loss by a per-class weight that up-weights rare tokens.
-Rejected because the standard CTC formulation marginalises over
-alignments and does not factorise into per-token contributions that
-can be weighted independently.  Approximate per-token weighting is
+The standard CTC formulation marginalises over alignments and does
+not factorise into per-token contributions that can be weighted
+independently.  Approximate per-token weighting is
 possible but introduces gradient bias that is hard to characterise.
 
 \paragraph{Focal-style CTC.}
@@ -1230,11 +1229,11 @@ focal-style weighting does not specifically target the under-represented
 classes the project cares about.
 
 \paragraph{Synthetic over-generation of rare-token samples.}
-Generate additional PrIMuS-style samples that contain ties.  Rejected
-on cost: it requires modifying the LilyPond generator's musical
-content in a way that risks producing musically improbable tie
-patterns, which would distort training distribution rather than fix
-the imbalance.
+Generate additional PrIMuS-style samples that contain ties.
+The generation cost rules this out: modifying the LilyPond generator's
+musical content risks producing musically improbable tie patterns,
+which would distort the training distribution rather than fix the
+imbalance.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Grammar Correction as a Design Layer}
@@ -1292,9 +1291,9 @@ already provides.
 \paragraph{Weighted finite-state transducer (WFST) decoder.}
 Compose the model's per-frame distribution with an explicit WFST
 representation of the LMX grammar at decode time.
-Rejected as over-engineered for a vocabulary this small: the
-hand-written stateful walker is shorter, easier to debug, and
-sufficient for the project's grammar complexity.
+Over-engineered for a vocabulary this small: the hand-written
+stateful walker is shorter, easier to debug, and sufficient for the
+project's grammar complexity.
 
 \paragraph{Learned sequence-to-sequence corrector.}
 Train a small transformer to map raw model output to grammatically

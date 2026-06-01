@@ -340,7 +340,7 @@ Add BibTeX entries matching existing style; replace `\todo{ref?}` with `\cite{}`
 
 - [ ] **Step 5.3: Implement data pipeline flow figure**
 
-Replace `\todo{FIGURE: Data pipeline flow}` with TikZ: PrIMuS raw → `generate_realbook.py` (render) → `semantic_to_lmx.py` (convert) → `augment_scanned.py` (augment) → train/val/test split. Each node cites the corresponding script file.
+Replace `\todo{FIGURE: Data pipeline flow}` with TikZ: PrIMuS raw → `generate_realbook.py` (render) → `semantic_to_lmx.py` (convert) → `generate_headerless_twins.py` (twins) → `augment_scanned.py` (augment) → `vocab` → train/val/test split. Each node cites the corresponding script file.
 
 - [ ] **Step 5.4: Implement augmentation samples figure**
 

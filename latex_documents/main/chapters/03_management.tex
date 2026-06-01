@@ -191,9 +191,9 @@ to a documented design decision, so that any number reported in
 produced it.
 
 \textit{Reproducibility.}
-Data generation, training, and evaluation are driven by scripts
-rather than by interactive notebook sessions; the concrete
-mechanism (embedded \code{Config}, deterministic seeds,
+Data generation, training, and evaluation are driven by scripts,
+not interactive notebook sessions.
+The mechanism (embedded \code{Config}, deterministic seeds,
 checkpoint format) is described in \Cref{sec:impl-reproducibility}.
 
 \textit{Quantitative control.}
@@ -208,6 +208,7 @@ Each sprint ends with a three-hour supervisor review (accounted
 for in \Cref{tab:task-summary}) that may adjust scope, effort
 estimates, or risk responses, and produces a short written note
 feeding the budget-control mechanism of \Cref{sec:mgmt-control}.
+Sprint reviews are the primary channel through which the project plan is adjusted.
 
 Monitoring tools include Git and GitHub for version control,
 per-experiment training logs and CSV summaries written into the

@@ -145,7 +145,7 @@ Input (PDF / image bytes)
 
 ```
 src/
-├── cli.py                      unified CLI (9 subcommands)
+├── cli.py                      unified CLI (12 subcommands; see docs/cli.md)
 ├── style.py                    matplotlib theme
 ├── CRNN_CTC/                   model, training, vocab, evaluation
 │   ├── model.py                CRNN-CTC architecture (ResNet18 / VGG backbone)
@@ -158,6 +158,7 @@ src/
 ├── data_processing/            dataset generation and augmentation
 │   ├── generate_realbook.py    PrIMuS → LilyJAZZ render
 │   ├── semantic_to_lmx.py      PrIMuS .semantic → LMX labels
+│   ├── generate_headerless_twins.py  __nh continuation-staff twins
 │   ├── augment_scanned.py      scan-simulation augmentation
 │   ├── chord_render.py         Synthetic chord strip renderer (LilyJAZZ)
 │   ├── generate_chord_crops.py Bulk chord strip generation for CRNN training
@@ -184,7 +185,7 @@ data/
 │   ├── strips/             cropped PNG images from real PDF pages
 │   └── labels.jsonl        hand-corrected labels (status: pending/done/skip)
 └── vocab/
-    ├── primus_lmx.txt      OMR vocabulary (~270 tokens)
+    ├── primus_lmx.txt      OMR vocabulary (~77 content tokens; 80 incl. blank/pad/unk)
     └── chord.txt           Chord CRNN vocabulary (26 character tokens)
 
 models/
@@ -243,12 +244,14 @@ simplifications, not bugs.  None of these affect typical Real Book scans.
 
 ### Vocabulary "dead output classes"
 
-The vocabulary file (`data/vocab/primus_lmx.txt`) contains a few tokens that
-are never produced once dataset filters are on (e.g. `clef:F4`, `clef:C3`,
-`octave:0`/`1`/`2`/`8`, exotic time-signature combinations).  They are kept
-so older checkpoints continue to load, but they cost a handful of unused
-logits per time step and do nothing else.  They will be removed the next
-time the vocabulary is rebuilt from scratch with `cli.py vocab`.
+The vocabulary file (`data/vocab/primus_lmx.txt`) is rebuilt empirically from
+all `.lmx` files (`cli.py vocab`) and is typically **~77 content tokens**
+(**80** including `<blank>`, `<pad>`, `<unk>`).  It can still list tokens that
+rarely appear in **training** once dataset filters are on (e.g. `clef:C3`,
+`clef:F4`, low octaves) because those labels exist in the corpus before
+`filter_non_leadsheet_clef` removes the samples.  Those logits cost capacity
+but are harmless at inference when the grammar fixer enforces the lead-sheet
+contract.  See `docs/lmx_format.md` for the canonical token list shape.
 
 ### Augmentation effects not implemented
 

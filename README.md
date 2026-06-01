@@ -103,27 +103,29 @@ poetry install
 All commands run through the unified CLI via `poetry run`:
 
 ```bash
-# 1. Run the full data pipeline (render + convert + augment + vocab)
+# 1. Run the full data pipeline (render → convert → twins → augment → vocab)
 poetry run python src/cli.py pipeline \
   --raw-primus-dir data/raw/primus \
   --clean-dir data/processed/primus/clean \
   --scanned-dir data/processed/primus/scanned \
   --vocab-path data/vocab/primus_lmx.txt \
-  --workers 8
+  --workers $(nproc)
 
-# 2. Train the model
+# 2. Train the model (if data already prepared)
 poetry run python src/cli.py train \
-  --epochs 60 --batch-size 16
+  --epochs 60 --batch-size 24
 
 # 3. Evaluate
 poetry run python src/cli.py evaluate \
   --checkpoint models/latest/best_model.pt \
   --split test --beam-width 10
 
-# 4. Or: run everything in one shot
+# 4. Or: full rebuild + train in one shot
 poetry run python src/cli.py pipeline-train \
   --raw-primus-dir data/raw/primus \
-  --workers 8 --epochs 60 --batch-size 16
+  --force-all \
+  --workers $(nproc) \
+  --epochs 60 --batch-size 24 --num-workers 12
 ```
 
 ---
@@ -132,7 +134,7 @@ poetry run python src/cli.py pipeline-train \
 
 ```
 src/
-├── cli.py                  Unified CLI (render / convert / augment / vocab / train / evaluate / api / pipeline)
+├── cli.py                  Unified CLI (render / convert / augment / vocab / train / pipeline / pipeline-train / …)
 ├── CRNN_CTC/               Model, training, vocab, evaluation
 │   ├── lilypond_render.py  Single source of truth for LMX→LilyPond lookup tables + render pipeline
 │   ├── config.py           Config dataclass (serialized in every checkpoint)
@@ -143,6 +145,7 @@ src/
 ├── data_processing/
 │   ├── generate_realbook.py    PrIMuS .semantic → LilyJAZZ PNG
 │   ├── semantic_to_lmx.py      PrIMuS .semantic → LMX tokens
+│   ├── generate_headerless_twins.py  __nh continuation-staff twins
 │   └── augment_scanned.py      Clean PNG → scan-simulated PNG
 └── omr_pipeline/           Full inference pipeline (staff detect + CRNN + chord OCR)
 

@@ -25,7 +25,7 @@
 ]
   % ── Music stream (top row) ───────────────────────────────────────────────
   \node[io]                    (mimg)  {Staff\\strip};
-  \node[stage, right=of mimg]  (mcrnn) {CRNN--CTC\\\scriptsize\sffamily $|V| \approx 270$\\\scriptsize\sffamily LMX tokens};
+  \node[stage, right=of mimg]  (mcrnn) {CRNN--CTC\\\scriptsize\sffamily $|V| \approx 80$\\\scriptsize\sffamily LMX tokens};
   \node[io, right=of mcrnn]    (mout)  {LMX\\tokens};
   \node[data, below=0.10cm of mcrnn] (mdata)
         {synthetic LilyJAZZ corpus $+$\\fine-tune on Real Book pages};
@@ -65,7 +65,7 @@
   architectural family (\Cref{fig:soa-crnn-pipeline}) but with
   disjoint vocabularies, disjoint training corpora, and no shared
   parameters or cross-attention.  The music stream emits LMX tokens
-  over a vocabulary of $\approx 270$ symbols; the chord stream emits
+  over a vocabulary of $\approx 80$ LMX symbols; the chord stream emits
   jazz-chord strings over a $29$-character alphabet.  Each is
   pre-trained on its own synthetic corpus and fine-tuned independently
   on a small hand-labelled real set.  Merging into the JSON output

@@ -12,6 +12,9 @@ vocab       Build LMX vocabulary from converted data.
 train       Train the CRNN-CTC model.
 evaluate    Evaluate a trained model checkpoint.
 evaluate-ab Compare SER for multiple beam widths on one split.
+pipeline    render → convert → header-less twins → augment → vocab.
+pipeline-train  pipeline, then train (--force-all for full rebuild).
+harvest-reject-fixtures / calibrate-reject  Staff-reject calibration set.
 
 Usage examples::
 

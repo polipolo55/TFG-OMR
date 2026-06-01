@@ -59,12 +59,13 @@ families of staff-removal algorithms and contributed a skeletonisation-based
 method; the \term{CVC-MUSCIMA} corpus~\cite{fornesCVCMUSCIMAGroundTruth2012}
 was constructed expressly to benchmark this stage.
 
-\term{Audiveris}~\cite{audiverisAudiveris} is a widely used open-source
-modular OMR engine.
-Its processing chain combines morphological operations for staff and beam
-handling, template matching for fixed-shape symbols, a small convolutional
-classifier for ambiguous glyphs, and external OCR for lyrics, exporting
-MusicXML~4.
+\term{Audiveris}~\cite{audiverisAudiveris} is the most widely used
+open-source modular OMR engine.
+Its processing chain combines morphological operations for staff and
+beam handling, template matching for fixed-shape symbols, a small
+convolutional classifier for ambiguous glyphs, and external OCR for
+lyrics, exporting MusicXML~4.
+The architecture is representative of the whole family.
 Established commercial systems such as SmartScore, PhotoScore, and
 SharpEye follow the same general decomposition but are
 proprietary~\cite{calvoZaragozaUnderstandingOMR2020}.
@@ -153,9 +154,8 @@ For a strictly monophonic target domain, where the CRNN--CTC baseline
 already attains sub-percent SER and the headroom for further gain is in
 domain robustness rather than model capacity, CRNN--CTC remains the right
 point on the cost/capability curve.
-The quantitative justification of this choice is developed in
-\Cref{ch:design}, and the project-management criteria behind it
-in \Cref{sec:mgmt-justification}.
+The quantitative justification is in \Cref{ch:design}; the
+project-management argument is in \Cref{sec:mgmt-justification}.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \newpage

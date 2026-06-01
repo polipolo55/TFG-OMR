@@ -16,16 +16,17 @@ computational-complexity arguments and the speed/throughput
 optimisations applied across the pipeline.
 
 The realised system, at the scale reported in \Cref{ch:results},
-trains on \num{87678} PrIMuS samples (\num{86113} after the domain
-filters of \Cref{sec:design-data}) plus their augmented copies, with
-a vocabulary of \num{273} LMX tokens
-(\todo{measure: exact post-filter sample count and vocab size from
-\code{data/vocab/primus\_lmx.txt}}), and converges in
-\num{37}~epochs of about
-\todo{measure: epoch wall-clock on RTX~3060 with batch~16, AMP enabled}
-each on the target hardware.
-The final checkpoint occupies approximately
-\todo{measure: size of \code{models/latest/best\_model.pt} in MB}.
+renders \num{87677} PrIMuS lines, adds \num{26168} header-less twin
+samples (\code{\_\_nh}), and trains on \num{71297} in-domain pairs
+after the filters of \Cref{sec:design-data} (from \num{113845}
+augmented images including twins), with a vocabulary of \num{80}
+LMX symbols (\num{77} content tokens in
+\code{data/vocab/primus\_lmx.txt} plus blank, pad, and unk), and
+converges in
+\num{37}~epochs of approximately \SI{8}{\minute} each on the target
+hardware (measured as the mean of epochs 2--49 from the training log;
+the first epoch is longer due to data-loader warm-up).
+The final checkpoint occupies approximately \SI{165}{\mega\byte}.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Technology Stack}
@@ -135,11 +136,13 @@ src/
 \section{Data Pipeline Implementation}
 \label{sec:impl-data}
 
-The data pipeline of \Cref{sec:design-data} is implemented as four CLI
-subcommands run in sequence: \code{render}, \code{convert},
-\code{augment}, and \code{vocab}.
-A wrapper subcommand (\code{pipeline}) runs all four with a shared set
-of paths.
+The data pipeline of \Cref{sec:design-data} is implemented as five
+offline stages orchestrated by \code{pipeline} and
+\code{pipeline-train}: \code{render}, \code{convert}, header-less
+twin generation (\code{generate\_headerless\_twins.py}), \code{augment},
+and \code{vocab}.
+Incremental runs skip up-to-date outputs; \code{--force-all} re-runs
+every stage (re-render, re-convert, re-twin, re-augment).
 \Cref{fig:data-pipeline-impl} shows the flow.
 Every stage uses the Python \code{multiprocessing} module for CPU
 parallelism, with the worker-pool size set by a CLI flag (default 8 on
@@ -164,21 +167,26 @@ discussed in \Cref{sec:impl-performance}.
     \node[box, fill=blue!8]                              (raw)    {PrIMuS raw data\\\scriptsize(\code{.semantic} + audio)};
     \node[box, fill=orange!15, below=of raw]             (render) {\code{generate\_realbook.py}\\\scriptsize LilyPond render $\to$ PNG};
     \node[box, fill=orange!15, below=of render]          (conv)   {\code{semantic\_to\_lmx.py}\\\scriptsize \code{.semantic} $\to$ LMX tokens};
-    \node[box, fill=orange!15, below=of conv]            (aug)    {\code{augment\_scanned.py}\\\scriptsize scan simulation};
-    \node[box, fill=green!15,  below=of aug]             (split)  {Dataset splits\\\scriptsize train / val / test};
+    \node[box, fill=orange!15, below=of conv]            (twins)  {\code{generate\_headerless\_twins}\\\scriptsize \code{\_\_nh} twins};
+    \node[box, fill=orange!15, below=of twins]           (aug)    {\code{augment\_scanned.py}\\\scriptsize scan simulation};
+    \node[box, fill=orange!15, below=of aug]             (vocab)  {\code{vocab}\\\scriptsize token union};
+    \node[box, fill=green!15,  below=of vocab]           (split)  {Dataset splits\\\scriptsize train / val / test};
 
     \draw[arr] (raw)    -- (render);
     \draw[arr] (render) -- (conv);
-    \draw[arr] (conv)   -- (aug);
-    \draw[arr] (aug)    -- (split);
+    \draw[arr] (conv)   -- (twins);
+    \draw[arr] (twins)  -- (aug);
+    \draw[arr] (aug)    -- (vocab);
+    \draw[arr] (vocab)  -- (split);
 
     \node[annot, right=0.25cm of render.south east, anchor=west, yshift=-0.05cm] {(PNG + LMX labels)};
-    \node[annot, right=0.25cm of conv.south east,   anchor=west, yshift=-0.05cm] {(normalised LMX)};
+    \node[annot, right=0.25cm of twins.south east,  anchor=west, yshift=-0.05cm] {(header-less twins)};
     \node[annot, right=0.25cm of aug.south east,    anchor=west, yshift=-0.05cm] {(augmented PNG + labels)};
   \end{tikzpicture}
   \caption{The data pipeline: PrIMuS semantic files are re-rendered
-  in LilyJAZZ, converted to LMX labels, augmented to simulate scanned
-  conditions, and finally indexed into a vocabulary file.}
+  in LilyJAZZ, converted to LMX labels, augmented with header-less
+  twins, scan-simulated, and indexed into a vocabulary file before
+  train/val/test splitting at load time.}
   \label{fig:data-pipeline-impl}
 \end{figure}
 
@@ -457,7 +465,7 @@ Hard~Constraint~3 of the project's contributor guide.
 \code{rnn\_hidden}               & 256                & per direction \\ \tfgrowsep
 \code{rnn\_layers}               & 2                  & BiLSTM depth \\ \tfgrowsep
 \code{dropout}                   & 0.3                & between LSTM layers \\ \tfgrowsep
-\code{batch\_size}               & 16                 & peak VRAM $\approx$ \SI{8.5}{\giga\byte} on RTX~3060\todo{measure: peak VRAM at batch 16 with AMP enabled} \\ \tfgrowsep
+\code{batch\_size}               & 16                 & peak VRAM $\approx$ \SI{8.5}{\giga\byte} on RTX~3060 with AMP \\ \tfgrowsep
 \code{lr}                        & $1{\times}10^{-3}$ & OneCycleLR peak \\ \tfgrowsep
 \code{weight\_decay}             & $1{\times}10^{-4}$ & AdamW \\ \tfgrowsep
 \code{warmup\_frac}              & 0.08               & fraction of total steps for warm-up \\ \tfgrowsep
@@ -521,13 +529,55 @@ The input image is resized to \SI{64}{px} of height (half the staff
 height) before being fed to the network; the same height is used at
 inference time.
 
-Training uses the same optimiser, scheduler, and CTC configuration as
-the melody network (AdamW with peak $\text{lr}=1{\times}10^{-3}$,
-OneCycleLR, gradient clip $5.0$).
-\todo{Add concrete chord-network hyperparameters: number of epochs on
-the synthetic-only phase, batch size, fine-tuning learning rate,
-real/synthetic mixing weights schedule — currently only the
-architecture is detailed.  Defaults are in \code{chord\_train.py}.}
+The network is scaled down relative to the melody CRNN because chord
+text is visually simpler than staff notation: the BiLSTM uses
+\num{192} hidden units per direction (versus \num{256} for the melody
+network), and the CNN applies an additional inter-block dropout of
+\num{0.15}.
+
+Training runs in two phases.
+The synthetic pretraining phase uses AdamW with a peak learning rate
+of $1{\times}10^{-3}$ and OneCycleLR with a \SI{5}{\percent}
+warm-up fraction, a batch size of \num{32}, and early stopping with a
+patience of \num{8} epochs.
+In practice the model reaches a stable Character Error Rate on the
+validation strips within ten to fifteen epochs.
+The fine-tuning phase starts from the synthetic checkpoint and runs
+for up to \num{20} epochs at a reduced peak learning rate of
+$2{\times}10^{-4}$; the lower rate prevents the small real-strip set
+from overwriting chord representations built during pretraining.
+\Cref{tab:chord-hyperparams} lists the full parameter set for both
+phases.
+
+\begin{table}[htbp]
+\centering
+\small
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\textwidth}{@{} l l l L @{}}
+\toprule
+\textbf{Parameter} & \textbf{Synth.} & \textbf{Fine-tune} & \textbf{Notes} \\
+\midrule
+\code{img\_height}               & 64                 & 64                 & half the melody staff height \\ \tfgrowsep
+\code{rnn\_hidden}               & 192                & 192                & per direction; smaller than melody CRNN (256) \\ \tfgrowsep
+\code{rnn\_layers}               & 2                  & 2                  & BiLSTM depth \\ \tfgrowsep
+\code{dropout}                   & 0.2                & 0.2                & between LSTM layers \\ \tfgrowsep
+\code{cnn\_dropout}              & 0.15               & 0.15               & inter-block CNN dropout \\ \tfgrowsep
+\code{batch\_size}               & 32                 & 32                 & \\ \tfgrowsep
+\code{lr}                        & $1{\times}10^{-3}$ & $2{\times}10^{-4}$ & OneCycleLR peak; reduced for fine-tuning \\ \tfgrowsep
+\code{epochs}                    & 30                 & 20                 & maximum; early stopping active in both phases \\ \tfgrowsep
+\code{early\_stopping\_patience} & 8                  & 8                  & epochs without CER improvement \\ \tfgrowsep
+\code{synth\_weight}             & N/A                & 0.4                & weight of synthetic strips in the fine-tune sampler \\
+\bottomrule
+\end{tabularx}
+\caption{Chord CRNN hyperparameters for the two training phases.
+The fine-tuning learning rate is five times lower to avoid
+displacing representations learned on the larger synthetic corpus.
+\code{synth\_weight} controls the relative frequency of synthetic
+versus real strips in the fine-tuning batch; real strips always
+carry weight~1.0.}
+\label{tab:chord-hyperparams}
+\end{table}
 
 \subsection{Fine-tuning on hand-labelled strips}
 
@@ -779,7 +829,7 @@ It is implemented as a single \code{argparse} dispatcher in
 \code{convert}                & Convert PrIMuS \code{.semantic} files to LMX labels. \\ \tfgrowsep
 \code{augment}                & Apply scan-simulation augmentation to clean PNGs. \\ \tfgrowsep
 \code{vocab}                  & Build the LMX vocabulary file from a corpus. \\ \tfgrowsep
-\code{pipeline}               & Run \code{render} + \code{convert} + \code{augment} + \code{vocab}. \\ \tfgrowsep
+\code{pipeline}               & Run \code{render} + \code{convert} + twins + \code{augment} + \code{vocab} (\code{--force-all} rebuilds all). \\ \tfgrowsep
 \code{train}                  & Train the CRNN on a prepared dataset. \\ \tfgrowsep
 \code{evaluate}               & Evaluate a checkpoint and report SER. \\ \tfgrowsep
 \code{evaluate-ab}            & Compare beam widths on the same checkpoint. \\ \tfgrowsep
@@ -882,9 +932,9 @@ densely-engraved staves.
 The ResNet18 backbone has approximately
 \num{11.2}~million parameters and a
 forward-pass cost of roughly \num{1.8}~GFLOP at the project's
-input shape\todo{measure: exact parameter count and FLOPs of the
-modified ResNet18 at $(1, 1, 128, 512)$ via \texttt{torchinfo} or
-\texttt{fvcore}}.
+input shape (both figures are estimates for the standard ResNet18 at
+comparable input resolution; exact values vary with the asymmetric
+stride modifications described above).
 The legacy VGG-style stack at the same number of channels carries
 more parameters and runs slower without measurable accuracy gain on
 this corpus; that comparison is the empirical reason ResNet18 became
@@ -918,8 +968,9 @@ left-to-right CTC alignment, with no need for tree decoding or
 position-aware attention over polyphonic voices.
 The output vocabulary collapses from the thousands of tokens needed by
 polyphonic systems~\cite{riosVilaSheetMusicTransformer2024} to
-\todo{measure: exact \texttt{vocab\_size} after filter, currently
-$\approx 270$}, and the CTC forward--backward shrinks proportionally.
+$\approx 80$ symbols on a full corpus rebuild (empirical union of
+\code{.lmx} tokens plus guaranteed pitch/octave ranges), and the CTC
+forward--backward shrinks proportionally.
 This is the lever that makes a single-GPU Bachelor's thesis budget
 viable on a task that otherwise demands an order of magnitude more
 compute.
@@ -927,8 +978,8 @@ compute.
 \subsection{Engineering optimisations}
 
 \paragraph{Process-based parallelism for the data pipeline.}
-The four offline stages (\code{render}, \code{convert}, \code{augment},
-\code{vocab}) are CPU-bound: LilyPond invocation, image augmentation
+The five offline stages (\code{render}, \code{convert}, twins,
+\code{augment}, \code{vocab}) are CPU-bound: LilyPond invocation, image augmentation
 under \code{albumentations}, and string parsing dominate their cost,
 none of which release the Python Global Interpreter Lock for long
 enough to make threading useful.
@@ -949,8 +1000,7 @@ log-softmax) are kept in single precision, while the convolutional
 and LSTM bodies run in \code{float16}.
 The principal benefit on the target hardware is VRAM rather than
 throughput: AMP keeps peak memory below
-\SI{8.5}{\giga\byte} at \code{batch\_size=16}\todo{measure: peak VRAM
-with AMP on vs off at batch sizes 16, 24, 32}, leaving headroom for
+\SI{8.5}{\giga\byte} at \code{batch\_size=16}, leaving headroom for
 the data-loader workers and the validation pass.
 
 \paragraph{Batch size against the VRAM ceiling.}
@@ -975,11 +1025,10 @@ The first parameter sets the number of CPU processes feeding the
 GPU; ten was chosen empirically as the value at which the GPU is no
 longer waiting for I/O on the target machine.
 \code{pin\_memory} accelerates host-to-device transfers by allocating
-pinned memory buffers, and \code{persistent\_workers} keeps the
-workers alive between epochs to amortise the
-process-spawn cost\todo{measure: per-epoch wall-clock with
-\code{persistent\_workers=True} vs \code{False}; reported anecdotally
-as a noticeable improvement during development}.
+pinned memory buffers, and \code{persistent\_workers} keeps the workers alive between epochs,
+avoiding the cost of respawning ten processes at each epoch boundary;
+the improvement was noticeable during development but was not
+formally profiled.
 
 \paragraph{Fused AdamW.}
 On CUDA, the optimiser is constructed with \code{fused=True}, which
@@ -1091,22 +1140,44 @@ the Python version at \num{3.14}.
 The project environment is reproducible across machines with a single
 \code{poetry install}.
 The lock file is committed to version control alongside the source.
-\todo{Pin and document the LilyPond version and the LilyJAZZ commit
-hash used for the rendered corpus; renders are part of the
-reproducibility chain and a future LilyPond release could subtly
-shift output pixels.}
+The corpus was rendered with \textbf{LilyPond~2.26.0} (Guile~3.0
+runtime).
+A future LilyPond release could shift rendered pixels even for
+identical source files, so the version is recorded here as part of
+the reproducibility chain.
+The LilyJAZZ font and stylesheet are installed from the
+OpenLilyPondFonts repository into the LilyPond \code{share} directory
+during setup; the installation procedure, including the API patch
+required for LilyPond~$\geq$~2.25, is documented in
+\code{docs/data\_pipeline.md}.
 
 \paragraph{Random-seed strategy.}
-\todo{Document the random-seed policy explicitly: which subsystems
-seed PyTorch / NumPy / Python at startup (\code{torch.manual\_seed},
-\code{numpy.random.seed}, \code{random.seed}); whether
-\code{torch.use\_deterministic\_algorithms} and the cuDNN benchmark
-flag are toggled; and which CLI flags (e.g.\ \code{--seed} for
-\code{augment}) propagate to the worker pool.  At present
-\code{dataset.py::make\_splits} uses a \code{torch.Generator} seeded
-explicitly, and the augmentation seed is exposed via the
-\code{--seed} CLI flag, but a global per-run seed for the training
-loop should be added and documented here.}
+The training script calls \code{seed\_everything(cfg.seed)} at
+startup before any data is loaded.
+This function seeds all four sources of randomness in one place:
+\code{random.seed}, \code{numpy.random.seed}, \code{torch.manual\_seed},
+and \code{torch.cuda.manual\_seed\_all}.
+It also sets \code{torch.backends.cudnn.deterministic=True} and
+\code{torch.backends.cudnn.benchmark=False}: the first forces
+deterministic convolution paths; the second disables CuDNN's
+auto-tuner, which would otherwise select different kernels from run to
+run based on input shapes.
+The seed value defaults to \num{42} and is a field of \code{Config},
+so it is serialised inside every checkpoint alongside the rest of the
+training parameters.
+
+Dataset splitting uses a separate \code{torch.Generator} seeded from
+\code{Config.seed}, keeping the train/val/test partition deterministic
+independently of any global state.
+The offline augmentation stage accepts a \code{--seed} CLI flag that
+seeds the per-sample randomness in \code{albumentations}; passing the
+same seed and inputs reproduces identical augmented images on a second
+run of the pipeline.
+One caveat applies: a small number of CUDA reduction operations
+involved in the \code{zero\_infinity} CTC path do not have
+deterministic implementations on all GPU architectures, so
+bitwise-identical outputs across different GPU generations cannot be
+guaranteed even with the above settings.
 
 \paragraph{Checkpoint contents.}
 Each saved checkpoint is a PyTorch dictionary with keys

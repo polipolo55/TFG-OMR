@@ -5,8 +5,8 @@ Music notation is a dense, two-dimensional graphical system that encodes pitch, 
 dynamics, and phrasing precisely enough for performers to reproduce a composer's
 intentions from a printed page. Yet most notated music exists today only as paper or
 low-resolution scanned image, inaccessible to the computational tools that drive music
-education, Music Information Retrieval (MIR), computational musicology, and digital
-archiving. \term{Optical Music Recognition} (OMR) bridges this divide: it translates
+education, \term{Music Information Retrieval (MIR)}, computational musicology, and digital
+archiving.\term{Optical Music Recognition} (OMR) bridges this divide: it translates
 images of musical scores into structured, machine-readable representations, much as
 Optical Character Recognition (OCR) did for printed text~\cite{shatriOPTICALMUSICRECOGNITION}.
 
@@ -26,17 +26,17 @@ Music archives, educational institutions, and individual musicians hold large qu
 of repertoire that exists only in paper or low-resolution scans. These collections cannot
 be searched, transposed, played back, or analysed quantitatively without manual
 transcription into notation software, a process that is slow, demands specialist
-training, and is repeatedly identified as a principal cost driver in corpus-level
+training, and is repeatedly identified as a principal cost driver in corpus-levelw
 digitisation projects~\cite{calvoZaragozaUnderstandingOMR2020, hajicOMRMetricsEvaluation2019}.
 The practical consequences are tangible: educators struggle to reassign jazz standards in
 new keys, musicologists cannot apply statistical methods to scanned PDFs, and musicians
 cannot feed a worn photocopy of \textit{The Real Book} into a digital practice app.
 
-OCR solved the equivalent problem for text decades ago, making printed documents editable
+OCR solved mostly the equivalent problem for text decades ago, making printed documents editable
 at almost zero marginal cost. OMR remains far less mature. The visual language of music
-notation is substantially more complex than alphabetic text, the available annotated data
-is drastically smaller, and the research community is correspondingly
-narrower~\cite{shatriOPTICALMUSICRECOGNITION}.
+notation is substantially more complex than alphabetic text.
+Annotated training data is scarcer by orders of magnitude, and the research
+community reflects that gap~\cite{shatriOPTICALMUSICRECOGNITION}.
 
 \subsection{Jazz Lead Sheets and \textit{The Real Book}}
 
@@ -151,8 +151,8 @@ The lead-sheet format requires processing two distinct visual streams from the s
 image region at once: the melodic staff content, which calls for pattern-based sequence
 recognition, and the chord symbols above the staff, which call for text OCR. These two
 streams require different feature representations and must ultimately be integrated into
-a coherent structured output. A complete lead-sheet OMR system must solve both
-sub-problems and align their results.
+a coherent structured output. Existing OMR pipelines address only the first.
+A complete lead-sheet system must solve both and align their results.
 
 This thesis addresses the four difficulties jointly: by constructing a synthetic
 training corpus in the jazz engraving style, applying a calibrated scan-simulation

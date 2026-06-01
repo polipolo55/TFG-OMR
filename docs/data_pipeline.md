@@ -1,6 +1,6 @@
 # Data Pipeline
 
-The data pipeline converts raw PrIMuS dataset packages into training-ready image/label pairs. It runs in four sequential stages.
+The data pipeline converts raw PrIMuS dataset packages into training-ready image/label pairs. It runs in five sequential stages (orchestrated by `cli.py pipeline` / `pipeline-train`).
 
 ## Source Dataset: PrIMuS
 
@@ -100,7 +100,26 @@ FERMATA   := "fermata"                              # attaches to previous note/
 
 **Output:** `.lmx` files co-located with clean PNGs
 
-## Stage 3 — Augment: Scan Simulation
+On incremental runs, samples whose `.lmx` is newer than `.semantic` are skipped unless `--force-convert` or `--force-all` is set.
+
+## Stage 3 — Header-less twins (`__nh`)
+
+**Script:** `src/data_processing/generate_headerless_twins.py`  
+**CLI:** integrated into `pipeline` / `pipeline-train` (step 3); standalone via the same module’s `main()`
+
+Real Book continuation systems often omit the leading clef and time signature. For a fraction of treble (`clef:G2`) samples, the pipeline renders a **twin**: same music with clef/time glyphs hidden (LilyPond `\omit`), paired with an LMX label that drops the corresponding header tokens. The key signature is kept so in-body accidentals stay aligned with the parent label.
+
+| Setting | Default | Notes |
+|---------|---------|--------|
+| `headerless-fraction` | 0.35 | Deterministic per sample id (seeded) |
+| `headerless-dpi` | 180, 200, 220 | One DPI picked per twin |
+| `--no-headerless-twins` | off | Skip this stage entirely |
+
+**Output:** sibling directories `data/processed/primus/clean/{sample_id}__nh/` with `{sample_id}__nh.png` and `{sample_id}__nh.lmx`.
+
+Twins are included in the **augment** pass (stage 4) so they receive scanned variants. Use `--force-twins` or `--force-all` to re-render existing twin PNGs.
+
+## Stage 4 — Augment: Scan Simulation
 
 **Script:** `src/data_processing/augment_scanned.py`
 **CLI:** `python src/cli.py augment`
@@ -143,10 +162,11 @@ gaussian noise σ ≈ 0.005–0.015, ±2 px horizontal shift) with probability `
 (default 0.5). Without this, every epoch sees identical pixel grids and the model overfits the
 exact augmentations baked into `scanned/`. Cost is ~50 µs per sample.
 
-**Output:** `data/processed/primus/scanned/{sample_id}/{sample_id}.png`
-Labels (`.lmx`) are identical to clean — copied unchanged.
+**Output:** `data/processed/primus/scanned/{sample_id}/{sample_id}.png` (and `{sample_id}__nh/` for twins)
 
-## Stage 4 — Vocabulary
+Labels (`.lmx`) are identical to clean — copied unchanged. Existing scanned PNGs are skipped unless `--force-augment` or `--force-all` (or when implied by `--force-render`).
+
+## Stage 5 — Vocabulary
 
 **Script:** `src/CRNN_CTC/vocab.py`
 **CLI:** `python src/cli.py vocab`
@@ -168,7 +188,7 @@ Output: a plain-text file, one token per line (excluding specials).
 ## Running the Full Pipeline
 
 ```bash
-# All four stages in one command:
+# All five stages in one command:
 poetry run python src/cli.py pipeline \
   --raw-primus-dir data/raw/primus \
   --clean-dir data/processed/primus/clean \
@@ -176,12 +196,19 @@ poetry run python src/cli.py pipeline \
   --vocab-path data/vocab/primus_lmx.txt \
   --workers 8
 
+# Full rebuild (re-render, re-convert, re-twin, re-augment everything):
+poetry run python src/cli.py pipeline --force-all --workers $(nproc) ...
+
 # Or individually:
 poetry run python src/cli.py render   --source data/raw/primus --output data/processed/primus/clean
 poetry run python src/cli.py convert  --source data/processed/primus/clean --workers 8
+poetry run python src/data_processing/generate_headerless_twins.py \
+  --data-dir data/processed/primus/clean --fraction 0.35 --workers 8
 poetry run python src/cli.py augment  --source data/processed/primus/clean --output data/processed/primus/scanned
 poetry run python src/cli.py vocab    --data-dir data/processed/primus/clean --output data/vocab/primus_lmx.txt
 ```
+
+`pipeline-train` runs the same five stages, then `train`. See `docs/cli.md` for `--force-all` and header-less twin flags.
 
 ## Data Filtering (applied at training time)
 
@@ -292,13 +319,13 @@ data/chord_synth/
 **File:** `src/CRNN_CTC/chord_train.py`
 
 Same CRNN-CTC architecture as the OMR model (ResNet18 backbone, 2-layer BiLSTM), but
-with a 29-token character vocabulary instead of the ~270-token LMX vocabulary.
+with a ~29-token character vocabulary instead of the ~80-token LMX vocabulary (77 content tokens in `primus_lmx.txt` after a full rebuild).
 
 ```bash
-cd src && poetry run python -m CRNN_CTC.chord_train \
-    --synth-dir ../data/chord_synth \
-    --model-dir ../models/chord \
-    --epochs 60
+PYTHONPATH=src poetry run python -m CRNN_CTC.chord_train \
+    --data-dir data/chord_synth \
+    --model-dir models/chord \
+    --epochs 30
 ```
 
 Checkpoint saved to `models/chord/run_TIMESTAMP/best_model.pt`.
@@ -352,17 +379,14 @@ Fine-tunes the synthetic checkpoint on hand-labeled real strips mixed with synth
 data to prevent catastrophic forgetting of rare chord types.
 
 ```bash
-cd src && poetry run python -m CRNN_CTC.chord_finetune \
-    --checkpoint ../models/chord/latest/best_model.pt \
-    --real-strips-dir ../data/chord_real/strips \
-    --real-labels ../data/chord_real/labels.jsonl \
-    --synth-dir ../data/chord_synth \
-    --model-dir ../models/chord \
-    --epochs 20 --synth-weight 0.4 --lr 2e-4
+PYTHONPATH=src poetry run python -m CRNN_CTC.chord_finetune \
+    --checkpoint models/chord/latest/best_model.pt \
+    --real-strips-dir data/chord_real/strips \
+    --real-labels data/chord_real/labels.jsonl \
+    --synth-dir data/chord_synth \
+    --model-dir models/chord \
+    --epochs 20 --synth-weight 0.5 --lr 2e-4
 ```
-
-Key `--model-dir ../models/chord` must be passed explicitly when running from `src/`
-to avoid the checkpoint being written to `src/models/chord/` instead.
 
 **Label canonicalization** (`RealChordDataset._canon()`):
 - `m7b5` / `-7b5` / `min7b5` → `ø`

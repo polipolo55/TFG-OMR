@@ -8,7 +8,7 @@ Bachelor's thesis (TFG) at FIB/UPC by Pol Casanovas Puig.
 | File | Contents |
 |------|---------|
 | [overview.md](overview.md) | Project goals, architecture diagram, tech stack, output format |
-| [data_pipeline.md](data_pipeline.md) | Data generation: PrIMuS → LilyJAZZ → LMX → augmentation → vocab |
+| [data_pipeline.md](data_pipeline.md) | Data generation: PrIMuS → LilyJAZZ → LMX → twins → augmentation → vocab |
 | [model.md](model.md) | CRNN-CTC architecture: CNN backbones, BiLSTM, CTC, vocabulary |
 | [training.md](training.md) | Training loop, dataset splits, hyperparameters, checkpointing, fine-tuning |
 | [inference_pipeline.md](inference_pipeline.md) | Full OMR pipeline: preprocess → staff detect → CRNN → chord OCR → grammar fix |
@@ -24,14 +24,16 @@ Bachelor's thesis (TFG) at FIB/UPC by Pol Casanovas Puig.
 # Install dependencies
 poetry install
 
-# Full pipeline: data generation + training
+# Full pipeline: data generation + training (full rebuild)
 poetry run python src/cli.py pipeline-train \
   --raw-primus-dir data/raw/primus \
   --clean-dir data/processed/primus/clean \
   --scanned-dir data/processed/primus/scanned \
   --vocab-path data/vocab/primus_lmx.txt \
   --model-dir models/run1 \
-  --epochs 60 --batch-size 16
+  --force-all \
+  --workers $(nproc) \
+  --epochs 60 --batch-size 24 --num-workers 12
 
 # Evaluate
 poetry run python src/cli.py evaluate \
@@ -48,7 +50,7 @@ poetry run python src/cli.py api --port 8000
 
 ```
 src/
-├── cli.py                       Unified CLI (9 subcommands)
+├── cli.py                       Unified CLI (12 subcommands; see cli.md)
 ├── style.py                     Matplotlib theme for figures
 │
 ├── CRNN_CTC/
@@ -63,6 +65,7 @@ src/
 ├── data_processing/
 │   ├── generate_realbook.py     PrIMuS .semantic → LilyJAZZ PNG
 │   ├── semantic_to_lmx.py       PrIMuS .semantic → .lmx tokens
+│   ├── generate_headerless_twins.py  __nh continuation-staff twins
 │   └── augment_scanned.py       Scan simulation augmentation
 │
 ├── omr_pipeline/

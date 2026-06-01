@@ -5,8 +5,11 @@
 ## Running Training
 
 ```bash
-# Full pipeline then train:
+# Full pipeline (render → convert → twins → augment → vocab) then train:
 poetry run python src/cli.py pipeline-train [options]
+
+# Full rebuild of all prepared data:
+poetry run python src/cli.py pipeline-train --force-all [options]
 
 # Train only (data already prepared):
 poetry run python src/cli.py train \
@@ -66,18 +69,20 @@ only.  The default set up-weights:
 ### Header-less continuation staves
 
 Continuation staves (lines 2+ of a Real Book page) typically omit the clef and
-time signature. These are provided to the model as **first-class header-less
-twin samples** generated at data time by `generate_headerless_twins.py`: a
-fraction of treble samples are re-rendered with the clef and time-signature
-glyphs hidden (LilyPond `\omit`) and labelled with the clef/time tokens removed.
-The key signature is kept, so the in-body accidentals — and thus the label body
-— are unchanged, and image and label stay aligned by construction.
+time signature. These are provided as **first-class header-less twin samples**
+(`{sample_id}__nh/`) generated in **pipeline stage 3** by
+`generate_headerless_twins.py` (default fraction 0.35 of treble samples): clef
+and time glyphs are hidden in the LilyPond render (`\omit`) and the matching
+clef/time tokens are removed from the LMX label; the key signature is kept.
+
+`cli.py pipeline` and `pipeline-train` run this step automatically before
+augment, so twins receive scanned variants in the same pass. Use
+`--no-headerless-twins` to skip, or `--force-twins` / `--force-all` to
+re-render existing twins.
 
 This replaces the earlier training-time crop (`strip_header_prob`, now inert):
-the header occupies only a few percent of staff width and its boundary cannot be
-located reliably from the rendered image, so cropping desynced the pixels from
-the removed tokens. After generating twins, re-run the scanned-augmentation pass
-so the twins get scanned variants too.
+the header boundary cannot be located reliably from the rendered image, so
+cropping desynced pixels from labels.
 
 ### Collation
 

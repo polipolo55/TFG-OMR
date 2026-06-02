@@ -135,15 +135,11 @@ Above all, training time on a consumer GPU is short enough
 sprint are realistic, which is what makes the iterative methodology
 of \Cref{sec:mgmt-methodology} workable in practice.
 
-The decision is also a risk-control choice.
-A traditional modular pipeline (the lower-bound baseline) can be
-implemented early and serves as a reference point for measuring
-the CRNN--CTC's contribution; the CRNN--CTC model is then
-iteratively improved through data and training refinements.
-This staged execution path still yields publishable results even
-if the more ambitious extensions (fine-tuning on real Real Book
-pages, chord OCR, full-page inference) cannot all be completed
-within the available time.
+The decision is also a risk-control choice: implementing the
+traditional baseline early (WP1) guarantees measurable results
+regardless of CRNN--CTC convergence, and the conditional
+extension task T5.3 absorbs schedule overrun from the more
+ambitious extensions (see \Cref{sec:mgmt-planning,sec:mgmt-risks}).
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Methodology}
@@ -239,9 +235,8 @@ This four-week grouping is a deliberate revision of the two-week
 sprint cadence in the initial GEP plan: aligning each sprint with a
 single work package gave the train--evaluate--improve loop a coherent
 deliverable per sprint and accommodated the late addition of the
-chord-recognition track (training and fine-tuning the chord CRNN,
-detailed in the WP4 and WP5 descriptions below) without fragmenting
-the schedule.
+chord-recognition track (detailed in the WP4 and WP5 descriptions
+below) without fragmenting the schedule.
 Backlog priorities, risks, and effort estimates are reviewed at
 every sprint boundary and may be revised in either direction.
 
@@ -290,12 +285,8 @@ The package ended with an initial end-to-end training run whose
 outputs fed directly into WP4.
 
 \textit{WP4 -- Iterative refinement (68\,h).}
-This package closed the train--evaluate--improve loop: error
-analysis identified systematic failure modes, the data pipeline
-and the training configuration were adjusted, and the model was
-retrained.
-Most of the closed-loop behaviour described in
-\Cref{sec:mgmt-methodology} happened here; its 68-hour budget
+This package was the primary site of the train--evaluate--improve
+loop (\Cref{sec:mgmt-methodology}); its 68-hour budget
 covered two internal iterations within Sprint 4 (weeks 13--16),
 each closing one pass of refinement and ablation.
 The chord-recognition track (synthetic strip rendering, the chord

@@ -6,16 +6,16 @@ high-level decision was taken.
 The companion chapter on implementation (\Cref{ch:impl}) describes
 \textit{how} the design is realised in code.
 
-Three constraints shape every decision in this chapter.
+A few constraints shape every decision in this chapter.
 The target domain (\Cref{sec:design-domain}) is narrow: monophonic
-treble-clef lead sheets in the Real Book style, nothing broader.
-Restricting the scope frees the design from a long tail of notation
-features that would otherwise consume disproportionate effort.
+treble-clef lead sheets in the Real Book style, which frees the design
+from a long tail of notation features that would otherwise consume
+disproportionate effort.
 No labelled corpus of real jazz lead sheets exists, which rules out
 fully supervised end-to-end training from real data and pushes the
 design toward synthetic supervision with domain transfer.
-And the project runs on a single consumer GPU within a Bachelor's
-thesis time budget, capping model capacity, training time, and the
+Finally, the project runs on a single consumer GPU within a Bachelor's
+thesis time budget, which caps model capacity, training time, and the
 number of architectural alternatives that can be explored empirically.
 
 Each major decision in this chapter is argued in its own section and
@@ -156,32 +156,32 @@ Out of scope & Tuplets, slurs, articulations, repeats, voltas, D.C., double acci
 \end{tabularx}
 \end{table}
 
-The contract is deliberate, not a workaround for missing features.
-The Real Book is monophonic by construction, and multi-voice piano grand
-staves are a different genre.  Exotic meters and non-treble
-clefs do appear in printed music in general, but they are vanishingly
-rare in the Real Book corpus that drives the project's motivation.
-Extending the contract to cover the long tail of out-of-scope features
-would require a much larger labelled corpus and a substantially more
-complex output vocabulary, which is an open research direction rather
-than a Bachelor's-thesis deliverable.
+The contract follows the genre rather than papering over missing
+features. The Real Book is monophonic by construction, and the
+multi-voice piano grand staff is a different genre; exotic meters and
+non-treble clefs are common in printed music at large but vanishingly
+rare in the corpus that motivates the project.
+Extending the contract to cover the out-of-scope long tail would require
+a much larger labelled corpus and a substantially more complex output
+vocabulary, an open research direction rather than a Bachelor's-thesis
+deliverable.
 
 \paragraph{Quantitative acceptance criteria.}
 The design must commit to falsifiable targets so that \Cref{ch:results}
 can adjudicate whether they are met.
 The thresholds below are calibrated against published baselines on
 PrIMuS-like clean data, where end-to-end CRNN--CTC systems report
-aggregate Symbol Error Rates in the
+aggregate Symbol Error Rates (SER) in the
 range \SIrange{1}{3}{\percent}~\cite{calvoZaragozaCameraPrimus2018,mayerPracticalEndToEnd2024}.
 
 \begin{itemize}
     \item \textbf{Aggregate SER on the clean test split} below
-          \SI{2}{\percent}. This is the headline number that
+          \SI{2}{\percent}, the target that
           \Cref{sec:design-eval} commits the model to.
     \item \textbf{Aggregate SER on the scanned test split} below
           \SI{3}{\percent}. The augmentation pipeline is judged a
           success if the gap to the clean number stays under
-          $1$~percentage point.
+          one percentage point.
     \item \textbf{Melodic SER} (SER restricted to musically
           relevant tokens; see \Cref{sec:design-eval}) below
           \SI{0.5}{\percent} on both splits. Barlines and ties
@@ -276,54 +276,52 @@ Serialise
 \end{table}
 
 \textbf{Why a five-stage decomposition.}
-Three constraints drove this decomposition.
-First, the chord-symbol stream and the melody stream require different
+The chord-symbol stream and the melody stream require different
 recognisers (staff-relative pattern recognition versus text-like OCR),
-so they must be separable.
-Second, the grammar of the LMX output is more easily enforced by a
+so they must be separable in the first place.
+The grammar of the LMX output is, in turn, more easily enforced by a
 deterministic validator than learned end-to-end from a finite training
 set; isolating that logic in a dedicated stage produces more reliable
 output without enlarging the model.
-Third, both major surveys of the
+Both major surveys of the
 field~\cite{calvoZaragozaUnderstandingOMR2020,shatriOPTICALMUSICRECOGNITION}
 recommend modular decomposition for OMR systems that target specific
-notation styles, since it allows each module to be replaced or
+notation styles, since it lets each module be replaced or
 retrained independently as the target domain evolves.
 
 \subsection{Alternatives considered}
 \label{sec:design-pipeline-alts}
 
-Two end-to-end architectures were considered as alternatives to the
-five-stage decomposition and rejected for the following reasons.
+Two end-to-end architectures were weighed against the five-stage
+decomposition and rejected.
 
 \paragraph{Full-page transformer (LEGATO\,\cite{yangLEGATO2025}).}
 A single encoder--decoder transformer that consumes a full-page image
-and emits the entire transcription as a long token sequence.
-This eliminates the staff-detection and grammar-fix stages and shares
+and emits the entire transcription as a long token sequence,
+eliminating the staff-detection and grammar-fix stages and sharing
 representations across the whole page.
-Two problems ruled this out.
-First, training a full-page transformer to competitive accuracy
+Training such a model to competitive accuracy
 requires either a corpus of full-page transcriptions (which does not
 exist for the Real Book) or a synthetic generator capable of laying
 out full pages with realistic chord placement, neither of which fits
 the time budget.
-Second, the failure modes of a monolithic model are opaque: a single
+A monolithic model is also opaque: a single
 mis-prediction of a chord symbol cannot be debugged without re-running
-the entire model. Modular pipelines yield localised failures that the
+the entire model, whereas a modular pipeline yields localised failures that the
 grammar fixer can repair.
 
 \paragraph{Tree-decoder transformer (SMT/SMT++\,\cite{riosVilaSheetMusicTransformer2024,riosVilaSMTPlusPlus2024}).}
 A transformer that emits a hierarchical MusicXML-like tree, removing
 the need for a separate grammar-correction step because the output is
 structurally valid by construction.
-SMT++ is the strongest current end-to-end baseline on polyphonic
-piano music.
-Rejected because (i)~the target domain is monophonic, so the
+SMT++ is a leading end-to-end model on polyphonic
+piano music, but its advantages do not carry over here.
+The target domain is monophonic, so the
 structural advantage of a tree decoder over a flat CTC decoder is
-small; (ii)~SMT++'s training recipe requires several hundred
-GPU-hours of pre-training that this project's hardware cannot afford;
-and (iii)~the existing CRNN--CTC baseline on Camera-PrIMuS already
-saturates the clean monophonic benchmark, leaving little headroom for
+small; its training recipe requires several hundred
+GPU-hours of pre-training that the project's hardware cannot afford;
+and the CRNN--CTC baseline on Camera-PrIMuS already
+performs near the ceiling of the clean monophonic benchmark, leaving little headroom for
 a more complex architecture to demonstrate gain.
 
 % ─────────────────────────────────────────────────────────────────────────────
@@ -365,31 +363,21 @@ Real pages contain non-music regions (page titles, footers,
 composer credits) that morphological staff detection can falsely
 accept when their layout is staff-like, for instance a row of small
 print that produces five collinear ink runs.
-A staff that is mis-detected on a non-music region is then fed to the
+A staff mis-detected on such a region is then fed to the
 CRNN, which dutifully emits a high-confidence but musically nonsense
 token sequence.
 
-The design therefore includes a two-tier rejection gate sitting
-between the staff detector and the recogniser:
-\begin{itemize}
-    \item \textbf{Pre-CRNN gates} use geometric and OCR signals on the
-          candidate strip (re-detection of five lines locally,
-          inter-line ink coverage, text density from a general-purpose
-          OCR) to filter out obvious non-music regions before the
-          recogniser is invoked.
-    \item \textbf{Post-CRNN gate} reads the CTC mean log-probability
-          of the recogniser's output; strips that produce confident
-          predictions are kept, strips below a calibrated log-prob
-          threshold are dropped.
-\end{itemize}
-A CTC-confidence override re-admits geometry-rejected strips when the
-recogniser is confident on them. The override does not apply to the
-OCR-density rejection, because high CRNN confidence on a strip of
-running text is a known false-positive mode.
-
-The log-prob threshold is checkpoint-dependent and is re-calibrated
-whenever the recogniser is retrained.
-Calibration procedure and concrete thresholds live in \Cref{ch:impl}.
+The design therefore inserts a two-tier rejection gate between the
+staff detector and the recogniser. A pre-CRNN tier uses cheap
+geometric and OCR signals to discard obvious non-music regions before
+the recogniser is invoked, and a post-CRNN tier reads the CTC mean
+log-probability of the output and drops strips that fall below a
+calibrated confidence threshold. A confidence override re-admits
+geometry-rejected strips on which the recogniser is confident, but it
+deliberately does not override the OCR-text rejection, since high CRNN
+confidence on running text is a known false-positive mode.
+The per-signal algorithm, the threshold, and its checkpoint-dependent
+recalibration live in \Cref{ch:impl}.
 
 \subsection{Alternatives considered}
 \label{sec:design-staffdetect-alts}
@@ -509,9 +497,8 @@ augmentations.
 Several other public OMR corpora were surveyed before settling on
 PrIMuS.
 Each carries annotations that could in principle support an
-end-to-end recogniser, but each fails on at least one of three
-practical axes: visual distribution, voicing assumption, or
-annotation format.
+end-to-end recogniser, but each fails on its visual distribution,
+its voicing assumption, or its annotation format.
 
 \paragraph{OLiMPiC.}
 OLiMPiC~\cite{mayerPracticalEndToEnd2024} is the corpus that
@@ -529,14 +516,12 @@ of the corpus.
 \paragraph{MUSCIMA++.}
 MUSCIMA++~\cite{hajicMuscimaPP2017} is the most-cited handwritten-OMR
 corpus and the natural reference for symbol-level supervision.
-Two reasons rule it out.
-First, its visual distribution is handwritten music on staff paper,
-whereas the inference distribution is typeset jazz lead sheets: the
-engraving-style gap is in the wrong direction.
-Second, its ground truth is a music-notation graph (MuNG) rather than
-a flat token sequence, which does not match a CTC-style sequence
-target without an additional sequentialisation step that would
-introduce its own errors.
+Its visual distribution is handwritten music on staff paper, whereas
+the inference distribution is typeset jazz lead sheets, so the
+engraving-style gap runs in the wrong direction. Its ground truth is
+also a music-notation graph (MuNG) rather than a flat token sequence,
+which does not match a CTC-style target without an additional
+sequentialisation step that would introduce its own errors.
 
 \paragraph{DeepScoresV2.}
 DeepScoresV2~\cite{tuggenerDeepScoresV22020} is the largest synthetic
@@ -596,12 +581,11 @@ distribution closer to the test distribution.
 \paragraph{Learned domain transfer (CycleGAN, style transfer).}
 Train an unpaired image-to-image translator (e.g.\ CycleGAN) to map
 clean LilyJAZZ renders to the Real Book scan distribution.
-Three problems ruled this out: (i)~CycleGAN training is notoriously
-unstable and would consume a substantial fraction of the project's
-GPU budget; (ii)~the mapping that minimises a cycle loss does not
-necessarily preserve the structural details (notehead position,
-accidental placement) that the recogniser must learn; (iii)~a
-hand-crafted augmentation pipeline gives explicit control over each
+CycleGAN training is unstable and would consume a substantial fraction
+of the project's GPU budget, and the mapping that minimises a cycle
+loss need not preserve the structural details (notehead position,
+accidental placement) that the recogniser must learn. A hand-crafted
+augmentation pipeline, by contrast, gives explicit control over each
 distortion's intensity, which is easier to debug when a particular
 failure mode appears at evaluation time.
 
@@ -615,21 +599,17 @@ dataset would still be smaller than PrIMuS by orders of magnitude.
 
 PrIMuS contains many samples that lie outside the lead-sheet domain:
 multi-staff renders, non-treble clefs, exotic time signatures.
-Three filters are applied at dataset construction time to restrict
-training to the in-scope distribution: multi-staff samples are dropped,
-samples with non-treble clefs are dropped, and samples with time
-signatures outside the eight-element jazz common-time set of
-\Cref{tab:domain-contract} are dropped.
-This is a contract, not a workaround. Disabling the filters would
-force the model to spend capacity on visual patterns that never appear
-at inference, without improving its performance on the target
-distribution.
-The same contract is enforced at inference time by the grammar fixer
-(\Cref{sec:design-grammar}).
+Three filters applied at dataset construction time restrict
+training to the in-scope distribution, dropping multi-staff samples,
+non-treble clefs, and time signatures outside the eight-element jazz
+common-time set of \Cref{tab:domain-contract}.
+Disabling them would only force the model to spend capacity on visual
+patterns that never appear at inference, with no gain on the target
+distribution. The same contract is enforced at inference time by the
+grammar fixer (\Cref{sec:design-grammar}).
 No alternative filter set was weighed at design time: the Real Book
-domain itself fixes the contract (treble clef, monophonic line,
-common-time jazz meters), and the filters merely transcribe that
-contract into a dataset operation.
+domain fixes the contract, and the filters merely transcribe it into a
+dataset operation.
 
 \subsection{Fine-tuning on real pages}
 
@@ -666,37 +646,17 @@ encoding choices that interact with the model.
 
 \subsection{Grammar}
 
-A valid LMX sequence is a sequence of measures, each introduced by a
-\code{measure} token and optionally followed by a clef, key, or time
-declaration before its musical content.
-Within a measure, the content is a flat sequence of notes and rests; no
-nesting or polyphony is permitted.
+A valid LMX sequence is a flat run of measures, each opened by a
+\code{measure} token and optionally carrying a clef, key, or time
+declaration before its content; within a measure the content is a flat
+sequence of notes and rests, with no nesting or polyphony.
+A note token gives a pitch letter and octave, then a duration and any
+augmentation dots, then up to three optional trailing markers: an
+accidental, a \code{tied:stop} closing an earlier \code{tied:start},
+and a \code{fermata} hold attached to the preceding event. The full
+production rules are given in \Cref{ch:impl}.
 \Cref{fig:lmx-example} shows a rendered staff paired with its LMX
-token stream, grounding the grammar below in a concrete sample.
-
-\begin{quote}\small
-\begin{verbatim}
-SEQUENCE  := HEADER ELEMENT* (BARLINE ELEMENT*)*
-HEADER    := "measure" [CLEF] [KEY] [TIME]
-BARLINE   := "measure" [KEY] [TIME]
-CLEF      := "clef:G2"
-KEY       := "key:fifths:" <fifths>
-TIME      := "time" "beats:" <n> "beat-type:" <d>
-ELEMENT   := NOTE | REST
-NOTE      := "pitch:" <A-G> "octave:" <0-8> DURATION DOT*
-             [ACCIDENTAL] [TIE_STOP] [FERMATA]
-REST      := "rest" DURATION DOT* [FERMATA]
-DURATION  := "whole"|"half"|"quarter"|"eighth"|"16th"|"32nd"|"64th"
-ACCIDENTAL:= "flat" | "sharp" | "natural"
-TIE       := "tied:start" ... "tied:stop"
-\end{verbatim}
-\end{quote}
-
-A note carries up to three optional trailing markers after its duration
-and dots: an accidental, a \code{tied:stop}
-closing a tie opened by an earlier \code{tied:start}, and a
-\code{fermata} hold marker, which attaches to the immediately preceding
-note or rest. All three are absent on the common case of a plain note.
+token stream.
 
 \begin{figure}[t]
     \centering
@@ -714,13 +674,12 @@ note or rest. All three are absent on the common case of a plain note.
     pitch:A octave:5 16th flat
     }}
     \caption{A LilyJAZZ-rendered staff (top) and its ground-truth LMX
-    token stream (bottom), with a single space separating tokens and a
-    wider gap inserted here between notes for readability.
-    Each measure opens with a \code{measure} token; the first also
-    carries the clef, key, and three-token time signature.
-    The accidental follows the duration, not the pitch (\code{quarter
-    flat}, \code{eighth flat}), which is the temporal-order convention
-    discussed below.}
+    token stream (bottom); the wider gaps between notes are added here
+    only for readability.
+    Each measure opens with a \code{measure} token, the first also
+    carrying the clef, key, and three-token time signature, and the
+    accidental follows the duration (\code{quarter flat}) by the
+    temporal-order convention discussed below.}
     \label{fig:lmx-example}
 \end{figure}
 
@@ -763,22 +722,14 @@ only when a sign should be drawn.
 
 \subsection{Vocabulary}
 
-The model treats LMX tokens as opaque class labels.
-Three special tokens are reserved at fixed indices: the CTC blank
-(index 0), the padding token used during batch collation (index 1),
-and the out-of-vocabulary token (index 2).
-The remaining indices, sorted alphabetically, encode the LMX tokens
-that appear in the training corpus: pitch letters \code{pitch:A}
-through \code{pitch:G}, octave numbers \code{octave:0} through
-\code{octave:8}, the seven duration words, the dot token, the three
-accidentals, the \code{fermata} hold marker, the \code{measure} and
-\code{rest} structural tokens, the
-tie tokens, the clef token \code{clef:G2}, key tokens
-\code{key:fifths:-6} through \code{key:fifths:7}, and the time-signature
-tokens.
-The full pitch and octave ranges are always reserved even if absent
-from the corpus, so that out-of-distribution pitch predictions decode
-gracefully rather than collapsing to \code{<unk>}.
+The model treats LMX tokens as opaque class labels, with the three
+special tokens (CTC blank, padding, out-of-vocabulary) reserved at
+fixed low indices and the remaining LMX tokens assigned in a stable
+order. The one design decision worth recording is that the full pitch
+and octave ranges are reserved even when absent from the corpus, so
+that an out-of-distribution pitch prediction decodes gracefully rather
+than collapsing to \code{<unk>}. The concrete index assignment is
+deferred to \Cref{ch:impl}.
 
 \subsection{Alternatives considered}
 \label{sec:design-lmx-alts}
@@ -856,18 +807,16 @@ A transformer encoder that ingests the staff image as a sequence of
 patches and a transformer decoder that emits LMX tokens
 auto-regressively, supervised by cross-entropy on the token
 sequence~\cite{riosVilaSheetMusicTransformer2024}.
-Three factors argued against this choice.
-First, transformer decoders need substantially more training data than
-CRNN--CTC to reach comparable accuracy on monophonic input, and the
-project does not have the budget to generate that volume of data.
-Second, the autoregressive decoder amplifies exposure-bias errors when
-a single token is mispredicted: subsequent tokens are conditioned on
-the wrong context.  CTC's frame-independent prediction does not have
-this failure mode.
-Third, on monophonic Real Book staves the input--output alignment is
-nearly monotonic and length-bounded, exactly the regime where CTC is
-known to match or exceed attention-based decoders at a fraction of the
-compute cost (\Cref{sec:soa-transformer}).
+Transformer decoders need substantially more training data than
+CRNN--CTC to reach comparable accuracy on monophonic input, which the
+project cannot afford to generate. The autoregressive decoder also
+amplifies exposure-bias errors: once a single token is mispredicted,
+subsequent tokens are conditioned on the wrong context, a failure mode
+that CTC's frame-independent prediction avoids. And on monophonic Real
+Book staves the input--output alignment is nearly monotonic and
+length-bounded, the regime where CTC is known to match or exceed
+attention-based decoders at a fraction of the compute cost
+(\Cref{sec:soa-transformer}).
 
 \paragraph{Tree-decoder transformer (SMT++\,\cite{riosVilaSMTPlusPlus2024}).}
 A transformer that emits a structured tree representing the score's
@@ -943,19 +892,14 @@ the same data and is not used for new experiments.
 
 \subsection{Temporal resolution and width compression}
 
-The backbone compresses the width of the input image by a fixed
-factor, leaving the model with one feature vector per several input
-columns of the original image.
-This factor balances two pressures: a smaller compression ratio
-preserves more time steps and admits longer output sequences without
-saturating CTC alignment, but increases compute cost; a larger ratio
-risks producing more output tokens than time steps, which CTC's
-\code{zero\_infinity} option silently masks but which corrupts
-gradient estimates.
-The selected factor is the smallest power-of-two ratio at which all
-in-scope samples satisfy the CTC length constraint while keeping the
-time axis rich enough to disambiguate adjacent notes even on
-densely-engraved staves; the exact value lives in \Cref{ch:impl}.
+The backbone compresses the input width by a fixed factor, trading the
+number of CTC time steps against compute: too little compression is
+wasteful, while too much can leave fewer time steps than output tokens
+and break the CTC length constraint. The design fixes this factor at
+the smallest ratio that keeps every in-scope sample within the
+constraint while leaving the time axis rich enough to separate adjacent
+notes on densely engraved staves; the exact value lives in
+\Cref{ch:impl}.
 
 \subsection{Recurrent layer}
 
@@ -985,13 +929,13 @@ There was no accuracy argument for deviating from it.
 \paragraph{Temporal convolution or self-attention instead of recurrence.}
 Replace the BiLSTM with a temporal-convolutional stack or a
 self-attention layer over the feature columns.
-Rejected on two counts: a temporal-convolutional network has a fixed
-receptive field that must be sized in advance for the longest context
-dependency, which on densely engraved staves is data-dependent and
-awkward to bound, whereas the BiLSTM adapts its effective context to
-the input; and a self-attention layer reintroduces the data-hunger of
-transformer components (\Cref{sec:design-model-alts}) without a clear
-accuracy gain on the length-bounded monophonic input this model sees.
+A temporal-convolutional network has a fixed receptive field that must
+be sized in advance for the longest context dependency, which on
+densely engraved staves is data-dependent and awkward to bound,
+whereas the BiLSTM adapts its effective context to the input.
+Self-attention, in turn, reintroduces the data-hunger of transformer
+components (\Cref{sec:design-model-alts}) without a clear accuracy gain
+on the length-bounded monophonic input this model sees.
 
 \subsection{Decoding strategy}
 \label{sec:design-decoder}
@@ -1106,30 +1050,20 @@ hyphen (\code{G-7} rather than \code{Gm7}), major-seventh chords with
 \code{maj} (\code{Fmaj7}), and diminished with the spelled-out
 \code{dim} suffix (\code{Cdim7}).
 Half-diminished is the one quality the Real Book itself spells
-inconsistently: the dominant printed form is \code{-7b5}
-(e.g.\ \code{G-7b5}), with \code{m7b5} and the \code{ø} glyph appearing
-more rarely.
-Rather than treat these as three classes, the design folds them into a
-single canonical token: the synthetic renderer draws all three printed
-forms (weighted to their observed corpus frequencies) but labels every
-one with the same \code{ø} token, so the recogniser learns to map any
-half-diminished spelling to one symbol regardless of how a given page
-draws it.
-
-The character vocabulary the recogniser predicts therefore covers the
-seven root letters, two accidentals, the quality letters needed to spell
-\code{maj}, \code{dim}, and \code{sus} (the set $\{a, d, i, j, m, s, u\}$),
-the symbols \code{-}, \code{+}, \code{ø} for minor, augmented, and
-half-diminished, the digits used in extensions ($1$, $3$, $6$, $7$, $9$),
-and the separator characters (space and slash).
-The canonical \code{ø} token is expanded back to the Real Book printed
-form \code{-7b5} by the chord post-processor when the final JSON is
-serialised; this is why the serialised output can contain a literal
-\code{5} that is never itself a prediction class.
-Out-of-scope chord features (\code{alt}, double accidentals,
-parenthesised alterations) are absent from the vocabulary and are
-mapped to nearest in-vocabulary spellings during label
-canonicalisation.
+inconsistently, between \code{-7b5}, \code{m7b5}, and the \code{ø}
+glyph. Rather than treat these as three classes, the design folds them
+into a single canonical token: the synthetic renderer draws all three
+printed forms (weighted to their observed corpus frequencies) but
+labels every one with the same \code{ø} token, so the recogniser maps
+any half-diminished spelling to one symbol regardless of how a given
+page draws it. A post-processor expands \code{ø} back to the printed
+\code{-7b5} at serialisation time.
+The recogniser predicts a small character vocabulary covering the root
+letters, accidentals, quality letters, extension digits, and
+separators; out-of-scope features (\code{alt}, double accidentals,
+parenthesised alterations) are mapped to the nearest in-vocabulary
+spelling during label canonicalisation. The exact character set is
+listed in \Cref{ch:impl}.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Training Strategy}
@@ -1155,14 +1089,12 @@ question of \Cref{ch:results}.
 \subsection{Loss and supervision signal}
 
 The supervision signal is the LMX token sequence associated with each
-image.
-CTC loss takes the log-probability tensor (one vector per output time
-step), the target token sequence, and their respective lengths, and
-computes the negative log-likelihood of the target marginalised over
-all valid alignments to the input time axis.
-The CTC blank class (the reserved index) absorbs time steps where no
-symbol is emitted, which is the mechanism by which the model handles
-variable-rate output without explicit alignment.
+image, and the loss is CTC. CTC provides alignment-free supervision:
+it scores the target sequence against the per-frame predictions without
+requiring a frame-by-frame label, which is what makes the synthetic
+corpus usable as ground truth at all (the rationale developed in
+\Cref{sec:design-model}). The mechanics of the loss are part of the
+implementation (\Cref{ch:impl}).
 
 \subsection{Data splits}
 
@@ -1298,7 +1230,7 @@ project's grammar complexity.
 \paragraph{Learned sequence-to-sequence corrector.}
 Train a small transformer to map raw model output to grammatically
 valid output, supervised by (noisy, grammatical) pairs.
-Rejected for two reasons: it requires a corpus of model errors that
+This requires a corpus of model errors that
 is only available after the model has been trained (a chicken-and-egg
 problem in the design stage), and it would introduce a second
 data-driven component that itself has failure modes harder to debug
@@ -1307,11 +1239,10 @@ than a deterministic walker.
 \paragraph{End-to-end grammar-aware loss.}
 Augment the CTC loss with a regulariser that penalises ungrammatical
 prefixes during training.
-Conceivable but rejected because (i)~it complicates loss optimisation
-for marginal gain on a vocabulary as small and as well-structured as
-LMX, and (ii)~deferring grammar to post-processing keeps the
-training-time concerns separated from the inference-time concerns,
-which simplifies analysis.
+Conceivable, but it complicates loss optimisation for marginal gain on
+a vocabulary as small and well-structured as LMX, and deferring grammar
+to post-processing keeps training-time concerns separate from
+inference-time concerns, which simplifies analysis.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Evaluation Design}
@@ -1375,7 +1306,7 @@ commits in advance to:
 (a)~the split definitions and seed used to construct them, fixed once
 and not retuned per experiment;
 (b)~the decoding strategy used to produce predictions: greedy CTC
-decoding as the headline number, with beam search reported as an
+decoding as the primary number, with beam search reported as an
 ablation, as set out in \Cref{sec:design-decoder};
 (c)~the metric aggregation rule (micro-averaged: total edits divided
 by total ground-truth length across the split, not the mean of

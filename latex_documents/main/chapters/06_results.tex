@@ -11,9 +11,8 @@ synthetic-data baseline.
 held-out synthetic test split and analyses the per-sample error
 distribution.
 \Cref{sec:res-errors} decomposes the errors by edit operation and by
-token category, and shows that the residual error budget is dominated
-by structural tokens (barlines and ties) rather than by pitch or
-duration mistakes.
+token category, locating most of the residual error budget in
+structural tokens (barlines and ties).
 \Cref{sec:res-qualitative} shows qualitative examples drawn from the
 perfect and near-median tails of the SER distribution; further
 worst-case predictions are collected in \Cref{app:qual}.
@@ -34,29 +33,18 @@ The procedure is reproducible with the one-line command shown at the
 end of this section.
 
 \paragraph{Datasets and splits.}
-Training, validation and test samples are drawn from the union of two
-corpora derived from PrIMuS~\cite{calvoZaragozaCameraPrimus2018,PrIMuSDataset}:
-a clean LilyJAZZ render at 200/250/300\,DPI, and a scan-augmented copy
-of the same samples produced by the pipeline of
-\Cref{sec:design-data}.
-The three domain filters (\code{filter\_multi\_staff},
-\code{filter\_non\_leadsheet\_clef}, \code{filter\_unusual\_time}) are
-applied before the split.
-\code{make\_splits} then partitions the post-filter corpus
-deterministically with a fixed seed: 80\,\% train, 10\,\% validation,
-10\,\% test.
-Clean and scanned variants of the same source share a split assignment,
-so the 4\,604-sample test split reports the same musical content under
-two visual regimes.
+The corpora, the three domain filters, and the deterministic
+\code{make\_splits} partition are specified in
+\Cref{sec:design-data}. The three filters are applied before the
+split. Clean and scanned variants of the same source share a split
+assignment, so the resulting 4\,604-sample test split reports the same
+musical content under two visual regimes.
 
 \paragraph{Hardware and software.}
-All training and evaluation runs use a single NVIDIA RTX 3060 GPU
-(12\,GB VRAM), batch size 16, mixed-precision (\code{torch.amp}),
-PyTorch 2.10 on Python 3.14 under Poetry, with LilyPond installed
-system-wide for the rendering pipeline.
-A full 49-epoch run takes approximately 6\,h 45\,min wall time
-($\approx 8$\,min/epoch), measured from the training log of the
-selected checkpoint.
+The hardware and software stack is described in \Cref{ch:impl}.
+On that single-GPU configuration, a full 49-epoch run takes
+approximately 6\,h 45\,min wall time ($\approx 8$\,min/epoch),
+measured from the training log of the selected checkpoint.
 
 \paragraph{Metrics.}
 The headline metric is the standard token-level \term{Symbol Error
@@ -68,12 +56,11 @@ normalised by the sum of ground-truth lengths:
 where $d$ is the edit distance on the LMX token alphabet, $\hat{y}_i$
 is the model's decoded prediction, and $y_i$ is the reference
 sequence~\cite{SymbolErrorRate,hajicOMRMetricsEvaluation2019}.
-The complementary \term{melodic SER} uses the same formula after
-stripping the \code{measure}, \code{tied:start} and \code{tied:stop}
-tokens from both sequences; it isolates pitch, duration and accidental
-errors from the structural error budget.
-The \term{perfect-transcription rate} is the fraction of test samples
-with $d(\hat{y}_i, y_i) = 0$.
+The \term{melodic SER} applies the same formula after stripping the
+\code{measure} and tie tokens, isolating pitch, duration and
+accidental errors from the structural budget. The
+\term{perfect-transcription rate} is the fraction of samples with
+$d(\hat{y}_i, y_i) = 0$.
 
 \paragraph{Repetitions.}
 Numbers reported here come from a single training run, since each run
@@ -134,12 +121,13 @@ Validation SER converges much faster than the loss curve suggests: by
 epoch 10 it is already below \SI{2}{\percent}, and the remaining 27
 epochs of useful training produce a further reduction of only
 $\approx 0.7$ percentage points.
-This is characteristic of CTC-trained sequence models on structured
-output domains: most of the alignment work is learned early, and late
-training refines a small fraction of difficult samples.
-The train/val loss gap remains small throughout, which is consistent
-with the regularisation choices justified in
-\Cref{sec:design-model}.
+In these runs the model appears to learn most of the CTC alignment
+early, with late training refining a small fraction of difficult
+samples.
+The train/val loss gap remains small throughout, consistent with the
+regularisation choices justified in \Cref{sec:design-model}; the
+trained weight distributions, reported as a sanity check in
+\Cref{app:weights}, show no sign of degenerate or dead components.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Aggregate Symbol Error Rate}
@@ -193,14 +181,12 @@ remainder of the chapter decomposes them rather than re-quoting them.
 
 \Cref{fig:ser-distribution} shows the per-sample SER distribution on
 the scanned variant.
-The aggregate value understates how often the model is exactly
-correct: the modal outcome is a perfect transcription
+The modal outcome is a perfect transcription
 ($\approx \SI{71.2}{\percent}$ of samples have SER \num{0}), and the
 empirical CDF reaches \num{0.95} near SER \num{0.05}.
-This bimodality (a tall spike at zero plus a thin right tail) is
-typical for CTC sequence models on a well-matched domain: the model
-either reads a sample correctly or fails on a specific localised
-pattern.
+The distribution is bimodal, a tall spike at zero plus a thin right
+tail: in these experiments the model tends either to read a sample
+correctly or to fail on a specific localised pattern.
 The samples in the right tail are analysed in
 \Cref{sec:res-qualitative,app:qual}.
 
@@ -239,11 +225,9 @@ Objective~6 (deployable system).}
 
 \subsection{Edit-operation breakdown}
 
-The aggregate edit count over the test split decomposes into three
-categories: \term{deletions} (a reference token is absent from the
-prediction), \term{insertions} (a predicted token is absent from the
-reference), and \term{substitutions} (a reference token is replaced
-by a different predicted token).
+The aggregate edit count over the test split decomposes into the three
+Levenshtein operations: \term{deletions}, \term{insertions} and
+\term{substitutions}.
 \Cref{fig:edit-dist} shows the distribution on the scanned variant.
 
 \begin{figure}[htbp]
@@ -259,11 +243,10 @@ by a different predicted token).
     \label{fig:edit-dist}
 \end{figure}
 
-Substitutions are the rarest error type, an encouraging finding
-because substitutions are precisely the errors that affect musical
-\textit{content}.
+Substitutions are the rarest error type, which matters because
+substitutions are the errors that affect musical \textit{content}.
 Deletions and insertions dominate; as the next subsection shows, the
-overwhelming majority of those concern the \code{measure} token.
+majority of those concern the \code{measure} token.
 \todo{measure: read the exact deletion/insertion/substitution counts
 from notebook \code{02\_evaluate\_model.ipynb}, section 6.2
 ``Error-type breakdown'' (cell that builds the \code{total\_r} dict
@@ -460,9 +443,9 @@ Further high-SER samples are collected in \Cref{app:qual}.
 
 The visual quality of these two examples is representative of the
 input regime the system was designed for: the augmentation pipeline
-produces images that look like phone photographs of moderately worn
-print (\Cref{sec:design-data}), and the model recovers the underlying
-notation cleanly in both cases.
+produces images that resemble phone photographs of moderately worn
+print (\Cref{sec:design-data}), and in both cases the rendered
+prediction reproduces the input notation.
 
 \todo{Add a worst-case figure (95th-percentile SER) here or in
 \Cref{app:qual}.  Source: notebook \code{02\_evaluate\_model.ipynb},
@@ -540,39 +523,6 @@ notation) vs.\ this system's output (LMX rendered back to notation),
 on the same input.  Audiveris is a one-line invocation:
 \code{Audiveris -batch -export <page>.pdf}.  This satisfies the
 tribunal-rubric requirement for an explicit SoA comparison.}
-
-% ─────────────────────────────────────────────────────────────────────────────
-\section{Model Weight Distribution}
-\label{sec:res-weights}
-
-A brief diagnostic, useful when comparing trained checkpoints, is the
-marginal distribution of the model's weights at convergence.
-\Cref{fig:weight-dist} shows the distributions of the four principal
-parameter groups of the epoch-37 checkpoint: the classifier (final
-linear layer), the convolutional and batch-normalisation weights of
-the ResNet backbone, the LSTM weights, and the biases.
-
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=\textwidth]{figures/fig_weight_distributions}
-    \caption{Marginal weight distributions of the four principal
-    parameter groups of the trained CRNN at epoch 37.
-    All four are close to centred Gaussian with standard deviations
-    in the $[0.17, 0.28]$ range; AdamW's \num{1e-4} weight decay
-    keeps the magnitudes bounded.
-    The small spikes near $\pm 1$ in the classifier panel are an
-    artefact of the classifier saturating on the CTC blank class and
-    the most frequent token.}
-    \label{fig:weight-dist}
-\end{figure}
-
-All four groups sit within the magnitudes expected of a
-well-regularised AdamW run; no parameter has grown to the
-exploding-gradient regime that the \num{5.0} gradient-norm clip is
-intended to prevent.
-This figure is included as a sanity check on the training procedure
-rather than as a primary result; it could be moved to an appendix if
-chapter length becomes a concern.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{The Synthetic-to-Real Domain Gap}
@@ -658,10 +608,9 @@ figures of \Cref{tab:results-headline}: aggregate SER around
 \SI{1.2}{\percent} on both the clean and the scan-augmented test
 splits, melodic SER an order of magnitude lower, and a
 perfect-transcription rate above \SI{70}{\percent}.
-The residual error budget is concentrated in structural tokens
-(\code{measure} and the two tie tokens), which together account for
-$\approx \SI{87}{\percent}$ of all edits; pitch and octave errors are
-negligible.
+The residual error budget is concentrated in the \code{measure} and
+tie tokens, which together account for $\approx \SI{87}{\percent}$ of
+all edits, while pitch and octave errors are negligible.
 Combined with the deterministic grammar fixer that reconstructs
 barline boundaries from the time signature, these results place the
 synthetic baseline within the operating range required for downstream

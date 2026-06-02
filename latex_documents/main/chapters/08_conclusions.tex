@@ -1,15 +1,14 @@
 \chapter{Conclusions and Future Work}
 \label{ch:conclusions}
 
-This chapter closes the memoir by returning to the objectives stated in
-\Cref{sec:objectives}, restating the headline quantitative results,
-assessing the limitations that the work made explicit, sketching
-concrete extensions that follow directly from those limitations, and
-mapping the technical competences declared at TFG inscription onto the
-chapters where evidence for each lives.
-The intent is to give a tribunal a single place from which the rest of
-the document can be audited: every claim below points to the section
-where it was developed or measured.
+This chapter closes the memoir. It revisits the objectives of
+\Cref{sec:objectives}, restates the headline results, sets out the
+limitations the work made explicit, proposes extensions that follow
+from those limitations, and maps the technical competences declared at
+TFG inscription onto the chapters where evidence for each lives.
+Every claim below points to the section where it was developed or
+measured, so the tribunal can audit the rest of the document from a
+single place.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Objectives Revisited}
@@ -91,7 +90,7 @@ a pointer to the evidence.
 The headline figures from \Cref{ch:results} are restated here so the
 tribunal can audit the assessment above without paging back.
 All numbers refer to the epoch-37 checkpoint at
-\code{models/latest/best\_model.pt}, evaluated on \num{4604} held-out
+\code{models/latest/best\_model.pt}, evaluated on 4\,604 held-out
 samples per split with greedy CTC decoding.
 
 \begin{itemize}
@@ -142,18 +141,15 @@ implementation.
 
 \paragraph{Scope restrictions, by design.}
 The target domain is monophonic treble-clef lead sheets with the
-eight common time signatures of jazz practice
-(\Cref{tab:domain-contract}).
-Polyphony, piano grand staves, non-treble clefs, exotic meters
-(\(5/8\), \(7/4\), \(11/8\), and the like), tuplets, slurs,
-articulations, repeat barlines, voltas, and navigation marks
-(D.C., D.S., segno, coda) are all out of scope.
-None of these features appear with non-negligible frequency in the
-Real Book, and extending the LMX vocabulary, the grammar fixer, and
-the training distribution to cover any one of them would require
-coordinated changes across the entire stack
+eight common time signatures of jazz practice; the features placed
+out of scope are listed in the domain contract of
+\Cref{tab:domain-contract}.
+None of them appear with non-negligible frequency in the Real Book,
+and extending the LMX vocabulary, the grammar fixer, and the training
+distribution to cover any one of them would require coordinated
+changes across the entire stack
 (\Cref{sec:design-data,sec:lmx-format,sec:design-grammar}).
-Each is a candidate for future work rather than a bug.
+Each is a candidate for future work.
 
 \paragraph{Synthetic-to-real domain gap.}
 The model is trained entirely on PrIMuS samples re-rendered in
@@ -215,10 +211,9 @@ independently and does not recover their narrative reading order.
 This is a layout-analysis problem that the morphological staff
 detector is not designed to solve.
 
-These limitations are honest constraints rather than failures: each
-follows from a decision taken explicitly in \Cref{ch:design}, and the
-acceptance criteria were set so that the system as scoped can be
-adjudicated against them.
+Each of these limitations follows from a decision taken explicitly in
+\Cref{ch:design}, and the acceptance criteria were set so that the
+system as scoped can be adjudicated against them.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Future Work}
@@ -280,10 +275,10 @@ slanted staves and partial systems
 Replacing it with a learned detector (YOLO-style box
 regression\todo{cite original YOLO paper, e.g.\ Redmon et al.\ 2016, in
 references.bib as \texttt{redmonYouOnlyLook2016}} or a DETR-style
-transformer detector) trained on a few hundred annotated pages would
-unlock
-multi-page batch inference and reduce the failure rate on the
-hardest scans.
+transformer detector\todo{cite DETR, e.g. Carion et al. 2020, as
+\texttt{carionDETR2020} in references.bib}) trained on a few hundred
+annotated pages would unlock multi-page batch inference and reduce the
+failure rate on the hardest scans.
 The current pipeline contract
 (\Cref{tab:stage-contracts}) is exactly the interface the new detector
 must implement, so the replacement is local: no downstream stage
@@ -320,52 +315,35 @@ implement the solution which guarantees the best performance according
 to the established requirements.'' (In depth.)
 
 \textbf{Where evidence lives.}
-The principal venue for this competence is the comparative analysis
-of architectural alternatives in \Cref{ch:design}, where every major
-design decision is adjudicated against at least two rejected
-alternatives on explicit complexity and performance grounds.
-The pipeline decomposition of \Cref{sec:design-pipeline} and its
-alternatives subsection \Cref{sec:design-pipeline-alts} weigh a
-modular five-stage pipeline against monolithic full-page
-transformers and tree-decoder transformers along compute-budget and
-training-data axes.
-The model-family decision (\Cref{sec:design-model,sec:design-model-alts})
-weighs CRNN--CTC against autoregressive transformers and pure-CNN
-classifiers on three axes: data efficiency, exposure-bias
-amplification under length-bounded monotonic alignment, and the
-fixed compute budget of a single consumer GPU.
-The backbone choice (ResNet18 over deeper ResNets, EfficientNets,
-ViTs, and the legacy VGG stack) is justified on parameter count,
-convergence rate, and VRAM headroom for a non-trivial batch size.
+The principal venue is the comparative analysis of architectural
+alternatives in \Cref{ch:design}, where each major design decision is
+adjudicated against rejected alternatives on complexity and
+performance grounds. The pipeline decomposition weighs a modular
+five-stage pipeline against monolithic and tree-decoder transformers
+(\Cref{sec:design-pipeline,sec:design-pipeline-alts}); the
+model-family decision weighs CRNN--CTC against autoregressive
+transformers and pure-CNN classifiers on data efficiency, exposure
+bias, and a fixed single-GPU compute budget
+(\Cref{sec:design-model,sec:design-model-alts}); and the backbone
+choice of ResNet18 is justified on parameter count, convergence rate,
+and VRAM headroom.
 
-The implementation chapter contributes further evidence.
-The asymmetric-stride modification of the torchvision ResNet18
-(\Cref{sec:impl-model}) compresses the height dimension eight times
-more aggressively than the width to preserve the CTC time axis at a
-\(4\times\) compression ratio, which is the smallest power-of-two
-ratio at which all in-scope samples satisfy the CTC input-length
-constraint.
-The CTC-decoder choice and the empirical observation that beam search
-at width 5 yields at most one edit per thousand tokens of improvement
-at roughly \(6\times\) decode cost (\Cref{sec:impl-inference},
-restated in \Cref{sec:conc-results}) is a direct
-complexity-versus-accuracy trade-off measured rather than asserted.
-The data-pipeline implementation (\Cref{sec:impl-data}) uses Python's
-\code{multiprocessing} module for CPU-bound rendering, conversion,
-and augmentation stages, since the global interpreter lock makes
-threading useless for compute-bound work; the worker-pool size is a
-deliberate hyperparameter rather than an accident.
-The grammar fixer is implemented as a deterministic stateful walker
-rather than as a constrained beam search or a weighted finite-state
-transducer (\Cref{sec:design-grammar-alts}), on the explicit ground
-that the grammar's finite-state size makes post-hoc enforcement
-essentially free.
+The implementation chapter contributes further evidence. The
+asymmetric-stride ResNet18 that preserves the CTC time axis at a
+\(4\times\) compression ratio is described in \Cref{sec:impl-model}.
+The beam-versus-greedy decoding trade-off, where width-5 beam search
+buys at most one edit per thousand tokens at roughly \(6\times\) the
+cost, is measured in \Cref{sec:impl-inference} and restated in
+\Cref{sec:conc-results}. The use of \code{multiprocessing} for the
+CPU-bound data stages is set out in \Cref{sec:impl-data}, and the
+choice of a deterministic stateful grammar walker over a constrained
+decoder or finite-state transducer is argued in
+\Cref{sec:design-grammar-alts}.
 
 The acceptance criteria of \Cref{sec:design-domain} commit the
-project to numeric performance targets ahead of measurement, and
-\Cref{ch:results} adjudicates against them, closing the loop between
-algorithmic-strategy choices and the performance they actually
-deliver.
+project to numeric targets ahead of measurement, and \Cref{ch:results}
+adjudicates against them, closing the loop between the
+algorithmic-strategy choices and the performance they deliver.
 
 \subsection{CCO2.4 — Machine learning and extraction of information
 from large data volumes}
@@ -377,119 +355,54 @@ them, including these ones dedicated to the automatic extraction of
 information and knowledge from large data volumes.'' (In depth.)
 
 \textbf{Where evidence lives.}
-The full machine-learning pipeline of this thesis is the principal
-evidence.
-\Cref{ch:soa} surveys the three generations of OMR systems
-(heuristic modular pipelines, CRNN--CTC sequence models,
-transformer-based end-to-end approaches) and grounds the
-architectural choice in published baselines.
-\Cref{sec:design-model} commits to a CRNN--CTC stack: a ResNet18
-convolutional backbone, a two-layer bidirectional LSTM, and a CTC
-output head, supervised by the CTC loss on LMX token sequences.
-The CTC formulation~\cite{gravesConnectionistTemporal2006} is the
-mechanism by which the model learns the alignment between input
-frames and output tokens without per-frame supervision; it is the
-core machine-learning insight on which the entire melody-recognition
-stage rests.
+The machine-learning pipeline of this thesis is the principal
+evidence. \Cref{ch:soa} surveys the OMR families and grounds the
+architectural choice in published baselines; \Cref{sec:design-model}
+commits to a CRNN--CTC stack supervised by the CTC
+loss~\cite{gravesConnectionistTemporal2006} on LMX token sequences,
+which learns the frame-to-token alignment without per-frame
+supervision and underpins the melody-recognition stage.
 
-The data dimension is large by Bachelor's-thesis standards.
-PrIMuS contributes 87\,678 monophonic incipits
-(\Cref{sec:design-data}), each re-rendered in LilyJAZZ and paired
-with a synthetic ``scanned'' copy through the augmentation pipeline,
-yielding on the order of \num{170000} training images after
-filtering.
-This is the ``large data volume'' the competence statement refers
-to, and the design choices that exploit it are explicit:
-synthetic supervision rather than manual annotation;
-sample-level oversampling of rare tokens rather than class-weighted
-loss (\Cref{sec:design-training}); first-class header-less twin
-samples to teach the model the continuation-line case without the
-image-label desync that a training-time pixel crop would introduce;
-and a deterministic split protocol
-(\Cref{sec:impl-reproducibility}) that keeps validation and test
-disjoint across reruns.
+The data dimension is large by Bachelor's-thesis standards. PrIMuS
+contributes 87\,678 monophonic incipits, each re-rendered in LilyJAZZ
+and paired with a synthetic scanned copy, yielding on the order of
+\num{170000} training images after filtering
+(\Cref{sec:design-data}). The design choices that exploit this volume
+are developed elsewhere: synthetic supervision in place of manual
+annotation, sample-level oversampling of rare tokens
+(\Cref{sec:design-training}), first-class header-less twin samples for
+the continuation-line case, and a deterministic split protocol that
+keeps validation and test disjoint (\Cref{sec:impl-reproducibility}).
 
-The structured-output side of the competence is satisfied by the
-choice of LMX as the model's symbolic target rather than raw
-MusicXML or a project-internal encoding
-(\Cref{sec:lmx-format,sec:design-lmx-alts}): a flat
-whitespace-separated token sequence that round-trips to MusicXML
-through a deterministic post-processor, compact enough to serve as a
-CTC target and aligned with the OLIMPIC reference
-work~\cite{mayerPracticalEndToEnd2024}.
-The chord-OCR network (\Cref{sec:impl-chord}) is a second instance
-of the same machine-learning pattern applied to a different visual
-language, trained on synthetic LilyJAZZ chord strips and fine-tuned
-on hand-labelled real strips with a weighted sampler that mixes the
-two distributions; the fine-tuning recipe is itself an information-
-extraction design pattern (synthetic pretraining followed by
-domain-targeted fine-tuning) developed inside the constraints of
-the available data.
-
-The full inference pipeline (\Cref{sec:impl-inference}) closes the
-loop: it accepts a PDF or image of a previously unseen page,
-extracts the symbolic content as structured JSON, and serves the
-result through a REST API (\Cref{sec:impl-api}) that demonstrates the
-end-to-end automatic extraction of musical information from large
-volumes of image data.
+The structured-output side is satisfied by the choice of LMX as the
+model's symbolic target, argued in
+\Cref{sec:lmx-format,sec:design-lmx-alts}. The chord-OCR network
+(\Cref{sec:impl-chord}) applies the same pattern to a different visual
+language through synthetic pretraining followed by domain-targeted
+fine-tuning on hand-labelled real strips. The full inference pipeline
+(\Cref{sec:impl-inference}) closes the loop: it accepts an unseen
+page, extracts the symbolic content as structured JSON, and serves the
+result through a REST API (\Cref{sec:impl-api}).
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Methodological Reflection}
 \label{sec:conc-reflection}
 
-A short reflection on what worked, what did not, and what would be
-done differently closes the assessment.
+The work proceeded incrementally, one pipeline stage at a time, and
+that order shaped the outcome. The synthetic-first decision was the
+one that made a thesis-scale project workable: re-rendering PrIMuS in
+the target engraving style cost a one-off LilyPond setup and a few
+thousand CPU-hours, but it produced a labelled corpus far larger than
+any manual annotation effort could have. Pairing that synthetic
+supervision with a calibrated augmentation pipeline brought the
+scanned-split SER within \num{0.1} percentage points of the
+clean-split SER, the most uncertain outcome at the outset.
 
-The synthetic-first methodology paid off.
-Re-rendering PrIMuS in the target engraving style cost a one-off
-LilyPond setup effort and a few thousand CPU-hours of rendering, but
-it gave the project a labelled corpus orders of magnitude larger
-than any annotation effort could realistically have produced; this
-is the single decision that made the rest of the work feasible
-inside a Bachelor's thesis budget.
-The pairing of synthetic supervision with a calibrated augmentation
-pipeline turned out to be sufficient to bring the scanned-split SER
-within \num{0.1} percentage points of the clean-split SER, which
-was the most uncertain outcome at the start of the project.
-
-The modular five-stage pipeline (\Cref{sec:design-pipeline}) proved
-more valuable in practice than a monolithic end-to-end model would
-have been.
-Localised failure modes, the ability to debug each stage in
-isolation, and the clean replacement contract between stages
-(\Cref{tab:stage-contracts}) all simplified iteration.
-The deterministic grammar fixer is a particularly favourable
-trade-off: a few hundred lines of stateful code remove a class of
-errors that would otherwise have required additional model capacity
-or constrained decoding to address.
-
-A few decisions would be revisited if the work were restarted.
-The CTC mean-logprob rejection threshold was calibrated late in the
-project, after a checkpoint had stabilised, and the calibration has
-to be redone whenever the recogniser is retrained.
-A learned out-of-distribution detector, decoupled from the CRNN's
-confidence calibration, would be cleaner.
-The chord-OCR network was scoped late as well, after the melody
-network had converged; in retrospect the two streams could have been
-developed in parallel from the start, which would have given the
-chord fine-tuning loop more iteration time.
-Finally, the end-to-end measurement on genuine Real Book pages
-should have been the first experimental milestone rather than the
-last: it would have driven the augmentation calibration earlier and
-exposed the visual gaps that the synthetic pipeline does not yet
-cover.
-
-The four lessons of the previous version of this chapter survive
-intact and are worth recording.
-LMX as a model target is decisively more practical than full
-MusicXML at the CTC scale.
-CTC remains a strong baseline for monophonic OMR despite the
-popularity of transformer decoders, particularly inside a thesis
-compute budget.
-Scan-simulation augmentation in \code{albumentations} closes most of
-the synthetic-to-real distribution shift but leaves a measurable
-residue on the noisier end of the corpus.
-Decoupling melody and chord recognition into two independent CRNNs
-prevents vocabulary pollution and admits independent retraining of
-either branch, which proved more valuable in practice than the
-theoretical appeal of a unified output head.
+Building the system as discrete stages with a clean contract between
+them (\Cref{tab:stage-contracts}) made each stage debuggable in
+isolation and kept iteration cheap; the deterministic grammar fixer,
+a few hundred lines of stateful code, removed a class of structural
+errors that would otherwise have cost model capacity. With hindsight
+the chord-OCR stream was scoped too late, after the melody network had
+converged, and developing the two streams in parallel would have given
+the chord fine-tuning loop more iteration time.

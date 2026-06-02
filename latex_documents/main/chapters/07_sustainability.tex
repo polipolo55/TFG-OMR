@@ -2,25 +2,23 @@
 \label{ch:sustain}
 
 This chapter records the sustainability dimension of the project,
-following the matrix and reflection framework set out in the FIB
-GEP sustainability guide~\cite{gepSustainabilityReport2018}, in
+following the matrix and reflection framework set out in the
+sustainability guide of the FIB project-management course (GEP,
+\textit{Gesti\'o de Projectes})~\cite{gepSustainabilityReport2018}, in
 accordance with the requirement of Article~12 of the TFG normativa
 (Acord Consell de Govern UPC 07/2023).
-\Cref{sec:sust-selfassessment} reports the self-assessment
-that opened the project; \Cref{sec:sust-matrix} fills the
+It opens with the self-assessment that started the project, fills the
 three-dimensional sustainability matrix (economic, environmental,
-and social) at the project's design-and-development stage and at
-its anticipated useful life; \Cref{sec:sust-commitment}
-records the ethical position and open-science commitments adopted;
-and \Cref{sec:sust-final} revisits the assessment in light
-of the completed work.
+and social) for both the design-and-development stage and the
+anticipated useful life, records the ethical and open-science
+position adopted, and revisits the assessment once the work is
+complete.
 The discussion is anchored to four UN Sustainable Development Goals
 (SDGs)~\cite{gepSustainabilityReport2018} that the project plausibly
 touches: SDG~4 (Quality Education), SDG~9 (Industry, Innovation and
 Infrastructure), SDG~10 (Reduced Inequalities), and SDG~12
 (Responsible Consumption and Production).
-The relevant goal is named within each dimension below rather than
-in a separate column of the matrix.
+The relevant goal is named within each dimension below.
 The chapter also consolidates the applicable-regulations,
 intellectual-property, and personal-data analysis for the whole
 thesis (\Cref{sec:sust-commitment}), which is referenced
@@ -56,47 +54,14 @@ is not only a computational decision but also an environmental one,
 a point explicitly reflected in the architectural justification of
 \Cref{sec:mgmt-justification}.
 
-Three concrete improvement commitments emerged for the remainder
-of the project.
-
-\textit{First}, energy-related impact should be quantified wherever
-possible rather than asserted qualitatively.
-The energy estimate of \Cref{sec:sust-environmental} is the
-result of this commitment: it is computed from the GPU hours
-consumed by the training runs, multiplied by the rated power draw
-of the workstation and converted to CO\textsubscript{2} using the
-official Spanish emission
-factor~\cite{reeInformeSistemaElectrico2024,mitecoFactorEmision2025}.
-The calculation is coarse but grounded in measurable quantities
-rather than in adjectives; the methodology is detailed in
-\Cref{sec:sust-environmental}.
-
-\textit{Second}, architecture choices should be justified with both
-performance and efficiency criteria.
-The comparison table in \Cref{sec:mgmt-justification} includes
-``computational feasibility'' and ``data requirements'' as
-first-class criteria alongside accuracy, and the backbone selected
-in \Cref{sec:design-model} carries the environmental dividends
-quantified in \Cref{sec:sust-environmental}.
-
-\textit{Third}, the discussion of who benefits from the resulting
-tool, and under what limitations, must be explicit rather than
-implicit.
-This commitment shapes the social-dimension discussion in
-\Cref{sec:sust-social} and the ethical-position statement
-in \Cref{sec:sust-commitment}; both name specific beneficiary
-groups (musicians, educators, archivists, researchers) and specific
-limitations (monophonic contract, treble-clef-only inputs, residual
-SER profile) rather than appealing to vague ``users'' and ``edge
-cases''.
-
-The questionnaire transformed sustainability from a formal reporting
-requirement into a design constraint that guides technical decisions
-throughout the project lifecycle.
-It also reframed project quality as a balance between technical
-success, economic feasibility, environmental responsibility, and
-social value, with each of those four facets reflected somewhere in
-the project plan rather than treated as a downstream addendum.
+Three improvement commitments emerged for the remainder of the
+project: quantifying energy-related impact rather than asserting it
+qualitatively, justifying architecture choices on efficiency as well
+as performance, and stating who benefits from the tool and under
+what limitations. They are carried out in the environmental estimate
+of \Cref{sec:sust-environmental}, the comparison table of
+\Cref{sec:mgmt-justification}, and the social-dimension discussion
+of \Cref{sec:sust-social}.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Sustainability Matrix}
@@ -106,9 +71,9 @@ the project plan rather than treated as a downstream addendum.
 three-dimensional sustainability matrix as used in the GEP
 framework.
 The remainder of this section discusses each dimension in turn,
-identifying the principal cost or benefit (PPP, ``the project as
-designed and developed'') and the useful-life perspective (the
-impact once the system is in service).
+identifying the principal cost or benefit at the project-production
+stage (PPP, the project as designed and developed) and the
+useful-life perspective (the impact once the system is in service).
 
 \begin{table}[h!]
     \centering
@@ -218,8 +183,8 @@ Inference, dataset generation, and development sessions away from
 the GPU contribute much less per hour because they do not engage
 the high-power-draw components of the workstation.
 This concentration of environmental impact in a single activity
-makes it tractable: optimising training has substantially more
-environmental leverage than optimising the rest of the workflow.
+makes it tractable: optimising training reduces the total far more
+than optimising the rest of the workflow.
 
 \textbf{Minimisation plan.}
 Four mitigations together keep the training-time energy cost
@@ -267,21 +232,11 @@ of the project's environmental footprint shrinks as the model is
 re-used.
 
 \textbf{Embodied and end-of-life impact.}
-The operational figure above excludes two lifecycle stages that
-are harder to quantify but worth naming explicitly.
-The \textit{embodied} energy of manufacturing the GPU and the rest
-of the workstation is paid once at fabrication, amortises across
-every project run on the same hardware, and is the main reason the
-project deliberately reuses an existing workstation rather than
-provisioning new equipment.
-At \textit{end of life}, the same GPU is expected to enter the
-domestic e-waste channel rather than be disposed of as bulk waste,
-and the trained-weight artefacts incur a small archival storage
-cost that is dwarfed by the cost of \emph{retraining} a successor
-model once architectures, datasets, or notation styles drift; the
-project mitigates this by publishing training scripts alongside the
-weights so a replacement can be re-derived rather than learned from
-scratch.\todo{cite: figure for embodied carbon of a consumer GPU or workstation if a defensible source can be located (e.g.\ NVIDIA or Dell product carbon-footprint disclosures); otherwise leave as qualitative.}
+The operational figure above excludes two lifecycle stages that are
+harder to quantify: the embodied energy of manufacturing the GPU and
+workstation, paid once at fabrication and amortised across every run
+on the reused hardware, and end-of-life disposal of the GPU through
+the domestic e-waste channel.\todo{cite: figure for embodied carbon of a consumer GPU or workstation if a defensible source can be located (e.g.\ NVIDIA or Dell product carbon-footprint disclosures); otherwise leave as qualitative.}
 
 \subsection{Social dimension}
 \label{sec:sust-social}
@@ -330,58 +285,26 @@ performed on raster images.
 A related accessibility argument applies to \emph{sight-impaired
 musicians}: the structured JSON output is in principle consumable
 by screen readers and braille-music tooling, whereas a scanned PDF
-is not.
-Realising this benefit in practice depends on downstream software
-the project does not itself ship, so the contribution is at the
-level of producing a machine-readable representation rather than a
-finished accessibility tool.
-
-\textbf{Users not served.}
-The narrow scope of the domain specification leaves several user
-groups outside the system's contract.
-Users of \emph{polyphonic} notation (piano scores, choral parts,
-guitar tablature, ensemble full scores) are excluded by the
-monophonic-only filter (\Cref{sec:design-data}).
-Users of \emph{non-Western notation systems} (Indian sargam,
-Byzantine neumes, jianpu numbered notation) are excluded entirely:
-the vocabulary is built around Common Western Music Notation.
-Users of \emph{handwritten} or \emph{historical engraved sources}
-are excluded by the choice of training corpus (synthetic LilyJAZZ
-renders of PrIMuS), which captures neither the variance of human
-handwriting nor the typography of pre-20th-century editions.
-Naming these exclusions is not a defect catalogue; it makes the
-boundary of the social benefit explicit so that the system is not
-deployed as a general-purpose music recogniser by accident.
-
-Across the served groups, the project may improve quality of life
-in two related ways: by reducing the repetitive manual work
-required to convert paper notation to a machine-readable form, and
-by facilitating the long-term preservation of music content that
+is not, though realising this benefit depends on downstream software
+the project does not itself ship.
+Across the served groups, the project may reduce the repetitive
+manual work of converting paper notation to a machine-readable form
+and support the long-term preservation of music content that
 currently exists only as paper or low-resolution scanned PDF.
 
-\textbf{Boundaries.}
-Social value depends on transparent communication of the system's
-current limitations.
-Four limitations are particularly important to name explicitly.
-The \textit{monophonic-only contract} (\Cref{sec:design-data})
-means the model is not designed to transcribe piano scores, choral
-parts, or any input with more than one simultaneous voice on the
-staff.
-The \textit{Real-Book-specific engraving style} means the model's
-accuracy on other engraving styles, such as classical Sibelius
-output, historical editions, or handwritten manuscripts, is not
-the accuracy reported in \Cref{ch:results} and would have to be
-measured separately.
-The \textit{treble-clef-only assumption} excludes any input on F
-or C clefs, which is acceptable for lead sheets but disqualifying
-for full scores.
-The \textit{residual error rate} reported in \Cref{ch:results},
-while small in aggregate, is not zero; applications that depend on
-note-perfect transcription must include a human verification step.
-Overpromising the system in scenarios outside the validated scope
-would erode rather than enhance its social value, and would also
-expose the system's users to downstream costs they have not been
-warned about.
+The narrow domain specification leaves several groups outside the
+system's contract, and the social value of the tool depends on
+communicating these limits clearly. The monophonic-only filter
+(\Cref{sec:design-data}) excludes polyphonic notation such as piano
+scores, choral parts, and ensemble full scores; the treble-clef-only
+assumption excludes F and C clefs; and the synthetic LilyJAZZ
+training corpus targets the Real Book engraving style, so accuracy
+on classical, historical, handwritten, or non-Western sources is not
+the figure reported in \Cref{ch:results}. The residual error rate of
+\Cref{ch:results}, while small in aggregate, is not zero, so
+applications needing note-perfect transcription must include a human
+verification step. Stating these boundaries keeps the system from
+being deployed as a general-purpose music recogniser by accident.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Commitment and Ethical Position}
@@ -456,20 +379,15 @@ intellectual-property dimension and to its honesty about its
 capabilities.
 
 \textit{Misuse considerations.}
-The same open-source release that makes the system reproducible
-also lowers the barrier for foreseeable misuse: at-scale digitisation
-and online redistribution of copyrighted lead sheets, circumvention
-of paid score libraries, or unlicensed derivative works generated
-from the symbolic output.
-The project mitigates these risks by limiting the released
-artefacts to code, training scripts, and weights trained exclusively
-on synthetic PrIMuS-derived data, without packaging any
-Real-Book-derived corpus or pre-extracted symbol library.
-Transparency about the system's capabilities and limitations, in
-this thesis and in the public \code{README}, is the principal
-non-technical mitigation: users acting in good faith are informed
-about what the system does, and users acting in bad faith cannot
-claim ignorance of the rights-holder relationship.
+The open-source release also lowers the barrier for foreseeable
+misuse: at-scale digitisation and redistribution of copyrighted lead
+sheets, circumvention of paid score libraries, or unlicensed
+derivative works generated from the symbolic output.
+The released artefacts are limited to code, training scripts, and
+weights trained exclusively on synthetic PrIMuS-derived data, with
+no Real-Book-derived corpus or pre-extracted symbol library, and the
+capabilities and limitations are documented in this thesis and in
+the public \code{README}.
 
 \textit{Documented limitations.}
 The known limitations of the system---the monophonic contract,
@@ -517,13 +435,9 @@ complete: a model with the same accuracy and no accessible
 deployment surface would have substantially less potential social
 impact regardless of its training-time efficiency.
 
-A residual concern, recorded here for completeness rather than as
-an unresolved issue, is the \textbf{lifecycle} of the trained model
-weights themselves.
-Model files have a finite useful life: they become obsolete as
-new architectures are released, as datasets evolve, and as the
-target notation style drifts.
-Publishing the training scripts alongside the weights is the
-standard mitigation: it ensures that the cost of training a
-replacement model can be paid once and then redistributed, rather
-than being repeated independently by each successor project.
+A residual concern is the \textbf{lifecycle} of the trained model
+weights, which become obsolete as new architectures are released,
+as datasets evolve, and as the target notation style drifts.
+Publishing the training scripts alongside the weights lets the cost
+of training a replacement be paid once and redistributed, rather
+than repeated independently by each successor project.

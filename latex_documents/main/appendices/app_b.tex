@@ -53,3 +53,35 @@ SER distribution to illustrate the failure modes summarised in
 \label{sec:qual-real}
 
 \todo{If the domain-gap section (\Cref{sec:res-domaingap}) ends up producing a single-page real-scan figure as its headline qualitative artefact, do \emph{not} duplicate it here. Either (a) drop this section entirely and reference \Cref{sec:res-domaingap} from the appendix preamble, or (b) keep this section as the extended version with 2--3 additional Real Book pages beyond the one in the main body. Generate any additional pages with \texttt{poetry run python src/cli.py run --input data/real\_pages/<page>.png --output results/<page>.json} and visualise with the same overlay script used for the body figure.}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Model Weight Distribution}
+\label{app:weights}
+
+A brief diagnostic, useful when comparing trained checkpoints, is the
+marginal distribution of the model's weights at convergence.
+\Cref{fig:weight-dist} shows the distributions of the four principal
+parameter groups of the epoch-37 checkpoint: the classifier (final
+linear layer), the convolutional and batch-normalisation weights of
+the ResNet backbone, the LSTM weights, and the biases.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/fig_weight_distributions}
+    \caption{Marginal weight distributions of the four principal
+    parameter groups of the trained CRNN at epoch 37.
+    All four are close to centred Gaussian with standard deviations
+    in the $[0.17, 0.28]$ range; AdamW's \num{1e-4} weight decay
+    keeps the magnitudes bounded.
+    The small spikes near $\pm 1$ in the classifier panel are an
+    artefact of the classifier saturating on the CTC blank class and
+    the most frequent token.}
+    \label{fig:weight-dist}
+\end{figure}
+
+All four groups sit within the magnitudes expected of a
+well-regularised AdamW run; no parameter has grown to the
+exploding-gradient regime that the \num{5.0} gradient-norm clip is
+intended to prevent.
+This distribution is reported as a sanity check on the training
+procedure rather than as a primary result.

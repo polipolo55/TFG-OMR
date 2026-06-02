@@ -6,7 +6,7 @@ dynamics, and phrasing precisely enough for performers to reproduce a composer's
 intentions from a printed page. Yet most notated music exists today only as paper or
 low-resolution scanned image, inaccessible to the computational tools that drive music
 education, \term{Music Information Retrieval (MIR)}, computational musicology, and digital
-archiving.\term{Optical Music Recognition} (OMR) bridges this divide: it translates
+archiving. \term{Optical Music Recognition} (OMR) closes this gap: it translates
 images of musical scores into structured, machine-readable representations, much as
 Optical Character Recognition (OCR) did for printed text~\cite{shatriOPTICALMUSICRECOGNITION}.
 
@@ -25,78 +25,57 @@ pedagogy~\cite{kernfeldStoryFakeBooks2006}.
 Music archives, educational institutions, and individual musicians hold large quantities
 of repertoire that exists only in paper or low-resolution scans. These collections cannot
 be searched, transposed, played back, or analysed quantitatively without manual
-transcription into notation software, a process that is slow, demands specialist
-training, and is repeatedly identified as a principal cost driver in corpus-levelw
+transcription into notation software, a slow process that demands specialist
+training and is repeatedly identified as a principal cost driver in corpus-level
 digitisation projects~\cite{calvoZaragozaUnderstandingOMR2020, hajicOMRMetricsEvaluation2019}.
-The practical consequences are tangible: educators struggle to reassign jazz standards in
+The practical consequences are concrete: educators cannot easily reassign jazz standards in
 new keys, musicologists cannot apply statistical methods to scanned PDFs, and musicians
 cannot feed a worn photocopy of \textit{The Real Book} into a digital practice app.
 
-OCR solved mostly the equivalent problem for text decades ago, making printed documents editable
-at almost zero marginal cost. OMR remains far less mature. The visual language of music
-notation is substantially more complex than alphabetic text.
-Annotated training data is scarcer by orders of magnitude, and the research
-community reflects that gap~\cite{shatriOPTICALMUSICRECOGNITION}.
+OCR mostly solved the equivalent problem for text decades ago, making printed documents editable
+at almost zero marginal cost. OMR remains far less mature: the visual language of music
+notation is substantially more complex than alphabetic text, annotated training data is
+scarcer by orders of magnitude, and the research community reflects that
+gap~\cite{shatriOPTICALMUSICRECOGNITION}.
 
 \subsection{Jazz Lead Sheets and \textit{The Real Book}}
 
-Notated music exists in many formats (full orchestral scores, piano reductions, chord
-charts, tablatures), much as written language ranges from novels to legal documents.
-Among these, jazz lead sheets occupy a particular position. A lead sheet is a compact
-score format that encodes only the most essential musical information: a single-voice
-melody line written on a staff, chord symbols printed above it indicating the harmonic
-context, and occasionally lyrics beneath the staff. This format is the lingua franca of
-jazz practice: it lets musicians memorise and improvise over a tune from a minimal,
-portable representation without the burden of a full orchestral
-score~\cite{reedHonorsLeadSheets2018}.
+Notated music exists in many formats, from full orchestral scores to piano reductions,
+chord charts, and tablatures. Among these, jazz lead sheets occupy a particular position.
+A lead sheet is a compact score format that encodes only the essential musical
+information: a single-voice melody line written on a staff, chord symbols printed above it
+indicating the harmonic context, and occasionally lyrics beneath the staff. It lets
+musicians memorise and improvise over a tune from a minimal, portable representation
+without the burden of a full orchestral score~\cite{reedHonorsLeadSheets2018}.
 
 \textit{The Real Book} is the most widely circulated collection of jazz lead
 sheets~\cite{martinezSevillaJazzLeadSheets2025}. Originally assembled as an unauthorised
 compilation by Berklee College of Music students in the 1970s, it circulated as a
-hand-copied samizdat for years before receiving official publication. It contains
-several hundred jazz standards (tunes by Miles Davis, Thelonious Monk, Bill Evans, John
-Coltrane, and dozens of other canonical figures) and sits on the music stand of jazz
-musicians worldwide at virtually every level of practice.
+hand-copied samizdat before receiving official publication. It contains several hundred
+jazz standards and sits on the music stand of jazz musicians worldwide at virtually every
+level of practice.
 
 Despite its cultural centrality, the content of \textit{The Real Book} remains almost
 entirely locked in paper or scanned-image form. The officially published editions exist
-as PDFs, but those PDFs are image-based: the musical content is not encoded as symbolic
+as PDFs, but those are image-based: the musical content is not encoded as symbolic
 data, and standard music notation software cannot interpret them directly. Digitising
 \textit{The Real Book}, and the broader class of jazz lead sheets it represents, would
-enable several practical applications: automatic transposition for B\(\flat\),
-E\(\flat\), and F instruments; instant MIDI playback for practice and accompaniment;
-corpus-level harmonic analysis for musicologists; better search and cataloguing in
-digital music libraries; and easier preparation of educational materials for jazz
-educators.
+enable automatic transposition for B\(\flat\), E\(\flat\), and F instruments, MIDI
+playback for practice, corpus-level harmonic analysis, and better search and cataloguing
+in digital music libraries.
 
 \subsection{Why Existing OMR Tools Fall Short}
 
 General-purpose OMR systems have advanced substantially in recent
 years~\cite{shatriOPTICALMUSICRECOGNITION}, but they are designed and evaluated mostly on
 classical full-score notation in standard engraving styles (Finale, Sibelius, Dorico, or
-LilyPond's default font). Lead sheets present three challenges that this baseline does not address.
-
-\textbf{Engraving style.}
-Many editions of \textit{The Real Book} use fonts and layouts that deliberately imitate
-hand-lettered notation. Models trained on classical-style corpora such as
-PrIMuS~\cite{PrIMuSDataset} or DeepScoresV2~\cite{tuggenerDeepScoresV22020} do not
-transfer naturally to this visual register.
-
-\textbf{Chord symbols.}
-Jazz chord symbols appear above the staff as free-form text and are a core part of
-lead-sheet semantics (see~\Cref{sec:chord-symbols-primer} for the full grammar). Standard
-OMR pipelines transcribe pitch and rhythm from the staff; they either ignore chord
-symbols or treat them as noise. A lead-sheet OMR system must include a complementary
-chord recogniser coordinated with melody transcription.
-
-\textbf{Absence of labelled data.}
-To the best of the author's knowledge, and consistent with recent surveys of OMR
-datasets~\cite{shatriOPTICALMUSICRECOGNITION} which list no such resource, no publicly
-available labelled dataset of Real Book pages with ground-truth symbolic transcriptions
-exists as of 2026. Supervised training of modern deep models without such a corpus
-requires synthetic data generation and domain adaptation; the calibration of both
-directly governs the performance of the resulting system. These gaps are surveyed in
-detail in \Cref{ch:soa}.
+LilyPond's default font). Lead sheets sit outside that comfort zone: their hand-lettered
+jazz engraving, their reliance on free-form chord symbols above the staff, and the absence
+of any public labelled corpus of Real Book pages all push beyond what general-purpose
+systems handle well. The result is that a musician with a worn photocopy has no tool that
+reliably turns it into editable, symbolic data. The technical difficulties behind this gap
+are formalised in \Cref{sec:problem-formulation}, and the prior art is surveyed in
+\Cref{ch:soa}.
 
 This thesis assumes basic familiarity with Western staff notation: the staff and treble
 clef, pitch and accidentals, note durations, time signatures, chord symbols, and the
@@ -136,7 +115,7 @@ suffer from scanner noise, perspective distortion, ink bleed, paper yellowing, a
 compression artefacts. A model trained exclusively on clean synthetic data generalises
 poorly to real scans: the feature distribution shifts substantially when crisp black
 symbols on a white background are replaced by blurred, uneven, noisy images with
-variable contrast. Bridging this \term{domain gap} without real annotated training data
+variable contrast. Closing this \term{domain gap} without real annotated training data
 requires a scan-simulation augmentation pipeline that teaches the model to be invariant
 to scan-related distortions.
 
@@ -156,9 +135,10 @@ A complete lead-sheet system must solve both and align their results.
 
 This thesis addresses the four difficulties jointly: by constructing a synthetic
 training corpus in the jazz engraving style, applying a calibrated scan-simulation
-augmentation pipeline, training a CRNN-CTC model for melody recognition, and building a
-separate OCR pathway for chord symbols that is fused into a unified output by the
-inference pipeline.
+augmentation pipeline, training a \term{Convolutional Recurrent Neural Network} trained
+with the \term{Connectionist Temporal Classification} (CTC) loss (CRNN-CTC) for melody
+recognition, and building a separate OCR pathway for chord symbols that is fused into a
+unified output by the inference pipeline.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Objectives}
@@ -166,7 +146,7 @@ inference pipeline.
 
 The \textbf{general objective} of this project is to develop, evaluate, and document a
 proof-of-concept end-to-end OMR system for monophonic jazz lead sheets, and to
-demonstrate that a CRNN-CTC architecture trained on synthetic data can bridge the
+demonstrate that a CRNN-CTC architecture trained on synthetic data can span the
 domain gap between clean rendered images and degraded scans, achieving an aggregate
 Symbol Error Rate (SER) of at most \SI{3}{\percent} on a held-out scan-simulated test
 split so that the outcome can be assessed quantitatively in \Cref{ch:conclusions}.
@@ -181,7 +161,7 @@ The \textbf{specific objectives} are:
     \item Design and implement a synthetic training dataset by rendering excerpts from
           the PrIMuS corpus~\cite{PrIMuSDataset} in a jazz engraving style using
           LilyPond and the LilyJAZZ font, paired with ground-truth annotations in the
-          LMX token format~\cite{OMRResearchLmx2025}.
+          \term{Linearised MusicXML} (LMX) token format~\cite{OMRResearchLmx2025}.
 
     \item Design and implement a scan-simulation augmentation pipeline calibrated
           against real Real Book scan characteristics, to close the domain gap at
@@ -211,9 +191,8 @@ The \textbf{specific objectives} are:
 \section{Proposed Approach}
 \label{sec:approach}
 
-The core design choice of this thesis is a \term{CRNN-CTC} architecture: a Convolutional
-Recurrent Neural Network trained with the Connectionist Temporal Classification (CTC)
-loss. The model class fits the left-to-right, variable-length token sequences that arise
+The core design choice of this thesis is a CRNN-CTC architecture. The model class fits
+the left-to-right, variable-length token sequences that arise
 from reading a single staff line: the convolutional backbone extracts local visual
 features along the width of the staff image, two bidirectional LSTM layers model
 long-range sequential dependencies, and CTC decoding maps the resulting frame-level

@@ -271,3 +271,111 @@ Every subcommand prints self-contained help text when invoked with
 \caption{CLI subcommands exposed by \code{src/cli.py} (\Cref{sec:impl-cli}).}
 \label{tab:cli-subcommands}
 \end{table}
+
+\section{Earned-Value Budget Control}
+\label{app:evm}
+
+This section gives the earned-value-management (EVM) definitions
+summarised in \Cref{sec:mgmt-control}.
+Each sprint is characterised by three quantities: the
+\textit{budgeted cost of work scheduled} (BCWS), the planned cost of
+the tasks the sprint should have completed; the \textit{budgeted cost
+of work performed} (BCWP), the planned cost of the tasks actually
+completed; and the \textit{actual cost of work performed} (ACWP), the
+real cost incurred to complete those tasks.
+The three control indicators are derived from these primitives.
+
+\textit{Cost variance.}
+$\mathrm{CV} = \mathrm{BCWP} - \mathrm{ACWP}$ is the difference
+between the budgeted cost of completed work and what it actually
+cost.
+A positive CV means the sprint came in under budget and a negative
+CV means it overran; this is the headline cost-health indicator for
+a single sprint.
+
+\textit{Schedule variance.}
+$\mathrm{SV} = \mathrm{BCWP} - \mathrm{BCWS}$ is the difference
+between the work completed and the work planned, both measured in
+the common currency of budgeted cost.
+A positive SV means the sprint completed more than was planned and a
+negative SV means it fell behind.
+SV is reported alongside CV because cost and schedule can move in
+opposite directions: a sprint can come in under cost simply by
+not completing all its work, which CV alone would not catch.
+
+\textit{Cost performance index.}
+$\mathrm{CPI} = \mathrm{BCWP} / \mathrm{ACWP}$ is the
+dimensionless ratio of value earned to cost incurred.
+A CPI of 1.0 indicates exact agreement with the plan, below 1.0
+indicates an overrun, and above 1.0 indicates an underrun.
+The advantage of the index form over the raw variance is that it
+is directly comparable across sprints of different sizes.
+
+\section{Detailed Budget Derivation}
+\label{app:budget-detail}
+
+This section records the per-role rate derivation and the
+hand-computed budget arithmetic summarised in
+\Cref{sec:mgmt-budget}.
+
+\subsection*{Human-resources rate derivation}
+
+Each task is costed at the loaded rate of the role that
+predominantly performs it: the GEP tasks (T0.1--T0.4), the supervisor
+meetings (T0.5), and the end-of-sprint reviews (T1.5, T2.5, T3.5,
+T4.5) at the Project Manager rate; the literature survey, dataset
+exploration, and error-analysis tasks at the Research Analyst rate;
+the dataset-rendering, model, and pipeline tasks at the ML Engineer
+rate; and the thesis-writing tasks (T0.6, T5.4) together with defence
+preparation (T5.5) at the Technical Writer rate.
+Aggregating the task hours by role gives \num{92}\,h Project Manager,
+\num{72}\,h Research Analyst, \num{255}\,h ML Engineer, and
+\num{90}\,h Technical Writer (\num{509}\,h in total), the allocation
+shown in \Cref{tab:roles-cost}.
+Summing the corresponding costs yields the \EUR{}13\,615.57
+human-resources total, which divided by the 509 hours gives a
+project-weighted blended rate of \EUR{}26.75/h; this differs slightly
+from the unweighted mean of the four rates (\EUR{}26.27/h) because the
+ML~Engineer role, the most expensive after the Project Manager,
+carries half the project's hours.
+
+\begin{table}[H]
+    \centering
+    \caption{Roles considered for the project, their loaded hourly
+    rates, and the hours each role is charged across the 509-hour
+    plan. The role totals reconstruct the human-resources budget of
+    \Cref{tab:hr-budget}.}
+    \label{tab:roles-cost}
+    \small
+    \setlength{\tabcolsep}{5pt}
+    \renewcommand{\arraystretch}{1.35}
+    \begin{tabularx}{\linewidth}{@{} L r r r r r @{}}
+        \toprule
+        \textbf{Role} & \textbf{Gross (\EUR{}/yr)} & \textbf{Loaded (\EUR{}/yr)} & \textbf{\EUR{}/h} & \textbf{Hours} & \textbf{Cost (\EUR{})} \\
+        \midrule
+        Project Manager   & 38\,000 & 51\,300 & 29.15 & 92  & 2\,681.80 \\ \tfgrowsep
+        Research Analyst  & 33\,000 & 44\,550 & 25.31 & 72  & 1\,822.32 \\ \tfgrowsep
+        ML Engineer       & 36\,000 & 48\,600 & 27.61 & 255 & 7\,040.55 \\ \tfgrowsep
+        Technical Writer  & 30\,000 & 40\,500 & 23.01 & 90  & 2\,070.90 \\
+        \midrule
+        \textbf{Total}    &         &         &       & \textbf{509} & \textbf{13\,615.57} \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+The \num{1.35} loading multiplier converts the gross annual salary
+used as a public reference into the fully loaded annual cost an
+employer actually incurs, and the working year of 1\,760 hours
+(220 working days, 8 hours per day, after holidays) follows the FIB
+GEP economic-management module.
+
+\subsection*{Hardware amortisation}
+
+The general-costs hardware line is a four-year linear amortisation
+prorated for the project duration.
+The workstation---a Ryzen~7 7800X3D with 32\,GB of DDR5 memory and an
+NVIDIA RTX~3060 12\,GB---is valued at \EUR{}1\,000, the monitor at
+\EUR{}200, and the peripherals at \EUR{}45, for a \EUR{}1\,245 base.
+Charged linearly over a four-year, \num{208}-week useful life for the
+21 project weeks, this gives
+$\EUR{}1\,245\times 21/208 \approx \EUR{}125.69$.

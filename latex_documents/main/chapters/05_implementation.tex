@@ -4,26 +4,18 @@
 This chapter describes how the design of \Cref{ch:design} is realised
 in code: the libraries chosen at each layer, the repository structure,
 the concrete configuration values, and the engineering choices that
-keep the system reproducible within the compute budget of a single
-consumer GPU.
+keep the system within the compute budget of a single consumer GPU.
 The conceptual architecture in \Cref{ch:design} is intentionally
-library-agnostic; this chapter fills in the specific versions, magic
-numbers, and trade-offs that follow from the hardware and the toolchain.
+library-agnostic; this chapter fills in the specific versions, numeric
+settings, and trade-offs imposed by the hardware and the toolchain.
 Computational-complexity arguments and speed optimisations are
 collected in \Cref{sec:impl-performance}.
 
-The realised system, at the scale reported in \Cref{ch:results},
-renders \num{87677} PrIMuS lines, adds \num{26168} header-less twin
-samples (\code{\_\_nh}), and trains on \num{71297} in-domain pairs
-after the filters of \Cref{sec:design-data} (from \num{113845}
-augmented images including twins), with a vocabulary of \num{80}
-LMX symbols (\num{77} content tokens in
-\code{data/vocab/primus\_lmx.txt} plus blank, pad, and unk), and
-converges in
-\num{37}~epochs of approximately \SI{8}{\minute} each on the target
-hardware (measured as the mean of epochs 2--49 from the training log;
-the first epoch is longer due to data-loader warm-up).
-The final checkpoint occupies approximately \SI{165}{\mega\byte}.
+The realised system trains on the filtered PrIMuS corpus described in
+\Cref{sec:design-data} against a vocabulary of \num{80} LMX symbols
+(\num{77} content tokens in \code{data/vocab/primus\_lmx.txt} plus
+blank, pad, and unk). The corpus sizes, epoch count, and checkpoint
+size are reported in \Cref{ch:results}.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Technology Stack}
@@ -36,10 +28,9 @@ image preprocessing and staff detection,
 augmentation, LilyPond~+~LilyJAZZ~\cite{nienhuysLilyPondSystem2003,hammerleOpenLilyPondFontsLilyJAZZ}
 for synthetic rendering, PyMuPDF~\cite{artifexPyMuPDF} for PDF
 rasterisation, and FastAPI~\cite{ramirezFastAPI} for the REST endpoint.
-Every library was chosen as the smallest widely-used option compatible
-with the design constraints; no component was chosen for novelty.
-The full version-pinned list is in \Cref{tab:tech-stack}
-(\Cref{app:hyperparams}).
+Each library is the smallest widely-used option compatible with the
+design constraints. The full version-pinned list is in
+\Cref{tab:tech-stack} (\Cref{app:hyperparams}).
 
 The runtime target is a single NVIDIA RTX~3060 with \SI{12}{\giga\byte}
 of VRAM.
@@ -52,53 +43,28 @@ locked in \code{poetry.lock} so the environment is reproducible with
 \label{sec:impl-repo}
 
 The project source tree is organised by responsibility rather than by
-file type, with three structural rules.
-First, all music-notation mapping tables (clef IDs, key-signature
-encodings, duration tokens) live in a single module,
-\code{CRNN\_CTC/lilypond\_render.py}, imported by every module that
-needs them; this stops the rendering pipeline and the label converter
-drifting out of sync.
-Second, the inference pipeline (\code{omr\_pipeline/}) depends on the
-training code only through the \code{Vocabulary} and \code{CRNN}
-classes, so it can be deployed without the training tree.
-Third, \code{cli.py} is the only entry point: every multi-step
-operation (data generation, training, evaluation, vocab building,
-threshold calibration) is a subcommand sharing the same flag names and
-defaults.
+file type. Three structural rules hold it together. The music-notation
+mapping tables (clef IDs, key-signature encodings, duration tokens)
+live in a single module, \code{CRNN\_CTC/lilypond\_render.py}, imported
+wherever they are needed, which keeps the rendering pipeline and the
+label converter from drifting out of sync. The inference pipeline
+(\code{omr\_pipeline/}) depends on the training code only through the
+\code{Vocabulary} and \code{CRNN} classes, so it can be deployed
+without the training tree. And \code{cli.py} is the only entry point:
+every multi-step operation is a subcommand sharing the same flag names
+and defaults.
 
 \begin{quote}\small
 \begin{verbatim}
 src/
-  cli.py                      unified CLI (12 subcommands)
-  CRNN_CTC/                   model, training, vocab, evaluation
-    model.py                  CRNN-CTC architecture
-    vocab.py                  Vocabulary (blank=0, pad=1, unk=2)
-    dataset.py, config.py     PrIMuS dataset + Config dataclass
-    train.py, evaluate.py     training loop and SER evaluation
-    lilypond_render.py        single source of truth for clef/
-                              key/duration → LilyPond tables
-    training_utils.py         shared train / eval helpers
-    chord_dataset.py          synthetic chord-strip dataset
-    chord_train.py            chord CRNN training from scratch
-    chord_finetune.py         fine-tune chord CRNN on real strips
-  data_processing/            dataset generation and augmentation
-    generate_realbook.py      PrIMuS -> LilyJAZZ render
-    semantic_to_lmx.py        PrIMuS .semantic -> LMX label
-    augment_scanned.py        scan-simulation augmentation
-    chord_render.py           synthetic chord-strip renderer
-    generate_chord_crops.py   bulk chord-strip generation
-    extract_real_chord_strips.py    pre-label strips from PDFs
-    extract_real_music_strips.py    pre-label staff strips
-  omr_pipeline/               inference pipeline
-    pipeline.py               run_pipeline() entry point
-    preprocess.py             load / binarise / deskew
-    staff_detect.py           morphology -> 5-line clusters
-    staff_reject.py           hybrid pre/post-CRNN rejection gate
-    inference.py              CRNN-CTC music recognition
-    chord_recognizer.py       chord OCR
-    chord_postprocess.py      jazz-chord grammar filter
-    grammar_fix.py            LMX token sequence validator
-  api/                        FastAPI web server
+  cli.py            unified CLI (12 subcommands)
+  CRNN_CTC/         model, training, vocab, evaluation,
+                    and chord-network code
+  data_processing/  dataset generation and augmentation
+  omr_pipeline/     inference pipeline (preprocess, staff
+                    detect, reject gate, CRNN, chord OCR,
+                    grammar fixer)
+  api/              FastAPI web server
 \end{verbatim}
 \end{quote}
 
@@ -233,9 +199,8 @@ The converter detects this case and injects the C-major key token
 before the time signature so every training sample carries an
 explicit key label.
 After the fix, C major accounts for roughly \SI{22.6}{\percent} of the
-post-filter corpus (\num{19778} of \num{87677} samples), confirming
-that the missing label was a labelling artefact rather than a
-distribution effect.
+post-filter corpus, confirming that the missing label was a labelling
+artefact rather than a distribution effect.
 
 \subsection{Augment: scan simulation}
 
@@ -326,10 +291,8 @@ with a $4\times$ compression.}
 
 After the backbone, the height dimension is squeezed so the BiLSTM
 receives a tensor of shape $(W/4, B, 512)$.
-The $4\times$ width compression follows the design argument of
-\Cref{sec:design-model}: it is the smallest power-of-two ratio at
-which every in-scope sample comfortably satisfies the CTC
-input-length~$\geq$~label-length constraint.
+The $4\times$ width-compression ratio follows the design argument of
+\Cref{sec:design-model}.
 
 \subsection{Bidirectional LSTM and projection head}
 
@@ -408,9 +371,8 @@ The complete parameter list, including architecture sizes and split
 fractions, is in \Cref{tab:hyperparams-omr} and \Cref{tab:arch-omr}
 of \Cref{app:hyperparams}.
 Because the \code{Config} dataclass is part of the checkpoint contract,
-adding, renaming, or removing a field is a backward-incompatible
-change for existing checkpoints (Hard~Constraint~3 of the contributor
-guide).
+adding, renaming, or removing a field is a backward-incompatible change
+for existing checkpoints.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Chord OCR Implementation}
@@ -590,10 +552,9 @@ Decoding is greedy by default: argmax over the vocabulary dimension at
 each time step, collapse consecutive duplicates, remove blank.
 Beam search is opt-in via the \code{OMR\_BEAM\_WIDTH=N} environment
 variable or the \code{--beam-width N} CLI flag.
-The performance comparison between the two modes is reported in
-\Cref{ch:results}; the present chapter only commits to greedy as the
-runtime default and to the implementation cost of beam search, which
-is examined in \Cref{sec:impl-performance}.
+The decode cost of each mode is examined in
+\Cref{sec:impl-performance}; the accuracy comparison is reported in
+\Cref{ch:results}.
 
 \subsection{Chord recognition}
 
@@ -643,8 +604,9 @@ The concrete state-transition rules applied per token are:
 The allowed time-signature set
 (\code{\{4/4, 3/4, 2/4, 2/2, 6/8, 6/4, 5/4, 12/8\}}) is stored in
 both \code{src/CRNN\_CTC/dataset.py} and
-\code{src/omr\_pipeline/grammar\_fix.py}; the two definitions must
-stay synchronised (Hard~Constraint~5 of the contributor guide).
+\code{src/omr\_pipeline/grammar\_fix.py}, and the two definitions must
+stay synchronised so that the training-time filter and the
+inference-time validator accept the same signatures.
 The walker emits a normalised LMX token list that satisfies the
 grammar of \Cref{sec:lmx-format}.
 
@@ -692,10 +654,8 @@ overlaid, the recognised LMX token sequence per segment, and the
 extracted chord list.
 The UI is a debugging aid that doubles as a demonstration interface;
 it is not the principal deliverable.
-On a representative \num{8}-staff page the median end-to-end latency
-on the target RTX~3060 is \SI{165}{\milli\second} (mean
-\SI{166}{\milli\second} $\pm$ \SI{12}{\milli\second} over ten runs,
-measured via \code{notebooks/02\_evaluate\_model.ipynb} §9).
+End-to-end per-page latency on the target RTX~3060 is reported in
+\Cref{ch:results}.
 The full response schema is documented in
 \code{docs/api.md}; the JSON top level carries \code{pages[]},
 \code{meta\{\}}, and a top-level \code{error} field that is non-null
@@ -705,89 +665,63 @@ only on pipeline failure.
 \section{Computational Performance and Speed Optimisations}
 \label{sec:impl-performance}
 
-This section covers the computational-complexity reasoning behind the
-design of \Cref{ch:design} and the concrete engineering choices that
-follow from it: which operations are cheap by construction, which
-required active work to keep within budget, and how the
-throughput/latency/accuracy trade-offs are exposed to the operator.
+This section reports the computational cost of the design decisions of
+\Cref{ch:design} and the engineering choices that keep the system
+within budget.
 
-\subsection{Algorithmic-complexity choices}
+\subsection{Complexity of the decode and model components}
 \label{sec:impl-perf-algorithmic}
 
+The architecture choices are justified in \Cref{sec:design-model} and
+\Cref{sec:design-domain}; what follows records the costs that those
+choices imply for the implementation.
+
 \paragraph{CTC decoding: greedy vs beam search.}
-Greedy CTC decoding has complexity $\mathcal{O}(T\cdot V)$ per
-sample, where $T$ is the number of output time steps and $V$ is the
-vocabulary size: it consists of one argmax per time step followed by
-a linear pass to collapse duplicates and remove blanks.
-Beam search of width $k$ has complexity $\mathcal{O}(T\cdot V\cdot k)$
-with an additional logarithmic factor for the priority queue.
-On the monophonic Real Book corpus, beam search of width $5$ yields
-$\leq 1$ edit per $1000$ SER improvement at approximately $6\times$
-the decode cost; greedy is therefore the runtime default for both
-the CLI \code{evaluate} subcommand and the API.
-Beam search is opt-in for users who want to spend the latency to
-chase the small additional accuracy on dense passages.
+Greedy CTC decoding has complexity $\mathcal{O}(T\cdot V)$ per sample,
+where $T$ is the number of output time steps and $V$ the vocabulary
+size: one argmax per time step followed by a linear pass to collapse
+duplicates and remove blanks.
+Beam search of width $k$ costs $\mathcal{O}(T\cdot V\cdot k)$, with an
+additional logarithmic factor for the priority queue.
+Greedy is the runtime default for the CLI \code{evaluate} subcommand
+and the API; beam search is opt-in. The accuracy gain and decode-cost
+multiplier are reported in \Cref{ch:results}.
 
 \paragraph{Width compression and the time axis.}
 The $4\times$ width compression in the CNN backbone
-(\Cref{tab:resnet-strides}) directly controls the cost of every
-downstream operation: the BiLSTM, the linear projection, and the CTC
+(\Cref{tab:resnet-strides}) controls the cost of every downstream
+operation: the BiLSTM, the linear projection, and the CTC
 forward--backward all scale linearly in $T \approx W/4$.
-A smaller compression ratio would multiply the recurrent and projection
-costs by the same factor; a larger ratio risks producing more output
-tokens than time steps, which CTC's \code{zero\_infinity} option
-silently masks but which corrupts the gradient estimate.
-The chosen $4\times$ ratio is the smallest power-of-two ratio at which
-every in-scope sample satisfies $T \geq L$ for label length $L$, while
-keeping the time axis rich enough to disambiguate adjacent symbols on
-densely-engraved staves.
+A smaller ratio multiplies those costs; a larger ratio risks producing
+more output tokens than time steps, violating the CTC
+$T \geq L$ constraint. The chosen ratio is justified in
+\Cref{sec:design-model}.
 
-\paragraph{ResNet18 vs VGG (parameter count and FLOPs).}
-The ResNet18 backbone has approximately
-\num{11.2}~million parameters and a
-forward-pass cost of roughly \num{1.8}~GFLOP at the project's
-input shape (both figures are estimates for the standard ResNet18 at
-comparable input resolution; exact values vary with the asymmetric
-stride modifications described above).
-The legacy VGG-style stack at the same number of channels carries
-more parameters and runs slower without measurable accuracy gain on
-this corpus; that comparison is the empirical reason ResNet18 became
-the default backbone, as discussed in \Cref{sec:design-model}.
-ResNet18's residual connections also help the gradient propagate
-deep into the network during the early epochs of CTC training, where
-the model is still learning the rough alignment between input frames
-and output tokens.
+\paragraph{ResNet18 backbone.}
+The ResNet18 backbone has approximately \num{11.2}~million parameters
+and a forward-pass cost of roughly \num{1.8}~GFLOP at the project's
+input shape (estimates for the standard ResNet18; exact values vary
+with the asymmetric stride modifications above). The choice over the
+legacy VGG stack is argued in \Cref{sec:design-model}.
 
-\paragraph{BiLSTM vs Transformer at this scale.}
+\paragraph{BiLSTM recurrent stack.}
 The two-layer BiLSTM with hidden size \num{256} per direction has on
 the order of \num{2.6}~M parameters and runs in
 $\mathcal{O}(T\cdot d^2)$ per layer, with $d = 512$ as the combined
 hidden width.
-A Transformer encoder layer over the same time axis runs in
-$\mathcal{O}(T^2\cdot d)$ for the self-attention, plus
-$\mathcal{O}(T\cdot d^2)$ for the feed-forward block.
-For typical staff widths in this corpus, $T \approx 200$--$500$, so
-self-attention is not asymptotically prohibitive, but a Transformer
-also requires substantially more parameters and training data to
-reach competitive accuracy on a monophonic task
-(\Cref{sec:design-model-alts}).
-The BiLSTM was preferred because it converges in fewer epochs on a
-synthetic corpus of this size and fits the project's compute envelope.
+A Transformer encoder layer over the same time axis would run in
+$\mathcal{O}(T^2\cdot d)$ for self-attention plus
+$\mathcal{O}(T\cdot d^2)$ for the feed-forward block; for the staff
+widths in this corpus ($T \approx 200$--$500$) self-attention is not
+asymptotically prohibitive. The reasons for preferring the BiLSTM are
+in \Cref{sec:design-model-alts}.
 
 \paragraph{Monophonic-only output space.}
-The single most consequential complexity decision is the
-monophonic-only contract (\Cref{sec:design-domain}): a single melody
-line per staff turns the recognition problem into a strictly
-left-to-right CTC alignment, with no need for tree decoding or
-position-aware attention over polyphonic voices.
-The output vocabulary collapses from the thousands of tokens needed by
-polyphonic systems~\cite{riosVilaSheetMusicTransformer2024} to
-$\approx 80$ symbols on a full corpus rebuild (empirical union of
-\code{.lmx} tokens plus guaranteed pitch/octave ranges), and the CTC
-forward--backward shrinks proportionally.
-This is the lever that makes a single-GPU Bachelor's thesis budget
-viable on a task that otherwise demands an order of magnitude more
-compute.
+The monophonic-only contract (\Cref{sec:design-domain}) reduces
+recognition to a left-to-right CTC alignment and collapses the output
+vocabulary from the thousands of tokens used by polyphonic
+systems~\cite{riosVilaSheetMusicTransformer2024} to $\approx 80$
+symbols, shrinking the CTC forward--backward proportionally.
 
 \subsection{Engineering optimisations}
 
@@ -862,27 +796,14 @@ latency is paid once at process start, not per request.
 
 \subsection{Inference latency}
 
-\paragraph{End-to-end per-page wall time.}
-On the target RTX~3060, the end-to-end inference cost of a typical
-\num{8}-staff page is approximately \SI{165}{\milli\second} (median
-over ten runs at \SI{300}{DPI}, greedy decoding).
-
-\paragraph{Cost breakdown across stages.}
-On an \num{8}-staff page the stage costs are: preprocessing
-(CLAHE $+$ deskew $+$ binarisation) \SI{26}{\milli\second},
-morphological staff detection \SI{48}{\milli\second},
-music CRNN $+$ greedy decode \SI{34}{\milli\second} for all staves in
-batch, chord CRNN \SI{28}{\milli\second}, and grammar fixer
-${<}$\SI{1}{\milli\second}.
-Per strip, the music CRNN forward pass and greedy CTC decode together
-cost approximately \SI{13}{\milli\second} at $W \approx 1\,500$~px
-(median over 20 runs of a ten-strip batch at the training image height
-of \SI{128}{px}).
-The chord CRNN runs on a strip of half the staff height, so its
-forward-pass cost is proportionally smaller; its total throughput is
-dominated by the per-batch CUDA-kernel launch overhead.
-The grammar fixer is a pure-Python state machine; its cost is
-negligible at any batch size.
+The end-to-end per-page wall time on the target RTX~3060 and the
+per-stage cost breakdown across preprocessing, staff detection, the
+music and chord CRNNs, and the grammar fixer are measured and reported
+in \Cref{ch:results}. The relevant implementation facts are that staff
+detection and the CRNN forward passes dominate the budget, while the
+grammar fixer is a pure-Python state machine whose cost is negligible
+at any batch size, and the chord CRNN runs on a half-height strip so
+its forward pass is proportionally cheaper than the music CRNN's.
 
 \subsection{Throughput, latency, and accuracy trade-offs}
 
@@ -899,7 +820,7 @@ latency / accuracy frontier.
 \toprule
 \textbf{Knob} & \textbf{Throughput effect} & \textbf{Latency effect} & \textbf{Accuracy effect} \\
 \midrule
-Beam width $k$ (\code{OMR\_BEAM\_WIDTH}) & $\sim 1/k$ at fixed throughput per stripe. & $\sim k\times$ per strip. & $\leq 1$ edit per $1000$ SER improvement at $k=5$ on this corpus. \\ \tfgrowsep
+Beam width $k$ (\code{OMR\_BEAM\_WIDTH}) & $\sim 1/k$ at fixed throughput per stripe. & $\sim k\times$ per strip. & Small SER reduction on dense passages (\Cref{ch:results}). \\ \tfgrowsep
 PDF DPI (\code{OMR\_PDF\_DPI}) & Linear: image area scales as DPI$^2$. & Linear in image area. & Higher DPI improves CRNN accuracy up to roughly \SI{300}{DPI}; beyond that the gain saturates and pre-processing dominates. \\ \tfgrowsep
 Pre-CRNN reject gate & Improves throughput by skipping non-music strips' CRNN call. & Reduces the average latency per page. & Trade-off between false-positive rejection of valid staves and false-negative acceptance of text; thresholds are calibrated on labelled fixtures. \\
 \bottomrule
@@ -922,8 +843,9 @@ environment variable without retraining or recompiling.
 \section{Reproducibility}
 \label{sec:impl-reproducibility}
 
-Three mechanisms together guarantee that any experiment reported in
-\Cref{ch:results} can be reproduced exactly.
+Three mechanisms together make any experiment reported in
+\Cref{ch:results} reproducible up to the documented hardware
+nondeterminism noted below.
 
 \paragraph{Deterministic dataset splits.}
 The \code{make\_splits} function partitions samples by hashing the
@@ -940,8 +862,7 @@ the model weights, so that the data filters, image dimensions, and
 hyperparameters are exactly those used during training.
 This is also why the \code{Config} dataclass is a hard contract:
 adding, renaming, or removing a field breaks backward compatibility
-with existing checkpoints (Hard~Constraint~3 of the project's
-contributor guide).
+with existing checkpoints.
 
 \paragraph{Pinned dependencies.}
 Poetry's \code{poetry.lock} file pins every dependency to an exact

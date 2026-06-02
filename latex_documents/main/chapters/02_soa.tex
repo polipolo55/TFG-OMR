@@ -25,19 +25,17 @@ primitives left behind once the staff lines have been erased; and semantic
 reconstruction, in which the recognised primitives are assembled into a
 structured score~\cite{calvoZaragozaUnderstandingOMR2020}.
 \Cref{fig:soa-arch-bainbridge,fig:soa-arch-rebelo} show two
-influential illustrations of this decomposition.
-Both predate the deep-learning shift discussed in \Cref{sec:soa-crnn} and
-share the same backbone of preprocessing, staff handling, primitive
-recognition, and semantic reconstruction.
+influential illustrations of this decomposition, both predating the
+deep-learning shift discussed in \Cref{sec:soa-crnn}.
 
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.82\textwidth]{figures/fig_omr_arch_bainbridge}
   \caption[Classical OMR pipeline (Bainbridge and Bell, 2001).]{Classical OMR
     pipeline architecture proposed by
-    \textcite{bainbridgeChallengeOpticalMusic2001}. The four-stage structure
-    (preprocessing, staff handling, primitive recognition, and semantic
-    reconstruction) set the template for the field for two decades.
+    \textcite{bainbridgeChallengeOpticalMusic2001}, showing the four-stage
+    structure (preprocessing, staff handling, primitive recognition, and
+    semantic reconstruction) that organised the field for two decades.
     Source: Wikimedia Commons, redrawn from the cited work.}
   \label{fig:soa-arch-bainbridge}
 \end{figure}
@@ -54,7 +52,7 @@ recognition, and semantic reconstruction.
 
 The second stage was historically the most studied because every subsequent
 step depended on it.
-Dalitz et al.~\cite{dalitzComparativeStudyStaff2008} compared the principal
+\textcite{dalitzComparativeStudyStaff2008} compared the principal
 families of staff-removal algorithms and contributed a skeletonisation-based
 method; the \term{CVC-MUSCIMA} corpus~\cite{fornesCVCMUSCIMAGroundTruth2012}
 was constructed expressly to benchmark this stage.
@@ -86,8 +84,8 @@ Both weaknesses point toward end-to-end, learning-based recognition.
 \section{Deep Learning Paradigm: CRNN with CTC}
 \label{sec:soa-crnn}
 
-The deep-learning era of OMR begins with Calvo-Zaragoza and
-Rizo~\cite{calvoZaragozaEndToEndNeural2018}, who in 2018 applied to
+The deep-learning era of OMR begins with
+\textcite{calvoZaragozaEndToEndNeural2018}, who in 2018 applied to
 single-staff music the CRNN--CTC architecture that had recently become
 standard for scene-text and handwritten-text recognition.
 The model treats a staff image as a sequence of vertical strips, extracts
@@ -99,13 +97,14 @@ per-symbol segmentation.\todo{optional cite for the scene-text CRNN precedent (S
 
 Alongside the architecture, Calvo-Zaragoza and Rizo released the
 \term{PrIMuS} corpus~\cite{PrIMuSDataset,calvoZaragozaEndToEndNeural2018}: 87\,678 real-music monophonic
-incipits sourced from the RISM library and distributed in five
+incipits sourced from the R\'epertoire International des Sources
+Musicales (RISM) and distributed in five
 representations, including two purpose-built token formats.
 The \term{agnostic} encoding lists visual primitives without musical
 interpretation; the \term{semantic} encoding lists musical events such as
 \code{note-C4\_eighth} or \code{keySignature-DM} directly.
 The CRNN--CTC architecture trained on this corpus achieves a Symbol Error
-Rate of \SI{1.0}{\percent} on the agnostic encoding and \SI{0.8}{\percent}
+Rate (SER) of \SI{1.0}{\percent} on the agnostic encoding and \SI{0.8}{\percent}
 on the semantic encoding, with sequence-level error rates of
 \SI{17.9}{\percent} and \SI{12.5}{\percent} respectively
 (\textcite{calvoZaragozaEndToEndNeural2018}, Sec.~5.2).
@@ -113,8 +112,8 @@ This established the reference baseline that subsequent monophonic OMR
 work, including Camera-PrIMuS and the present thesis, builds upon.
 A follow-up release, Camera-PrIMuS~\cite{calvoZaragozaCameraPrimus2018},
 augments the same incipits with synthetic photographic distortion and
-demonstrates that the same network retains useful accuracy on
-phone-captured real-world inputs; this thesis follows the same template.
+shows that the same network retains useful accuracy on
+phone-captured real-world inputs.
 \Cref{fig:soa-crnn-pipeline} illustrates the CRNN--CTC pipeline as applied
 to a music staff.
 
@@ -151,9 +150,9 @@ structure shared by these systems.
 These architectures, however, demand resources that exceed the budget of
 a Bachelor's thesis.
 For a strictly monophonic target domain, where the CRNN--CTC baseline
-already attains sub-percent SER and the headroom for further gain is in
-domain robustness rather than model capacity, CRNN--CTC remains the right
-point on the cost/capability curve.
+already attains sub-percent SER and the headroom for further gain lies in
+domain robustness rather than model capacity, CRNN--CTC remains the more
+economical choice.
 The quantitative justification is in \Cref{ch:design}; the
 project-management argument is in \Cref{sec:mgmt-justification}.
 
@@ -192,18 +191,17 @@ this work.}
 \label{tab:omr-datasets}
 \end{table}
 
-Two observations shape the data strategy of this thesis.
-First, to the author's knowledge none of these corpora captures the
+The data strategy of this thesis follows from a gap in this table.
+To the author's knowledge none of these corpora captures the
 LilyJAZZ-style engraving of \textit{The Real Book}, and none labels chord
-symbols as first-class objects; the only directly comparable corpus emerged
+symbols as first-class objects. The only directly comparable corpus emerged
 contemporaneously with this work~\cite{martinezSevillaJazzLeadSheets2025}
 and, at 293 annotated sheets, is far below the scale of the tens of
 thousands of samples used to train the CRNN--CTC models surveyed above, and
-so is too small to train such a model from scratch.
-Second, every recent end-to-end system (SMT, SMT++, OLiMPiC, LEGATO, and
-Camera-PrIMuS itself) follows the same recipe of synthetic pretraining
-followed by fine-tuning on a small annotated target set.
-This is the recipe applied here.
+so is too small to train such a model from scratch. Every recent end-to-end
+system (SMT, SMT++, OLiMPiC, LEGATO, and Camera-PrIMuS itself) addresses an
+equivalent scarcity by synthetic pretraining followed by fine-tuning on a
+small annotated target set.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Symbolic Output Representations}
@@ -228,7 +226,7 @@ The PrIMuS \textbf{agnostic} and \textbf{semantic} formats are compact and
 CTC-friendly but interoperate only with the PrIMuS ecosystem.
 
 \textbf{LMX} (Linearised MusicXML), introduced by
-Mayer et al.~\cite{mayerPracticalEndToEnd2024} and maintained as an open
+\textcite{mayerPracticalEndToEnd2024} and maintained as an open
 specification~\cite{OMRResearchLmx2025}, depth-first-traverses the
 MusicXML tree and emits one whitespace-separated token per leaf event.
 It is round-trippable to MusicXML with minimal information loss,
@@ -282,17 +280,17 @@ It is defined as the Levenshtein edit distance between the predicted and
 the reference token sequences, normalised by the reference
 length~\cite{SymbolErrorRate}, mirroring the Word Error Rate of automatic
 speech recognition.
-Its principal weaknesses, flagged by both Shatri and
-Fazekas~\cite{shatriOPTICALMUSICRECOGNITION} and by Hajič et
-al.~\cite{hajicOMRMetricsEvaluation2019}, are that all token-level edits
+Its principal weaknesses, flagged by both
+\textcite{shatriOPTICALMUSICRECOGNITION} and
+\textcite{hajicOMRMetricsEvaluation2019}, are that all token-level edits
 count equally regardless of musical significance and that SER values
 depend on the chosen tokenisation, so they are not directly comparable
 across encodings.
 
-Two recent metrics partially address these shortcomings.
+Two recent metrics address these shortcomings in part.
 \textbf{TEDn} (normalised tree edit distance on the parsed MusicXML tree)
 weights structural errors appropriately; it was introduced by
-Mayer et al.~\cite{mayerPracticalEndToEnd2024} and is the primary metric in
+\textcite{mayerPracticalEndToEnd2024} and is the primary metric in
 OLiMPiC and SMT++.
 \textbf{OMR-NED}~\cite{martinezSevillaOMRNED2025} extends SER with
 per-element categories so that error distribution, not only error
@@ -318,8 +316,8 @@ UCF~\cite{reedHonorsLeadSheets2018}, which built a non-deep modular
 pipeline for chord-symbol recognition on printed and handwritten lead
 sheets and used the recovered chord progressions to attempt
 formal-structure reconstruction.
-The closest published precedent is Martínez-Sevilla et
-al.~\cite{martinezSevillaJazzLeadSheets2025},
+The closest published precedent is
+\textcite{martinezSevillaJazzLeadSheets2025},
 presented at ISMIR 2025 and roughly contemporaneous with the final stages
 of this thesis.
 That work introduces a 293-sheet dataset of \textit{handwritten} jazz lead
@@ -355,7 +353,7 @@ Output representations have moved toward compact MusicXML-linear formats,
 most prominently LMX, and evaluation is shifting from raw SER toward
 structurally aware metrics.
 Jazz lead-sheet OMR received almost no dedicated attention until 2025;
-this thesis and the concurrent work of Martínez-Sevilla et
-al.~\cite{martinezSevillaJazzLeadSheets2025} are the first two focused
+this thesis and the concurrent work of
+\textcite{martinezSevillaJazzLeadSheets2025} are the first two focused
 efforts.
 The design choices in \Cref{ch:design} follow from this survey.

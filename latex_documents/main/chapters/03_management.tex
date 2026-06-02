@@ -122,20 +122,18 @@ baseline against which the CRNN--CTC results are compared in
 
 \subsection{Schedule and budget consequences}
 
-This choice has three direct consequences for the project plan.
-First, the training corpus can be built entirely from a single
+This choice shaped the project plan in several ways.
+The training corpus could be built entirely from a single
 public dataset (PrIMuS) re-rendered in the target engraving style,
-which keeps the data-acquisition cost within the budget allocated
-for the thesis.
-Second, the output representation can be a compact flat token
+which kept the data-acquisition cost within the thesis budget.
+The output representation is a compact flat token
 sequence (LMX, \Cref{sec:lmx-format}) consumed by both the
 music and the chord branches, avoiding the verbose-XML output that
 transformer-decoder architectures typically produce.
-Third, the model's training time on a consumer GPU is short enough
-(of the order of a day per full run) that several training
-iterations per sprint are realistic; this is what makes the
-iterative methodology of \Cref{sec:mgmt-methodology}
-workable in practice.
+Above all, training time on a consumer GPU is short enough
+(of the order of a day per full run) that several iterations per
+sprint are realistic, which is what makes the iterative methodology
+of \Cref{sec:mgmt-methodology} workable in practice.
 
 The decision is also a risk-control choice.
 A traditional modular pipeline (the lower-bound baseline) can be
@@ -282,25 +280,24 @@ model architecture is dimensioned to the vocabulary the dataset
 produces.
 
 \textit{WP3 -- CRNN--CTC development (75\,h).}
-This package designs and implements the model, the training loop,
+This package designed and implemented the model, the training loop,
 and the evaluation framework.
-The training-pipeline task (T3.2) overlaps deliberately with the
-evaluation-framework task (T3.4) because the latter can be
-developed against synthetic CRNN outputs before the former has
+The training-pipeline task (T3.2) overlapped deliberately with the
+evaluation-framework task (T3.4), since the latter could be
+developed against synthetic CRNN outputs before the former had
 fully converged.
-The package ends with an initial end-to-end training run whose
-outputs feed directly into WP4.
+The package ended with an initial end-to-end training run whose
+outputs fed directly into WP4.
 
 \textit{WP4 -- Iterative refinement (68\,h).}
-This package closes the train--evaluate--improve loop: error
-analysis identifies systematic failure modes, the data pipeline
-and the training configuration are adjusted, and the model is
+This package closed the train--evaluate--improve loop: error
+analysis identified systematic failure modes, the data pipeline
+and the training configuration were adjusted, and the model was
 retrained.
-This is the work package where most of the closed-loop behaviour
-described in \Cref{sec:mgmt-methodology} actually
-happens; its 68-hour budget covers two internal iterations within
-Sprint 4 (weeks 13--16), each closing one pass of refinement and
-ablation.
+Most of the closed-loop behaviour described in
+\Cref{sec:mgmt-methodology} happened here; its 68-hour budget
+covered two internal iterations within Sprint 4 (weeks 13--16),
+each closing one pass of refinement and ablation.
 The chord-recognition track (synthetic strip rendering, the chord
 CRNN training and fine-tuning runs, and the chord post-processing
 filter) was absorbed into T4.2 and T4.3 as a parallel branch of
@@ -309,15 +306,15 @@ which is why the WP4 budget is not enlarged despite the additional
 scope.
 
 \textit{WP5 -- Final evaluation and defence (85\,h).}
-This package contains the final evaluation on held-out data, the
+This package covered the final evaluation on held-out data, the
 qualitative error analysis, a conditional extension task (T5.3,
 budgeted at 20\,h and contingent on the monophonic objective
 having been achieved), the final integration pass on the thesis
 document, and the defence preparation.
-The conditional extension task is the most important schedule
-buffer in the plan: it can be reduced to zero without
+The conditional extension task was the most important schedule
+buffer in the plan, since it could be reduced to zero without
 compromising the core deliverable.
-In execution, T5.3 was spent on fine-tuning the chord CRNN against
+T5.3 was ultimately spent on fine-tuning the chord CRNN against
 hand-labelled real Real Book strips (using the
 \code{extract\_real\_chord\_strips} utility) and on tightening the
 chord post-processing grammar, which together realised the
@@ -442,23 +439,20 @@ Sprint reviews are marked as red diamonds (M1 through M4),
 together with the final defence at week 21 (M5).
 
 Three structural features of the chart are worth noting.
-First, the management package (WP0) spans the entire timeline,
+The management package (WP0) spans the entire timeline,
 reflecting the policy of continuous thesis writing and biweekly
-supervisor meetings; the four GEP-specific tasks (T0.1--T0.4)
-are concentrated in the first half of the project to align with
-the GEP coursework deadlines.
-Second, the technical packages WP1--WP4 are scheduled
+supervisor meetings, with the four GEP-specific tasks (T0.1--T0.4)
+concentrated in the first half to align with the GEP coursework
+deadlines.
+The technical packages WP1--WP4 are scheduled
 back-to-back with no slack between them, because each one
 depends on the deliverable of its predecessor in a way that does
-not admit overlap.
-The schedule resilience instead comes from the conditional
-extension task in WP5, which can be reduced if any of the
-earlier packages overruns its budget.
-Third, the bars within each sprint deliberately do not all
-extend to the sprint boundary; this leaves room within each
-sprint for the corrective-loop activities of
-\Cref{sec:mgmt-methodology}, which would otherwise have
-to come out of the next sprint's allocation.
+not admit overlap; schedule resilience instead comes from the
+conditional extension task T5.3 (\Cref{sec:mgmt-planning}).
+Finally, the bars within each sprint deliberately do not all
+extend to the sprint boundary, leaving room for the corrective-loop
+activities of \Cref{sec:mgmt-methodology}, which would otherwise
+have to come out of the next sprint's allocation.
 
 \begin{landscape}
 \begin{figure}[p]
@@ -540,128 +534,49 @@ to come out of the next sprint's allocation.
 
 The risk register identifies six principal risks that were
 foreseeable at the start of the project and for which explicit
-mitigations or alternative plans can be prepared in advance.
-Each risk is rated on two axes (likelihood and impact)
-using a three-level scale (low, medium, high), and is
-paired with a \emph{detection trigger} (the observable signal that
-tells the project the risk has materialised), an alternative plan,
-an estimate of how much schedule the activation of that plan would
-consume, and an estimate of any additional resources it would
-require.
-The register is summarised in \Cref{tab:risk-register}; the
-discussion below explains the reasoning behind each entry and states
-its detection trigger explicitly.
+mitigations or alternative plans were prepared in advance.
+Each risk is rated on two axes, likelihood and impact, using a
+three-level scale (low, medium, high), and is paired with an
+alternative plan, an estimate of how much schedule the activation
+of that plan would consume, and an estimate of any additional
+resources it would require.
+The full register, including the alternative plans and their
+schedule and resource costs, is given in \Cref{tab:risk-register}.
 
-\textit{Limited ground-truth data on real Real Book pages
-(likelihood high, impact high).}
-The fine-tuning stage of the training plan requires manually
-labelled scans of real Real Book pages, which the author must
-produce.
-If labelling proves slower than estimated, an outcome made more
-likely by the absence of a similar corpus to bootstrap
-from, the project falls back to the synthetic
-LilyJAZZ-augmented corpus alone, accepting that the
-synthetic-to-real domain gap will remain partly open.
-The fallback consumes up to ten hours of reallocated effort but
-requires no additional resources, because the synthetic
-pipeline is already implemented.
-\textit{Detection trigger:} a labelling throughput below roughly ten
-usable staves per hour in the first labelling session, which would
-push the target annotation set past its allotted window.
+Each entry also has a \emph{detection trigger}, the observable
+signal that tells the project the risk has materialised:
+\begin{itemize}
+    \item \textbf{R1 (ground-truth data):} labelling throughput below
+    roughly ten usable staves per hour in the first session, which
+    would push the annotation set past its allotted window.
+    \item \textbf{R2 (staff detection):} the detector missing or
+    mis-segmenting more than about one staff in ten on a spot-check
+    set of real scanned pages.
+    \item \textbf{R3 (encoding design):} a non-trivial fraction of
+    dataset tokens mapping to \code{<unk>}, or the vocabulary needing
+    structural revision after the first training run.
+    \item \textbf{R4 (underfitting / CTC misalignment):} validation
+    SER plateauing above the \SI{2}{\percent} clean-split target (or
+    the CTC loss failing to descend) after the first ten-to-fifteen
+    epochs, or \code{zero\_infinity} silently masking samples whose
+    CTC input length falls below their label length.
+    \item \textbf{R5 (scope creep toward polyphony):} any
+    implementation effort logged against polyphony, or T5.3 scope
+    expanding beyond a feasibility discussion at a sprint review.
+    \item \textbf{R6 (compute constraints):} a required training
+    configuration exceeding the \SI{12}{\giga\byte} VRAM budget at the
+    minimum viable batch size, or workstation contention stretching a
+    single training run beyond about one day.
+\end{itemize}
 
-\textit{Staff-detection errors propagating downstream
-(likelihood medium, impact medium).}
-The morphological staff detector can fail on degraded scans, and
-its failures propagate irreversibly into the CRNN's input.
-The fallback is to use manually cropped staff regions for
-critical evaluations, sidestepping the detector entirely for the
-purposes of measuring CRNN-only accuracy.
-This shifts hours from the conditional extension task (T5.3) to
-the final thesis-writing task (T5.4) but does not require new
-resources.
-\textit{Detection trigger:} the detector missing or mis-segmenting
-more than about one staff in ten on a spot-check set of real
-scanned pages.
-
-\textit{Encoding-design complexity (likelihood medium, impact medium).}
-The LMX vocabulary is the only output representation the model
-can produce; if the initial vocabulary design proves too rich
-(too many rare classes that the model under-fits) or too
-restrictive (missing tokens that the dataset emits), training
-results will be unreliable until the vocabulary is revised.
-The fallback is to start from a minimal vocabulary and extend it
-incrementally after the model has reached a stable convergence
-profile.
-This consumes up to six hours of redesign within the project
-buffer and does not propagate further.
-\textit{Detection trigger:} a non-trivial fraction of dataset tokens
-mapping to \code{<unk>}, or the vocabulary needing structural revision
-after inspecting the first training run.
-
-\textit{Model underfitting or CTC misalignment
-(likelihood medium, impact high).}
-CTC training is known to fail catastrophically if the input time
-budget is shorter than the target token sequence, or if the
-model's capacity is insufficient for the vocabulary.
-The fallback is to simplify the vocabulary, retrain on cleaned
-data subsets, and adjust the image-scale parameter so that the
-time axis available to the CTC alignment is sufficient.
-This consumes up to ten hours from the project buffer and
-requires additional GPU time, accounted for in the incidentals
-table.
-\textit{Detection trigger:} validation SER plateauing above the
-\SI{2}{\percent} clean-split target (or the CTC loss failing to
-descend) after the first ten-to-fifteen epochs, or
-\code{zero\_infinity} silently masking samples whose CTC input length
-falls below their label length.
-
-\textit{Scope creep toward polyphony (likelihood medium, impact high).}
-A persistent risk in OMR research is the temptation to extend
-the model to polyphonic input before the monophonic objective
-has been achieved.
-The mitigation is structural rather than reactive: the project
-scope (\Cref{sec:scope}) explicitly excludes polyphony,
-and the conditional extension task (T5.3) is restricted to a
-feasibility discussion rather than implementation.
-If the temptation arises mid-project, up to eighteen hours of
-T5.3's budget can be recovered for the core monophonic
-deliverable.
-\textit{Detection trigger:} any implementation effort logged against
-polyphony, or T5.3 scope expanding beyond a feasibility discussion at
-a sprint review.
-
-\textit{Computational resource constraints
-(likelihood low-to-medium, impact medium).}
-The available hardware (an NVIDIA RTX~3060 with 12\,GB of VRAM)
-fits the baseline model comfortably but provides limited
-headroom for hyperparameter sweeps.
-If concurrent obligations occupy the workstation or if a
-significant resize of the model becomes necessary, the fallback
-is a temporary cloud-GPU rental (an AWS or Lambda Labs session,
-priced as the worst-case multi-day rental in the incidentals of
-\Cref{tab:incidentals}) that lets the project clear the
-bottleneck without impact on the core schedule.
-Setup consumes up to five hours and is the only entry in the
-register that requires direct procurement.
-\textit{Detection trigger:} a required training configuration
-exceeding the \SI{12}{\giga\byte} VRAM budget at the minimum viable
-batch size, or workstation contention stretching a single training
-run beyond about one day.
-
-\bigskip
-
-To improve schedule robustness, the plan includes explicit slack
-in three places:
-conservative estimation in the two highest-uncertainty tasks
-(dataset rendering and model refinement);
-the conditional extension task T5.3, which can be reduced
-without compromising the core objective;
-and progressive thesis writing throughout execution rather than
-the more common pattern of postponing all writing to the final
-weeks.
-Together, these three buffers absorb the schedule consequences
-of the lower-impact risks without triggering the
-budget-control mechanism described in
+The plan also carries explicit schedule slack: conservative
+estimation in the two highest-uncertainty tasks (dataset rendering
+and model refinement), progressive thesis writing throughout
+execution, and the conditional extension task T5.3, which functions
+as the principal buffer and can be reduced to zero without
+compromising the core objective (\Cref{sec:mgmt-planning}).
+Together these absorb the schedule consequences of the lower-impact
+risks without triggering the budget-control mechanism of
 \Cref{sec:mgmt-control}.
 
 \begin{table}[h!]
@@ -742,67 +657,21 @@ INE-EAES~\cite{ineEncuestaEstructuraSalarial2023} and loaded with
 a \num{1.35} multiplier that captures the employer's
 social-security contributions in the General Regime of the
 Spanish social-security
-system~\cite{segSocialCotizacion2025}.
-This multiplier converts the gross annual salary used as a
-public reference number into the fully loaded annual cost that
-an employer actually incurs, which is the figure relevant for
-project budgeting.
-The hourly rate is then derived from the loaded annual cost
-assuming a working year of 1\,760 hours
-(220 working days, 8 hours per day, after holidays), as prescribed
-by the FIB GEP economic-management
+system~\cite{segSocialCotizacion2025}, then converted to an hourly
+figure assuming a working year of 1\,760 hours, as prescribed by the
+FIB GEP economic-management
 module~\cite{gepModule24EconomicManagement}.
-
-\begin{table}[h!]
-    \centering
-    \caption{Roles considered for the project, their loaded hourly
-    rates, and the hours each role is charged across the 509-hour
-    plan. The role totals reconstruct the human-resources budget of
-    \Cref{tab:hr-budget} and the blended rate quoted below.}
-    \label{tab:roles-cost}
-    \small
-    \setlength{\tabcolsep}{5pt}
-    \renewcommand{\arraystretch}{1.35}
-    \begin{tabularx}{\linewidth}{@{} L r r r r r @{}}
-        \toprule
-        \textbf{Role} & \textbf{Gross (\EUR{}/yr)} & \textbf{Loaded (\EUR{}/yr)} & \textbf{\EUR{}/h} & \textbf{Hours} & \textbf{Cost (\EUR{})} \\
-        \midrule
-        Project Manager   & 38\,000 & 51\,300 & 29.15 & 92  & 2\,681.80 \\ \tfgrowsep
-        Research Analyst  & 33\,000 & 44\,550 & 25.31 & 72  & 1\,822.32 \\ \tfgrowsep
-        ML Engineer       & 36\,000 & 48\,600 & 27.61 & 255 & 7\,040.55 \\ \tfgrowsep
-        Technical Writer  & 30\,000 & 40\,500 & 23.01 & 90  & 2\,070.90 \\
-        \midrule
-        \textbf{Total}    &         &         &       & \textbf{509} & \textbf{13\,615.57} \\
-        \bottomrule
-    \end{tabularx}
-\end{table}
-
-Since the project is executed by a single person who carries out
-all four roles, each task in \Cref{tab:task-summary} is costed
-at the loaded rate of the role that predominantly performs it:
-the GEP tasks (T0.1--T0.4), the supervisor meetings (T0.5), and the
-end-of-sprint reviews (T1.5, T2.5, T3.5, T4.5) at the Project Manager
-rate; the literature survey, dataset exploration, and error-analysis
-tasks at the Research Analyst rate; the dataset-rendering, model, and
-pipeline tasks at the ML Engineer rate; and the thesis-writing tasks
-(T0.6, T5.4) together with defence preparation (T5.5) at the Technical
-Writer rate.
-Aggregating the task hours by role gives \num{92}\,h Project Manager,
-\num{72}\,h Research Analyst, \num{255}\,h ML Engineer, and
-\num{90}\,h Technical Writer (\num{509}\,h in total), the allocation
-tabulated in the last two columns of \Cref{tab:roles-cost}.
-Summing the corresponding costs yields the \EUR{}13\,615.57
-human-resources total, which divided by the 509 hours gives a
-project-weighted blended rate of \EUR{}26.75/h; this differs slightly
-from the unweighted mean of the four rates (\EUR{}26.27/h) because the
-ML~Engineer role, the most expensive after the Project Manager,
-carries half the project's hours.
-The same \EUR{}13\,615.57 total is distributed across work
+Because the project is executed by a single person carrying out all
+four roles, each task in \Cref{tab:task-summary} is costed at the
+loaded rate of the role that predominantly performs it.
+The full per-role rate derivation and the project-weighted blended
+rate are given in \Cref{app:budget-detail}; the resulting
+\EUR{}13\,615.57 human-resources total is distributed across work
 packages in \Cref{tab:hr-budget}.
 This figure dominates the budget: roughly \SI{85}{\percent} of
-the project cost is engineering time, which is the expected
-profile for a research-intensive software project where tooling
-and hardware are commodity items.
+the project cost is engineering time, the expected profile for a
+research-intensive software project where tooling and hardware are
+commodity items.
 
 \begin{table}[h!]
     \centering
@@ -833,20 +702,16 @@ and hardware are commodity items.
 share of fixed assets and overheads attributable to the 21 weeks
 of the project: hardware amortisation on the workstation, monitor,
 and peripherals at a four-year linear rate prorated for the
-project duration (the workstation---a Ryzen~7 7800X3D with 32\,GB of
-DDR5 memory and an NVIDIA RTX~3060 12\,GB---is valued at \EUR{}1\,000,
-the monitor at \EUR{}200, and the peripherals at \EUR{}45, for a
-\EUR{}1\,245 base; charged linearly over a four-year, \num{208}-week
-useful life for the 21 project weeks this gives
-$\EUR{}1\,245\times 21/208 \approx \EUR{}125.69$);
-software licences (zero, since the entire
-toolchain, Python, PyTorch, OpenCV, LilyPond, PyMuPDF,
+project duration (\EUR{}125.69); software licences (zero, since the
+entire toolchain, Python, PyTorch, OpenCV, LilyPond, PyMuPDF,
 albumentations, FastAPI, and Poetry, is open source); and overheads
 covering electricity and internet connectivity, derived from the
 workstation's average power draw and the Spanish domestic-tariff
 rate~\cite{reeInformeSistemaElectrico2024} on the assumption that
 the workstation is dedicated to the thesis for an average of
 twenty hours per week.
+The hardware valuation and the amortisation arithmetic are detailed
+in \Cref{app:budget-detail}.
 
 \textit{Contingency reserve.}
 A contingency reserve of \SI{15}{\percent} is applied over the
@@ -960,43 +825,13 @@ data-cleaning cycles incur direct monetary cost.
 \label{sec:mgmt-control}
 
 Budget tracking is performed at each sprint review using three
-indicators drawn from the earned-value-management
-framework~\cite{pmiBOKGuide2021}.
-The framework requires three quantities per sprint: the
-\textit{budgeted cost of work scheduled} (BCWS), which is the
-planned cost of the tasks the sprint should have completed;
-the \textit{budgeted cost of work performed} (BCWP), which is
-the planned cost of the tasks actually completed; and the
-\textit{actual cost of work performed} (ACWP), which is the
-real cost incurred to complete those tasks.
-From these three primitives the indicators are derived as
-follows.
-
-\textit{Cost variance.}
-$\mathrm{CV} = \mathrm{BCWP} - \mathrm{ACWP}$ is the difference
-between the budgeted cost of completed work and what it actually
-cost.
-A positive CV means the sprint came in under budget; a negative
-CV means it overran.
-This is the headline cost-health indicator for a single sprint.
-
-\textit{Schedule variance.}
-$\mathrm{SV} = \mathrm{BCWP} - \mathrm{BCWS}$ is the difference
-between the work completed and the work planned, both measured in
+indicators drawn from the earned-value-management (EVM)
+framework~\cite{pmiBOKGuide2021}: the cost variance (CV) and cost
+performance index (CPI), which measure cost health, and the schedule
+variance (SV), which measures progress against plan, all expressed in
 the common currency of budgeted cost.
-A positive SV means the sprint completed more than was planned; a
-negative SV means it fell behind.
-SV is reported alongside CV because cost and schedule can move in
-opposite directions: a sprint can come in under cost simply by
-not completing all its work, which CV alone would not catch.
-
-\textit{Cost performance index.}
-$\mathrm{CPI} = \mathrm{BCWP} / \mathrm{ACWP}$ is the
-dimensionless ratio of value earned to cost incurred.
-A CPI of 1.0 indicates exact agreement with the plan, below 1.0
-indicates an overrun, and above 1.0 indicates an underrun.
-The advantage of the index form over the raw variance is that it
-is directly comparable across sprints of different sizes.
+The definitions of these indicators and their underlying BCWS, BCWP,
+and ACWP quantities are given in \Cref{app:evm}.
 
 \textit{Trigger thresholds.}
 Corrective actions are triggered when at least one of the

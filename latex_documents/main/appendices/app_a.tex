@@ -240,7 +240,7 @@ Package manager          & Poetry $\geq 2.0$ & Dependency isolation, determinist
 
 \section{Command-Line Interface}
 
-\Cref{tab:cli-subcommands} lists the twelve subcommands of
+\Cref{tab:cli-subcommands} lists the thirteen subcommands of
 \code{src/cli.py}.
 Every subcommand prints self-contained help text when invoked with
 \code{--help}.
@@ -264,6 +264,7 @@ Every subcommand prints self-contained help text when invoked with
 \code{evaluate-ab}             & Compare beam widths on the same checkpoint. \\ \tfgrowsep
 \code{api}                     & Launch the FastAPI web service. \\ \tfgrowsep
 \code{pipeline-train}          & Run the full data pipeline then immediately start training. \\ \tfgrowsep
+\code{generate-header-templates} & Prerender clef/key/time header templates for continuation-staff injection. \\ \tfgrowsep
 \code{harvest-reject-fixtures} & Cut staff-strip fixtures from real PDFs for reject-gate calibration. \\ \tfgrowsep
 \code{calibrate-reject}        & Sweep reject-gate thresholds on labelled fixtures and emit \code{thresholds.json}. \\
 \bottomrule

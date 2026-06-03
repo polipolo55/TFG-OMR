@@ -481,7 +481,7 @@ the page.
 
 Between staff detection and the CRNN, every candidate strip is passed
 through the hybrid pre/post-CRNN gate of
-\Cref{sec:design-staffdetect}.
+\Cref{sec:design-staff-reject}.
 The pre-CRNN gate evaluates five geometric and OCR-based signals:
 local re-detection of five staff lines
 (\code{geometry\_no\_staff\_lines}),
@@ -584,11 +584,11 @@ grammar of \Cref{sec:lmx-format}.
 \label{sec:impl-cli}
 
 Every offline operation goes through \code{src/cli.py}, a single
-\code{argparse} dispatcher with twelve subcommands covering
+\code{argparse} dispatcher with thirteen subcommands covering
 \code{render}, \code{convert}, \code{augment}, \code{vocab},
 \code{pipeline}, \code{train}, \code{evaluate}, \code{evaluate-ab},
-\code{api}, \code{pipeline-train}, \code{harvest-reject-fixtures},
-and \code{calibrate-reject}.
+\code{api}, \code{pipeline-train}, \code{generate-header-templates},
+\code{harvest-reject-fixtures}, and \code{calibrate-reject}.
 The full subcommand reference is in \Cref{tab:cli-subcommands}
 (\Cref{app:hyperparams}).
 CLI flags map one-to-one onto fields of the \code{Config} dataclass for

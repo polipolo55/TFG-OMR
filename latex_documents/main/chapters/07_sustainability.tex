@@ -199,10 +199,12 @@ Second, \textit{mixed-precision training} via PyTorch's
 \code{torch.amp} reduces both VRAM occupancy and the cycle time
 per training step, which translates directly into fewer
 GPU-hours per converged model.
-Third, \textit{early stopping} with a twelve-epoch patience halts
-training once the validation SER stops improving, avoiding the
-common pattern of running for a fixed number of epochs ``to be
-safe''.
+Third, \textit{early stopping} with a twelve-epoch patience is
+configured to halt training once the validation SER stops improving,
+avoiding the common pattern of running well past convergence ``to be
+safe''; on the final run the validation SER kept improving slowly to
+the end, so the run reached the 60-epoch cap without the patience
+triggering.
 Fourth, the project \textit{reuses existing hardware} rather than
 provisioning new equipment specifically for the thesis; the
 embodied energy of manufacturing a new workstation would dwarf
@@ -317,7 +319,8 @@ principle.
 
 \textit{Open source release.}
 The source code is released under a permissive open-source
-licence and is tracked in a public Git repository.
+licence and is tracked in a public Git repository
+(\Cref{app:code}).
 Every experiment in the thesis can be reproduced from a clean
 clone using a pinned-dependency environment managed by Poetry
 (\Cref{sec:impl-reproducibility}), and the trained model

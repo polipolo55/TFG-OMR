@@ -496,26 +496,34 @@ def collate_fn(
 class _AugSubset(Dataset):
     """Thin wrapper around a ``Subset`` that enables training-only online augmentation.
 
-    Temporarily sets ``_online_aug_prob`` on the underlying ``OMRDataset``
-    before each ``__getitem__`` call. Safe across DataLoader workers because
-    each worker gets an independent copy via fork/pickle.
+    ``OMRDataset.__getitem__`` reads ``self._online_aug_prob`` to decide
+    whether to jitter each image.  The original implementation temporarily
+    mutated that attribute and restored it afterwards, which was unsafe when
+    train and val DataLoaders ran concurrently with multiple workers: a train
+    worker's write could race with a val worker's read on the shared dataset
+    object (before forking), causing augmentation to bleed into val images and
+    inflate the in-loop SER.
+
+    The fix: set ``_online_aug_prob`` permanently on the underlying dataset at
+    construction time.  ``make_splits`` creates a separate ``OMRDataset``
+    instance (``full_ds``) that is not shared with the val/test Subsets once
+    the DataLoader workers have forked, so mutating it here is safe.
     """
 
     def __init__(self, subset: Dataset, online_aug_prob: float) -> None:
         self._subset = subset
         self._online_prob = online_aug_prob
+        # Permanently set the prob on the underlying dataset so that every
+        # __getitem__ call in this wrapper (and its forked worker copies) sees
+        # the correct value without any save/restore dance.
+        ds: OMRDataset = self._subset.dataset  # type: ignore[attr-defined]
+        ds._online_aug_prob = online_aug_prob
 
     def __len__(self) -> int:
         return len(self._subset)  # type: ignore[arg-type]
 
     def __getitem__(self, idx: int):
-        ds: OMRDataset = self._subset.dataset  # type: ignore[attr-defined]
-        old_online = ds._online_aug_prob
-        ds._online_aug_prob = self._online_prob
-        try:
-            return self._subset[idx]
-        finally:
-            ds._online_aug_prob = old_online
+        return self._subset[idx]
 
 
 def make_splits(

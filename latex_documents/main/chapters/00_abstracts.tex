@@ -74,8 +74,8 @@ Network with Connectionist Temporal Classification} loss (CRNN-CTC) for melody
 recognition, and a second CRNN-CTC for chord symbol extraction. Both streams are trained
 independently on synthetic data derived from the PrIMuS dataset. To bridge the gap
 between clean synthetic renderings and real scans, an augmentation stage simulates common
-photographic artefacts. Evaluated using the \term{Symbol Error Rate} (SER) on a
-held-out test split of 4\,608 samples, the melody model achieves \textbf{0.28\%} SER on
+photographic artefacts. Evaluated using the \term{Symbol Error Rate} (SER), the melody
+model achieves \textbf{0.28\%} SER on
 the clean synthetic set and \textbf{0.23\%} on its scan-simulated counterpart, with
 melodic SER (barline and tie tokens excluded) of \textbf{0.02\%} and \textbf{0.03\%}
 respectively, and perfect transcription rates of \textbf{92\%} and \textbf{94\%}.

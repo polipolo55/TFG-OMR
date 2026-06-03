@@ -26,6 +26,7 @@ import numpy as np
 from . import staff_detect as _staff_detect
 from .chord_recognizer import recognize_chords_crnn
 from .grammar_fix import fix_sequence
+from .header_injector import inject_header
 from .inference import recognize_music
 from .preprocess import load_image, load_pdf_page, pdf_load_dpi, preprocess_page
 from .staff_detect import System, detect_systems
@@ -108,21 +109,59 @@ def _process_systems(
     music_preds, music_logprobs, music_outlens = recognize_music(music_imgs, checkpoint_path)
     chord_preds = recognize_chords_crnn(chord_imgs)
 
-    # LMX grammar correction with cross-system key + time propagation
+    # LMX grammar correction — pass 1: find key+time from first music staff
     global_key: str | None = None
     global_time: tuple[str, str, str] | None = None
+    first_keyed_idx: int = -1
     fixed_music: list[str] = []
-    for pred in music_preds:
+    for i, pred in enumerate(music_preds):
         fixed, global_key, global_time = fix_sequence(
             pred,
             global_key=global_key,
             global_time=global_time,
             force_clef=True,
         )
+        if global_time is not None and first_keyed_idx < 0:
+            first_keyed_idx = i
         fixed_music.append(fixed)
 
-    # If no staff produced a time signature, fall back to 4/4 — the overwhelming
-    # Real Book default — and re-run grammar fixing so barline regularisation works.
+    # Virtual header injection: re-run CRNN on continuation staves with the
+    # key+time header prepended so the model sees its training distribution.
+    if first_keyed_idx >= 0 and global_key is not None and global_time is not None:
+        continuation_idxs = [
+            i for i in range(first_keyed_idx + 1, len(systems))
+            if not crnn_skip_mask[i]
+        ]
+        if continuation_idxs:
+            log.info(
+                "Header injection: re-running CRNN on %d continuation staff(s) "
+                "(key=%s time=%s %s)",
+                len(continuation_idxs), global_key, global_time[1], global_time[2],
+            )
+            cont_imgs = [
+                inject_header(music_imgs[i], global_key, global_time)
+                for i in continuation_idxs
+            ]
+            cont_preds, cont_lp, cont_ol = recognize_music(cont_imgs, checkpoint_path)
+            for j, i in enumerate(continuation_idxs):
+                music_preds[i] = cont_preds[j]
+                music_logprobs[i] = cont_lp[j]
+                music_outlens[i] = cont_ol[j]
+
+            # Grammar fix pass 2: re-fix with corrected continuation predictions
+            global_key = None
+            global_time = None
+            fixed_music = []
+            for pred in music_preds:
+                fixed, global_key, global_time = fix_sequence(
+                    pred,
+                    global_key=global_key,
+                    global_time=global_time,
+                    force_clef=True,
+                )
+                fixed_music.append(fixed)
+
+    # If no time signature was detected on any staff, fall back to 4/4.
     if global_time is None:
         _DEFAULT_TIME = ("time", "beats:4", "beat-type:4")
         log.info("No time signature detected on any staff; injecting 4/4 default")

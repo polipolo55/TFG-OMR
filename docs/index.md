@@ -65,7 +65,7 @@ src/
 ├── data_processing/
 │   ├── generate_realbook.py     PrIMuS .semantic → LilyJAZZ PNG
 │   ├── semantic_to_lmx.py       PrIMuS .semantic → .lmx tokens
-│   ├── generate_headerless_twins.py  __nh continuation-staff twins
+│   ├── generate_header_templates.py  prerender 120 header-strip templates
 │   └── augment_scanned.py       Scan simulation augmentation
 │
 ├── omr_pipeline/
@@ -73,6 +73,7 @@ src/
 │   ├── preprocess.py            Binarize, deskew (CLAHE + Otsu + projection)
 │   ├── staff_detect.py          Morphological staff line detection
 │   ├── inference.py             CRNN batch inference + CTC decode
+│   ├── header_injector.py       Prepend header templates to continuation staves
 │   ├── chord_recognizer.py      Chord symbol OCR (CRNN-CTC, character-level)
 │   ├── grammar_fix.py           Stateful LMX token validator
 │   └── chord_postprocess.py     Jazz chord grammar cleanup

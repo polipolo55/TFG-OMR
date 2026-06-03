@@ -102,13 +102,15 @@ CRNN checkpoint's log-prob distribution. After every CRNN re-train, re-run
   which is the only clef the Real Book uses.  Disabling it does not generalise the model;
   it only forces it to spend capacity on visual patterns that never appear at inference.
 
-- **Header-less continuation staves are first-class `__nh` twin samples, not a crop.**
-  `generate_headerless_twins.py` renders a fraction of treble samples with the clef and
-  time-signature glyphs hidden (key signature kept) and writes a matching label with the
-  clef/time tokens removed, so image and label are aligned by construction. This step is
-  **stage 3 of `cli.py pipeline` / `pipeline-train`** (before augment). `strip_header_prob`
-  is DEPRECATED/inert (kept on `Config` only for checkpoint compatibility). Use
-  `--force-all` to re-render twins together with clean and scanned data.
+- **Continuation staves use virtual header injection, not training twins.**
+  Real Book continuation staves (all staves after the first) have no clef, key,
+  or time signature. At inference, `src/omr_pipeline/header_injector.py` prepends
+  a prerendered template (clef+key+time glyphs from `data/header_templates/`) to
+  each continuation staff image before the CRNN, so the model always sees a
+  full-header staff matching its training distribution. Templates are generated
+  once by `cli.py generate-header-templates` (stage 3 of `cli.py pipeline`).
+  `strip_header_prob` is DEPRECATED/inert (kept on `Config` only for checkpoint
+  compatibility).
 
 - **Vocabulary file excludes the three special tokens.** `<blank>`, `<pad>`, `<unk>` are not written
   to the vocab text file — they are injected at indices 0, 1, 2 by `Vocabulary` in code. Line N

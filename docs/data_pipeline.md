@@ -102,22 +102,17 @@ FERMATA   := "fermata"                              # attaches to previous note/
 
 On incremental runs, samples whose `.lmx` is newer than `.semantic` are skipped unless `--force-convert` or `--force-all` is set.
 
-## Stage 3 — Header-less twins (`__nh`)
+## Stage 3 — Header template generation
 
-**Script:** `src/data_processing/generate_headerless_twins.py`  
-**CLI:** integrated into `pipeline` / `pipeline-train` (step 3); standalone via the same module’s `main()`
+**Script:** `src/data_processing/generate_header_templates.py`
+**CLI:** `poetry run python src/cli.py generate-header-templates`
+**Output:** `data/header_templates/key_{N}_time_{beats}_{beat_type}.png` (120 files)
 
-Real Book continuation systems often omit the leading clef and time signature. For a fraction of treble (`clef:G2`) samples, the pipeline renders a **twin**: same music with clef/time glyphs hidden (LilyPond `\omit`), paired with an LMX label that drops the corresponding header tokens. The key signature is kept so in-body accidentals stay aligned with the parent label.
-
-| Setting | Default | Notes |
-|---------|---------|--------|
-| `headerless-fraction` | 0.35 | Deterministic per sample id (seeded) |
-| `headerless-dpi` | 180, 200, 220 | One DPI picked per twin |
-| `--no-headerless-twins` | off | Skip this stage entirely |
-
-**Output:** sibling directories `data/processed/primus/clean/{sample_id}__nh/` with `{sample_id}__nh.png` and `{sample_id}__nh.lmx`.
-
-Twins are included in the **augment** pass (stage 4) so they receive scanned variants. Use `--force-twins` or `--force-all` to re-render existing twin PNGs.
+Prerenders 120 header-strip images (15 key signatures × 8 time signatures) using
+LilyPond + LilyJAZZ at 200 DPI. These are used at inference time by
+`header_injector.py` to prepend the correct clef+key+time glyphs to continuation
+staff images before the CRNN. Run once; re-run with `--force` if LilyJAZZ
+styling changes.
 
 ## Stage 4 — Augment: Scan Simulation
 
@@ -162,7 +157,7 @@ gaussian noise σ ≈ 0.005–0.015, ±2 px horizontal shift) with probability `
 (default 0.5). Without this, every epoch sees identical pixel grids and the model overfits the
 exact augmentations baked into `scanned/`. Cost is ~50 µs per sample.
 
-**Output:** `data/processed/primus/scanned/{sample_id}/{sample_id}.png` (and `{sample_id}__nh/` for twins)
+**Output:** `data/processed/primus/scanned/{sample_id}/{sample_id}.png`
 
 Labels (`.lmx`) are identical to clean — copied unchanged. Existing scanned PNGs are skipped unless `--force-augment` or `--force-all` (or when implied by `--force-render`).
 
@@ -196,19 +191,18 @@ poetry run python src/cli.py pipeline \
   --vocab-path data/vocab/primus_lmx.txt \
   --workers 8
 
-# Full rebuild (re-render, re-convert, re-twin, re-augment everything):
+# Full rebuild (re-render, re-convert, re-augment everything):
 poetry run python src/cli.py pipeline --force-all --workers $(nproc) ...
 
 # Or individually:
 poetry run python src/cli.py render   --source data/raw/primus --output data/processed/primus/clean
 poetry run python src/cli.py convert  --source data/processed/primus/clean --workers 8
-poetry run python src/data_processing/generate_headerless_twins.py \
-  --data-dir data/processed/primus/clean --fraction 0.35 --workers 8
+poetry run python src/cli.py generate-header-templates
 poetry run python src/cli.py augment  --source data/processed/primus/clean --output data/processed/primus/scanned
 poetry run python src/cli.py vocab    --data-dir data/processed/primus/clean --output data/vocab/primus_lmx.txt
 ```
 
-`pipeline-train` runs the same five stages, then `train`. See `docs/cli.md` for `--force-all` and header-less twin flags.
+`pipeline-train` runs the same five stages, then `train`. See `docs/cli.md` for `--force-all` and other pipeline flags.
 
 ## Data Filtering (applied at training time)
 

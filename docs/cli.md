@@ -105,7 +105,7 @@ poetry run python src/cli.py train \
   [--max-source-height 180]
   [--rare-lmx-oversample 2]
   [--rare-lmx-tokens tied:start,tied:stop]
-  [--strip-header-prob 0.0]    # DEPRECATED/inert; header-less staves now come from __nh twin samples
+  [--strip-header-prob 0.0]    # DEPRECATED/inert; kept for checkpoint compatibility
   [--online-aug-prob 0.5]      # 0 disables online jitter
 ```
 
@@ -166,9 +166,22 @@ Visit `http://localhost:8000` for the upload UI. POST to `/api/omr/lead-sheet` f
 
 ---
 
+## generate-header-templates
+
+Prerender 120 clef+key+time templates (15 keys × 8 time sigs) into `data/header_templates/`. Use `--force` to re-render.
+
+```
+poetry run python src/cli.py generate-header-templates \
+  [--output data/header_templates]
+  [--dpi 200]
+  [--force]
+```
+
+---
+
 ## pipeline
 
-Run all data preparation stages in sequence: render → convert → header-less twins → augment → vocab.
+Run all data preparation stages in sequence: render → convert → header template generation → augment → vocab.
 
 ```
 poetry run python src/cli.py pipeline \
@@ -177,10 +190,8 @@ poetry run python src/cli.py pipeline \
   [--scanned-dir data/processed/primus/scanned]
   [--vocab-path data/vocab/primus_lmx.txt]
   [--render-dpi 200 250 300]
-  [--force-all]                # re-render, re-convert, re-twin, re-augment everything
-  [--force-render] [--force-convert] [--force-twins] [--force-augment]
-  [--no-headerless-twins]      # skip __nh continuation-staff twins (not recommended)
-  [--headerless-fraction 0.35]
+  [--force-all]                # re-render, re-convert, re-generate-templates, re-augment everything
+  [--force-render] [--force-convert] [--force-augment]
   [--augment-copies 1]
   [--augment-seed 42]
   [--extra-vocab-data-dir <dir>]    # repeatable: extra .lmx dirs for vocab
@@ -218,7 +229,7 @@ poetry run python src/cli.py pipeline-train \
   --epochs 60 --batch-size 24 --num-workers 12
 ```
 
-`--force-all` re-renders every clean PNG, re-converts all `.lmx`, regenerates all `__nh` twins in the twin fraction, and re-augmentates every scanned PNG. Omit it for incremental rebuilds (skips up-to-date outputs).
+`--force-all` re-renders every clean PNG, re-converts all `.lmx`, regenerates all header templates, and re-augments every scanned PNG. Omit it for incremental rebuilds (skips up-to-date outputs).
 
 ### Resume interrupted training
 ```bash

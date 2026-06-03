@@ -66,23 +66,16 @@ only.  The default set up-weights:
 3. Convert to float32 in [0.0, 1.0]
 4. Per-image zero-mean, unit-variance normalization
 
-### Header-less continuation staves
+### Continuation staves
 
-Continuation staves (lines 2+ of a Real Book page) typically omit the clef and
-time signature. These are provided as **first-class header-less twin samples**
-(`{sample_id}__nh/`) generated in **pipeline stage 3** by
-`generate_headerless_twins.py` (default fraction 0.35 of treble samples): clef
-and time glyphs are hidden in the LilyPond render (`\omit`) and the matching
-clef/time tokens are removed from the LMX label; the key signature is kept.
+Real Book continuation staves (all staves after the first on a page) carry no
+header. The model is trained only on full-header PrIMuS staves — this is by
+design. At inference, `header_injector.py` prepends a prerendered header to
+each continuation staff before the CRNN (see `docs/inference_pipeline.md`), so
+the model always receives its training distribution.
 
-`cli.py pipeline` and `pipeline-train` run this step automatically before
-augment, so twins receive scanned variants in the same pass. Use
-`--no-headerless-twins` to skip, or `--force-twins` / `--force-all` to
-re-render existing twins.
-
-This replaces the earlier training-time crop (`strip_header_prob`, now inert):
-the header boundary cannot be located reliably from the rendered image, so
-cropping desynced pixels from labels.
+`strip_header_prob` appears in `Config` but is **DEPRECATED/inert** — it is
+kept only so existing checkpoints deserialise without error.
 
 ### Collation
 

@@ -158,7 +158,7 @@ src/
 ├── data_processing/            dataset generation and augmentation
 │   ├── generate_realbook.py    PrIMuS → LilyJAZZ render
 │   ├── semantic_to_lmx.py      PrIMuS .semantic → LMX labels
-│   ├── generate_headerless_twins.py  __nh continuation-staff twins
+│   ├── generate_header_templates.py  prerender 120 header-strip templates
 │   ├── augment_scanned.py      scan-simulation augmentation
 │   ├── chord_render.py         Synthetic chord strip renderer (LilyJAZZ)
 │   ├── generate_chord_crops.py Bulk chord strip generation for CRNN training
@@ -168,6 +168,7 @@ src/
 │   ├── preprocess.py           load / binarize / deskew
 │   ├── staff_detect.py         morphology → 5-line clusters + chord strip crop
 │   ├── inference.py            CRNN-CTC music recognition
+│   ├── header_injector.py      prepend header templates to continuation staves
 │   ├── chord_recognizer.py     CRNN chord OCR (recognize_chords_crnn)
 │   ├── chord_postprocess.py    jazz-chord grammar filter
 │   └── grammar_fix.py          LMX token sequence validator
@@ -178,6 +179,7 @@ data/
 ├── processed/primus/
 │   ├── clean/              rendered LilyJAZZ PNGs + .lmx labels
 │   └── scanned/            augmented (distorted) copies
+├── header_templates/       prerendered clef+key+time strips (120 files)
 ├── chord_synth/            synthetic chord-strip images + CSV labels
 │   ├── train/  val/        split folders
 │   └── train_labels.csv  val_labels.csv

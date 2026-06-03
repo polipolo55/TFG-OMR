@@ -253,36 +253,6 @@ def _online_jitter(img: np.ndarray) -> np.ndarray:
     return np.clip(img, 0.0, 1.0)
 
 
-# ---------------------------------------------------------------------------
-# Header-strip augmentation helpers
-# ---------------------------------------------------------------------------
-
-_HEADER_PREFIXES = ("clef:", "key:fifths:", "time", "beats:", "beat-type:")
-
-
-def _strip_header_tokens(tokens: list[str]) -> list[str]:
-    """Remove leading header tokens (clef, key, time) from an LMX sequence.
-
-    Keeps the initial ``measure`` but drops every contiguous header token
-    that follows it, returning ``["measure", <first note/rest>, ...]``.
-    """
-    if not tokens or tokens[0] != "measure":
-        return tokens
-
-    i = 1
-    while i < len(tokens) and any(tokens[i] == p or tokens[i].startswith(p) for p in _HEADER_PREFIXES):
-        i += 1
-    return ["measure"] + tokens[i:]
-
-
-# NOTE: the old morphological _find_header_crop_x heuristic was removed. It
-# cropped at the first ink gap (~6% of width), which systematically over-cropped
-# past the true header into the first notes, desyncing the image from the
-# stripped tokens — and the header boundary cannot be located reliably from a
-# rendered staff. Header-less continuation staves are now produced as first-class
-# "__nh" twin samples at data time (see generate_headerless_twins.py), where the
-# image and label are aligned by construction.
-
 
 # ---------------------------------------------------------------------------
 # Dataset
@@ -332,7 +302,6 @@ class OMRDataset(Dataset):
         max_source_height: int = 180,
         extra_data_dirs: list[Path] | None = None,
         extra_scanned_dirs: list[Path] | None = None,
-        strip_header_prob: float = 0.0,
         online_aug_prob: float = 0.0,
     ) -> None:
         self.data_dir = Path(data_dir)
@@ -341,7 +310,6 @@ class OMRDataset(Dataset):
         self.max_image_width = max_image_width
         self.scanned_dir = Path(scanned_dir) if scanned_dir else None
         self.extra_scanned_dirs = [Path(p) for p in (extra_scanned_dirs or [])]
-        self._strip_header_prob = strip_header_prob
         self._online_aug_prob = online_aug_prob
         self._oov_counts: dict[str, int] = {}  # token → occurrence count
 
@@ -447,13 +415,6 @@ class OMRDataset(Dataset):
         img = _load_image(png_path, self.img_height, self.max_image_width)
         tokens = _load_lmx_tokens(lmx_path)
 
-        # Header-less continuation staves are provided as first-class "__nh"
-        # twin samples generated at data time (see generate_headerless_twins.py),
-        # NOT by cropping here. The previous in-loop crop never aligned the
-        # removed pixels with the removed label tokens (the header boundary
-        # cannot be located reliably from the rendered image). self._strip_header_prob
-        # is retained on Config for checkpoint compatibility but no longer crops.
-
         # Online augmentation (training only): light per-epoch jitter on top
         # of the offline-augmented scanned PNG.  Without this every epoch
         # sees the exact same pixel grid for each sample → the model overfits
@@ -533,31 +494,15 @@ def collate_fn(
 
 
 class _AugSubset(Dataset):
-    """Thin wrapper around a ``Subset`` that enables training-only augmentation.
+    """Thin wrapper around a ``Subset`` that enables training-only online augmentation.
 
-    DataLoader workers receive independent copies (via fork/pickle), so the
-    temporary mutation of the underlying dataset's augmentation flags is safe —
-    no cross-worker or cross-loader interference.
-
-    Parameters
-    ----------
-    subset : Dataset
-        The training ``Subset`` to wrap.
-    strip_header_prob : float
-        Probability of removing the clef + key + time visual header.
-    online_aug_prob : float
-        Probability of applying the cheap online jitter (brightness, noise,
-        horizontal shift) on top of the offline-augmented PNG.
+    Temporarily sets ``_online_aug_prob`` on the underlying ``OMRDataset``
+    before each ``__getitem__`` call. Safe across DataLoader workers because
+    each worker gets an independent copy via fork/pickle.
     """
 
-    def __init__(
-        self,
-        subset: Dataset,
-        strip_header_prob: float,
-        online_aug_prob: float,
-    ) -> None:
+    def __init__(self, subset: Dataset, online_aug_prob: float) -> None:
         self._subset = subset
-        self._strip_prob = strip_header_prob
         self._online_prob = online_aug_prob
 
     def __len__(self) -> int:
@@ -565,14 +510,11 @@ class _AugSubset(Dataset):
 
     def __getitem__(self, idx: int):
         ds: OMRDataset = self._subset.dataset  # type: ignore[attr-defined]
-        old_strip = ds._strip_header_prob
         old_online = ds._online_aug_prob
-        ds._strip_header_prob = self._strip_prob
         ds._online_aug_prob = self._online_prob
         try:
             return self._subset[idx]
         finally:
-            ds._strip_header_prob = old_strip
             ds._online_aug_prob = old_online
 
 
@@ -591,7 +533,6 @@ def make_splits(
     max_source_height: int = 180,
     extra_data_dirs: list[Path] | None = None,
     extra_scanned_dirs: list[Path] | None = None,
-    strip_header_prob: float = 0.0,
     online_aug_prob: float = 0.0,
     rare_lmx_oversample: int = 1,
     rare_lmx_tokens: frozenset[str] | None = None,
@@ -602,12 +543,6 @@ def make_splits(
 
     The split is deterministic (seeded) and stratified at the sample-id level
     (no data leakage across splits).
-
-    Parameters
-    ----------
-    strip_header_prob : float
-        Probability of stripping the header from training samples.
-        Applied to the *training* split only (val/test are never augmented).
 
     Returns
     -------
@@ -665,8 +600,8 @@ def make_splits(
     test_idx = perm[n_train + n_val :]
 
     train_ds: Dataset = Subset(full_ds, train_idx)
-    if strip_header_prob > 0 or online_aug_prob > 0:
-        train_ds = _AugSubset(train_ds, strip_header_prob, online_aug_prob)
+    if online_aug_prob > 0:
+        train_ds = _AugSubset(train_ds, online_aug_prob)
 
     # Append fine-tune (real-domain) samples to the TRAIN set only. Built as a
     # separate OMRDataset so none of its samples can land in val/test.
@@ -687,10 +622,9 @@ def make_splits(
             extra_scanned_dirs=ft_scanned[1:] or None,
         )
         ft_train: Dataset = finetune_ds
-        if strip_header_prob > 0 or online_aug_prob > 0:
+        if online_aug_prob > 0:
             ft_train = _AugSubset(
                 Subset(finetune_ds, list(range(len(finetune_ds)))),
-                strip_header_prob,
                 online_aug_prob,
             )
         from torch.utils.data import ConcatDataset

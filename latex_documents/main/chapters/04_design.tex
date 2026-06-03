@@ -494,46 +494,10 @@ augmentations.
 
 \subsubsection*{Alternatives considered}
 
-Several other public OMR corpora were surveyed before settling on
-PrIMuS.
-Each carries annotations that could in principle support an
-end-to-end recogniser, but each fails on its visual distribution,
-its voicing assumption, or its annotation format.
-
-\paragraph{OLiMPiC.}
-OLiMPiC~\cite{mayerPracticalEndToEnd2024} is the corpus that
-introduced the very LMX output format adopted by this thesis
-(\Cref{sec:lmx-format}), and is in that sense the closest analogue to
-PrIMuS in terms of output representation.
-Rejected because its content is \textit{pianoform} (grand staff,
-multi-voice), whereas the system targets monophonic single-staff
-input.
-Training on pianoform examples would either force the recogniser to
-consume capacity on visual patterns it must reject at inference, or
-require an aggressive sub-selection that defeats the size advantage
-of the corpus.
-
-\paragraph{MUSCIMA++.}
-MUSCIMA++~\cite{hajicMuscimaPP2017} is the most-cited handwritten-OMR
-corpus and the natural reference for symbol-level supervision.
-Its visual distribution is handwritten music on staff paper, whereas
-the inference distribution is typeset jazz lead sheets, so the
-engraving-style gap runs in the wrong direction. Its ground truth is
-also a music-notation graph (MuNG) rather than a flat token sequence,
-which does not match a CTC-style target without an additional
-sequentialisation step that would introduce its own errors.
-
-\paragraph{DeepScoresV2.}
-DeepScoresV2~\cite{tuggenerDeepScoresV22020} is the largest synthetic
-OMR corpus by image count and is the canonical reference for
-object-detection-style approaches.
-Rejected because its primary annotations are oriented bounding boxes
-for individual symbols, supporting symbol-classification and
-object-detection pipelines rather than sequence-to-sequence learning.
-Converting OBB annotations into a flat token sequence is possible but
-is itself a non-trivial dataset-conversion project, and the converted
-labels would still be coarser than the semantic transcriptions PrIMuS
-provides natively.
+Three other public corpora were surveyed and rejected.
+\textbf{OLiMPiC}~\cite{mayerPracticalEndToEnd2024}, which introduced LMX, is the closest analogue to PrIMuS in output format but is pianoform (grand staff, multi-voice); training on it would consume capacity on visual patterns never seen at inference.
+\textbf{MUSCIMA++}~\cite{hajicMuscimaPP2017} covers handwritten music on staff paper --- the wrong direction of engraving-style gap --- and its MuNG graph ground truth does not map to a flat CTC-style token sequence without an error-prone sequentialisation step.
+\textbf{DeepScoresV2}~\cite{tuggenerDeepScoresV22020} provides oriented bounding boxes per symbol, not token sequences; converting those annotations to LMX is a non-trivial dataset-conversion project, and the result would be coarser than PrIMuS's semantic transcriptions.
 
 \subsection{Domain augmentation: from clean renders to scanned pages}
 
@@ -734,38 +698,9 @@ deferred to \Cref{ch:impl}.
 \subsection{Alternatives considered}
 \label{sec:design-lmx-alts}
 
-\paragraph{MusicXML.}
-The de-facto interchange format for score data.
-As a direct model output MusicXML is too verbose: each note is
-wrapped in nested \code{<note>$\langle$pitch$\rangle$\dots} tags that
-contribute large numbers of tokens with no musical content.
-MusicXML is instead the downstream target. LMX is round-trippable to
-MusicXML through a deterministic post-processor, isolating the
-model's learning task from the XML formatting overhead.
-
-\paragraph{PrIMuS \code{.semantic} encoding.}
-The native PrIMuS textual encoding.
-It is close to LMX in spirit but encodes pitch and accidentals
-jointly (\code{note-Bb5\_quarter} rather than a flat sequence) and uses
-a project-internal vocabulary not adopted by downstream tooling.
-LMX is more compact, more easily round-trippable to MusicXML, and
-matches the OLIMPIC reference work, keeping the present results
-directly comparable.
-
-\paragraph{\code{**kern} (Humdrum).}
-A compact, pipe-delimited format widely used in musicology
-research~\cite{huronHumdrum2002,Humdrum}.
-Its tooling ecosystem outside musicology is thin, and its expression
-of accidentals and rhythm requires per-cell escape characters that
-complicate CTC training.
-
-\paragraph{ABC notation.}
-A line-oriented format originally designed for folk-tune
-exchange~\cite{walshawABC2011}.
-The same reasoning applies as for \code{**kern}: tooling support
-outside the folk-music community is limited, and its spacing and
-headers are stylistically opinionated in a way that LMX's flat token
-stream avoids.
+\textbf{MusicXML} is too verbose as a direct model target --- each note is wrapped in nested XML tags that inflate sequence length with no musical content; it is the downstream target that LMX round-trips to via a deterministic post-processor.
+\textbf{PrIMuS \code{.semantic}} encodes pitch and accidentals jointly (\code{note-Bb5\_quarter}), uses a project-internal vocabulary not adopted by downstream tooling, and does not round-trip to MusicXML; LMX is more compact and aligns with the OLiMPiC reference work.
+\textbf{Humdrum \code{**kern}}~\cite{huronHumdrum2002,Humdrum} and \textbf{ABC}~\cite{walshawABC2011} are compact but have thin tooling ecosystems outside musicology and folk music respectively, and their per-cell escape-character and header conventions complicate CTC training.
 
 
 % ─────────────────────────────────────────────────────────────────────────────
@@ -1210,39 +1145,10 @@ error analysis (\Cref{ch:results}).
 \subsection{Alternatives considered}
 \label{sec:design-grammar-alts}
 
-\paragraph{Grammar-aware CTC beam search.}
-A constrained decoder that restricts the beam to grammatically valid
-prefixes at each time step, much like a language-model-shallow-fusion
-ASR decoder.
-Rejected because the LMX grammar is a small finite-state object whose
-post-hoc enforcement is essentially free; folding it into beam search
-would slow inference proportionally to the beam width without
-contributing extra accuracy beyond what the deterministic post-pass
-already provides.
-
-\paragraph{Weighted finite-state transducer (WFST) decoder.}
-Compose the model's per-frame distribution with an explicit WFST
-representation of the LMX grammar at decode time.
-Over-engineered for a vocabulary this small: the hand-written
-stateful walker is shorter, easier to debug, and sufficient for the
-project's grammar complexity.
-
-\paragraph{Learned sequence-to-sequence corrector.}
-Train a small transformer to map raw model output to grammatically
-valid output, supervised by (noisy, grammatical) pairs.
-This requires a corpus of model errors that
-is only available after the model has been trained (a chicken-and-egg
-problem in the design stage), and it would introduce a second
-data-driven component that itself has failure modes harder to debug
-than a deterministic walker.
-
-\paragraph{End-to-end grammar-aware loss.}
-Augment the CTC loss with a regulariser that penalises ungrammatical
-prefixes during training.
-Conceivable, but it complicates loss optimisation for marginal gain on
-a vocabulary as small and well-structured as LMX, and deferring grammar
-to post-processing keeps training-time concerns separate from
-inference-time concerns, which simplifies analysis.
+\textbf{Grammar-aware beam search} restricts prefixes to valid sequences at $\mathcal{O}(T\cdot V\cdot k)$ cost; the accuracy gain over the free post-pass is negligible because the LMX grammar is a small finite-state object.
+\textbf{WFST composition} at decode time is over-engineered for a vocabulary this small; the hand-written stateful walker is shorter, easier to debug, and equally expressive.
+\textbf{A learned sequence-to-sequence corrector} requires a corpus of model errors that is only available after training, and introduces a second learned component with harder-to-debug failure modes.
+\textbf{An end-to-end grammar-aware loss} complicates CTC optimisation for marginal gain on a small, well-structured vocabulary, and conflates training-time and inference-time concerns that are easier to analyse in isolation.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Evaluation Design}

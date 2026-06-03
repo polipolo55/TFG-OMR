@@ -286,3 +286,8 @@ writes the chosen thresholds to `--out`. Point
 `$OMR_REJECT_THRESHOLDS=<path>` at the JSON to make the pipeline use them.
 
 Re-run after every CRNN re-train — the CTC log-prob distribution will shift.
+
+**Note:** `min_mean_logprob` and `confident_override_logprob` are **not**
+swept by this command — they retain the baked-in defaults from
+`staff_reject.DEFAULT_THRESHOLDS`. Only the four geometric and one OCR
+thresholds are calibrated from fixtures.

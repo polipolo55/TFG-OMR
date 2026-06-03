@@ -219,7 +219,20 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
 
     if resume_from is not None and "scheduler_state_dict" in ckpt:
         scheduler.load_state_dict(ckpt["scheduler_state_dict"])
-        log.info("  Scheduler state restored.")
+        # If the dataset size changed since the checkpoint was made, the saved
+        # total_steps may not cover the remaining epochs.  Extend the budget so
+        # the scheduler never runs out before epoch cfg.epochs.
+        steps_remaining = (cfg.epochs - start_epoch + 1) * len(train_loader)
+        new_total = scheduler.last_epoch + steps_remaining
+        if new_total > scheduler.total_steps:
+            scheduler.total_steps = new_total
+            scheduler._schedule_phases[-1]["end_step"] = float(new_total) - 1
+            log.info(
+                "  Scheduler state restored (budget extended to %d steps — dataset size changed).",
+                new_total,
+            )
+        else:
+            log.info("  Scheduler state restored.")
 
     scaler = GradScaler("cuda", enabled=use_amp)
     if resume_from is not None and "scaler_state_dict" in ckpt:

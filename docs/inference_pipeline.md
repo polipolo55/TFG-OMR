@@ -57,7 +57,7 @@ binary image
 ```python
 @dataclass
 class Staff:
-    lines: list[int]       # 5 y-coordinates (px)
+    line_ys: list[int]     # 5 y-coordinates (px)
     staff_space: float     # avg distance between adjacent lines
     x_start: int
     x_end: int
@@ -65,11 +65,13 @@ class Staff:
 @dataclass
 class System:
     staff: Staff
-    music_img: ndarray     # cropped grayscale staff region
-    music_bin: ndarray     # binarized version
-    chord_img: ndarray     # region above staff (chord symbols)
-    chord_bin: ndarray
-    bbox: tuple[int,int,int,int]  # (x, y, w, h) in page
+    chord_bbox: tuple[int,int,int,int] | None  # (x, y, w, h) or None
+    music_bbox: tuple[int,int,int,int]         # (x, y, w, h)
+    chord_image: ndarray | None                # region above staff (chord symbols)
+    music_image: ndarray | None                # cropped grayscale staff region
+    chord_binary: ndarray | None               # binarized chord strip
+    music_binary: ndarray | None               # binarized music strip
+    pre_result: object | None                  # set by pre-CRNN gate; None = gate not yet run
 ```
 
 ## Stage 2b — Rejection Gates
@@ -83,6 +85,8 @@ filters out title regions, footer text, and other non-music page elements.
 
 | Gate | Signal | Reject when |
 |------|--------|-------------|
+| `geometry_no_image` | music image present | no image extracted |
+| `geometry_no_strip` | binary strip present | no binary strip extracted |
 | `geometry_no_staff_lines` | local 5-line re-detection | <5 lines found |
 | `geometry_line_span` | min fraction of cols with ink on each line | < `min_line_span_frac` |
 | `geometry_spacing_cov` | std/mean of inter-line gaps | > `max_spacing_cov` |
@@ -283,3 +287,4 @@ On error:
 | `OMR_BEAM_WIDTH` | `1` (greedy) | CTC beam width for music CRNN.  Set to >1 to enable beam search. |
 | `OMR_ENABLE_TILING` | unset | Set `=1` to enable legacy tiling mode (rarely useful). |
 | `OMR_CHORD_CHECKPOINT` | `models/chord/latest/best_model.pt` | Path to the chord CRNN checkpoint. Absolute or project-root-relative. |
+| `OMR_REJECT_THRESHOLDS` | unset | Path to a JSON thresholds file for staff rejection gates. Falls back to `models/staff_reject/thresholds.json` if it exists, then to baked-in defaults. |

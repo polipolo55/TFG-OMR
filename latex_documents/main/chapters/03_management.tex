@@ -176,33 +176,12 @@ regularly send the project back to a prior WP for incremental
 refinement, and the budget reserves time for that.
 
 Four practices enforce methodological rigour across the project.
-
-\textit{Traceability.}
-Every milestone artefact (dataset version, model checkpoint,
-SER measurement) is linked to a specific repository commit and
-to a documented design decision, so that any number reported in
-\Cref{ch:results} can be traced back to the data and code that
-produced it.
-
-\textit{Reproducibility.}
-Data generation, training, and evaluation are driven by scripts,
-not interactive notebook sessions.
-The mechanism (embedded \code{Config}, deterministic seeds,
-checkpoint format) is described in \Cref{sec:impl-reproducibility}.
-
-\textit{Quantitative control.}
-Symbol Error Rate is measured at every significant training
-iteration alongside side metrics (loss gap, per-token
-edit-distance breakdown, per-sample SER distribution), so that no
-design decision rests on a single aggregate number; the breakdown
-of \Cref{sec:res-errors} is the direct product of this practice.
-
-\textit{Corrective loop.}
-Each sprint ends with a three-hour supervisor review (accounted
-for in \Cref{tab:task-summary}) that may adjust scope, effort
-estimates, or risk responses, and produces a short written note
-feeding the budget-control mechanism of \Cref{sec:mgmt-control}.
-Sprint reviews are the primary channel through which the project plan is adjusted.
+\begin{itemize}
+    \item \textit{Traceability.} Every artefact (dataset version, checkpoint, SER value) is linked to a repository commit and a documented design decision, so that any number in \Cref{ch:results} can be traced to the data and code that produced it.
+    \item \textit{Reproducibility.} Data generation, training, and evaluation are script-driven; the mechanism (embedded \code{Config}, deterministic seeds, checkpoint format) is described in \Cref{sec:impl-reproducibility}.
+    \item \textit{Quantitative control.} SER is measured at every significant training iteration alongside per-token breakdown and per-sample distribution, so no decision rests on a single aggregate number (\Cref{sec:res-errors}).
+    \item \textit{Corrective loop.} Each sprint ends with a supervisor review that adjusts scope, effort estimates, or risk responses via the budget-control mechanism of \Cref{sec:mgmt-control}.
+\end{itemize}
 
 Monitoring tools include Git and GitHub for version control,
 per-experiment training logs and CSV summaries written into the
@@ -314,110 +293,25 @@ chord-recognition extension foreshadowed in
 
 \subsection{Tasks, dependencies, and resources}
 
-\Cref{tab:task-summary} lists the 31 tasks of the plan with
-their effort estimates, dependencies, and principal resources.
-The estimates are expressed in hours per task and were validated
-against the author's available weekly workload of four to five
-effective working hours per day; together they amount to the
-509-hour total of \Cref{tab:task-summary}, distributed over
-the 21-week schedule at an average of approximately 24\,h per
-week.
-
-The dependency column distinguishes between strict
-dependencies (a task cannot begin until its predecessor is
-complete) and partial dependencies, marked ``\textit{partial}'',
-where a task may begin once its predecessor has reached a
-sufficient maturity to provide the required input.
-Partial dependencies are used sparingly, since they are
-difficult to coordinate in a single-person project where context
-switching has a real cost.
-
-Concurrency in the schedule is intentionally limited.
-A single-person project does not benefit from the parallelism
-that drives multi-person planning, because the same individual
-cannot productively split attention across more than one major
-task in the same sprint.
-Overlap is therefore introduced only when two tasks are
-naturally compatible: for example, developing the evaluation
-framework (T3.4) while the first training run (T3.3) is in
-progress, since training runs in the background on the GPU and
-the developer is otherwise idle.
-
-\begin{table}[h!]
-    \centering
-    \caption{Task summary with effort estimates, dependencies, and
-    principal resources.}
-    \label{tab:task-summary}
-    \renewcommand{\arraystretch}{1.05}
-    \scriptsize
-    \begin{tabularx}{\linewidth}{c >{\raggedright}p{4.2cm} r >{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}p{2.0cm}}
-        \toprule
-        \textbf{Code} & \textbf{Task} & \textbf{h} & \textbf{Dependencies} & \textbf{Resources} \\
-        \midrule
-        \multicolumn{5}{l}{\textbf{WP0 -- Project management (130\,h, concurrent)}} \\
-        \midrule
-        T0.1 & Context and scope definition         & 20  & --             & Zotero \\
-        T0.2 & Temporal planning                    & 12  & T0.1           & -- \\
-        T0.3 & Budget and sustainability            & 15  & T0.2           & -- \\
-        T0.4 & Final GEP integration                & 8   & T0.3           & -- \\
-        T0.5 & Supervisor meetings                  & 25  & Concurrent     & -- \\
-        T0.6 & Thesis writing                       & 50  & Concurrent     & \LaTeX{} \\
-        \midrule
-        \multicolumn{5}{l}{\textbf{WP1 -- Sprint 1: literature review and baseline (78\,h)}} \\
-        \midrule
-        T1.1 & OMR literature survey                & 25  & --             & Library access \\
-        T1.2 & Dataset exploration                  & 15  & T1.1 (partial) & -- \\
-        T1.3 & Classical CV baseline                & 25  & T1.2           & OpenCV \\
-        T1.4 & Baseline evaluation                  & 10  & T1.3           & -- \\
-        T1.5 & Sprint 1 review                      & 3   & T1.4           & -- \\
-        \midrule
-        \multicolumn{5}{l}{\textbf{WP2 -- Sprint 2: dataset construction (73\,h)}} \\
-        \midrule
-        T2.1 & Output encoding (LMX) design         & 12  & T1.5           & music21 \\
-        T2.2 & Synthetic rendering pipeline         & 35  & T2.1           & LilyPond \\
-        T2.3 & Data augmentation                    & 15  & T2.2           & OpenCV / albumentations \\
-        T2.4 & Validation and splits                & 8   & T2.3           & -- \\
-        T2.5 & Sprint 2 review                      & 3   & T2.4           & -- \\
-        \midrule
-        \multicolumn{5}{l}{\textbf{WP3 -- Sprint 3: CRNN--CTC development (75\,h)}} \\
-        \midrule
-        T3.1 & CRNN architecture design             & 25  & T2.5           & Consumer GPU \\
-        T3.2 & Training pipeline                    & 20  & T3.1           & -- \\
-        T3.3 & Initial training run                 & 15  & T3.2           & GPU \\
-        T3.4 & Evaluation framework                 & 12  & T3.2 (partial) & -- \\
-        T3.5 & Sprint 3 review                      & 3   & T3.3, T3.4     & -- \\
-        \midrule
-        \multicolumn{5}{l}{\textbf{WP4 -- Sprint 4: iterative refinement (68\,h)}} \\
-        \midrule
-        T4.1 & Error analysis                       & 10  & T3.5           & -- \\
-        T4.2 & Data pipeline improvements           & 15  & T4.1           & -- \\
-        T4.3 & Model refinement runs                & 25  & T4.2           & GPU \\
-        T4.4 & Ablation studies                     & 15  & T4.3           & GPU \\
-        T4.5 & Sprint 4 review                      & 3   & T4.4           & -- \\
-        \midrule
-        \multicolumn{5}{l}{\textbf{WP5 -- Sprint 5: final evaluation and defence (85\,h)}} \\
-        \midrule
-        T5.1 & Final evaluation                     & 15  & T4.5           & GPU \\
-        T5.2 & Qualitative error analysis           & 10  & T5.1           & -- \\
-        T5.3 & Extension exploration (conditional)  & 20  & T5.1           & GPU \\
-        T5.4 & Final thesis writing                 & 30  & T5.2           & \LaTeX{} \\
-        T5.5 & Defence preparation                  & 10  & T5.4           & -- \\
-        \midrule
-        & \textbf{TOTAL}                            & \textbf{509} & & \\
-        \bottomrule
-    \end{tabularx}
-\end{table}
+The plan totals 509\,h across 31 tasks, distributed over the
+21-week schedule at an average of approximately 24\,h per week;
+the full per-task breakdown with effort estimates, dependency
+chain, and principal resources is given in \Cref{tab:task-summary}.
+Strict dependencies require a predecessor to be complete before
+the successor can start; partial dependencies (marked
+``\textit{partial}'') require only sufficient maturity.
+Concurrency is limited to naturally compatible pairs, such as
+developing the evaluation framework (T3.4) while the initial
+training run (T3.3) executes on the GPU.
 
 The plan was deliberately scoped to 509\,h rather than to the
 Art.~17 nominal envelope of $18\,\text{ECTS} \times 30\,\text{h/ECTS}
 = 540\,\text{h}$; the resulting 31-hour margin is held as an
-undistributed reserve for unforeseen tasks (in particular the
-documentation phase) and is not committed to any specific work
+undistributed reserve and is not committed to any specific work
 package.
 The accounting in \Cref{tab:hr-budget} and the budget total of
 \Cref{tab:total-budget} are computed against the 509-hour
-baseline, since charging unused reserve hours would inflate the
-budget without corresponding effort.
+baseline.
 
 \subsection{Gantt chart}
 
@@ -763,7 +657,7 @@ data-cleaning cycles incur direct monetary cost.
     \end{tabularx}
 \end{table}
 
-\begin{table}[h!]
+\begin{table}[H]
     \centering
     \caption{Incidentals derived from the risk register.
     Each entry is the cost of the priced contingency action
@@ -791,7 +685,7 @@ data-cleaning cycles incur direct monetary cost.
 
 \subsection{Total budget}
 
-\begin{table}[h!]
+\begin{table}[H]
     \centering
     \caption{Total project budget.}
     \label{tab:total-budget}

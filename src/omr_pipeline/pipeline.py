@@ -121,6 +121,21 @@ def _process_systems(
         )
         fixed_music.append(fixed)
 
+    # If no staff produced a time signature, fall back to 4/4 — the overwhelming
+    # Real Book default — and re-run grammar fixing so barline regularisation works.
+    if global_time is None:
+        _DEFAULT_TIME = ("time", "beats:4", "beat-type:4")
+        log.info("No time signature detected on any staff; injecting 4/4 default")
+        fixed_music = []
+        for pred in music_preds:
+            fixed, _, _ = fix_sequence(
+                pred,
+                global_key=global_key,
+                global_time=_DEFAULT_TIME,
+                force_clef=True,
+            )
+            fixed_music.append(fixed)
+
     _empty_diag = {
         "line_span_min": 0.0,
         "spacing_cov": 0.0,

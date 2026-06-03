@@ -272,6 +272,79 @@ Every subcommand prints self-contained help text when invoked with
 \label{tab:cli-subcommands}
 \end{table}
 
+\section{Project Task Summary}
+\label{app:task-summary}
+
+\Cref{tab:task-summary} lists the 31 tasks of the project plan
+with their effort estimates, dependency chain, and principal
+resources; it is the source for the 509-hour human-resources total
+used in the budget of \Cref{sec:mgmt-budget}.
+
+\begin{table}[H]
+    \centering
+    \caption{Task summary with effort estimates, dependencies, and
+    principal resources.}
+    \label{tab:task-summary}
+    \renewcommand{\arraystretch}{1.05}
+    \scriptsize
+    \begin{tabularx}{\linewidth}{c >{\raggedright}p{4.2cm} r >{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}p{2.0cm}}
+        \toprule
+        \textbf{Code} & \textbf{Task} & \textbf{h} & \textbf{Dependencies} & \textbf{Resources} \\
+        \midrule
+        \multicolumn{5}{l}{\textbf{WP0 -- Project management (130\,h, concurrent)}} \\
+        \midrule
+        T0.1 & Context and scope definition         & 20  & --             & Zotero \\
+        T0.2 & Temporal planning                    & 12  & T0.1           & -- \\
+        T0.3 & Budget and sustainability            & 15  & T0.2           & -- \\
+        T0.4 & Final GEP integration                & 8   & T0.3           & -- \\
+        T0.5 & Supervisor meetings                  & 25  & Concurrent     & -- \\
+        T0.6 & Thesis writing                       & 50  & Concurrent     & \LaTeX{} \\
+        \midrule
+        \multicolumn{5}{l}{\textbf{WP1 -- Sprint 1: literature review and baseline (78\,h)}} \\
+        \midrule
+        T1.1 & OMR literature survey                & 25  & --             & Library access \\
+        T1.2 & Dataset exploration                  & 15  & T1.1 (partial) & -- \\
+        T1.3 & Classical CV baseline                & 25  & T1.2           & OpenCV \\
+        T1.4 & Baseline evaluation                  & 10  & T1.3           & -- \\
+        T1.5 & Sprint 1 review                      & 3   & T1.4           & -- \\
+        \midrule
+        \multicolumn{5}{l}{\textbf{WP2 -- Sprint 2: dataset construction (73\,h)}} \\
+        \midrule
+        T2.1 & Output encoding (LMX) design         & 12  & T1.5           & music21 \\
+        T2.2 & Synthetic rendering pipeline         & 35  & T2.1           & LilyPond \\
+        T2.3 & Data augmentation                    & 15  & T2.2           & OpenCV / albumentations \\
+        T2.4 & Validation and splits                & 8   & T2.3           & -- \\
+        T2.5 & Sprint 2 review                      & 3   & T2.4           & -- \\
+        \midrule
+        \multicolumn{5}{l}{\textbf{WP3 -- Sprint 3: CRNN--CTC development (75\,h)}} \\
+        \midrule
+        T3.1 & CRNN architecture design             & 25  & T2.5           & Consumer GPU \\
+        T3.2 & Training pipeline                    & 20  & T3.1           & -- \\
+        T3.3 & Initial training run                 & 15  & T3.2           & GPU \\
+        T3.4 & Evaluation framework                 & 12  & T3.2 (partial) & -- \\
+        T3.5 & Sprint 3 review                      & 3   & T3.3, T3.4     & -- \\
+        \midrule
+        \multicolumn{5}{l}{\textbf{WP4 -- Sprint 4: iterative refinement (68\,h)}} \\
+        \midrule
+        T4.1 & Error analysis                       & 10  & T3.5           & -- \\
+        T4.2 & Data pipeline improvements           & 15  & T4.1           & -- \\
+        T4.3 & Model refinement runs                & 25  & T4.2           & GPU \\
+        T4.4 & Ablation studies                     & 15  & T4.3           & GPU \\
+        T4.5 & Sprint 4 review                      & 3   & T4.4           & -- \\
+        \midrule
+        \multicolumn{5}{l}{\textbf{WP5 -- Sprint 5: final evaluation and defence (85\,h)}} \\
+        \midrule
+        T5.1 & Final evaluation                     & 15  & T4.5           & GPU \\
+        T5.2 & Qualitative error analysis           & 10  & T5.1           & -- \\
+        T5.3 & Extension exploration (conditional)  & 20  & T5.1           & GPU \\
+        T5.4 & Final thesis writing                 & 30  & T5.2           & \LaTeX{} \\
+        T5.5 & Defence preparation                  & 10  & T5.4           & -- \\
+        \midrule
+        & \textbf{TOTAL}                            & \textbf{509} & & \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
 \section{Earned-Value Budget Control}
 \label{app:evm}
 

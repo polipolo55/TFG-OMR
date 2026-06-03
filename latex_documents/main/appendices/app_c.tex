@@ -1,5 +1,12 @@
-\chapter{Code Snippets}
+\chapter{Software Availability}
+\label{app:code}
 
-\todo{AUDIT (orphan appendix \& scope question): (a) Not referenced from any chapter---add a \texttt{\textbackslash label\{app:code\}} and forward pointers from the relevant Implementation subsections (e.g.\ ``the full rendering loop is reproduced in \Cref{app:code}''). (b) Reconsider whether pasting source code into a TFG memoir is the best use of pages: tribunals generally prefer a GitHub/Zenodo link plus a 5--10 line key excerpt over multi-page code dumps. If the repository is public, replace this appendix with a short ``Software Availability'' note and a DOI/URL, and keep at most one short excerpt (e.g.\ the augmentation pipeline config) inline.}
+The complete source code, training scripts, and trained model weights for this project are published in a public Git repository; the URL appears on the cover page of this document.
+The environment is fully reproducible with \code{poetry install} followed by the relevant \code{src/cli.py} subcommands documented in \Cref{tab:cli-subcommands} (\Cref{app:hyperparams}).
 
-\todo{Include the three most instructive scripts: (1) the rendering loop from \texttt{src/data\_processing/generate\_realbook.py}, (2) the augmentation pipeline configuration from \texttt{src/data\_processing/augment\_scanned.py}, (3) the BNF grammar rule set from \texttt{src/omr\_pipeline/grammar\_fix.py}.}
+Readers wishing to inspect the most instructive implementation files are directed to:
+\begin{itemize}
+    \item the LilyJAZZ rendering loop: \code{src/data\_processing/generate\_realbook.py}
+    \item the augmentation pipeline parameters: \code{src/data\_processing/augment\_scanned.py}
+    \item the grammar fixer state machine: \code{src/omr\_pipeline/grammar\_fix.py}
+\end{itemize}

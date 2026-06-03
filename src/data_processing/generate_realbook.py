@@ -297,51 +297,121 @@ def make_lily_source(
 # ---------------------------------------------------------------------------
 # Header-less ("continuation staff") twin samples
 # ---------------------------------------------------------------------------
-# A fraction of real Real Book staves are continuation systems that do not
-# reprint the leading clef and time signature. To teach the recogniser to read
-# such staves, we generate first-class header-less *twin* samples: the SAME
-# music rendered with the clef and time-signature glyphs hidden, paired with a
-# label that drops the corresponding tokens. Because the twin is a real render
-# matched to a real label, the image and label are aligned by construction —
-# no fragile header-boundary detection is needed (an earlier crop-based
-# approach could not locate the boundary reliably).
-#
-# The key signature is intentionally KEPT (shown): hiding it would force
-# LilyPond to print explicit accidentals on key-altered notes, which would
-# change the in-body accidental tokens and require re-deriving the label.
-# Keeping the key signature leaves the body — and thus the label body —
-# untouched. (`\omit` hides a glyph while preserving its musical effect, so
-# note positions and accidentals are unchanged.)
+# Real Book continuation staves (all staves after the first on a page) have
+# NO header at all: no clef, no key signature, no time signature — just bare
+# staff lines and notes. To teach the recogniser to read them, we generate
+# first-class header-less *twin* samples: the SAME music rendered with all
+# three header elements hidden via LilyPond \omit, paired with a label that
+# drops the clef/key/time tokens AND injects explicit accidentals for any
+# pitch that was previously implied by the key signature (because LilyPond
+# will now print those accidentals visibly when the key is hidden).
 
 _NEW_STAFF_RE = re.compile(r"(\\new\s+Staff\s*\{)")
 
-# LMX header tokens that the header-less twin drops (clef + time signature).
-# `key:fifths:*` is deliberately NOT dropped (see above).
+# LMX tokens stripped from the twin label (clef, key, time).
 _TWIN_DROP_EXACT = {"clef:G2", "time"}
-_TWIN_DROP_PREFIX = ("beats:", "beat-type:")
+_TWIN_DROP_PREFIX = ("beats:", "beat-type:", "key:fifths:")
+
+# Circle-of-fifths accidental order.
+_FLAT_ORDER = ("B", "E", "A", "D", "G", "C", "F")   # 1 flat = Bb, 2 = Bb+Eb, …
+_SHARP_ORDER = ("F", "C", "G", "D", "A", "E", "B")  # 1 sharp = F#, 2 = F#+C#, …
+
+_DURATIONS = frozenset(
+    {"whole", "half", "quarter", "eighth", "16th", "32nd", "64th", "breve", "longa"}
+)
+_ACCIDENTALS = frozenset({"flat", "sharp", "natural"})
+
+
+def _key_accidentals(fifths: int) -> dict[str, str]:
+    """Map pitch letter → accidental token for a given key signature."""
+    if fifths < 0:
+        return {p: "flat" for p in _FLAT_ORDER[: -fifths]}
+    if fifths > 0:
+        return {p: "sharp" for p in _SHARP_ORDER[:fifths]}
+    return {}
 
 
 def omit_header_in_ly(ly_source: str) -> str:
-    """Inject ``\\omit`` of the clef and time signature into a LilyPond source.
+    """Hide the clef, key signature, and time signature in a LilyPond source.
 
-    Hides the clef and time-signature glyphs (without changing the music) so
-    the staff renders as a header-less continuation line.
+    All three are suppressed so the render matches a bare Real Book
+    continuation staff (no header glyphs at all).  LilyPond will print
+    explicit accidentals on key-altered notes because the key is hidden.
     """
     return _NEW_STAFF_RE.sub(
-        r"\1 \\omit Staff.Clef \\omit Staff.TimeSignature", ly_source, count=1
+        r"\1 \\omit Staff.Clef \\omit Staff.KeySignature \\omit Staff.TimeSignature",
+        ly_source,
+        count=1,
     )
 
 
 def headerless_label_tokens(tokens: list[str]) -> list[str]:
-    """Return ``tokens`` with the clef and time-signature tokens removed.
+    """Return *tokens* with the full header removed and key-implied accidentals injected.
 
-    Mirrors :func:`omit_header_in_ly`: the key signature is kept.
+    Mirrors :func:`omit_header_in_ly`:
+    - Drops ``clef:G2``, ``key:fifths:*``, ``time``, ``beats:*``, ``beat-type:*``.
+    - For every note whose pitch is altered by the key signature and that does
+      not already carry an explicit accidental token, injects the key-implied
+      accidental (``flat`` or ``sharp``) after the note's duration so the label
+      matches the accidental glyphs LilyPond now prints.
     """
-    return [
-        t
-        for t in tokens
-        if t not in _TWIN_DROP_EXACT and not t.startswith(_TWIN_DROP_PREFIX)
-    ]
+    # Extract key signature so we know which pitches need explicit accidentals.
+    fifths = 0
+    for t in tokens:
+        if t.startswith("key:fifths:"):
+            try:
+                fifths = int(t.split(":")[2])
+            except (ValueError, IndexError):
+                pass
+            break
+    key_acc = _key_accidentals(fifths)
+
+    out: list[str] = []
+    i = 0
+    n = len(tokens)
+    while i < n:
+        tok = tokens[i]
+
+        # Drop header tokens.
+        if tok in _TWIN_DROP_EXACT or any(tok.startswith(p) for p in _TWIN_DROP_PREFIX):
+            i += 1
+            continue
+
+        # Note: walk pitch → octave → duration → dots → [existing acc] → [tie]
+        # and inject the key-implied accidental when missing.
+        if tok.startswith("pitch:"):
+            pitch_letter = tok.split(":")[1]  # e.g. "B" from "pitch:B"
+            note: list[str] = [tok]
+            i += 1
+
+            if i < n and tokens[i].startswith("octave:"):
+                note.append(tokens[i]); i += 1
+
+            if i < n and tokens[i] in _DURATIONS:
+                note.append(tokens[i]); i += 1
+
+            while i < n and tokens[i] == "dot":
+                note.append(tokens[i]); i += 1
+
+            has_acc = False
+            if i < n and tokens[i] in _ACCIDENTALS:
+                note.append(tokens[i]); i += 1
+                has_acc = True
+
+            # Inject key-implied accidental if the note has none.
+            if not has_acc and pitch_letter in key_acc:
+                note.append(key_acc[pitch_letter])
+
+            if i < n and tokens[i] in ("tied:start", "tied:stop"):
+                note.append(tokens[i]); i += 1
+
+            out.extend(note)
+            continue
+
+        out.append(tok)
+        i += 1
+
+    return out
 
 
 # ---------------------------------------------------------------------------

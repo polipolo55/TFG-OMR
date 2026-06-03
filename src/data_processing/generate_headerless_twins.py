@@ -4,18 +4,15 @@ generate_headerless_twins.py
 Generate first-class header-less ("continuation staff") twin samples for an
 already rendered LilyJAZZ dataset.
 
-Real Real Book pages contain continuation systems that do not reprint the
-leading clef and time signature. To teach the recogniser to read them, for a
-fraction of in-scope (treble) samples we render a TWIN: the same music with the
-clef and time-signature glyphs hidden (LilyPond ``\\omit``), paired with a label
-that drops the corresponding tokens. Because the twin is a real render matched
-to a real label, image and label are aligned by construction — unlike the old
-training-time crop, which could not locate the header boundary reliably.
-
-The key signature is kept (shown): hiding it would make LilyPond print explicit
-accidentals on key-altered notes, changing the in-body accidental tokens. With
-the key kept, the twin label is exactly the parent label minus the clef and
-time tokens, and the body is untouched.
+Real Real Book continuation staves (all staves after the first on a page) carry
+no header at all — no clef, no key signature, no time signature. To teach the
+recogniser to read them, for a fraction of in-scope (treble) samples we render
+a TWIN: the same music with all three header glyphs hidden (LilyPond
+``\\omit``), paired with a label that drops the clef/key/time tokens and injects
+explicit accidentals for any pitch that was previously covered by the key
+signature (because LilyPond now prints those accidentals visibly). Because the
+twin is a real render matched to a real label, image and label are aligned by
+construction — unlike the old training-time crop approach.
 
 Each twin is written as a sibling sample directory ``<id>__nh/`` containing
 ``<id>__nh.png`` and ``<id>__nh.lmx`` inside the same data directory, so it is

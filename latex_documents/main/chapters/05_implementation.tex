@@ -2,12 +2,17 @@
 \label{ch:impl}
 
 This chapter describes how the design of \Cref{ch:design} is realised
-in code: the libraries chosen at each layer, the repository structure,
-the concrete configuration values, and the engineering choices that
-keep the system within the compute budget of a single consumer GPU.
+in code: the libraries chosen at each layer, the concrete configuration
+values, and the engineering choices that keep the system within the
+compute budget of a single consumer GPU.
 The conceptual architecture in \Cref{ch:design} is intentionally
 library-agnostic; this chapter fills in the specific versions, numeric
 settings, and trade-offs imposed by the hardware and the toolchain.
+The source tree is organised into four packages---\code{CRNN\_CTC/}
+(model, training, evaluation, and chord network), \code{data\_processing/}
+(dataset generation and augmentation), \code{omr\_pipeline/} (inference),
+and \code{api/} (web service)---with \code{cli.py} as the sole entry
+point for all multi-step operations.
 Computational-complexity arguments and speed optimisations are
 collected in \Cref{sec:impl-performance}.
 
@@ -37,36 +42,6 @@ of VRAM.
 The Python version is pinned at \num{3.14}; all dependencies are
 locked in \code{poetry.lock} so the environment is reproducible with
 \code{poetry install}.
-
-% ─────────────────────────────────────────────────────────────────────────────
-\section{Repository Structure}
-\label{sec:impl-repo}
-
-The project source tree is organised by responsibility rather than by
-file type. Three structural rules hold it together. The music-notation
-mapping tables (clef IDs, key-signature encodings, duration tokens)
-live in a single module, \code{CRNN\_CTC/lilypond\_render.py}, imported
-wherever they are needed, which keeps the rendering pipeline and the
-label converter from drifting out of sync. The inference pipeline
-(\code{omr\_pipeline/}) depends on the training code only through the
-\code{Vocabulary} and \code{CRNN} classes, so it can be deployed
-without the training tree. And \code{cli.py} is the only entry point:
-every multi-step operation is a subcommand sharing the same flag names
-and defaults.
-
-\begin{quote}\small
-\begin{verbatim}
-src/
-  cli.py            unified CLI (12 subcommands)
-  CRNN_CTC/         model, training, vocab, evaluation,
-                    and chord-network code
-  data_processing/  dataset generation and augmentation
-  omr_pipeline/     inference pipeline (preprocess, staff
-                    detect, reject gate, CRNN, chord OCR,
-                    grammar fixer)
-  api/              FastAPI web server
-\end{verbatim}
-\end{quote}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Data Pipeline Implementation}
@@ -143,8 +118,8 @@ Global Interpreter Lock; the trade-off is discussed in
     {Data preparation pipeline};
 
 \end{tikzpicture}
-\caption[Data preparation pipeline.]{Five offline stages that convert PrIMuS
-  raw data into training-ready image/label pairs.
+\caption[Data preparation pipeline.]{The data preparation pipeline converts
+  PrIMuS raw data into training-ready image/label pairs across five offline stages.
   The \code{pipeline} and \code{pipeline-train} subcommands run all five
   stages in sequence; incremental runs skip any stage whose outputs are already
   up to date.}
@@ -198,7 +173,7 @@ area without explicit supervision.
 The converter detects this case and injects the C-major key token
 before the time signature so every training sample carries an
 explicit key label.
-After the fix, C major accounts for roughly \SI{22.6}{\percent} of the
+After the fix, C major accounts for \SI{22.6}{\percent} of the
 post-filter corpus, confirming that the missing label was a labelling
 artefact rather than a distribution effect.
 
@@ -281,11 +256,11 @@ aggressively than the width:
 \code{AdaptiveAvgPool2d}      & --     & $1,\ W/4$    & collapse height to 1 \\
 \bottomrule
 \end{tabularx}
-\caption{Stride table for the modified ResNet18 backbone.  Cumulatively
-the input shape $(B, 1, H{=}128, W)$ becomes
-$(B, 512, 1, W/4)$ at the backbone output: the height is collapsed to
-one feature vector per column, and the time axis (width) is preserved
-with a $4\times$ compression.}
+\caption{Asymmetric stride schedule for the modified ResNet18 backbone:
+the input shape $(B, 1, H{=}128, W)$ is cumulatively transformed to
+$(B, 512, 1, W/4)$ at the backbone output, collapsing the height to
+one feature vector per column while preserving the time axis (width) at
+$4\times$ compression.}
 \label{tab:resnet-strides}
 \end{table}
 
@@ -363,16 +338,10 @@ All defaults are encoded in the \code{Config} dataclass, serialised to
 \code{config.json} at training start, and embedded in every checkpoint
 so that evaluation always uses the exact settings that produced the
 weights.
-The key values are: batch size~16 (peak VRAM $\approx$ \SI{8.5}{\giga\byte}
-on the RTX~3060), peak learning rate $1{\times}10^{-3}$ with OneCycleLR,
-weight decay $1{\times}10^{-4}$, gradient clip $5.0$, and early stopping
-with a patience of~12 epochs.
-The complete parameter list, including architecture sizes and split
-fractions, is in \Cref{tab:hyperparams-omr} and \Cref{tab:arch-omr}
-of \Cref{app:hyperparams}.
-Because the \code{Config} dataclass is part of the checkpoint contract,
-adding, renaming, or removing a field is a backward-incompatible change
-for existing checkpoints.
+The complete parameter list is in \Cref{tab:hyperparams-omr} and
+\Cref{tab:arch-omr} of \Cref{app:hyperparams}; the one value worth
+noting here is batch size~16, which keeps peak VRAM at
+$\approx$\,\SI{8.5}{\giga\byte} on the target hardware.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Chord OCR Implementation}
@@ -652,9 +621,9 @@ A minimal HTML upload UI is served at the root path (\code{GET /});
 it displays the rendered page with detected staff bounding boxes
 overlaid, the recognised LMX token sequence per segment, and the
 extracted chord list.
-The UI is a debugging aid that doubles as a demonstration interface;
-it is not the principal deliverable.
-End-to-end per-page latency on the target RTX~3060 is reported in
+The UI functions as a debugging aid and demonstration interface rather
+than a primary deliverable.
+End-to-end per-page latency on the target hardware is reported in
 \Cref{ch:results}.
 The full response schema is documented in
 \code{docs/api.md}; the JSON top level carries \code{pages[]},
@@ -683,9 +652,8 @@ size: one argmax per time step followed by a linear pass to collapse
 duplicates and remove blanks.
 Beam search of width $k$ costs $\mathcal{O}(T\cdot V\cdot k)$, with an
 additional logarithmic factor for the priority queue.
-Greedy is the runtime default for the CLI \code{evaluate} subcommand
-and the API; beam search is opt-in. The accuracy gain and decode-cost
-multiplier are reported in \Cref{ch:results}.
+The accuracy gain from beam search relative to greedy and the
+corresponding decode-cost multiplier are reported in \Cref{ch:results}.
 
 \paragraph{Width compression and the time axis.}
 The $4\times$ width compression in the CNN backbone
@@ -698,11 +666,11 @@ $T \geq L$ constraint. The chosen ratio is justified in
 \Cref{sec:design-model}.
 
 \paragraph{ResNet18 backbone.}
-The ResNet18 backbone has approximately \num{11.2}~million parameters
-and a forward-pass cost of roughly \num{1.8}~GFLOP at the project's
-input shape (estimates for the standard ResNet18; exact values vary
-with the asymmetric stride modifications above). The choice over the
-legacy VGG stack is argued in \Cref{sec:design-model}.
+The ResNet18 backbone has approximately \num{11.2}~million parameters;
+the asymmetric stride schedule reduces the effective forward-pass cost
+relative to the standard architecture by collapsing the spatial
+dimensions earlier in the network.
+The choice over the legacy VGG stack is argued in \Cref{sec:design-model}.
 
 \paragraph{BiLSTM recurrent stack.}
 The two-layer BiLSTM with hidden size \num{256} per direction has on
@@ -773,10 +741,9 @@ The first parameter sets the number of CPU processes feeding the
 GPU; ten was chosen empirically as the value at which the GPU is no
 longer waiting for I/O on the target machine.
 \code{pin\_memory} accelerates host-to-device transfers by allocating
-pinned memory buffers, and \code{persistent\_workers} keeps the workers alive between epochs,
-avoiding the cost of respawning ten processes at each epoch boundary;
-the improvement was noticeable during development but was not
-formally profiled.
+pinned memory buffers, and \code{persistent\_workers} keeps the workers
+alive between epochs, avoiding the cost of respawning ten processes at
+each epoch boundary.
 
 \paragraph{Fused AdamW.}
 On CUDA, the optimiser is constructed with \code{fused=True}, which
@@ -796,7 +763,7 @@ latency is paid once at process start, not per request.
 
 \subsection{Inference latency}
 
-The end-to-end per-page wall time on the target RTX~3060 and the
+The end-to-end per-page wall time on the target hardware and the
 per-stage cost breakdown across preprocessing, staff detection, the
 music and chord CRNNs, and the grammar fixer are measured and reported
 in \Cref{ch:results}. The relevant implementation facts are that staff
@@ -825,9 +792,10 @@ PDF DPI (\code{OMR\_PDF\_DPI}) & Linear: image area scales as DPI$^2$. & Linear 
 Pre-CRNN reject gate & Improves throughput by skipping non-music strips' CRNN call. & Reduces the average latency per page. & Trade-off between false-positive rejection of valid staves and false-negative acceptance of text; thresholds are calibrated on labelled fixtures. \\
 \bottomrule
 \end{tabularx}
-\caption{Operator-tunable trade-offs in the inference pipeline.  Exact
-multipliers are stated where measured in this thesis; the SER /
-latency numbers themselves are reported in \Cref{ch:results}.}
+\caption{Three operator-tunable knobs that move along the throughput,
+latency, and accuracy frontier of the inference pipeline.
+Exact multipliers are stated where measured; the SER and latency
+numbers themselves are reported in \Cref{ch:results}.}
 \label{tab:perf-tradeoffs}
 \end{table}
 

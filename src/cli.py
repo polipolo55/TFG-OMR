@@ -5,15 +5,16 @@ cli.py — Unified command-line interface for the TFG-OMR pipeline.
 
 Subcommands
 -----------
-render      Render PrIMuS samples → LilyJAZZ PNGs + LMX annotations.
-convert     Convert PrIMuS .semantic → monophonic LMX (standalone).
-augment     Apply scan-simulation augmentations to clean images.
-vocab       Build LMX vocabulary from converted data.
-train       Train the CRNN-CTC model.
-evaluate    Evaluate a trained model checkpoint.
-evaluate-ab Compare SER for multiple beam widths on one split.
-pipeline    render → convert → header-less twins → augment → vocab.
-pipeline-train  pipeline, then train (--force-all for full rebuild).
+render                      Render PrIMuS samples → LilyJAZZ PNGs + LMX annotations.
+convert                     Convert PrIMuS .semantic → monophonic LMX (standalone).
+augment                     Apply scan-simulation augmentations to clean images.
+vocab                       Build LMX vocabulary from converted data.
+train                       Train the CRNN-CTC model.
+evaluate                    Evaluate a trained model checkpoint.
+evaluate-ab                 Compare SER for multiple beam widths on one split.
+generate-header-templates   Prerender 120 clef+key+time templates for inference.
+pipeline                    render → convert → header-templates → augment → vocab.
+pipeline-train              pipeline, then train (--force-all for full rebuild).
 harvest-reject-fixtures / calibrate-reject  Staff-reject calibration set.
 
 Usage examples::
@@ -50,9 +51,6 @@ log = logging.getLogger("omr.cli")
 _FULL_RUN_RENDER_DPI: tuple[int, ...] = (200, 250, 300)
 _FULL_RUN_AUGMENT_SEED = 42
 _FULL_RUN_AUGMENT_COPIES = 1  # scanned tree mirrors clean sample ids (one PNG per id)
-_FULL_RUN_HEADERLESS_FRACTION = 0.35
-_FULL_RUN_HEADERLESS_DPI: tuple[int, ...] = (180, 200, 220)
-_FULL_RUN_HEADERLESS_SEED = 42
 
 
 def _get_default_workers() -> int:
@@ -69,18 +67,17 @@ def _resolve_pipeline_force(args: argparse.Namespace) -> dict[str, bool]:
     return {
         "force_render": force_render,
         "force_convert": force_all or getattr(args, "force_convert", False),
-        "force_twins": force_all or getattr(args, "force_twins", False),
         "force_augment": force_all or getattr(args, "force_augment", False) or force_render,
     }
 
 
 def _add_pipeline_rebuild_args(parser: argparse.ArgumentParser) -> None:
-    """Force / header-less-twin options shared by ``pipeline`` and ``pipeline-train``."""
+    """Force options shared by ``pipeline`` and ``pipeline-train``."""
     g_force = parser.add_argument_group("full rebuild")
     g_force.add_argument(
         "--force-all",
         action="store_true",
-        help="Re-render, re-convert, regenerate all header-less twins, and re-augment every sample.",
+        help="Re-render, re-convert, and re-augment every sample.",
     )
     g_force.add_argument(
         "--force-render",
@@ -93,39 +90,9 @@ def _add_pipeline_rebuild_args(parser: argparse.ArgumentParser) -> None:
         help="Re-run semantic→LMX even when .lmx is up to date. Implied by --force-all.",
     )
     g_force.add_argument(
-        "--force-twins",
-        action="store_true",
-        help="Re-render existing __nh twin PNGs. Implied by --force-all.",
-    )
-    g_force.add_argument(
         "--force-augment",
         action="store_true",
         help="Re-augment scanned PNGs even if they exist. Implied by --force-all and --force-render.",
-    )
-    g_twins = parser.add_argument_group("header-less twins (__nh)")
-    g_twins.add_argument(
-        "--no-headerless-twins",
-        action="store_true",
-        help="Skip the continuation-staff twin step (not recommended for full training runs).",
-    )
-    g_twins.add_argument(
-        "--headerless-fraction",
-        type=float,
-        default=_FULL_RUN_HEADERLESS_FRACTION,
-        help=f"Share of treble samples to twin (default: {_FULL_RUN_HEADERLESS_FRACTION}).",
-    )
-    g_twins.add_argument(
-        "--headerless-dpi",
-        type=int,
-        nargs="+",
-        default=list(_FULL_RUN_HEADERLESS_DPI),
-        help=f"DPI choices for twin renders (default: {' '.join(map(str, _FULL_RUN_HEADERLESS_DPI))}).",
-    )
-    g_twins.add_argument(
-        "--headerless-seed",
-        type=int,
-        default=_FULL_RUN_HEADERLESS_SEED,
-        help=f"RNG seed for twin fraction selection (default: {_FULL_RUN_HEADERLESS_SEED}).",
     )
 
 
@@ -419,22 +386,16 @@ def cmd_augment(args: argparse.Namespace) -> None:
         sys.argv = old_argv
 
 
-# ── headerless-twins ──────────────────────────────────────────────────────
+# ── generate-header-templates ──────────────────────────────────────────────
 
 
-def cmd_headerless_twins(args: argparse.Namespace) -> None:
-    """Generate header-less (__nh) continuation-staff twin samples."""
-    from data_processing.generate_headerless_twins import run_headerless_twins
+def cmd_generate_header_templates(args: argparse.Namespace) -> None:
+    """Prerender clef+key+time header strip templates for virtual header injection."""
+    from data_processing.generate_header_templates import generate_all_templates
 
-    force = _resolve_pipeline_force(args)["force_twins"] or getattr(args, "force", False)
-    run_headerless_twins(
-        Path(args.data_dir),
-        fraction=args.headerless_fraction,
-        dpi_choices=tuple(args.headerless_dpi),
-        workers=args.workers,
-        seed=args.headerless_seed,
-        force=force,
-        limit=args.limit,
+    generate_all_templates(
+        output_dir=Path(args.output),
+        force=getattr(args, "force", False),
     )
 
 
@@ -456,12 +417,13 @@ def cmd_api(args: argparse.Namespace) -> None:
 
 
 def cmd_pipeline(args: argparse.Namespace) -> None:
-    """Run the full data pipeline (render → convert → twins → augment → vocab).
+    """Run the full data pipeline (render → convert → header-templates → augment → vocab).
 
     New layout (no package-specific wiring):
         raw PrIMuS:          data/raw/primus/...
         clean rendered:      data/processed/primus/clean/...
         scanned/augmented:   data/processed/primus/scanned/...
+        header templates:    data/header_templates/...
         vocabulary:          data/vocab/primus_lmx.txt
     """
     extra_vocab = getattr(args, "extra_vocab_data_dir", None) or None
@@ -492,22 +454,10 @@ def cmd_pipeline(args: argparse.Namespace) -> None:
     )
     cmd_convert(convert_args)
 
-    # 3. Header-less continuation-staff twins (__nh) — before augment so twins get scanned variants
-    if not getattr(args, "no_headerless_twins", False):
-        log.info("--- Generating header-less (__nh) twin samples ---")
-        twins_args = argparse.Namespace(
-            data_dir=args.clean_dir,
-            headerless_fraction=getattr(args, "headerless_fraction", _FULL_RUN_HEADERLESS_FRACTION),
-            headerless_dpi=getattr(args, "headerless_dpi", list(_FULL_RUN_HEADERLESS_DPI)),
-            headerless_seed=getattr(args, "headerless_seed", _FULL_RUN_HEADERLESS_SEED),
-            workers=args.workers,
-            limit=args.limit,
-            force_all=getattr(args, "force_all", False),
-            force_twins=force["force_twins"],
-        )
-        cmd_headerless_twins(twins_args)
-    else:
-        log.info("--- Skipping header-less twins (--no-headerless-twins) ---")
+    # 3. Prerender header templates for virtual header injection at inference
+    log.info("--- Generating header templates for virtual header injection ---")
+    tmpl_args = argparse.Namespace(output=Path("data/header_templates"), force=getattr(args, "force_all", False))
+    cmd_generate_header_templates(tmpl_args)
 
     # 4. Augment clean images → scanned/augmented dataset (labels copied over)
     log.info("--- Augmenting clean images → scanned dataset ---")
@@ -1056,7 +1006,7 @@ def build_parser() -> argparse.ArgumentParser:
     # ── pipeline ──────────────────────────────────────────────────────
     p_pipe = sub.add_parser(
         "pipeline",
-        help="Run full data pipeline (render → convert → twins → augment → vocab)",
+        help="Run full data pipeline (render → convert → header-templates → augment → vocab)",
     )
     p_pipe.add_argument(
         "--raw-primus-dir",
@@ -1215,6 +1165,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     p_ptrain.set_defaults(func=cmd_pipeline_train)
+
+    # ── generate-header-templates ─────────────────────────────────────────
+    p_tmpl = sub.add_parser(
+        "generate-header-templates",
+        help="Prerender 120 header-strip templates (15 keys × 8 time sigs) for virtual header injection.",
+    )
+    p_tmpl.add_argument(
+        "--output",
+        type=Path,
+        default=Path("data/header_templates"),
+        help="Directory to write template PNGs (default: data/header_templates).",
+    )
+    p_tmpl.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-render even if templates already exist.",
+    )
+    p_tmpl.set_defaults(func=cmd_generate_header_templates)
 
     # ─── harvest-reject-fixtures ───────────────────────────────────────────
     p_harvest = sub.add_parser(

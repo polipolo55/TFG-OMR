@@ -172,7 +172,6 @@ def run_eval(
         max_source_height=cfg.max_source_height,
         extra_data_dirs=cfg.extra_data_dirs or None,
         extra_scanned_dirs=cfg.extra_scanned_dirs or None,
-        strip_header_prob=0.0,
         online_aug_prob=0.0,
         rare_lmx_oversample=1,
     )

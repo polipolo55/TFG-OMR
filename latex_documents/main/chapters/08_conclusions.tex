@@ -48,8 +48,8 @@ a pointer to the evidence.
           with the protocol of \Cref{sec:design-training}, and
           evaluated against the acceptance criteria of
           \Cref{sec:design-domain}; the headline numbers reach
-          \SI{1.19}{\percent} aggregate SER on the clean test split and
-          \SI{1.28}{\percent} on the scanned split
+          \SI{0.28}{\percent} aggregate SER on the clean test split and
+          \SI{0.23}{\percent} on the scanned split
           (\Cref{tab:results-headline}), well below the
           \SI{2}{\percent} and \SI{3}{\percent} targets set in advance.
     \item \textbf{O5 — Quantitative error analysis.}
@@ -89,32 +89,32 @@ a pointer to the evidence.
 
 The headline figures from \Cref{ch:results} are restated here so the
 tribunal can audit the assessment above without paging back.
-All numbers refer to the epoch-37 checkpoint at
-\code{models/latest/best\_model.pt}, evaluated on 4\,604 held-out
+All numbers refer to the epoch-59 checkpoint at
+\code{models/latest/best\_model.pt}, evaluated on 4\,608 held-out
 samples per split with greedy CTC decoding.
 
 \begin{itemize}
-    \item \textbf{Aggregate SER:} \SI{1.19}{\percent} (clean) and
-          \SI{1.28}{\percent} (scanned).
-          The clean-to-scanned gap is \num{0.09} percentage points,
+    \item \textbf{Aggregate SER:} \SI{0.28}{\percent} (clean) and
+          \SI{0.23}{\percent} (scanned).
+          The two splits differ by \num{0.05} percentage points,
           well inside the one-percentage-point margin set as the
           augmentation acceptance criterion in
           \Cref{sec:design-domain}.
-    \item \textbf{Melodic SER:} \SI{0.11}{\percent} (clean) and
-          \SI{0.18}{\percent} (scanned), measured after stripping
+    \item \textbf{Melodic SER:} \SI{0.02}{\percent} (clean) and
+          \SI{0.03}{\percent} (scanned), measured after stripping
           \code{measure} and tie tokens; the model gets the actual
           pitch, duration, and accidental content right on more than
           \SI{99}{\percent} of tokens.
-    \item \textbf{Perfect-transcription rate:} \SI{73}{\percent}
-          (clean) and \SI{71}{\percent} (scanned); roughly three out
-          of four input staves come out token-identical to the ground
+    \item \textbf{Perfect-transcription rate:} \SI{92.1}{\percent}
+          (clean) and \SI{94.1}{\percent} (scanned); more than nine
+          in ten input staves come out token-identical to the ground
           truth (\Cref{sec:res-ser}).
-    \item \textbf{Error composition:} approximately \SI{74}{\percent}
-          of edits are \code{measure} tokens and \SI{13}{\percent} are
+    \item \textbf{Error composition:} approximately \SI{73}{\percent}
+          of edits are \code{measure} tokens and \SI{16}{\percent} are
           ties; together these two structural classes account for
-          about \SI{87}{\percent} of the residual SER, while
+          about \SI{89}{\percent} of the residual SER, while
           per-category pitch, octave, and duration error rates each
-          remain below \SI{0.15}{\percent} (\Cref{sec:res-errors}).
+          remain below \SI{0.05}{\percent} (\Cref{sec:res-errors}).
     \item \textbf{Beam-vs-greedy decoding:} beam search at width 5
           yields an SER improvement of at most one edit per thousand
           tokens at roughly \num{6}$\times$ the decoding cost; greedy
@@ -165,7 +165,7 @@ The end-to-end measurement on real pages is therefore the most
 important uncovered question.
 
 \paragraph{Structural errors dominate the residual SER.}
-About \SI{87}{\percent} of the residual edits are barline and tie
+About \SI{89}{\percent} of the residual edits are barline and tie
 tokens (\Cref{sec:res-errors}).
 These are largely musically irrelevant once a downstream renderer
 re-bars the output, which is the reason for reporting a separate

@@ -165,8 +165,8 @@ The workstation pairs an NVIDIA RTX~3060 GPU (\SI{170}{\watt} TDP)
 with a desktop platform whose full-system draw under training load
 is approximately \SI{250}{\watt}.
 Cumulative GPU-engaged time totals approximately
-\SI{230}{\hour}, dominated by the main CRNN training (37 converged
-epochs, plus ablation and chord-OCR fine-tuning runs), with smaller
+\SI{230}{\hour}, dominated by the main CRNN training (a 60-epoch
+run, plus ablation and chord-OCR fine-tuning runs), with smaller
 contributions from synthetic-data rendering and evaluation passes.
 The energy estimate follows directly:
 $\SI{230}{\hour} \times \SI{0.25}{\kilo\watt} \approx
@@ -409,8 +409,8 @@ two updates are worth recording.
 
 First, the \textbf{environmental} estimate of $\approx 57.5$\,kWh
 made at the planning stage is consistent with the executed
-training profile: the final checkpoint converged in
-\num{37} epochs (\Cref{sec:res-training}) and the full
+training profile: the best checkpoint was reached at epoch
+\num{59} of a 60-epoch run (\Cref{sec:res-training}) and the full
 training run including ablations fits within the planned envelope.
 Mixed-precision training was the single most effective mitigation:
 it reduced VRAM usage enough that the entire pipeline runs on a

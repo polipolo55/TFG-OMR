@@ -61,7 +61,7 @@ SER distribution to illustrate the failure modes summarised in
 A brief diagnostic, useful when comparing trained checkpoints, is the
 marginal distribution of the model's weights at convergence.
 \Cref{fig:weight-dist} shows the distributions of the four principal
-parameter groups of the epoch-37 checkpoint: the classifier (final
+parameter groups of the epoch-59 checkpoint: the classifier (final
 linear layer), the convolutional and batch-normalisation weights of
 the ResNet backbone, the LSTM weights, and the biases.
 
@@ -69,10 +69,11 @@ the ResNet backbone, the LSTM weights, and the biases.
     \centering
     \includegraphics[width=\textwidth]{figures/fig_weight_distributions}
     \caption{Marginal weight distributions of the four principal
-    parameter groups of the trained CRNN at epoch 37.
+    parameter groups of the trained CRNN at epoch 59.
     All four are close to centred Gaussian with standard deviations
-    in the $[0.17, 0.28]$ range; AdamW's \num{1e-4} weight decay
-    keeps the magnitudes bounded.
+    in the $[0.22, 0.35]$ range (the classifier layer is the widest);
+    AdamW's \num{1e-4} weight decay keeps the magnitudes bounded, and
+    no output row is dead.
     The small spikes near $\pm 1$ in the classifier panel are an
     artefact of the classifier saturating on the CTC blank class and
     the most frequent token.}

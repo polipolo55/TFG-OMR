@@ -65,11 +65,11 @@ class Config:
     dropout: float = 0.3  # dropout between LSTM layers
 
     # ── Data augmentation ──────────────────────────────────────────────────
-    # strip_header_prob: DEPRECATED / inert. Header-less continuation lines are
-    # now provided as first-class "__nh" twin samples generated at data time
-    # (see generate_headerless_twins.py), because the previous training-time
-    # crop could not align the removed header pixels with the removed label
-    # tokens. The field is kept (not removed) so existing checkpoints still
+    # strip_header_prob: DEPRECATED / inert. Continuation staves are now handled
+    # at inference time by virtual header injection (header_injector.py +
+    # generate_header_templates.py) — a clef+key+time strip is prepended to the
+    # staff image before the CRNN so no training-time augmentation is needed.
+    # The field is kept (not removed) so existing checkpoints still
     # deserialise their Config; it no longer drives any image crop.
     strip_header_prob: float = 0.0
 

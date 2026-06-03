@@ -27,7 +27,7 @@ front.
 \label{sec:res-protocol}
 
 All numbers in this chapter are produced from a single trained
-checkpoint, \code{models/latest/best\_model.pt} (epoch 37), with the
+checkpoint, \code{models/latest/best\_model.pt} (epoch 59), with the
 hyperparameters listed in \Cref{tab:hyperparams-omr} (\Cref{app:hyperparams}).
 The procedure is reproducible with the one-line command shown at the
 end of this section.
@@ -37,13 +37,13 @@ The corpora, the three domain filters, and the deterministic
 \code{make\_splits} partition are specified in
 \Cref{sec:design-data}. The three filters are applied before the
 split. Clean and scanned variants of the same source share a split
-assignment, so the resulting 4\,604-sample test split reports the same
+assignment, so the resulting 4\,608-sample test split reports the same
 musical content under two visual regimes.
 
 \paragraph{Hardware and software.}
 The hardware and software stack is described in \Cref{ch:impl}.
-On that single-GPU configuration, a full 49-epoch run takes
-approximately 6\,h 45\,min wall time ($\approx 8$\,min/epoch),
+On that single-GPU configuration, the full 60-epoch run takes
+approximately 13.9\,h wall time ($\approx 14$\,min/epoch),
 measured from the training log of the selected checkpoint.
 
 \paragraph{Metrics.}
@@ -94,8 +94,9 @@ held-out split and prints both the aggregate and the melodic SER.
 
 \Cref{fig:training-curves} shows the trajectory of the CTC loss on
 the train and validation splits and the corresponding validation SER
-over the 49 epochs that ran before early stopping triggered at
-patience 12.
+over the 60 epochs of the training run; the validation SER kept
+improving up to epoch 59, so the run reached the 60-epoch cap
+without the patience-12 early stopping ever triggering.
 
 \begin{figure}[htbp]
     \centering
@@ -104,23 +105,23 @@ patience 12.
     \textbf{Left:} CTC loss on the train (blue) and validation
     (orange) splits.
     The train loss continues to decrease while the validation loss
-    plateaus around \num{0.05}--\num{0.07}, indicating a small but
+    plateaus around \num{0.05}--\num{0.06}, indicating a small but
     bounded overfit margin.
     \textbf{Right:} validation SER over the same epochs.
-    The curve drops sharply from $\approx \SI{12}{\percent}$ to below
-    \SI{2}{\percent} within ten epochs and converges to
-    $\approx \SI{1.3}{\percent}$.
+    The curve drops sharply from $\approx \SI{8}{\percent}$ to below
+    \SI{2}{\percent} within seven epochs and converges to
+    $\approx \SI{1.0}{\percent}$.
     The best checkpoint, marked by the vertical dashed line at epoch
-    37 (val SER \num{0.0128}), is the one used for every subsequent
-    evaluation; later epochs do not improve validation SER and the
-    early-stopping mechanism halts training at epoch 49.}
+    59 (val SER \num{0.0098}), is the one used for every subsequent
+    evaluation; the validation SER keeps improving slowly to the end,
+    so training runs to the 60-epoch cap.}
     \label{fig:training-curves}
 \end{figure}
 
 Validation SER converges much faster than the loss curve suggests: by
-epoch 10 it is already below \SI{2}{\percent}, and the remaining 27
-epochs of useful training produce a further reduction of only
-$\approx 0.7$ percentage points.
+epoch 7 it is already below \SI{2}{\percent}, and the remaining
+epochs of training produce a further reduction of only
+$\approx 0.6$ percentage points.
 In these runs the model appears to learn most of the CTC alignment
 early, with late training refining a small fraction of difficult
 samples.
@@ -133,35 +134,35 @@ trained weight distributions, reported as a sanity check in
 \section{Aggregate Symbol Error Rate}
 \label{sec:res-ser}
 
-Evaluation is performed on the 4\,604-sample held-out test split with
+Evaluation is performed on the 4\,608-sample held-out test split with
 greedy CTC decoding.
-Aggregate SER is \SI{1.28}{\percent} on the scanned variant and
-\SI{1.19}{\percent} on the clean variant; melodic SER is
-\SI{0.18}{\percent} and \SI{0.11}{\percent} respectively.
-The perfect-transcription rate is \SI{71.2}{\percent} on the scanned
-variant and \SI{73}{\percent} on the clean variant.
+Aggregate SER is \SI{0.23}{\percent} on the scanned variant and
+\SI{0.28}{\percent} on the clean variant; melodic SER is
+\SI{0.03}{\percent} and \SI{0.02}{\percent} respectively.
+The perfect-transcription rate is \SI{94.1}{\percent} on the scanned
+variant and \SI{92.1}{\percent} on the clean variant.
 \Cref{tab:results-headline} consolidates these headline numbers; the
 remainder of the chapter decomposes them rather than re-quoting them.
 
 \begin{table}[h!]
     \centering
-    \caption{Headline test-set results on the epoch-37 checkpoint
+    \caption{Headline test-set results on the epoch-59 checkpoint
     (\code{models/latest/best\_model.pt}), greedy CTC decoding,
-    4\,604 held-out samples per visual variant.  Reproduced with
+    4\,608 held-out samples per visual variant.  Reproduced with
     \code{scripts/evaluate\_full.py --both-splits}.}
     \label{tab:results-headline}
     \small
     \setlength{\tabcolsep}{6pt}
     \renewcommand{\arraystretch}{1.25}
-    \begin{tabular}{@{} l S[table-format=1.2] S[table-format=1.2] @{}}
+    \begin{tabular}{@{} l S[table-format=2.2] S[table-format=2.2] @{}}
         \toprule
         \textbf{Metric} & {\textbf{Scanned}} & {\textbf{Clean}} \\
         \midrule
-        Aggregate SER (\%)               & 1.28 & 1.19 \\
-        Melodic SER (\%)                 & 0.18 & 0.11 \\
-        Perfect transcriptions (\%)      & 71.2 & 73.0 \\
-        Samples with SER $\le 0.05$ (\%) & 90.4 & {\textemdash} \\
-        Samples with SER $\le 0.10$ (\%) & 97.7 & {\textemdash} \\
+        Aggregate SER (\%)               & 0.23 & 0.28 \\
+        Melodic SER (\%)                 & 0.03 & 0.02 \\
+        Perfect transcriptions (\%)      & 94.1 & 92.1 \\
+        Samples with SER $\le 0.05$ (\%) & 98.5 & 98.4 \\
+        Samples with SER $\le 0.10$ (\%) & 99.7 & {\textemdash} \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -171,19 +172,19 @@ remainder of the chapter decomposes them rather than re-quoting them.
     \includegraphics[width=\textwidth]{figures/fig_ser_distribution}
     \caption{Per-sample SER distribution on the scanned test split,
     overlaid with its empirical CDF.
-    The aggregate SER of \num{0.0128} is dominated by a long but
+    The aggregate SER of \num{0.0023} is dominated by a long but
     thin right tail of high-error samples; the bulk of the
     distribution sits at zero.
-    Approximately \SI{71}{\percent} of test samples are transcribed
-    with zero edits and \SI{95}{\percent} fall below SER \num{0.05}.}
+    Approximately \SI{94}{\percent} of test samples are transcribed
+    with zero edits and \SI{98.5}{\percent} fall below SER \num{0.05}.}
     \label{fig:ser-distribution}
 \end{figure}
 
 \Cref{fig:ser-distribution} shows the per-sample SER distribution on
 the scanned variant.
 The modal outcome is a perfect transcription
-($\approx \SI{71.2}{\percent}$ of samples have SER \num{0}), and the
-empirical CDF reaches \num{0.95} near SER \num{0.05}.
+($\approx \SI{94.1}{\percent}$ of samples have SER \num{0}), and the
+empirical CDF exceeds \num{0.95} by SER \num{0.05}.
 The distribution is bimodal, a tall spike at zero plus a thin right
 tail: in these experiments the model tends either to read a sample
 correctly or to fail on a specific localised pattern.
@@ -195,7 +196,7 @@ after stripping the \code{measure} and the two tie tokens
 (see \Cref{tab:results-headline}).
 The checkpoint sits roughly an order of magnitude lower on this
 metric than on the aggregate SER for both visual variants, and the
-melodic perfect-transcription rate rises to \SI{93.7}{\percent} on the
+melodic perfect-transcription rate rises to \SI{99.0}{\percent} on the
 scanned variant.
 The reason becomes clear once the error budget is decomposed by
 token category, which is the subject of the next section.
@@ -212,12 +213,43 @@ this chapter, and beam search is retained as an opt-in flag at
 inference time, consistent with the model documentation in
 \Cref{sec:design-model}.
 
-\todo{Add an inference-time table: cold-start time, per-staff greedy
-decode time, per-staff beam-5 decode time, full-page wall time on a
-representative Real Book page.  Measure with
-\code{poetry run python -m timeit -n 10 -s "from omr\_pipeline.pipeline
-import run\_pipeline; ..."} or a small instrumented script.  Strengthens
-Objective~6 (deployable system).}
+\paragraph{Inference latency.}
+End-to-end per-page latency was measured on the target RTX~3060 over a
+representative synthetic page ($2550\times3300$\,px, eight staves) with
+greedy decoding.
+The full \code{run\_pipeline} call completes in a median of
+\SI{111}{\milli\second} (mean \SI{111}{\milli\second}~$\pm$~\SI{2}{\milli\second}
+over ten repetitions).
+\Cref{tab:latency} breaks this down by stage: staff detection and
+preprocessing dominate the budget, the two CRNN forward passes are
+comparatively cheap, and the deterministic grammar fixer is
+negligible.
+A standalone per-strip measurement on staves of width
+$\approx\SI{1500}{px}$ gives a median CRNN decode time of
+\SI{4.9}{\milli\second} (greedy, 20 repetitions).
+
+\begin{table}[h!]
+    \centering
+    \caption{Per-stage inference latency on a representative
+    eight-staff page (RTX~3060, greedy decoding, single run).}
+    \label{tab:latency}
+    \small
+    \setlength{\tabcolsep}{8pt}
+    \renewcommand{\arraystretch}{1.25}
+    \begin{tabular}{@{} l S[table-format=3.1] @{}}
+        \toprule
+        \textbf{Stage} & {\textbf{Time (ms)}} \\
+        \midrule
+        Preprocessing (load + deskew + binarise) & 22.4 \\
+        Staff detection                          & 45.4 \\
+        Music CRNN (8 staves, greedy)            &  7.1 \\
+        Chord CRNN (8 strips)                    &  4.4 \\
+        Grammar fixer                            &  0.1 \\
+        \midrule
+        \textbf{End-to-end (median, 10 reps)}    & 111.0 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Error Decomposition}
@@ -243,26 +275,23 @@ Levenshtein operations: \term{deletions}, \term{insertions} and
     \label{fig:edit-dist}
 \end{figure}
 
-Substitutions are the rarest error type, which matters because
-substitutions are the errors that affect musical \textit{content}.
-Deletions and insertions dominate; as the next subsection shows, the
-majority of those concern the \code{measure} token.
-\todo{measure: read the exact deletion/insertion/substitution counts
-from notebook \code{02\_evaluate\_model.ipynb}, section 6.2
-``Error-type breakdown'' (cell that builds the \code{total\_r} dict
-\code{\{sub, ins, del, match\}} via \code{\_edit\_ops}, and the
-pie-chart cell that follows it), and write them into the prose above
-as concrete percentages of total edits.}
+Substitutions are the rarest error type at \SI{3.0}{\percent} of the
+\num{667} total edits, which matters because substitutions are the
+errors that affect musical \textit{content}.
+Insertions (\SI{36.0}{\percent}) and deletions (\SI{61.0}{\percent})
+dominate; as the next subsection shows, the majority of those concern
+the \code{measure} token.
 
 \subsection{Per-token breakdown}
 
 \Cref{fig:common-edits} shows the top-15 substitutions, deletions
 and insertions by frequency.
 The picture is unambiguous: \code{measure} dominates both deletions
-($\approx \num{1600}$ occurrences, an order of magnitude above the
-next-most-deleted token) and insertions ($\approx \num{1050}$).
+(\num{302} occurrences, an order of magnitude above the
+next-most-deleted token) and insertions (\num{185}).
 Tie tokens (\code{tied:start} and \code{tied:stop}) follow in second
-place for both categories, contributing roughly \num{150} each.
+place for both categories, contributing \num{63} deletions and
+\num{39} insertions in total.
 Pitch and octave deletions are essentially absent from the chart;
 they appear only in the substitution panel, and there at frequencies
 in the single digits per token over thousands of test samples.
@@ -272,15 +301,15 @@ in the single digits per token over thousands of test samples.
     \includegraphics[width=\textwidth]{figures/fig_top_token_errors}
     \caption{Top-15 token-level edit operations on the scanned test
     split.
-    \textbf{Left:} most frequent substitutions, dominated by duration
-    confusions ($16^{\rm th} \leftrightarrow 32^{\rm nd}$,
-    $\rm{eighth} \leftrightarrow 16^{\rm th}$).
+    \textbf{Left:} most frequent substitutions --- a sparse mix of
+    duration ($\rm{eighth} \leftrightarrow 16^{\rm th}$), pitch, and
+    tie confusions, none exceeding two occurrences.
     \textbf{Middle:} most frequent deletions, dominated by missed
-    \code{measure} tokens (over \num{1600} occurrences).
+    \code{measure} tokens (\num{302} occurrences).
     \textbf{Right:} most frequent insertions, again dominated by
     spurious \code{measure} tokens.
     The two structural categories (\code{measure} and the tie tokens)
-    together account for approximately \SI{87}{\percent} of the
+    together account for approximately \SI{89}{\percent} of the
     edit budget.}
     \label{fig:common-edits}
 \end{figure}
@@ -291,25 +320,43 @@ deterministic grammar fixer rather than at the model level, because
 barline boundaries are intrinsically ambiguous for a model without
 explicit beat tracking and the cleanest place to enforce them is the
 post-processor that knows the time signature.
-The substitutions that do occur are almost entirely confined to
-duration confusions between visually similar values
-($16^{\rm th} \leftrightarrow 32^{\rm nd}$,
-$\rm{eighth} \leftrightarrow 16^{\rm th}$,
-$\rm{quarter} \leftrightarrow \rm{eighth}$).
-Pitch substitutions (e.g.\ $\rm{pitch:A} \to \rm{pitch:C}$) and
-octave substitutions (e.g.\ $\rm{octave:5} \to \rm{octave:6}$) exist
-but with single-digit counts over the full test split.
+The substitutions that do occur are sparse (\num{20} in total) and
+spread across duration confusions between visually similar values
+($\rm{eighth} \leftrightarrow 16^{\rm th}$,
+$\rm{half} \leftrightarrow \rm{quarter}$), a few pitch confusions
+(e.g.\ $\rm{pitch:A} \to \rm{pitch:B}$), and occasional octave
+(e.g.\ $\rm{octave:4} \to \rm{octave:5}$) or accidental slips, none
+occurring more than twice over the full test split.
 The residual error budget is therefore structural and rhythmic, not
 melodic.
 
-\todo{Add a small confusion table: top-5 source\,$\to$\,target
-substitution pairs by count.  Data is already produced by notebook
-\code{02\_evaluate\_model.ipynb}, section 6.3 ``Most common confused
-/ deleted / inserted tokens'' (cell that prints
-\code{sub\_counts.most\_common(TOP\_N)} as ``\code{ref → pred ×count}'');
-take the top-5 rows from that output and export them as a
-\code{booktabs} table here.  This was called out by the audit as a
-low-effort, high-evidence addition.}
+\Cref{tab:top-subs} lists the most frequent substitution pairs on the
+scanned test split.  No pair occurs more than twice, confirming that
+content-level confusions are both rare and unsystematic: the three
+joint-most-frequent substitutions span a duration pair, a pitch pair,
+and a tie pair, with no single failure mode standing out.
+
+\begin{table}[h!]
+    \centering
+    \caption{Top-5 substitution pairs (reference\,$\to$\,prediction)
+    by count on the scanned test split.  The three leading pairs are
+    tied at two occurrences each.}
+    \label{tab:top-subs}
+    \small
+    \setlength{\tabcolsep}{8pt}
+    \renewcommand{\arraystretch}{1.25}
+    \begin{tabular}{@{} l l c @{}}
+        \toprule
+        \textbf{Reference} & \textbf{Prediction} & \textbf{Count} \\
+        \midrule
+        \code{pitch:A}    & \code{pitch:B}    & 2 \\
+        \code{eighth}     & \code{16th}       & 2 \\
+        \code{tied:start} & \code{tied:stop}  & 2 \\
+        \code{pitch:B}    & \code{pitch:G}    & 1 \\
+        \code{natural}    & \code{flat}       & 1 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 
 \subsection{SER versus sequence length}
 
@@ -566,7 +613,7 @@ testing.  Command:
 --checkpoint models/latest/best\_model.pt --epochs 10}.
 Report aggregate SER and melodic SER on the held-out real test set
 both before and after fine-tuning, with the synthetic-test SER
-of \SI{1.28}{\percent} reported alongside as a non-regression check.
+of \SI{0.23}{\percent} reported alongside as a non-regression check.
 Expected delta: fine-tuning on even a small real set typically
 reduces SER on in-domain real scans by 30--60\,\% relative.}
 
@@ -605,11 +652,11 @@ SER above.}
 
 The synthetic-data baseline trained from scratch reaches the headline
 figures of \Cref{tab:results-headline}: aggregate SER around
-\SI{1.2}{\percent} on both the clean and the scan-augmented test
+\SIrange{0.2}{0.3}{\percent} on both the clean and the scan-augmented test
 splits, melodic SER an order of magnitude lower, and a
-perfect-transcription rate above \SI{70}{\percent}.
+perfect-transcription rate above \SI{90}{\percent}.
 The residual error budget is concentrated in the \code{measure} and
-tie tokens, which together account for $\approx \SI{87}{\percent}$ of
+tie tokens, which together account for $\approx \SI{89}{\percent}$ of
 all edits, while pitch and octave errors are negligible.
 Combined with the deterministic grammar fixer that reconstructs
 barline boundaries from the time signature, these results place the

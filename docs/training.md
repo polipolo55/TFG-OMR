@@ -119,7 +119,7 @@ Batch dict keys: `images`, `labels`, `label_lens`, `image_widths`
 | `val_frac` | 0.10 | validation split fraction |
 | `test_frac` | 0.10 | test split fraction |
 | `use_scanned` | True | include augmented images |
-| `strip_header_prob` | 0.0 | DEPRECATED/inert — header-less staves now come from `__nh` twin samples |
+| `strip_header_prob` | 0.0 | DEPRECATED/inert — continuation staves handled at inference via virtual header injection |
 | `rare_lmx_oversample` | 2 | oversampling factor for ties |
 
 ## Checkpoint Files

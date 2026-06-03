@@ -15,10 +15,10 @@ d'acords. Tots dos models s'entrenen de manera independent sobre dades sintètiq
 generades a partir del conjunt PrIMuS. Per reduir la diferència entre imatges sintètiques
 i escaneigs reals, s'aplica una etapa d'augmentació que simula artefactes fotogràfics
 habituals. Avaluat amb la \term{Taxa d'Error de Símbols} (SER), el model assoleix un
-\textbf{1{,}19\%} sobre el conjunt de prova sintètic net i un \textbf{1{,}28\%} sobre la
+\textbf{0{,}28\%} sobre el conjunt de prova sintètic net i un \textbf{0{,}23\%} sobre la
 versió simulada com a escanejada; la SER melòdica (excloent-hi els tokens de compàs i
-lligadura) és de \textbf{0{,}11\%} i \textbf{0{,}18\%} respectivament, i el
-\textbf{73\%} i \textbf{71\%} de les transcripcions són perfectes per a cada versió.
+lligadura) és de \textbf{0{,}02\%} i \textbf{0{,}03\%} respectivament, i el
+\textbf{92\%} i \textbf{94\%} de les transcripcions són perfectes per a cada versió.
 
 El sistema complet integra detecció de pentagrames, reconeixement de melodia, extracció
 de símbols d'acords i correcció gramatical, i accepta fitxers PDF o imatges com a
@@ -44,10 +44,10 @@ símbolos de acorde. Ambos modelos se entrenan de forma independiente sobre dato
 sintéticos generados a partir del conjunto PrIMuS. Para reducir la brecha entre imágenes
 sintéticas y escáneres reales, se aplica una etapa de aumento que simula artefactos
 fotográficos habituales. Evaluado con la \term{Tasa de Error de Símbolos} (SER), el
-modelo alcanza un \textbf{1{,}19\%} sobre el conjunto de prueba sintético limpio y un
-\textbf{1{,}28\%} sobre la versión simulada como escaneada; la SER melódica (excluyendo
-tokens de compás y ligadura) es de \textbf{0{,}11\%} y \textbf{0{,}18\%}
-respectivamente, y el \textbf{73\%} y \textbf{71\%} de las transcripciones son perfectas
+modelo alcanza un \textbf{0{,}28\%} sobre el conjunto de prueba sintético limpio y un
+\textbf{0{,}23\%} sobre la versión simulada como escaneada; la SER melódica (excluyendo
+tokens de compás y ligadura) es de \textbf{0{,}02\%} y \textbf{0{,}03\%}
+respectivamente, y el \textbf{92\%} y \textbf{94\%} de las transcripciones son perfectas
 para cada versión.
 
 El sistema completo integra detección de pentagramas, reconocimiento de melodía,
@@ -75,10 +75,10 @@ recognition, and a second CRNN-CTC for chord symbol extraction. Both streams are
 independently on synthetic data derived from the PrIMuS dataset. To bridge the gap
 between clean synthetic renderings and real scans, an augmentation stage simulates common
 photographic artefacts. Evaluated using the \term{Symbol Error Rate} (SER) on a
-held-out test split of 4\,604 samples, the melody model achieves \textbf{1.19\%} SER on
-the clean synthetic set and \textbf{1.28\%} on its scan-simulated counterpart, with
-melodic SER (barline and tie tokens excluded) of \textbf{0.11\%} and \textbf{0.18\%}
-respectively, and perfect transcription rates of \textbf{73\%} and \textbf{71\%}.
+held-out test split of 4\,608 samples, the melody model achieves \textbf{0.28\%} SER on
+the clean synthetic set and \textbf{0.23\%} on its scan-simulated counterpart, with
+melodic SER (barline and tie tokens excluded) of \textbf{0.02\%} and \textbf{0.03\%}
+respectively, and perfect transcription rates of \textbf{92\%} and \textbf{94\%}.
 
 The full inference pipeline integrates staff detection, melody recognition, chord symbol
 extraction, and a grammar correction stage, accepting PDF or image input and returning a

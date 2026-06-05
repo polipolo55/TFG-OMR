@@ -329,13 +329,13 @@ testing on pages with chord symbols printed close to the staff: the
 chord text shrank the inter-staff gap and produced under-segmented
 two-staff strips. The morphological detector is robust to this because
 it keys on isolated long horizontal runs, not the full-page
-projection --- a choice the staff-detection
-literature~\cite{dalitzComparativeStudyStaff2008} supports.
+projection. The staff-detection
+literature~\cite{dalitzComparativeStudyStaff2008} supports this choice.
 
 \paragraph{OCR-only rejection rule.}
 Tested first: mark any strip on which general-purpose OCR returns text
 as non-music, since titles and credits carry text where staves do not.
-Too brittle --- legitimate staves often carry text (rehearsal letters,
+Too brittle: legitimate staves often carry text (rehearsal letters,
 dynamics, chord symbols), and the binary verdict rejected them with no
 recourse. The final design instead demotes OCR density to one signal
 among several and adds the CTC-confidence override.
@@ -346,7 +346,7 @@ did not consistently beat the geometric and OCR gates: training it
 needs hand-labelled non-music crops covering the real failure
 distribution (credits, collinear-text footers, watermarks, title
 headings), and a classifier trained on the cheaply-labelled subset
-accepted the same false positives the heuristics already did --- a
+accepted the same false positives the heuristics already did, a
 labelling cost out of proportion to the gain over a supervision-free
 CTC-confidence post-gate.
 
@@ -402,7 +402,7 @@ augmentations.
 
 Three other public corpora were surveyed and rejected.
 \textbf{OLiMPiC}~\cite{mayerPracticalEndToEnd2024}, which introduced LMX, is the closest analogue to PrIMuS in output format but is pianoform (grand staff, multi-voice); training on it would consume capacity on visual patterns never seen at inference.
-\textbf{MUSCIMA++}~\cite{hajicMuscimaPP2017} covers handwritten music on staff paper --- the wrong direction of engraving-style gap --- and its MuNG graph ground truth does not map to a flat CTC-style token sequence without an error-prone sequentialisation step.
+\textbf{MUSCIMA++}~\cite{hajicMuscimaPP2017} covers handwritten music on staff paper (the wrong direction of the engraving-style gap), and its MuNG graph ground truth does not map to a flat CTC-style token sequence without an error-prone sequentialisation step.
 \textbf{DeepScoresV2}~\cite{tuggenerDeepScoresV22020} provides oriented bounding boxes per symbol, not token sequences; converting those annotations to LMX is a non-trivial dataset-conversion project, and the result would be coarser than PrIMuS's semantic transcriptions.
 
 \subsection{Domain augmentation: from clean renders to scanned pages}
@@ -593,7 +593,7 @@ deferred to \Cref{ch:impl}.
 \subsection{Alternatives considered}
 \label{sec:design-lmx-alts}
 
-\textbf{MusicXML} is too verbose as a direct model target --- each note is wrapped in nested XML tags that inflate sequence length with no musical content; it is the downstream target that LMX round-trips to via a deterministic post-processor.
+\textbf{MusicXML} is too verbose as a direct model target: each note is wrapped in nested XML tags that inflate sequence length with no musical content; it is the downstream target that LMX round-trips to via a deterministic post-processor.
 \textbf{PrIMuS \code{.semantic}} encodes pitch and accidentals jointly (\code{note-Bb5\_quarter}), uses a project-internal vocabulary not adopted by downstream tooling, and does not round-trip to MusicXML; LMX is more compact and aligns with the OLiMPiC reference work.
 \textbf{Humdrum \code{**kern}}~\cite{huronHumdrum2002,Humdrum} and \textbf{ABC}~\cite{walshawABC2011} are compact but have thin tooling ecosystems outside musicology and folk music respectively, and their per-cell escape-character and header conventions complicate CTC training.
 
@@ -656,8 +656,8 @@ while the training cost and architectural complexity are large.
 Replace the BiLSTM with a deeper CNN and treat each feature column as
 an independent class prediction.
 Rejected because monophonic OMR needs horizontal context to
-disambiguate adjacent symbols --- a dot binds to the preceding note,
-an accidental to the following note, a beam groups several notes ---
+disambiguate adjacent symbols (a dot binds to the preceding note,
+an accidental to the following note, a beam groups several notes),
 which a fixed convolutional receptive field cannot supply but the
 recurrent layer propagates along the whole staff; this is what
 motivated recurrence in the standard monophonic-OMR CRNN
@@ -686,7 +686,7 @@ engraved staves. The exact value lives in \Cref{ch:impl}.
 \subsubsection*{Alternatives considered}
 
 Deeper ResNets (ResNet34/50) slowed each epoch with no SER gain in
-ablations --- capacity is not the bottleneck, the synthetic-to-real
+ablations. Capacity is not the bottleneck; the synthetic-to-real
 gap is. EfficientNet/MobileNet and ViT/Swin both converge more slowly
 on a tall, narrow monochrome strip: the lightweight nets are tuned for
 natural images, and the transformers carry the data-hunger of the
@@ -755,7 +755,7 @@ pass.
 \label{sec:design-twostream}
 
 The lead-sheet format (\Cref{sec:motivation}) contains two visually
-distinct streams --- staff notation and chord-symbol text --- that
+distinct streams (staff notation and chord-symbol text) that
 require different feature representations.
 The architectural response is a \textit{two-stream} design, summarised
 in \Cref{fig:two-stream-arch}: two independent CRNN--CTC recognisers
@@ -799,8 +799,8 @@ prohibitive data and compute requirements, and opaque failure modes.
 \paragraph{Pipeline OCR (text detector + chord parser).}
 Run a general-purpose OCR engine (EasyOCR, Tesseract) on the chord
 strip and parse its text. Rejected because general OCR mis-reads
-stylised jazz glyphs --- the \code{ø} half-diminished sign as
-\code{0}, \code{O}, or \code{o} --- whereas a CRNN trained on synthetic
+stylised jazz glyphs (the \code{ø} half-diminished sign as
+\code{0}, \code{O}, or \code{o}), whereas a CRNN trained on synthetic
 Real Book strips is far more accurate for a one-off training cost.
 
 \subsection{Independent training, joint inference}
@@ -809,7 +809,7 @@ At inference the staff-detection stage emits both a staff image and a
 chord-strip image for each system; the two are recognised in parallel
 and their outputs joined into a single JSON segment keyed by the
 system's bounding box. No cross-attention or shared representation
-links the networks --- a deliberate simplicity choice.
+links the networks, a deliberate simplicity choice.
 
 \subsection{Chord vocabulary and notation conventions}
 
@@ -864,9 +864,9 @@ question of \Cref{ch:results}.
 
 The corpus is partitioned deterministically into train, validation,
 and test splits with a fixed seed. The held-out fractions are kept
-small but not negligible --- each comfortably exceeds the
+small but not negligible (each comfortably exceeds the
 few-thousand-sample threshold at which SER estimates stabilise to two
-decimal places --- and the same sample identifier always falls into
+decimal places), and the same sample identifier always falls into
 the same split across runs, so successive experiments are directly
 comparable. Exact split fractions are stated in \Cref{ch:impl}.
 
@@ -880,8 +880,8 @@ repairs the mismatch at inference: each continuation staff has a
 reconstructed clef--key--time header prepended before the CRNN, so the
 model only ever sees the full-header staves it was trained on.
 The key and time signature to inject are taken from the first staff
-that prints them, with a $4/4$ fallback. The mechanism --- prerendered
-header templates injected by the inference pipeline --- is described in
+that prints them, with a $4/4$ fallback. The mechanism (prerendered
+header templates injected by the inference pipeline) is described in
 \Cref{sec:impl-inference}.
 An earlier design instead trained on header-less render variants; it
 was dropped because injecting a known-correct header at inference keeps
@@ -892,9 +892,9 @@ the training set single-distribution and needs no header-less labels.
 Two LMX tokens (\code{tied:start} and \code{tied:stop}) are visually
 subtle and statistically rare in the corpus, so the model
 under-predicts them.
-The design choice is to oversample at the dataset level---duplicating
-samples whose label contains a rare token in the training split
-only---rather than to up-weight the rare token in the loss.
+The design choice is to oversample at the dataset level (duplicating
+samples whose label contains a rare token, in the training split
+only) rather than to up-weight the rare token in the loss.
 Sample-level oversampling preserves the natural distribution of
 context (the rare token appears in its real visual context, with the
 correct surrounding tokens) and, crucially, is compatible with CTC,
@@ -973,8 +973,8 @@ The primary metric is the Symbol Error Rate (SER) defined in
 \Cref{sec:soa-metrics}, reported separately on the clean and scanned
 test splits so the contribution of the augmentation pipeline is
 visible. Because SER aggregates errors of very different musical
-significance --- a missed barline counts identically to a wrong pitch
---- the evaluation also reports a category-level breakdown of the
+significance (a missed barline counts identically to a wrong pitch),
+the evaluation also reports a category-level breakdown of the
 edits attributable to each LMX token family (\code{measure} tokens,
 tie tokens, pitch letters, octaves, durations, accidentals, and
 key/time-signature tokens), the diagnostic information that OMR-NED

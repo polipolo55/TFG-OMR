@@ -1,9 +1,9 @@
 \chapter{Conclusions and Future Work}
 \label{ch:conclusions}
 
-Every claim below points to the section where it was developed or
-measured, so the tribunal can audit the rest of the document from a
-single place.
+Each claim below is cross-referenced to the section where it was
+developed or measured, so the supporting argument can be checked at its
+source.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Objectives Revisited}
@@ -82,9 +82,8 @@ a pointer to the evidence.
 \section{Key Quantitative Results}
 \label{sec:conc-results}
 
-The headline figures from \Cref{ch:results} are restated here so the
-tribunal can audit the assessment above without paging back.
-All numbers refer to the epoch-59 checkpoint at
+The headline figures from \Cref{ch:results} are restated here for
+reference. All numbers refer to the epoch-59 checkpoint at
 \code{models/latest/best\_model.pt}, evaluated on 4\,608 held-out
 samples per split with greedy CTC decoding.
 
@@ -127,12 +126,11 @@ unaugmented Real Book pages, which is treated in
 \section{Critical Assessment and Limitations}
 \label{sec:conc-limitations}
 
-The system meets its declared targets, but the breadth of the targets
+The system meets its declared targets, but the breadth of those targets
 is itself a deliberate restriction.
-The list below enumerates the limitations that follow from design
-decisions taken in \Cref{ch:design}, separating those that were
-explicitly contracted out of scope from those that surfaced during
-implementation.
+The limitations below follow from the design decisions of
+\Cref{ch:design}: some were contracted out of scope from the start,
+others surfaced during implementation.
 
 \paragraph{Scope restrictions, by design.}
 The target domain is monophonic treble-clef lead sheets with the
@@ -169,16 +167,28 @@ number and the most visible target for further improvement.
 A grammar-aware decoder or a richer beat-counting validator could
 reduce them further, at the cost of additional engineering.
 
-\paragraph{No comparison to commercial OMR.}
+\paragraph{No comparison to existing OMR tools.}
 The evaluation reports synthetic-split numbers against the
 acceptance criteria of \Cref{sec:design-domain}, but does not
-compare the system head-to-head against commercial OMR products
-such as Audiveris or SmartScore on the same input.
+compare the system head-to-head against established OMR tools
+such as the open-source Audiveris or the commercial SmartScore on
+the same input.
 A qualitative comparison on a small sample of Real Book pages would
 strengthen the case for the chosen architecture and is feasible
 within the existing infrastructure;
 it is flagged in \Cref{sec:res-domaingap}
 and noted as future work below.
+
+\paragraph{Chord recognition sits outside the headline metric.}
+The chord stream (\Cref{sec:impl-chord}) is trained and wired into the
+pipeline, but its accuracy is reported on a separate track from the
+melody model and is not folded into the SER figures of
+\Cref{sec:conc-results}: the melody numbers are well characterised,
+whereas the chord network is assessed with its own character-level
+measure on a smaller set of strips. The headline results therefore
+quantify the melodic half of the two-stream output far more thoroughly
+than the harmonic half, and an end-to-end quality figure for the merged
+JSON is not among the numbers reported here.
 
 \paragraph{CTC-confidence reject gate is checkpoint-bound.}
 The staff rejection gate of \Cref{sec:design-staff-reject} uses a

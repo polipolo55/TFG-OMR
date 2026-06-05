@@ -99,8 +99,8 @@ Rare tokens (\S\ref{sec:design-training})
 \label{sec:design-domain}
 
 The system is designed for monophonic jazz lead sheets in the style of
-\textit{The Real Book}\,\cite{kernfeldStoryFakeBooks2006}: a single
-melody line in treble clef with chord symbols printed above the staff.
+\textit{The Real Book}\,\cite{kernfeldStoryFakeBooks2006}, as described
+in \Cref{sec:motivation}.
 The notation contract is summarised in \Cref{tab:domain-contract}; it
 defines both the inputs the design must handle and the inputs that
 fall outside its scope.
@@ -507,20 +507,6 @@ systems~\cite{calvoZaragozaCameraPrimus2018,mayerPracticalEndToEnd2024,riosVilaS
 the specific list of distortions used here is calibrated against a
 sample of real Real Book scans.
 
-\begin{figure}[t]
-    \centering
-    \includegraphics[width=0.7\textwidth]{figures/fig_augmentation_gallery}
-    \caption{Augmentation gallery. The top strip is a clean LilyJAZZ
-    render straight from the rendering pipeline; the five strips below
-    are independent samples from the scan-simulation augmentation,
-    each carrying its own ground-truth label.
-    Visible across the gallery are page warp and lens distortion,
-    focus blur, exposure and illumination variation, sensor noise,
-    ink bleed, halftone banding, and JPEG-style compression, sampled
-    jointly with independent random draws.}
-    \label{fig:aug-gallery}
-\end{figure}
-
 \subsubsection*{Alternatives considered}
 
 \paragraph{No augmentation, larger model.}
@@ -546,6 +532,20 @@ Hand-label enough real Real Book pages to train from scratch.
 The cost rules this out: producing a fully labelled corpus of even a
 few thousand staves is well outside the time budget, and the resulting
 dataset would still be smaller than PrIMuS by orders of magnitude.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.7\textwidth]{figures/fig_augmentation_gallery}
+    \caption{Augmentation gallery. The top strip is a clean LilyJAZZ
+    render straight from the rendering pipeline; the five strips below
+    are independent samples from the scan-simulation augmentation,
+    each carrying its own ground-truth label.
+    Visible across the gallery are page warp and lens distortion,
+    focus blur, exposure and illumination variation, sensor noise,
+    ink bleed, halftone banding, and JPEG-style compression, sampled
+    jointly with independent random draws.}
+    \label{fig:aug-gallery}
+\end{figure}
 
 \subsection{Domain restriction: filtering the training set}
 
@@ -897,11 +897,9 @@ pass.
 \section{Two-Stream Architecture for Lead Sheets}
 \label{sec:design-twostream}
 
-A jazz lead sheet contains two visually distinct streams: the melody
-on the staff (graphical symbols positioned relative to staff lines,
-clef-dependent) and the chord symbols typeset above it (short
-alphanumeric strings such as \code{Cmaj7}, \code{G-7}, \code{Bb13},
-read as text and independent of staff geometry).
+The lead-sheet format (\Cref{sec:motivation}) contains two visually
+distinct streams --- staff notation and chord-symbol text --- that
+require different feature representations.
 The architectural response is a \textit{two-stream} design, summarised
 in \Cref{fig:two-stream-arch}: two independent CRNN--CTC recognisers
 of the same family (\Cref{sec:design-model}) but with disjoint
@@ -1011,13 +1009,10 @@ question of \Cref{ch:results}.
 
 \subsection{Loss and supervision signal}
 
-The supervision signal is the LMX token sequence associated with each
-image, and the loss is CTC. CTC provides alignment-free supervision:
-it scores the target sequence against the per-frame predictions without
-requiring a frame-by-frame label, which is what makes the synthetic
-corpus usable as ground truth at all (the rationale developed in
-\Cref{sec:design-model}). The mechanics of the loss are part of the
-implementation (\Cref{ch:impl}).
+The supervision signal is the LMX token sequence and the loss is CTC,
+whose alignment-free property (\Cref{sec:soa-crnn}) is what makes the
+synthetic corpus usable as ground truth without per-frame labels.
+The mechanics of the loss are in \Cref{ch:impl}.
 
 \subsection{Data splits}
 
@@ -1150,12 +1145,9 @@ without ambiguity.
 
 \subsection{Primary metric: Symbol Error Rate}
 
-The primary metric is the Symbol Error Rate~\cite{SymbolErrorRate}:
-the Levenshtein edit distance between the predicted token sequence and
-the ground truth, normalised by the length of the ground truth.
-SER is reported on both the clean and the scanned versions of the test
-split, so that the contribution of the augmentation pipeline is
-visible.
+The primary metric is SER as defined in \Cref{sec:soa-metrics},
+reported separately on the clean and scanned test splits so that the
+contribution of the augmentation pipeline is visible.
 
 \subsection{Category-level error breakdown}
 

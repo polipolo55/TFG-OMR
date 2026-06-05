@@ -6,18 +6,6 @@ high-level decision was taken.
 The companion chapter on implementation (\Cref{ch:impl}) describes
 \textit{how} the design is realised in code.
 
-A few constraints shape every decision in this chapter.
-The target domain (\Cref{sec:design-domain}) is narrow: monophonic
-treble-clef lead sheets in the Real Book style, which frees the design
-from a long tail of notation features that would otherwise consume
-disproportionate effort.
-No labelled corpus of real jazz lead sheets exists, which rules out
-fully supervised end-to-end training from real data and pushes the
-design toward synthetic supervision with domain transfer.
-Finally, the project runs on a single consumer GPU within a Bachelor's
-thesis time budget, which caps model capacity, training time, and the
-number of architectural alternatives that can be explored empirically.
-
 Each major decision in this chapter is argued in its own section and
 paired with the alternatives that were weighed and rejected.
 \Cref{tab:decision-register} collects those decisions in one place as

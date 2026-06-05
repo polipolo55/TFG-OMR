@@ -233,8 +233,10 @@ token category, which is the subject of the next section.
 A beam-search ablation was carried out with widths
 $\{1, 5, 10\}$ on the same checkpoint, reproducible with
 \code{poetry run python src/cli.py evaluate-ab --beams 1,5,10}.
-Beam width 5 yields an aggregate SER improvement bounded by one edit
-per thousand tokens at roughly $6\times$ the decode cost; width 10
+Beam width 5 reduces the edit count from \num{667} to \num{659}
+(8 fewer edits over \num{285958} reference tokens, or
+$\approx\num{0.003}$ percentage points of SER) at
+$\approx 8.4\times$ the wall-clock decode time; width 10
 does not improve further.
 Greedy decoding is therefore the default used for every number in
 this chapter, and beam search is retained as an opt-in flag at
@@ -343,11 +345,7 @@ in the single digits per token over thousands of test samples.
 \end{figure}
 
 These numbers are consistent with the design rationale in
-\Cref{sec:design-grammar}: barline regularisation is handled by a
-deterministic grammar fixer rather than at the model level, because
-barline boundaries are intrinsically ambiguous for a model without
-explicit beat tracking and the cleanest place to enforce them is the
-post-processor that knows the time signature.
+\Cref{sec:design-grammar}.
 The substitutions that do occur are sparse (\num{20} in total) and
 spread across duration confusions between visually similar values
 ($\rm{eighth} \leftrightarrow 16^{\rm th}$,
@@ -536,13 +534,14 @@ per-sample edit-operation overlay (S/I/D) is produced by
 \code{\_edit\_ops(pred, ref)} from section 6.2 of the same notebook.}
 
 \todo{Add at least one qualitative example on a \emph{real} Real Book
-scan, even before fine-tuning.  Run the inference pipeline
-(\code{poetry run python src/cli.py run --input data/real\_pages/
-<song>.png --output results/<song>.json}) on one page and present
-the staff strip plus rendered prediction in the same format as
-\Cref{fig:qual-median}.  Without this, the chapter has no figure
-demonstrating model behaviour on the input distribution the system
-is actually meant for.}
+scan, even before fine-tuning.  Upload a page via the FastAPI endpoint
+(\code{POST /api/omr/lead-sheet}) or call \code{run\_pipeline} directly
+from a script, then present the staff strip plus rendered prediction in
+the same format as \Cref{fig:qual-median}.  Without this, the chapter
+has no figure demonstrating model behaviour on the input distribution
+the system is actually meant for.
+Note: there is no \code{cli.py run} subcommand; single-page inference
+goes through the API (\Cref{sec:impl-api}).}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Comparison to the State of the Art}
@@ -559,8 +558,8 @@ CRNN-CTC baseline on PrIMuS, which established the CTC-on-staff
 formulation as a credible approach to end-to-end staff-line
 recognition~\cite{calvoZaragozaEndToEndNeural2018,calvoZaragozaCameraPrimus2018}.
 The model here uses the same family of architectures and a derived
-PrIMuS corpus, and lands within the same single-percent SER regime on
-synthetic data; the contribution is not a better number on PrIMuS but
+PrIMuS corpus, and achieves sub-percent SER on a comparable synthetic
+split; the contribution is not a better number on PrIMuS but
 the addition of the LilyJAZZ render, the scan-simulation
 augmentation pipeline (\Cref{sec:design-data}) and the deterministic
 grammar fixer (\Cref{sec:design-grammar}), all aimed at the Real Book
@@ -632,7 +631,7 @@ important missing experiment in the chapter; the conclusion's
 \subsection{Fine-tuning}
 
 \todo{Fine-tune the same checkpoint on a small real-scan training
-set (target $N \approx 50$--$100$ staves from the same source as the
+set (target $N \approx 40$ staves from the same source as the
 zero-shot evaluation), keeping a separate held-out real subset for
 testing.  Command:
 \code{poetry run python src/cli.py train
@@ -648,10 +647,10 @@ reduces SER on in-domain real scans by 30--60\,\% relative.}
 \subsection{Qualitative inference on a complete Real Book page}
 
 \todo{Pick one representative page from The Real Book
-(e.g.\ ``Autumn Leaves'', p.\,1) and run the full inference pipeline:
-\code{poetry run python src/cli.py run
---input data/real\_pages/autumn\_leaves\_p1.png
---output results/autumn\_leaves\_out.json}.
+(e.g.\ ``Autumn Leaves'', p.\,1) and run the full inference pipeline
+via \code{POST /api/omr/lead-sheet} (or call \code{run\_pipeline}
+from a script — there is no \code{cli.py run} subcommand; single-page
+inference goes through the FastAPI service of \Cref{sec:impl-api}).
 Produce a figure showing (a) the full page scan with staff bounding
 boxes overlaid (from \code{staff\_bbox} fields in the JSON), (b) the
 predicted LMX token array for each detected staff printed beneath

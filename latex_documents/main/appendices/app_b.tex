@@ -1,58 +1,174 @@
 \chapter{Qualitative Predictions}
 \label{app:qual}
 
-\todo{AUDIT (orphan appendix \& content placement): (a) The chapter introduction of \Cref{ch:results} and \Cref{sec:res-ser,sec:res-qualitative} already forward-point to this appendix, so it is reachable from the body. (b) Reconsider scope: a small number of qualitative figures (3--5) belongs in \Cref{sec:res-qualitative}; only the long-form per-sample listings and the full edit-operation table justify an appendix. If only 5 figures are produced, this appendix may be deleted and the figures folded into the Results chapter.}
-
-This appendix collects qualitative predictions that complement the
-aggregate metrics of \Cref{ch:results}. Each example pairs the input
-staff image with the predicted LMX sequence (or a LilyPond re-render of
-it), together with the ground-truth tokens and the edit operations
-required to reconcile them. The selection targets the right tail of the
-SER distribution to illustrate the failure modes summarised in
-\Cref{sec:res-errors}.
+This appendix collects the five worst-case predictions on the synthetic
+scanned test split, selected by per-sample edit distance.
+Each figure pairs the scan-augmented input strip with a LilyPond
+re-render of the grammar-fixed model prediction, making the discrepancy
+directly legible without inspecting raw token lists.
+\Cref{tab:qual-worst-edits} summarises the edit-operation breakdown
+for each sample.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Worst-Case Predictions on the Synthetic Test Split}
 \label{sec:qual-worst}
 
-\todo{Generate the artefact from notebook \texttt{notebooks/02\_evaluate\_model.ipynb}, section 6.1 ``Worst predictions'' (cell that computes \texttt{worst = np.argsort(ed\_vals)[::-1][:8]} and calls \texttt{show\_predictions(... render=True)}). Re-run that cell with the top-5 worst samples, then save each rendered figure (input strip on top, LilyPond re-render of the prediction on the bottom) as \texttt{latex\_documents/main/figures/worst/worst\_N\_input.png} and \texttt{latex\_documents/main/figures/worst/worst\_N\_pred.png} for $N \in \{1,\dots,5\}$. For each, also export a small text block listing predicted tokens, ground-truth tokens, and edit operations (S/I/D) using \texttt{\_edit\_ops(pred, ref)} defined in section 6.2 of the same notebook.}
+\crefrange{fig:qual-worst-1}{fig:qual-worst-5} show the five samples
+with the highest edit distance on the scanned test split (epoch-59
+checkpoint, greedy decoding).
+In every case the dominant failure mode is barline misplacement
+(missed or spurious \code{measure} tokens), consistent with the
+error budget of \Cref{sec:res-errors}; melodic content
+(pitch, duration, accidental) is correct on most tokens even in
+the worst predictions.
 
 \begin{figure}[htbp]
     \centering
-    % \begin{subfigure}{\textwidth}
-    %     \centering
-    %     \includegraphics[width=\textwidth]{figures/worst/worst_1_input}
-    %     \caption{Input: scan-augmented staff strip from the synthetic test split.}
-    %     \label{fig:qual-worst-1-input}
-    % \end{subfigure}\\[0.6em]
-    % \begin{subfigure}{\textwidth}
-    %     \centering
-    %     \includegraphics[width=\textwidth]{figures/worst/worst_1_pred}
-    %     \caption{LilyPond re-render of the predicted LMX sequence.}
-    %     \label{fig:qual-worst-1-pred}
-    % \end{subfigure}
-    \todo{Replace this placeholder with the two subfigures above once \texttt{figures/worst/worst\_1\_input.png} and \texttt{figures/worst/worst\_1\_pred.png} have been generated.}
-    \caption{Worst-case test prediction (rank 1 of 5 by per-sample SER):
-    input strip (top) and LilyPond re-render of the prediction (bottom),
-    with SER \texttt{<value>} and edit distance \texttt{<value>}. The
-    discrepancies are dominated by \texttt{<category>} tokens, consistent
-    with the global breakdown of \Cref{sec:res-errors}.}
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/worst/worst_1_input}
+        \caption{Input: scan-augmented staff strip.}
+        \label{fig:qual-worst-1-input}
+    \end{subfigure}\\[0.6em]
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/worst/worst_1_pred}
+        \caption{LilyPond re-render of the predicted LMX sequence.}
+        \label{fig:qual-worst-1-pred}
+    \end{subfigure}
+    \caption{Rank-1 worst prediction (sample \texttt{210017589-1\_51\_1}):
+    edit distance \num{11}, SER \num{0.112}.
+    Errors are barline shifts --- the model misplaces measure boundaries
+    across several dense eighth-note runs, leaving pitch and duration
+    content intact.}
     \label{fig:qual-worst-1}
 \end{figure}
 
-\todo{Repeat the figure block above for ranks 2--5, labels \texttt{fig:qual-worst-2} \dots \texttt{fig:qual-worst-5}. Keep the caption template identical except for the rank, SER, edit distance, and dominant error category. Reference all five from the surrounding prose with a single \texttt{\textbackslash crefrange\{fig:qual-worst-1\}\{fig:qual-worst-5\}}.}
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/worst/worst_2_input}
+        \caption{Input: scan-augmented staff strip.}
+        \label{fig:qual-worst-2-input}
+    \end{subfigure}\\[0.6em]
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/worst/worst_2_pred}
+        \caption{LilyPond re-render of the predicted LMX sequence.}
+        \label{fig:qual-worst-2-pred}
+    \end{subfigure}
+    \caption{Rank-2 worst prediction (sample \texttt{220034617-1\_2\_1}):
+    edit distance \num{9}, SER \num{0.127}.
+    A 6/4 time signature with long half-note values causes the model to
+    insert extra barlines, and one accidental is omitted.}
+    \label{fig:qual-worst-2}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/worst/worst_3_input}
+        \caption{Input: scan-augmented staff strip.}
+        \label{fig:qual-worst-3-input}
+    \end{subfigure}\\[0.6em]
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/worst/worst_3_pred}
+        \caption{LilyPond re-render of the predicted LMX sequence.}
+        \label{fig:qual-worst-3-pred}
+    \end{subfigure}
+    \caption{Rank-3 worst prediction (sample \texttt{220014195-1\_1\_1}):
+    edit distance \num{9}, SER \num{0.089}.
+    Dense dotted-sixteenth patterns in E$\flat$ major; several octave-3
+    pitches are misread as octave-4 or octave-5 equivalents.}
+    \label{fig:qual-worst-3}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/worst/worst_4_input}
+        \caption{Input: scan-augmented staff strip.}
+        \label{fig:qual-worst-4-input}
+    \end{subfigure}\\[0.6em]
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/worst/worst_4_pred}
+        \caption{LilyPond re-render of the predicted LMX sequence.}
+        \label{fig:qual-worst-4-pred}
+    \end{subfigure}
+    \caption{Rank-4 worst prediction (sample \texttt{220011439-1\_1\_1}):
+    edit distance \num{9}, SER \num{0.167} --- the highest per-sample
+    SER in the test set.
+    Whole- and half-note measures cause misaligned barline insertion,
+    producing extra short measures that inflate the edit count relative
+    to the number of wrong pitches (zero).}
+    \label{fig:qual-worst-4}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/worst/worst_5_input}
+        \caption{Input: scan-augmented staff strip.}
+        \label{fig:qual-worst-5-input}
+    \end{subfigure}\\[0.6em]
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/worst/worst_5_pred}
+        \caption{LilyPond re-render of the predicted LMX sequence.}
+        \label{fig:qual-worst-5-pred}
+    \end{subfigure}
+    \caption{Rank-5 worst prediction (sample \texttt{000122226-1\_1\_1}):
+    edit distance \num{8}, SER \num{0.136}.
+    Spurious tied groups are inserted around a half-note run,
+    producing \code{tied:start}/\code{tied:stop} pairs that do not
+    appear in the ground truth.}
+    \label{fig:qual-worst-5}
+\end{figure}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Per-Sample Edit Operations}
 \label{sec:qual-edits}
 
-\todo{Produce a \texttt{booktabs} table listing the five worst-case predictions with one row per sample and the following columns: rank, sample id (PrIMuS source filename), per-sample SER, edit distance, number of substitutions, insertions, deletions, and a short free-text note on the dominant failure mode (e.g.\ ``missed barline in dense beamed run''). Generate the numbers in notebook \texttt{notebooks/02\_evaluate\_model.ipynb}: take the same \texttt{worst} indices from section 6.1, look up each \texttt{results[i]} record (\texttt{sid}, \texttt{ser}, \texttt{ed}) populated in cell 9, and run \texttt{\_edit\_ops(pred, ref)} from section 6.2 to count S/I/D per sample. Place the table immediately below this paragraph with caption template ``Edit-operation breakdown for the five worst-case predictions on the synthetic test split.'' and label \texttt{tab:qual-worst-edits}.}
+\begin{table}[htbp]
+\centering
+\caption{Edit-operation breakdown for the five worst-case predictions
+on the synthetic scanned test split (epoch-59 checkpoint, greedy
+decoding, 4\,608 samples).
+S~=~substitutions, I~=~insertions, D~=~deletions.}
+\label{tab:qual-worst-edits}
+\small
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\linewidth}{@{} c L r r r r c L @{}}
+\toprule
+\textbf{Rank} & \textbf{Sample ID} & \textbf{SER} & \textbf{ED} &
+\textbf{S} & \textbf{I} & \textbf{D} & \textbf{Dominant failure} \\
+\midrule
+1 & \texttt{210017589-1\_51\_1} & 0.112 & 11 & 0 & 5 & 6 & Barline shift in dense eighth runs \\
+2 & \texttt{220034617-1\_2\_1}  & 0.127 &  9 & 1 & 4 & 4 & Barline miscount in 6/4 + missed accidental \\
+3 & \texttt{220014195-1\_1\_1}  & 0.089 &  9 & 3 & 3 & 3 & Octave confusion on low pitches \\
+4 & \texttt{220011439-1\_1\_1}  & 0.167 &  9 & 0 & 5 & 4 & Barline insertion in whole-note measures \\
+5 & \texttt{000122226-1\_1\_1}  & 0.136 &  8 & 0 & 4 & 4 & Spurious tied-group insertions \\
+\bottomrule
+\end{tabularx}
+\end{table}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Qualitative Prediction on a Real Real Book Page}
 \label{sec:qual-real}
 
-\todo{If the domain-gap section (\Cref{sec:res-domaingap}) ends up producing a single-page real-scan figure as its headline qualitative artefact, do \emph{not} duplicate it here. Either (a) drop this section entirely and reference \Cref{sec:res-domaingap} from the appendix preamble, or (b) keep this section as the extended version with 2--3 additional Real Book pages beyond the one in the main body. Generate any additional pages with \texttt{poetry run python src/cli.py run --input data/real\_pages/<page>.png --output results/<page>.json} and visualise with the same overlay script used for the body figure.}
+Real-scan evaluation is the subject of \Cref{sec:res-domaingap}, which
+is not yet concluded in this memoir (see Objective~O7 in
+\Cref{sec:conc-objectives}).
+Once the domain-gap section produces a headline qualitative figure, it
+should not be duplicated here; this section is reserved for any
+additional pages beyond the one shown in the body.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Model Weight Distribution}

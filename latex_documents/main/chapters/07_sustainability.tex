@@ -25,44 +25,6 @@ thesis (\Cref{sec:sust-commitment}), which is referenced
 forward from \Cref{ch:mgmt} but discussed only here.
 
 % ─────────────────────────────────────────────────────────────────────────────
-\section{Self-Assessment Summary}
-\label{sec:sust-selfassessment}
-
-The GEP sustainability questionnaire identified the author's
-strongest area as the \textbf{economic} dimension of software
-projects, especially cost estimation, trade-off analysis, and
-management control.
-The author is comfortable reasoning about whether a technical
-decision is financially realistic within a constrained project, and
-about how planning choices affect viability and long-term
-maintenance cost.
-The questionnaire also surfaced a medium level in social reflection:
-accessibility and user benefit are routinely considered, but
-technical performance still tends to take priority over social
-impact when the project is under time pressure.
-
-The weakest area was the \textbf{environmental} lifecycle
-perspective.
-At the start of the project, environmental impact was associated
-mainly with direct energy consumption during model training.
-The reflection process surfaced additional factors that had not
-previously been analysed in depth: the hardware manufacturing
-footprint, end-of-life device management, and the difference
-between one-time experimentation and sustained deployment impact.
-The reflection also made clear that selecting lighter architectures
-is not only a computational decision but also an environmental one,
-a point explicitly reflected in the architectural justification of
-\Cref{sec:mgmt-justification}.
-
-Three improvement commitments emerged for the remainder of the
-project: quantifying energy-related impact rather than asserting it
-qualitatively, justifying architecture choices on efficiency as well
-as performance, and stating who benefits from the tool and under
-what limitations. They are carried out in the environmental estimate
-of \Cref{sec:sust-environmental}, the comparison table of
-\Cref{sec:mgmt-justification}, and the social-dimension discussion
-of \Cref{sec:sust-social}.
-
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Sustainability Matrix}
 \label{sec:sust-matrix}
@@ -118,22 +80,12 @@ footprint is not material-intensive: no new physical infrastructure
 is built, and the budget is mostly a transfer of human capital.
 
 \textbf{Useful life and state of the art.}
-The alternatives for lead-sheet digitisation are manual
-transcription and general-purpose OMR tools, and the project's
-economic improvement must be evaluated against both.
-Manual transcription is expensive in recurrent cost (a trained
-musician's time, at conservatory or freelance rates) and in
-turnaround time (typically of the order of minutes to tens of
-minutes per page, depending on density and clarity).
-General-purpose OMR tools, both commercial (SmartScore, PhotoScore,
-SharpEye) and open-source (Audiveris), reduce the recurrent cost
-but require substantial correction effort on the jazz-specific
-notation studied here, because their internal heuristics are tuned
-for classical engraving styles (\Cref{sec:soa-classical}).
-A specialised CRNN--CTC model targeted at the Real Book engraving
-style reduces the correction workload further, on the class of
-input it was trained for, and eliminates the licence costs that
-the commercial alternatives charge per seat.
+The alternatives for lead-sheet digitisation are manual transcription
+and general-purpose OMR tools, both of which fall short on jazz
+engraving for the reasons surveyed in \Cref{sec:soa-classical}.
+A domain-specific CRNN--CTC model reduces the correction workload on
+the target class of input and eliminates the per-seat licence costs of
+commercial alternatives.
 
 \textbf{Improvement contribution.}
 The principal economic improvement is not zero-cost digitisation
@@ -170,7 +122,7 @@ run, plus ablation and chord-OCR fine-tuning runs), with smaller
 contributions from synthetic-data rendering and evaluation passes.
 The energy estimate follows directly:
 $\SI{230}{\hour} \times \SI{0.25}{\kilo\watt} \approx
-\SI{57.5}{\kilo\watt\hour}$.\todo{cite: ML carbon-accounting methodology (Strubell et al.\ 2019, Patterson et al.\ 2021, Lacoste et al.\ 2019) for the kWh $\to$ CO\textsubscript{2} conversion convention used here.}
+\SI{57.5}{\kilo\watt\hour}$~\cite{strubellEnergyPolicyConsiderations2019,pattersonCarbonConsiderationsDeep2021,lacosteQuantifyingCarbonEmissions2019}.
 Applying the Spanish electricity emission factor of approximately
 \SI{0.23}{\kilo\gram\per\kilo\watt\hour} of CO\textsubscript{2}
 reported by Red El\'ectrica de Espa\~na and

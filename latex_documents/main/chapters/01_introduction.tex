@@ -191,24 +191,9 @@ The \textbf{specific objectives} are:
 \section{Proposed Approach}
 \label{sec:approach}
 
-The core design choice of this thesis is a CRNN-CTC architecture. The model class fits
-the left-to-right, variable-length token sequences that arise
-from reading a single staff line: the convolutional backbone extracts local visual
-features along the width of the staff image, two bidirectional LSTM layers model
-long-range sequential dependencies, and CTC decoding maps the resulting frame-level
-distributions to a token sequence without requiring explicit segmentation of the image
-into individual symbols.
-
-Transformer-based end-to-end models such as the Sheet Music
-Transformer~\cite{riosVilaSheetMusicTransformer2024} or the OLIMPIC system for
-pianoform music~\cite{mayerPracticalEndToEnd2024} offer higher modelling capacity but
-demand substantially larger labelled datasets and compute budgets than are available
-within the scope of a Bachelor's thesis. Traditional heuristic
-pipelines~\cite{dalitzComparativeStudyStaff2008} avoid data requirements but accumulate
-segmentation errors that propagate irreversibly through the recognition chain. The
-CRNN-CTC architecture represents the best trade-off for this project's constraints; the
-technical case is developed in \Cref{ch:design} and the project-management criteria
-behind the decision are recorded in \Cref{sec:mgmt-justification}.
+The core design choice is a CRNN-CTC architecture, which maps staff images to
+token sequences without requiring per-symbol segmentation; the full justification
+is in \Cref{ch:design,sec:mgmt-justification}.
 
 The system is organised around a five-stage inference pipeline (preprocessing, staff
 detection, melody recognition, grammar correction, and chord OCR) whose outputs are
@@ -262,44 +247,3 @@ The project is bounded by the following scope definition.
           justify the vocabulary and grammar extensions they would require.
 \end{itemize}
 
-% ─────────────────────────────────────────────────────────────────────────────
-\section{Document Structure}
-\label{sec:structure}
-
-The remainder of this document is organised as follows.
-
-\Cref{ch:soa} surveys the state of the art in OMR, covering the progression from
-heuristic modular pipelines through CRNN-CTC models to modern transformer-based
-end-to-end architectures, and reviews the datasets and symbolic representations
-relevant to this work.
-
-\Cref{ch:mgmt} covers project management: methodology, work-breakdown structure and
-timeline, the comparative analysis behind the architectural choice, the budget and
-economic analysis, and risk management.
-
-\Cref{ch:design} presents the conceptual design of the system: the pipeline
-decomposition, the data strategy, the LMX output representation and vocabulary, the
-CRNN--CTC architectural choices, the two-stream approach for melody and chord
-recognition, the training strategy, and the evaluation design.
-
-\Cref{ch:impl} describes the implementation: the technology stack, the repository
-structure, the data and augmentation pipeline, the model and training loop, the chord
-OCR network, the inference pipeline, the CLI and web service, and the mechanisms used
-to keep the experiments reproducible.
-
-\Cref{ch:results} reports the experimental results: training curves, SER on the
-synthetic test set, ablation studies, qualitative error analysis by failure category,
-and domain-gap measurements with and without fine-tuning on real Real Book pages.
-
-\Cref{ch:sustain} analyses the sustainability and ethical implications of the work
-along the environmental, economic, and social dimensions, as required by Art. 12 of
-the FIB TFG normativa.
-
-\Cref{ch:conclusions} closes the document: it revisits the stated objectives,
-summarises the main contributions and limitations, and outlines directions for
-future work.
-
-The appendices contain supporting material. \Cref{app:notation-primer} provides a
-self-contained primer on Western staff notation for readers without a musical
-background. The remaining appendices collect additional tables and hyperparameters,
-representative qualitative predictions, and reference code snippets.

@@ -58,8 +58,7 @@ Every stage uses the Python \code{multiprocessing} module for CPU
 parallelism, with the worker-pool size set by a CLI flag (default 8 on
 the target machine).
 The choice of process-based parallelism over threading follows from the
-Global Interpreter Lock; the trade-off is discussed in
-\Cref{sec:impl-performance}.
+Python GIL; see \Cref{sec:impl-performance}.
 
 \begin{figure}[ht]
 \centering

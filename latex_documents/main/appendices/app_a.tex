@@ -182,7 +182,7 @@ Real-to-synthetic sampling weight & N/A                 & real 1.0 / synth 0.4 \
 \midrule
 PDF rasterisation DPI (\texttt{OMR\_PDF\_DPI})   & 300, clamped to $[72, 600]$ \\
 CTC decoder                                      & greedy (argmax then collapse-and-strip-blanks) \\
-Beam-search width (\texttt{OMR\_BEAM\_WIDTH})    & 1 (greedy). Width~5 yields $\leq 1$ edit per 1000 SER improvement at ${\sim}6\times$ decode cost. \\
+Beam-search width (\texttt{OMR\_BEAM\_WIDTH})    & 1 (greedy). Width~5 saves 8 edits over 285\,958 tokens (${\approx}0.003$ pp SER) at ${\approx}8.4\times$ decode cost; width~10 does not improve further (\Cref{sec:res-ser}). \\
 Multi-page handling                              & only page 0 of multi-page PDFs is processed \\
 Tiling mode (\texttt{OMR\_ENABLE\_TILING})       & disabled (legacy mode) \\
 Chord checkpoint (\texttt{OMR\_CHORD\_CHECKPOINT}) & \texttt{models/chord/latest/best\_model.pt} \\

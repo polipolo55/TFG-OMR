@@ -1,15 +1,8 @@
 \chapter{Project Management}
 \label{ch:mgmt}
 
-This chapter records the management dimension of the project: the
-justification for the chosen architecture, the iterative methodology,
-the work-breakdown structure and schedule, the risk register, and the
-economic budget with its control mechanism.
 Applicable regulations, intellectual-property considerations, and the
 dataset-licensing analysis are discussed in \Cref{ch:sustain}.
-The introductory framing of the project (academic context, scope,
-objectives, and stakeholders) is given in \Cref{ch:intro}
-and is not repeated here.
 
 % ── Gantt colour palette (reused from the GEP deliverable) ─────────────────────
 \definecolor{gpMgmt}{HTML}{1565C0}
@@ -38,50 +31,22 @@ decision.
 \subsection{Selection criteria}
 
 \textit{Expected accuracy on monophonic lines.}
-The principal deliverable of the project is a measurable Symbol
-Error Rate on monophonic jazz lead sheets, so any architecture
-whose published accuracy on monophonic input is substantially
-below the state of the art is disqualified at the outset.
+Published accuracy on monophonic input must be competitive with the state of the art.
 
 \textit{Computational feasibility on consumer hardware.}
-Training must complete within a few days on a single NVIDIA
-RTX~3060 with 12\,GB of VRAM, the hardware available to the
-author.
-Any model whose memory or compute footprint exceeds that envelope
-either has to be downscaled (defeating its accuracy advantage)
-or trained in cloud rentals, which is incompatible
-with the project budget.
+Training must fit within the 12\,GB VRAM of the available NVIDIA RTX~3060 without cloud rental.
 
 \textit{Data requirements.}
-The only labelled corpus directly usable for monophonic OMR is
-PrIMuS~\cite{PrIMuSDataset}, with approximately 88\,000 incipits;
-the closest jazz-specific corpus emerged only in mid-2025 and is
-substantially
-smaller~\cite{martinezSevillaJazzLeadSheets2025}.
-Architectures whose published results rely on hundreds of
-thousands of polyphonic samples are infeasible without a
-data-acquisition phase that exceeds the scope of this thesis.
+The architecture must be trainable on PrIMuS~\cite{PrIMuSDataset} ($\approx$88\,000 incipits), the only substantial labelled corpus for monophonic OMR.
 
 \textit{Implementation complexity.}
-A single-person project does not have the engineering bandwidth to
-debug a custom transformer training stack in parallel with a
-synthetic data pipeline.
-A well-documented architecture with mature open-source
-reference implementations is preferred.
+A single-person project requires a well-documented architecture with mature open-source reference implementations.
 
 \textit{Reproducibility within the project's timeline.}
-Each sprint cycle must terminate with a measurable, reproducible
-result.
-Architectures whose training is highly stochastic, or whose
-hyperparameter space is large enough to require dozens of trial
-runs before convergence, would consume the project's iteration
-budget before producing a stable baseline.
+Each sprint must produce a measurable, reproducible result; architectures requiring dozens of trial runs before convergence are impractical.
 
 \textit{Extension potential for future work.}
-The thesis records the design space available to follow-up
-work; an architecture that has natural extensions to polyphony,
-full-page input, or chord-symbol integration is preferred over
-one that locks the line of research into a single configuration.
+The chosen architecture should support natural extensions to polyphony, full-page input, and chord-symbol integration.
 
 \begin{table}[h!]
     \centering
@@ -255,40 +220,40 @@ model architecture is dimensioned to the vocabulary the dataset
 produces.
 
 \textit{WP3 -- CRNN--CTC development (75\,h).}
-This package designed and implemented the model, the training loop,
+This package designs and implements the model, the training loop,
 and the evaluation framework.
-The training-pipeline task (T3.2) overlapped deliberately with the
-evaluation-framework task (T3.4), since the latter could be
-developed against synthetic CRNN outputs before the former had
+The training-pipeline task (T3.2) overlaps deliberately with the
+evaluation-framework task (T3.4), since the latter can be
+developed against synthetic CRNN outputs before the former has
 fully converged.
-The package ended with an initial end-to-end training run whose
-outputs fed directly into WP4.
+The package closes with an initial end-to-end training run whose
+outputs feed directly into WP4.
 
 \textit{WP4 -- Iterative refinement (68\,h).}
-This package was the primary site of the train--evaluate--improve
+This package is the primary site of the train--evaluate--improve
 loop (\Cref{sec:mgmt-methodology}); its 68-hour budget
-covered two internal iterations within Sprint 4 (weeks 13--16),
+covers two internal iterations within Sprint 4 (weeks 13--16),
 each closing one pass of refinement and ablation.
 The chord-recognition track (synthetic strip rendering, the chord
 CRNN training and fine-tuning runs, and the chord post-processing
-filter) was absorbed into T4.2 and T4.3 as a parallel branch of
+filter) is absorbed into T4.2 and T4.3 as a parallel branch of
 the same refinement loop rather than as a separate work package,
 which is why the WP4 budget is not enlarged despite the additional
 scope.
 
 \textit{WP5 -- Final evaluation and defence (85\,h).}
-This package covered the final evaluation on held-out data, the
+This package covers the final evaluation on held-out data, the
 qualitative error analysis, a conditional extension task (T5.3,
 budgeted at 20\,h and contingent on the monophonic objective
 having been achieved), the final integration pass on the thesis
 document, and the defence preparation.
-The conditional extension task was the most important schedule
-buffer in the plan, since it could be reduced to zero without
+The conditional extension task is the most important schedule
+buffer in the plan, since it can be reduced to zero without
 compromising the core deliverable.
-T5.3 was ultimately spent on fine-tuning the chord CRNN against
+T5.3 is allocated to fine-tuning the chord CRNN against
 hand-labelled real Real Book strips (using the
-\code{extract\_real\_chord\_strips} utility) and on tightening the
-chord post-processing grammar, which together realised the
+\code{extract\_real\_chord\_strips} utility) and to tightening the
+chord post-processing grammar, which together realise the
 chord-recognition extension foreshadowed in
 \Cref{sec:scope}.
 
@@ -316,29 +281,9 @@ baseline.
 
 \subsection{Gantt chart}
 
-\Cref{fig:gantt} shows the full 21-week timeline.
-The chart is grouped by work package for readability; planning
-control is performed at the sprint level with a fixed four-week
-cadence and an inspection/adaptation checkpoint at every
-boundary.
-Sprint reviews are marked as red diamonds (M1 through M4),
-together with the final defence at week 21 (M5).
-
-Three structural features of the chart are worth noting.
-The management package (WP0) spans the entire timeline,
-reflecting the policy of continuous thesis writing and biweekly
-supervisor meetings, with the four GEP-specific tasks (T0.1--T0.4)
-concentrated in the first half to align with the GEP coursework
-deadlines.
-The technical packages WP1--WP4 are scheduled
-back-to-back with no slack between them, because each one
-depends on the deliverable of its predecessor in a way that does
-not admit overlap; schedule resilience instead comes from the
-conditional extension task T5.3 (\Cref{sec:mgmt-planning}).
-Finally, the bars within each sprint deliberately do not all
-extend to the sprint boundary, leaving room for the corrective-loop
-activities of \Cref{sec:mgmt-methodology}, which would otherwise
-have to come out of the next sprint's allocation.
+\Cref{fig:gantt} shows the full 21-week timeline, grouped by work
+package, with sprint-review milestones M1--M4 and the final defence
+(M5).
 
 \begin{landscape}
 \begin{figure}[p]

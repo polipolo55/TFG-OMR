@@ -93,7 +93,7 @@ local visual features through a convolutional backbone, contextualises them
 with a bidirectional recurrent network, and decodes the resulting per-frame
 distribution into a token sequence using the CTC
 alignment~\cite{gravesConnectionistTemporal2006}, removing the need for
-per-symbol segmentation.\todo{optional cite for the scene-text CRNN precedent (Shi et al.\ 2017) -- no bib entry exists yet}
+per-symbol segmentation~\cite{shiEndToEndTrainable2017}.
 
 Alongside the architecture, Calvo-Zaragoza and Rizo released the
 \term{PrIMuS} corpus~\cite{PrIMuSDataset,calvoZaragozaEndToEndNeural2018}: 87\,678 real-music monophonic
@@ -228,12 +228,9 @@ CTC-friendly but interoperate only with the PrIMuS ecosystem.
 \textbf{LMX} (Linearised MusicXML), introduced by
 \textcite{mayerPracticalEndToEnd2024} and maintained as an open
 specification~\cite{OMRResearchLmx2025}, depth-first-traverses the
-MusicXML tree and emits one whitespace-separated token per leaf event.
-It is round-trippable to MusicXML with minimal information loss,
-substantially more compact than the parent format, and was designed
-specifically as a CRNN- and transformer-friendly target; the OLiMPiC
-reference implementation provides a Python \code{Linearizer}/\code{Delinearizer}
-pair that converts between the two representations directly.
+MusicXML tree and emits one whitespace-separated token per leaf event;
+its grammar, encoding choices, and vocabulary are described in full in
+\Cref{sec:lmx-format}.
 
 \begin{table}[htbp]
 \centering
@@ -334,26 +331,6 @@ unified single-stream model), and in output format
 The two systems are thus complementary points in the design space, and
 both contribute training corpora, models, and evaluation protocols that
 future work can compare and combine.
-
-% ─────────────────────────────────────────────────────────────────────────────
-\section{Summary}
-\label{sec:soa-summary}
-
-Modular pipelines work well for typeset classical scores but do not
-transfer to jazz lead sheets, where the engraving style and chord-symbol
-semantics fall outside the heuristics those systems rely on.
-End-to-end deep learning has largely displaced them: CRNN--CTC achieves
-sub-percent error on monophonic input (\Cref{sec:soa-crnn}), while
-transformers scale to polyphonic and full-page tasks at substantially
-higher data cost (\Cref{sec:soa-transformer}).
-Both families follow the same training pattern: a large synthetic-corpus
-pretraining phase, followed by fine-tuning on a small set of
-annotated target-domain examples.
-Output representations have moved toward compact MusicXML-linear formats,
-most prominently LMX, and evaluation is shifting from raw SER toward
-structurally aware metrics.
-Jazz lead-sheet OMR received almost no dedicated attention until 2025;
-this thesis and the concurrent work of
-\textcite{martinezSevillaJazzLeadSheets2025} are the first two focused
-efforts.
-The design choices in \Cref{ch:design} follow from this survey.
+Together they constitute the first two focused efforts on jazz
+lead-sheet OMR; the design choices in \Cref{ch:design} follow from
+this survey.

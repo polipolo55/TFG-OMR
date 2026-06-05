@@ -1,11 +1,6 @@
 \chapter{Conclusions and Future Work}
 \label{ch:conclusions}
 
-This chapter closes the memoir. It revisits the objectives of
-\Cref{sec:objectives}, restates the headline results, sets out the
-limitations the work made explicit, proposes extensions that follow
-from those limitations, and maps the technical competences declared at
-TFG inscription onto the chapters where evidence for each lives.
 Every claim below points to the section where it was developed or
 measured, so the tribunal can audit the rest of the document from a
 single place.
@@ -116,9 +111,9 @@ samples per split with greedy CTC decoding.
           per-category pitch, octave, and duration error rates each
           remain below \SI{0.05}{\percent} (\Cref{sec:res-errors}).
     \item \textbf{Beam-vs-greedy decoding:} beam search at width 5
-          yields an SER improvement of at most one edit per thousand
-          tokens at roughly \num{6}$\times$ the decoding cost; greedy
-          decoding is therefore the deployed default
+          reduces the edit count by 8 over \num{285958} tokens
+          ($\approx\num{0.003}$ pp of SER) at $\approx 8.4\times$ the
+          decode cost; greedy decoding is therefore the deployed default
           (\Cref{sec:impl-inference}).
 \end{itemize}
 
@@ -183,7 +178,7 @@ A qualitative comparison on a small sample of Real Book pages would
 strengthen the case for the chosen architecture and is feasible
 within the existing infrastructure;
 it is flagged in \Cref{sec:res-domaingap}
-and noted as future work below.\todo{cite Audiveris and SmartScore if used in a comparison; placeholder citations \texttt{audiveris} and \texttt{smartscore} expected in references.bib.}
+and noted as future work below.
 
 \paragraph{CTC-confidence reject gate is checkpoint-bound.}
 The staff rejection gate of \Cref{sec:design-staff-reject} uses a
@@ -211,23 +206,17 @@ independently and does not recover their narrative reading order.
 This is a layout-analysis problem that the morphological staff
 detector is not designed to solve.
 
-Each of these limitations follows from a decision taken explicitly in
-\Cref{ch:design}, and the acceptance criteria were set so that the
-system as scoped can be adjudicated against them.
-
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Future Work}
 \label{sec:future-work}
 
-Five extensions follow directly from the limitations of the previous
-section.
-Each is scoped against the existing codebase and infrastructure rather
-than as an open research direction.
+Each extension below is scoped against the existing codebase and
+infrastructure rather than as an open research direction.
 
 \paragraph{Real-data fine-tuning and end-to-end measurement on Real
 Book pages.}
 The synthetic-to-real gap remains the most important open question.
-A natural follow-up is to assemble a hand-annotated set of \numrange{50}{100}
+A natural follow-up is to assemble a hand-annotated set of approximately \num{40}
 staves drawn from real Real Book scans, run the fine-tuning protocol
 specified in \Cref{sec:design-training} with the convolutional
 backbone frozen and only the BiLSTM and CTC head updated, and
@@ -273,10 +262,8 @@ performs well on cleanly scanned Real Book pages but is fragile on
 slanted staves and partial systems
 \cite{simonettaOpticalMusicRecognition2024}.
 Replacing it with a learned detector (YOLO-style box
-regression\todo{cite original YOLO paper, e.g.\ Redmon et al.\ 2016, in
-references.bib as \texttt{redmonYouOnlyLook2016}} or a DETR-style
-transformer detector\todo{cite DETR, e.g. Carion et al. 2020, as
-\texttt{carionDETR2020} in references.bib}) trained on a few hundred
+regression~\cite{redmonYouOnlyLook2016} or a DETR-style
+transformer detector~\cite{carionEndToEndObjectDetection2020}) trained on a few hundred
 annotated pages would unlock multi-page batch inference and reduce the
 failure rate on the hardest scans.
 The current pipeline contract
@@ -332,8 +319,8 @@ The implementation chapter contributes further evidence. The
 asymmetric-stride ResNet18 that preserves the CTC time axis at a
 \(4\times\) compression ratio is described in \Cref{sec:impl-model}.
 The beam-versus-greedy decoding trade-off, where width-5 beam search
-buys at most one edit per thousand tokens at roughly \(6\times\) the
-cost, is measured in \Cref{sec:impl-inference} and restated in
+saves 8 edits over \num{285958} tokens at $\approx 8.4\times$ the
+decode cost, is measured in \Cref{ch:results} and restated in
 \Cref{sec:conc-results}. The use of \code{multiprocessing} for the
 CPU-bound data stages is set out in \Cref{sec:impl-data}, and the
 choice of a deterministic stateful grammar walker over a constrained

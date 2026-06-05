@@ -172,9 +172,7 @@ range \SIrange{1}{3}{\percent}~\cite{calvoZaragozaCameraPrimus2018,mayerPractica
           one percentage point.
     \item \textbf{Melodic SER} (SER restricted to musically
           relevant tokens; see \Cref{sec:design-eval}) below
-          \SI{0.5}{\percent} on both splits. Barlines and ties
-          dominate the absolute edit count, but a downstream renderer
-          can re-bar the output trivially.
+          \SI{0.5}{\percent} on both splits.
     \item \textbf{Perfect-transcription rate} above \SI{60}{\percent}
           on the scanned test split: more than half of input staves
           come out token-perfect.
@@ -186,40 +184,21 @@ range \SIrange{1}{3}{\percent}~\cite{calvoZaragozaCameraPrimus2018,mayerPractica
 \label{sec:design-pipeline}
 
 The end-to-end transcription task is decomposed into five processing
-stages plus a final serialisation step, with a clearly defined
-contract between each pair.
-\Cref{fig:pipeline-design} summarises the data flow, and
-\Cref{tab:stage-contracts} gives the typed input/output for each stage.
-
-\begin{enumerate}
-    \item \textbf{Preprocessing} takes the input bytes (a PDF page or a
-          raster image) and returns a clean, deskewed binary image of
-          the page.
-          This stage is purely image-processing; it is independent of any
-          musical content.
-    \item \textbf{Staff detection} takes the binary page and returns a
-          list of detected \term{systems}, each consisting of a cropped
-          staff image, the strip of pixels above it (where chord symbols
-          live), and the bounding box on the page.
-          This is the only stage that performs spatial layout analysis;
-          everything downstream operates on one staff at a time.
-    \item \textbf{Melody recognition} takes a single staff image and
-          returns a flat sequence of LMX tokens describing the notes,
-          rests, key, time signature, and barlines printed on that
-          staff.
-          This is the core machine-learning stage.
-    \item \textbf{Grammar correction} takes the raw token sequence and
-          returns a syntactically valid LMX sequence, repairing
-          structural errors (misplaced accidentals, malformed time
-          signatures, runaway measures) without inventing new musical
-          content.
-          This stage is deterministic, not learned.
-    \item \textbf{Chord recognition} takes the chord-strip image
-          associated with each staff and returns a list of jazz chord
-          symbols.
-          It is independent of the melody recognition stage and uses a
-          separate neural network.
-\end{enumerate}
+stages plus a final serialisation step, with a typed contract between
+each pair (\Cref{tab:stage-contracts}) and the data flow shown in
+\Cref{fig:pipeline-design}.
+\textbf{Preprocessing} cleans and deskews the page and is independent
+of any musical content.
+\textbf{Staff detection} is the only stage that performs spatial
+layout analysis, emitting one \term{system} per staff (a staff crop,
+the chord strip above it, and a page bounding box); everything
+downstream operates on one staff at a time.
+\textbf{Melody recognition}, the core machine-learning stage, reads a
+staff image into a flat sequence of LMX tokens.
+\textbf{Grammar correction} then repairs structural errors
+deterministically, without inventing musical content.
+\textbf{Chord recognition} reads the chord-strip image with a separate
+network, independent of melody recognition.
 
 \input{figures/fig_pipeline_design}
 
@@ -264,18 +243,15 @@ Serialise
 \end{table}
 
 \textbf{Why a five-stage decomposition.}
-The chord-symbol stream and the melody stream require different
-recognisers (staff-relative pattern recognition versus text-like OCR),
-so they must be separable in the first place.
-The grammar of the LMX output is, in turn, more easily enforced by a
-deterministic validator than learned end-to-end from a finite training
-set; isolating that logic in a dedicated stage produces more reliable
-output without enlarging the model.
-Both major surveys of the
-field~\cite{calvoZaragozaUnderstandingOMR2020,shatriOPTICALMUSICRECOGNITION}
-recommend modular decomposition for OMR systems that target specific
-notation styles, since it lets each module be replaced or
-retrained independently as the target domain evolves.
+The chord and melody streams require different recognisers
+(staff-relative pattern recognition versus text-like OCR), so they
+must be separable. The LMX grammar is likewise more reliably enforced
+by a deterministic validator than learned end-to-end from a finite
+set, so isolating it in its own stage improves output without
+enlarging the model. Both major
+surveys~\cite{calvoZaragozaUnderstandingOMR2020,shatriOPTICALMUSICRECOGNITION}
+recommend modular decomposition for style-specific OMR, since each
+module can then be replaced or retrained independently.
 
 \subsection{Alternatives considered}
 \label{sec:design-pipeline-alts}
@@ -285,32 +261,21 @@ decomposition and rejected.
 
 \paragraph{Full-page transformer (LEGATO\,\cite{yangLEGATO2025}).}
 A single encoder--decoder transformer that consumes a full-page image
-and emits the entire transcription as a long token sequence,
-eliminating the staff-detection and grammar-fix stages and sharing
-representations across the whole page.
-Training such a model to competitive accuracy
-requires either a corpus of full-page transcriptions (which does not
-exist for the Real Book) or a synthetic generator capable of laying
-out full pages with realistic chord placement, neither of which fits
-the time budget.
-A monolithic model is also opaque: a single
-mis-prediction of a chord symbol cannot be debugged without re-running
-the entire model, whereas a modular pipeline yields localised failures that the
-grammar fixer can repair.
+and emits the whole transcription as one token sequence.
+Competitive accuracy needs either a corpus of full-page Real Book
+transcriptions (which does not exist) or a synthetic full-page
+generator with realistic chord placement, neither of which fits the
+time budget; and a monolithic model is opaque, where a modular
+pipeline yields localised failures the grammar fixer can repair.
 
 \paragraph{Tree-decoder transformer (SMT/SMT++\,\cite{riosVilaSheetMusicTransformer2024,riosVilaSMTPlusPlus2024}).}
-A transformer that emits a hierarchical MusicXML-like tree, removing
-the need for a separate grammar-correction step because the output is
-structurally valid by construction.
-SMT++ is a leading end-to-end model on polyphonic
-piano music, but its advantages do not carry over here.
-The target domain is monophonic, so the
-structural advantage of a tree decoder over a flat CTC decoder is
-small; its training recipe requires several hundred
-GPU-hours of pre-training that the project's hardware cannot afford;
-and the CRNN--CTC baseline on Camera-PrIMuS already
-performs near the ceiling of the clean monophonic benchmark, leaving little headroom for
-a more complex architecture to demonstrate gain.
+A transformer that emits a hierarchical MusicXML-like tree, so the
+output is structurally valid by construction and no separate
+grammar-correction stage is needed.
+Rejected for the same reason it is rejected as a model family in
+\Cref{sec:design-model-alts}: on monophonic input the structural
+advantage over a flat decoder is small, while the pre-training cost is
+large.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Staff Detection}
@@ -376,58 +341,39 @@ the last two cover earlier designs of the rejection gate of
 \Cref{sec:design-staff-reject}.
 
 \paragraph{Deep object detector (YOLO, RT-DETR, Mask~R-CNN).}
-A learned staff detector trained on bounding-box annotations of staff
-regions. Modern detectors give competitive segmentation on cluttered
-pages~\cite{simonettaOpticalMusicRecognition2024}.
-The annotation cost alone is non-trivial (hundreds to thousands of
-manually labelled pages), and the gain over the morphological detector
-on Real Book pages is in the noise. A learned detector becomes
-attractive when the page layout is irregular (handwritten manuscripts,
-historical scores), which is outside the project's scope.
+A learned detector trained on bounding-box annotations of staff
+regions~\cite{simonettaOpticalMusicRecognition2024}. The annotation
+cost is non-trivial (hundreds to thousands of labelled pages) and the
+gain over morphology on the Real Book's regular layout is in the
+noise; learned detection pays off on irregular layouts (handwritten or
+historical scores), which are out of scope.
 
 \paragraph{Projection-profile slicer.}
-An earlier version of this project used a horizontal-projection slicer
-that cut the page at low-density rows.
-Dropped after testing on Real Book pages with chord symbols printed
-close to the staff: the chord text reduced the inter-staff gap and
-produced under-segmented two-staff strips.
-The morphological line detector is robust to chord-text density
-because it operates on isolated long horizontal runs, not on the full
-page projection.
-The comparative literature on staff-line removal and
-detection~\cite{dalitzComparativeStudyStaff2008} supports this choice:
-morphological line operators consistently outperform pure
-projection-profile methods on typeset music.
+An earlier version cut the page at low-density rows. Dropped after
+testing on pages with chord symbols printed close to the staff: the
+chord text shrank the inter-staff gap and produced under-segmented
+two-staff strips. The morphological detector is robust to this because
+it keys on isolated long horizontal runs, not the full-page
+projection --- a choice the staff-detection
+literature~\cite{dalitzComparativeStudyStaff2008} supports.
 
 \paragraph{OCR-only rejection rule.}
-A simpler rejection rule was tested first: any candidate strip on
-which a general-purpose OCR returned non-empty text was marked
-non-music, on the reasoning that page titles, composer credits, and
-lyric lines all carry text where music staves do not.
-Rejected as too brittle: legitimate staves frequently carry text in
-or adjacent to the strip (rehearsal letters, dynamics, chord symbols,
-expressive cues), and the binary verdict rejected them with no
-recourse.
-The current design preserves the original intent by demoting OCR
-text density to one signal among several and adding the
-CTC-confidence override for the cases where the recogniser
-confidently disagrees with the geometric heuristics.
+Tested first: mark any strip on which general-purpose OCR returns text
+as non-music, since titles and credits carry text where staves do not.
+Too brittle --- legitimate staves often carry text (rehearsal letters,
+dynamics, chord symbols), and the binary verdict rejected them with no
+recourse. The final design instead demotes OCR density to one signal
+among several and adds the CTC-confidence override.
 
 \paragraph{Learned binary classifier on staff crops.}
-A small classifier trained to discriminate music from non-music
-staff crops was also tried, on the assumption that the visual
-difference between the two would be obvious enough for a
-low-capacity model to capture from a modest labelled set.
-Rejected because it did not consistently improve over the geometric
-and OCR-density gates: training such a classifier required
-hand-labelled non-music crops covering the actual failure
-distribution (composer credits, footers with collinear text,
-watermarks, multi-line title headings), and the classifier trained
-on what could be labelled at low cost accepted the same
-false-positive regions the heuristics already accepted.
-The labelling cost was disproportionate to the marginal benefit
-over a CTC-confidence post-gate that requires no additional
-supervision.
+A small music/non-music classifier on staff crops. Rejected because it
+did not consistently beat the geometric and OCR gates: training it
+needs hand-labelled non-music crops covering the real failure
+distribution (credits, collinear-text footers, watermarks, title
+headings), and a classifier trained on the cheaply-labelled subset
+accepted the same false positives the heuristics already did --- a
+labelling cost out of proportion to the gain over a supervision-free
+CTC-confidence post-gate.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Data Strategy}
@@ -467,17 +413,14 @@ of manual annotation cost, and visually aligned with the target domain.
     \label{fig:primus-vs-lilyjazz}
 \end{figure}
 
-Per-sample rendering variations sample the natural visual variability
-of real lead sheets without altering the musical content: the time
-signature is rendered with non-trivial probability as the C or cut-time
-glyph rather than numerically; cautionary accidentals are added on a
-fraction of samples; the global staff size is drawn from a small range
-of point sizes, varying note size and horizontal density; and unbeamed
-eighth notes appear in a minority of samples to expose the model to
-both beamed and unbeamed groupings.
-The specific probabilities and ranges are hyperparameters and live in
-\Cref{ch:impl}; the design commitment is that these variations are
-independent random draws applied at render time, not class-conditioned
+Per-sample rendering variations capture the visual variability of real
+lead sheets without altering musical content: the time signature is
+sometimes drawn as the C or cut-time glyph rather than numerically,
+cautionary accidentals are added on a fraction of samples, the global
+staff size is drawn from a small range of point sizes, and a minority
+of samples use unbeamed eighth notes. The probabilities and ranges are
+hyperparameters (\Cref{ch:impl}); the design commitment is that these
+are independent random draws at render time, not class-conditioned
 augmentations.
 
 \subsubsection*{Alternatives considered}
@@ -517,15 +460,12 @@ capacity bottleneck: adding parameters does not move the training
 distribution closer to the test distribution.
 
 \paragraph{Learned domain transfer (CycleGAN, style transfer).}
-Train an unpaired image-to-image translator (e.g.\ CycleGAN) to map
-clean LilyJAZZ renders to the Real Book scan distribution.
-CycleGAN training is unstable and would consume a substantial fraction
-of the project's GPU budget, and the mapping that minimises a cycle
-loss need not preserve the structural details (notehead position,
-accidental placement) that the recogniser must learn. A hand-crafted
-augmentation pipeline, by contrast, gives explicit control over each
-distortion's intensity, which is easier to debug when a particular
-failure mode appears at evaluation time.
+Train an unpaired image-to-image translator to map clean renders to
+the scan distribution. CycleGAN training is unstable and GPU-costly,
+and a cycle-loss-minimising mapping need not preserve the structural
+detail (notehead position, accidental placement) the recogniser must
+learn; a hand-crafted pipeline instead gives explicit, debuggable
+control over each distortion's intensity.
 
 \paragraph{Real-only training (no synthetic).}
 Hand-label enough real Real Book pages to train from scratch.
@@ -565,17 +505,14 @@ dataset operation.
 
 \subsection{Fine-tuning on real pages}
 
-The synthetic-to-real gap cannot be fully closed by augmentation alone:
-the visual distribution of real Real Book scans has detail (specific
-ink-pen artefacts, paper grain, page-layout idiosyncrasies) that no
-practical augmentation pipeline can reproduce exactly.
-The design therefore plans for a second training phase. After the
-synthetic model has converged, a small set of manually annotated Real
-Book pages is injected into the training split (only) and the model is
-fine-tuned on the combined corpus.
-The fine-tuning stage is lightweight by design: its purpose is to
-adjust the feature distribution rather than to teach the model new
-musical concepts.
+The synthetic-to-real gap cannot be fully closed by augmentation
+alone: real scans carry detail (ink-pen artefacts, paper grain,
+page-layout idiosyncrasies) that no practical augmentation reproduces
+exactly. The design therefore plans a lightweight second training
+phase that fine-tunes the converged synthetic model on a small set of
+annotated Real Book pages, to shift the feature distribution rather
+than teach new musical concepts. The procedure is detailed in
+\Cref{sec:design-training}.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Output Representation: LMX}
@@ -658,19 +595,14 @@ because that mirrors the temporal order in which a reader processes a
 note: pitch position, then duration, then any required display marks.
 
 \textbf{Display-only accidentals.}
-An accidental token (\code{flat}, \code{sharp}, \code{natural}) signals
-that a flat, sharp, or natural sign should be \textit{drawn} on the
-staff; it does not encode the pitch's chromatic alteration.
-The chromatic pitch is already determined by the pitch letter, the
-octave, and the active key signature.
-This is the rule used by MusicXML, and it makes the model's prediction
-task more local: deciding whether to display an accidental depends
-only on the current measure and the key signature, not on a global
-pitch inference.
-A consequence is that the converter must compute, per note, whether
-the pitch's alteration conflicts with the active key signature or with
-a prior alteration in the same measure, and emit an accidental token
-only when a sign should be drawn.
+An accidental token signals that a sign should be \textit{drawn} on the
+staff; it does not encode chromatic alteration, which is already fixed
+by the pitch letter, octave, and active key signature.
+This MusicXML rule keeps the model's task local: whether to show an
+accidental depends only on the current measure and key signature, not
+on a global pitch inference. The converter therefore emits an
+accidental only when a note's alteration conflicts with the key
+signature or a prior alteration in the same measure.
 
 \subsection{Vocabulary}
 
@@ -726,20 +658,16 @@ domain~\cite{calvoZaragozaCameraPrimus2018,mayerPracticalEndToEnd2024}.
 \label{sec:design-model-alts}
 
 \paragraph{Encoder--decoder transformer with attention (TrOMR-style).}
-A transformer encoder that ingests the staff image as a sequence of
-patches and a transformer decoder that emits LMX tokens
-auto-regressively, supervised by cross-entropy on the token
-sequence~\cite{riosVilaSheetMusicTransformer2024}.
+A transformer encoder over image patches with an autoregressive
+decoder emitting LMX tokens, supervised by
+cross-entropy~\cite{riosVilaSheetMusicTransformer2024}.
 Transformer decoders need substantially more training data than
-CRNN--CTC to reach comparable accuracy on monophonic input, which the
-project cannot afford to generate. The autoregressive decoder also
-amplifies exposure-bias errors: once a single token is mispredicted,
-subsequent tokens are conditioned on the wrong context, a failure mode
-that CTC's frame-independent prediction avoids. And on monophonic Real
-Book staves the input--output alignment is nearly monotonic and
-length-bounded, the regime where CTC is known to match or exceed
-attention-based decoders at a fraction of the compute cost
-(\Cref{sec:soa-transformer}).
+CRNN--CTC to match its accuracy on monophonic input, which the project
+cannot afford to generate; the autoregressive decoder also amplifies
+exposure bias, a failure mode CTC's frame-independent prediction
+avoids. On the nearly monotonic, length-bounded alignment of
+monophonic staves, CTC matches or exceeds attention-based decoders at
+a fraction of the compute (\Cref{sec:soa-transformer}).
 
 \paragraph{Tree-decoder transformer (SMT++\,\cite{riosVilaSMTPlusPlus2024}).}
 A transformer that emits a structured tree representing the score's
@@ -750,39 +678,30 @@ token stream the gain over CTC + deterministic grammar fix is small,
 while the training cost and architectural complexity are large.
 
 \paragraph{Pure-CNN classifier (no recurrence).}
-Replace the BiLSTM with a deeper CNN and treat each column-of-features
-as an independent class prediction.
-Rejected because monophonic OMR requires non-trivial horizontal
-context to disambiguate adjacent symbols (a dot belongs to the
-preceding note; an accidental belongs to the following note; a beam
-groups several notes).
-A purely convolutional column classifier has only the fixed receptive
-field of its filters to draw on, whereas the recurrent layer
-propagates context along the whole staff; it is precisely this
-limitation that motivated the recurrent stage in the CRNN family that
-became standard for monophonic OMR
+Replace the BiLSTM with a deeper CNN and treat each feature column as
+an independent class prediction.
+Rejected because monophonic OMR needs horizontal context to
+disambiguate adjacent symbols --- a dot binds to the preceding note,
+an accidental to the following note, a beam groups several notes ---
+which a fixed convolutional receptive field cannot supply but the
+recurrent layer propagates along the whole staff; this is what
+motivated recurrence in the standard monophonic-OMR CRNN
 (\Cref{sec:soa-crnn})~\cite{calvoZaragozaEndToEndNeural2018}.
 
 \subsection{Backbone choice}
 
 The default backbone is a modified
 ResNet18~\cite{heDeepResidualLearning2016} with asymmetric strides
-that compress the height dimension aggressively while preserving
-width, leaving the horizontal dimension as the CTC time axis.
-ResNet18 was preferred for two reasons.
-First, its residual connections give the gradient a direct path
-through the network and accelerate convergence relative to comparable
-plain CNNs of the VGG family.
-Second, its parameter count fits comfortably within the VRAM budget of
-a single consumer GPU and leaves enough headroom for a non-trivial
-batch size, which is necessary for stable CTC training
-(see \Cref{ch:mgmt}).
-The backbone is trained from scratch on the synthetic corpus rather
-than initialised from ImageNet weights: the input is a single-channel
-monochrome strip with a distribution far from natural images, and the
-training corpus is large enough that random initialisation converges
-in a comparable number of epochs without the channel-averaging
-indirection that ImageNet weights would require.
+that compress height aggressively while preserving width, leaving the
+horizontal axis as the CTC time axis. ResNet18 was preferred on two
+grounds: its residual connections speed convergence over comparable
+plain CNNs of the VGG family, and its parameter count leaves VRAM
+headroom for the non-trivial batch size that stable CTC training needs
+(see \Cref{ch:mgmt}). It is trained from scratch rather than from
+ImageNet weights: the input is a single-channel monochrome strip far
+from the natural-image distribution, and the corpus is large enough
+that random initialisation converges in comparable time without the
+channel-averaging indirection ImageNet weights would require.
 
 \subsubsection*{Alternatives considered}
 
@@ -793,19 +712,16 @@ the validation split. The bottleneck on this task is the
 synthetic-to-real domain gap, not backbone capacity.
 
 \paragraph{EfficientNet / MobileNet.}
-Lightweight backbones designed for mobile inference. Their channel
-widths and depth-wise convolutions are tuned for natural-image
-classification, not for a tall, narrow monochrome strip with
-asymmetric aspect ratio. Preliminary tests with EfficientNet-B0
-converged more slowly than ResNet18 and offered no inference-speed
-advantage on the project's hardware. Not adopted.
+Lightweight backbones tuned for natural-image classification on mobile
+hardware, not for a tall, narrow monochrome strip. EfficientNet-B0
+converged more slowly than ResNet18 in preliminary tests with no
+inference-speed advantage on the project's hardware.
 
 \paragraph{Vision Transformer (ViT, Swin).}
-A patch-based transformer encoder. Rejected on the same training-data
-argument as the encoder--decoder transformer above: ViTs are
-data-hungry and the project's synthetic corpus, while large in
-absolute terms, has lower visual diversity than the natural-image
-datasets ViTs are typically trained on.
+A patch-based transformer encoder, rejected on the same data-hunger
+argument as the encoder--decoder transformer above: the synthetic
+corpus, though large, has lower visual diversity than the datasets
+ViTs need.
 
 \paragraph{VGG-style stack (legacy).}
 A five-block VGG-style stack with progressive max-pooling is retained
@@ -827,14 +743,12 @@ notes on densely engraved staves; the exact value lives in
 \subsection{Recurrent layer}
 
 The convolutional features are fed to a stacked bidirectional
-LSTM~\cite{hochreiterLongShortTermMemory1997}, since per-frame
-predictions on a music staff require non-trivial horizontal context
-on both sides of the current position (an accidental belongs to the
-following note; a dot to the preceding one).
+LSTM~\cite{hochreiterLongShortTermMemory1997}: the per-frame
+predictions need the bidirectional horizontal context discussed in
+\Cref{sec:design-model-alts}, which a feed-forward stage cannot supply.
 The depth and width of the stack are bounded by VRAM at the chosen
 batch size, and dropout between layers regularises against the
-distribution mismatch between synthetic training data and real-scan
-inference inputs.
+synthetic-to-real distribution mismatch.
 Concrete hidden sizes, layer counts, and dropout probabilities live
 in \Cref{ch:impl}.
 
@@ -926,15 +840,12 @@ adjuncts to staff notation.
 \label{sec:design-twostream-alts}
 
 \paragraph{Single multi-task network with shared backbone.}
-One CNN backbone feeds two task-specific recurrent heads (one for LMX,
-one for chord characters), trained jointly with a summed CTC loss.
-Rejected because the visual features useful for chord OCR (letter
-strokes, numeric glyphs) and for melody recognition (notehead
-position relative to staff lines) have little overlap.  Sharing the
-backbone forces the network to allocate capacity to a generic feature
-representation when a specialised one would do, and the joint loss
-introduces a tuning headache (weighting the two losses against each
-other) that the two-stream split avoids entirely.
+One CNN backbone feeding two task-specific recurrent heads, trained
+with a summed CTC loss. Rejected because chord-OCR features (letter
+and numeric glyphs) and melody features (notehead position relative to
+staff lines) barely overlap: a shared backbone wastes capacity on a
+generic representation, and the summed loss adds a loss-weighting
+tuning problem the two-stream split avoids.
 
 \paragraph{Single full-page transformer with positional decoding.}
 The same family as the LEGATO baseline discussed in
@@ -943,25 +854,19 @@ streams interleaved.  Rejected for the same reasons stated there:
 prohibitive data and compute requirements, and opaque failure modes.
 
 \paragraph{Pipeline OCR (text detector + chord parser).}
-Apply a general-purpose OCR engine (e.g.\ EasyOCR, Tesseract) to the
-chord strip, then parse the output text into chord symbols.
-Rejected because general-purpose OCR is trained on standard text and
-mis-reads stylised jazz symbols: the \code{ø} half-diminished glyph
-is read as \code{0}, \code{O}, or \code{o}, and the \code{maj} suffix
-is often split across two lines. A specialised CRNN trained on
-synthetic Real Book chord strips reaches substantially higher accuracy
-at the cost of a one-off training effort.
+Run a general-purpose OCR engine (EasyOCR, Tesseract) on the chord
+strip and parse its text. Rejected because general OCR mis-reads
+stylised jazz glyphs --- the \code{ø} half-diminished sign as
+\code{0}, \code{O}, or \code{o} --- whereas a CRNN trained on synthetic
+Real Book strips is far more accurate for a one-off training cost.
 
 \subsection{Independent training, joint inference}
 
-The two networks are trained on disjoint datasets and produce
-independent outputs.
-At inference time, the staff detection stage emits both a staff image
-and a chord-strip image for each detected system; the two are processed
-in parallel and their outputs are joined into a single JSON segment
-keyed by the system's bounding box on the page.
-No cross-attention or shared representation links the two networks;
-this is a deliberate simplicity choice.
+At inference the staff-detection stage emits both a staff image and a
+chord-strip image for each system; the two are recognised in parallel
+and their outputs joined into a single JSON segment keyed by the
+system's bounding box. No cross-attention or shared representation
+links the networks --- a deliberate simplicity choice.
 
 \subsection{Chord vocabulary and notation conventions}
 
@@ -1016,38 +921,30 @@ The mechanics of the loss are in \Cref{ch:impl}.
 
 \subsection{Data splits}
 
-The corpus is partitioned deterministically into train, validation, and
-test splits with a fixed seed.
-The held-out fractions for validation and test are kept small but not
-negligible---each comfortably exceeds the few-thousand-sample threshold
-at which SER estimates stabilise to two decimal places---and the
-remaining majority of the data is used for training.
-The same sample identifier always falls into the same split across
-runs, so successive experiments are directly comparable.
-When fine-tuning data is added, it is injected only into the train
-split; no fine-tuning sample ever enters validation or test.
-Exact split fractions are stated in \Cref{ch:impl}.
+The corpus is partitioned deterministically into train, validation,
+and test splits with a fixed seed. The held-out fractions are kept
+small but not negligible --- each comfortably exceeds the
+few-thousand-sample threshold at which SER estimates stabilise to two
+decimal places --- and the same sample identifier always falls into
+the same split across runs, so successive experiments are directly
+comparable. Exact split fractions are stated in \Cref{ch:impl}.
 
 \subsection{Header-less continuation staves}
 
-Real Book pages span multiple staves per system, and continuation staves
-typically do not reprint the clef and time signature.
-To teach the recogniser to read such staves, the synthetic corpus includes
-\textit{header-less} variants: a fraction of treble samples are re-rendered
-with the clef and time-signature glyphs hidden and paired with a label from
-which the corresponding tokens are removed.
-The key signature is retained, both because continuation staves normally
-reprint it and because hiding it would force explicit accidentals onto
-key-altered notes and so alter the body of the label.
-Because each header-less variant is a genuine render paired with its own
-label, the image and label are consistent by construction.
-This is preferable to cropping the header out of a full render at training
-time: the header occupies only a few percent of the staff width and its
-boundary cannot be located reliably from the rendered image, so a crop
-desynchronises the pixels from the removed tokens.
-The variants enter the training distribution as ordinary samples; the model
-then learns pitch and rhythm without an explicit clef, which the
-treble-only contract makes unambiguous.
+Real Book pages span multiple staves per system, and continuation
+staves typically do not reprint the clef and time signature.
+The synthetic corpus therefore includes \textit{header-less} variants:
+a fraction of treble samples are re-rendered with the clef and
+time-signature glyphs hidden and labelled with the corresponding
+tokens removed. The key signature is retained, since continuation
+staves normally reprint it and hiding it would force explicit
+accidentals onto key-altered notes, altering the label body.
+Re-rendering keeps image and label consistent by construction; this is
+preferable to cropping the header from a full render, where the header
+boundary cannot be located reliably and a crop desynchronises the
+pixels from the removed tokens. The model then learns pitch and rhythm
+without an explicit clef, which the treble-only contract makes
+unambiguous.
 
 \subsection{Rare-token oversampling}
 
@@ -1065,25 +962,21 @@ which does not admit per-class weights in its standard formulation.
 \subsubsection*{Alternatives considered}
 
 \paragraph{Class-weighted CTC loss.}
-Adjust the loss by a per-class weight that up-weights rare tokens.
-The standard CTC formulation marginalises over alignments and does
-not factorise into per-token contributions that can be weighted
-independently.  Approximate per-token weighting is
-possible but introduces gradient bias that is hard to characterise.
+Up-weight rare tokens in the loss. Standard CTC marginalises over
+alignments and does not factorise into independently weightable
+per-token terms; approximate weighting introduces gradient bias that
+is hard to characterise.
 
 \paragraph{Focal-style CTC.}
-A focal-loss variant of CTC that down-weights easy samples and lets
-hard samples dominate the gradient.  Rejected because the rarity of
-ties is a label-frequency issue, not a sample-difficulty issue:
-focal-style weighting does not specifically target the under-represented
-classes the project cares about.
+Down-weight easy samples so hard ones dominate the gradient. Rejected
+because tie rarity is a label-frequency issue, not sample difficulty,
+so focal weighting does not target the under-represented classes.
 
 \paragraph{Synthetic over-generation of rare-token samples.}
-Generate additional PrIMuS-style samples that contain ties.
-The generation cost rules this out: modifying the LilyPond generator's
-musical content risks producing musically improbable tie patterns,
-which would distort the training distribution rather than fix the
-imbalance.
+Generate extra PrIMuS-style samples containing ties. Ruled out because
+altering the generator's musical content risks musically improbable
+tie patterns, distorting the training distribution rather than fixing
+the imbalance.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Grammar Correction as a Design Layer}
@@ -1174,16 +1067,13 @@ This is the metric that the \SI{0.5}{\percent} target in
 
 \subsection{Domain-gap evaluation}
 
-The principal experimental question of this thesis is whether
-synthetic pretraining plus fine-tuning closes the gap between training
-on rendered images and inference on real scans.
-Two ablations support this evaluation:
-(i)~the model trained only on clean LilyJAZZ renders is evaluated on
-real Real Book pages, exposing the raw synthetic-to-real gap;
-(ii)~the same model after fine-tuning on a small annotated real set is
-evaluated on the same pages, quantifying the reduction in the gap.
-The fine-tuning protocol is the same as that described in
-\Cref{sec:design-training}.
+Whether synthetic pretraining plus fine-tuning closes the
+synthetic-to-real gap is measured by two ablations:
+(i)~the model trained only on clean LilyJAZZ renders, evaluated on
+real Real Book pages, exposing the raw gap; and
+(ii)~the same model after fine-tuning on a small annotated real set,
+evaluated on the same pages, quantifying the reduction.
+The fine-tuning protocol is that of \Cref{sec:design-training}.
 
 \subsection{Reporting protocol}
 

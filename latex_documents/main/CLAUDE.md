@@ -158,10 +158,10 @@ when content could go in either, put justification in Ch. 4 and engineering deta
 
 ## Common Pitfalls (specific to this source)
 
-- **Quoting the numbers.** Headline metrics (SER 1.19% clean / 1.28% scan-simulated, melodic
-  SER 0.11%/0.18%, perfect-transcription 73%/71%, 4 604-sample test split) appear in the
-  abstract, intro, results, and conclusions. If a result changes, it must change in **all**
-  places — grep the figure before editing one occurrence.
+- **Quoting the numbers.** Headline metrics (SER 0.28% clean / 0.23% scan-simulated, melodic
+  SER 0.02% clean / 0.03% scan, perfect-transcription 92.1% clean / 94.1% scan, 4 608-sample
+  test split) appear in the abstract, intro, results, and conclusions. If a result changes, it
+  must change in **all** places — grep the figure before editing one occurrence.
 - **Objectives are measurable and are revisited.** Ch. 1 states numeric targets (aggregate SER
   ≤ 3% scan-simulated, ≤ 2% clean, ≥ 30% relative reduction on fine-tuned real pages). Ch. 8
   must tick each off as met/partial/dropped. Don't soften a Ch. 1 target without updating Ch. 8.

@@ -24,7 +24,7 @@ a pointer to the evidence.
           adjudicate the chosen CRNN--CTC pipeline against the alternatives.
     \item \textbf{O2 — Synthetic dataset from PrIMuS in LilyJAZZ style.}
           Met.
-          The render-convert-twins-augment-vocab pipeline of
+          The render-convert-header-template-augment-vocab pipeline of
           \Cref{sec:impl-data} produces a paired
           \texttt{PNG+LMX} corpus from the original PrIMuS
           semantic files, with the engraving style aligned to the
@@ -357,9 +357,10 @@ and paired with a synthetic scanned copy, yielding on the order of
 (\Cref{sec:design-data}). The design choices that exploit this volume
 are developed elsewhere: synthetic supervision in place of manual
 annotation, sample-level oversampling of rare tokens
-(\Cref{sec:design-training}), first-class header-less twin samples for
-the continuation-line case, and a deterministic split protocol that
-keeps validation and test disjoint (\Cref{sec:impl-reproducibility}).
+(\Cref{sec:design-training}), virtual header injection for the
+continuation-line case (\Cref{sec:impl-inference}), and a deterministic
+split protocol that keeps validation and test disjoint
+(\Cref{sec:impl-reproducibility}).
 
 The structured-output side is satisfied by the choice of LMX as the
 model's symbolic target, argued in

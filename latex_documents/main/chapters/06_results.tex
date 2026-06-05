@@ -43,28 +43,22 @@ musical content under two visual regimes.
 \paragraph{Hardware and software.}
 The hardware and software stack is described in \Cref{ch:impl}.
 On that single-GPU configuration, the full 60-epoch run takes
-approximately 13.9\,h wall time ($\approx 14$\,min/epoch),
+approximately 6\,h of wall time ($\approx 6$\,min/epoch),
 measured from the training log of the selected checkpoint.
 
 \paragraph{Metrics.}
-The headline metric is the standard token-level \term{Symbol Error
-Rate} (SER), the sum of Levenshtein distances over the test set
-normalised by the sum of ground-truth lengths:
-\[
-    \mathrm{SER} \;=\; \frac{\sum_i d(\hat{y}_i, y_i)}{\sum_i |y_i|},
-\]
-where $d$ is the edit distance on the LMX token alphabet, $\hat{y}_i$
-is the model's decoded prediction, and $y_i$ is the reference
-sequence~\cite{SymbolErrorRate,hajicOMRMetricsEvaluation2019}.
-The \term{melodic SER} applies the same formula after stripping the
-\code{measure} and tie tokens, isolating pitch, duration and
-accidental errors from the structural budget. The
-\term{perfect-transcription rate} is the fraction of samples with
-$d(\hat{y}_i, y_i) = 0$.
+The headline metric is the token-level \term{Symbol Error Rate} (SER)
+defined in \Cref{sec:soa-metrics} --- total edit distance over the test
+set divided by total ground-truth
+length~\cite{SymbolErrorRate,hajicOMRMetricsEvaluation2019} --- reported
+on both the clean and scanned splits. The \term{melodic SER} (the same
+measure after stripping the \code{measure} and tie tokens) and the
+\term{perfect-transcription rate} (fraction of samples decoded with
+zero edits) follow the definitions in \Cref{sec:design-eval}.
 
 \paragraph{Repetitions.}
 Numbers reported here come from a single training run, since each run
-costs $\approx 7$\,h on the available hardware.
+costs $\approx 6$\,h on the available hardware.
 The training curve in \Cref{fig:training-curves} is smooth and the
 validation SER plateau is tight (within roughly $\pm 0.05$ percentage
 points over the last ten epochs), which suggests the point estimates
@@ -73,7 +67,7 @@ optimisation noise; this is not, however, a substitute for a proper
 multi-seed study.
 \todo{If time permits, repeat training with at least two further seeds
 and report mean $\pm$ std for the headline numbers in
-\Cref{tab:results-headline}. Cost: $\approx 7$\,h per seed on the RTX
+\Cref{tab:results-headline}. Cost: $\approx 6$\,h per seed on the RTX
 3060.}
 
 \paragraph{Reproducibility.}
@@ -159,14 +153,16 @@ Aggregate SER is \SI{0.23}{\percent} on the scanned variant and
 \SI{0.03}{\percent} and \SI{0.02}{\percent} respectively.
 The perfect-transcription rate is \SI{94.1}{\percent} on the scanned
 variant and \SI{92.1}{\percent} on the clean variant.
-The scanned variant thus scores marginally \emph{better} than the
-clean one on every headline metric.  The difference is small
-(\num{0.05} percentage points of aggregate SER, within the per-sample
-noise at this error scale) and most plausibly reflects the online
-jitter applied throughout training (\Cref{sec:impl-data}): the model
-is always optimised on lightly perturbed inputs, so the scan-simulated
-test distribution sits marginally closer to its training distribution
-than the pristine clean renders do.  Either way the augmentation
+The two variants are statistically indistinguishable: the scanned one
+is marginally ahead on aggregate SER (by \num{0.05} percentage points)
+and on perfect-transcription rate, and marginally behind on melodic SER
+(by \num{0.01} percentage points), all within the per-sample noise at
+this error scale.  The slight scanned-side advantage on aggregate SER
+most plausibly reflects the online jitter applied throughout training
+(\Cref{sec:impl-data}): the model is always optimised on lightly
+perturbed inputs, so the scan-simulated test distribution sits
+marginally closer to its training distribution than the pristine clean
+renders do.  Either way the augmentation
 pipeline meets its acceptance criterion of keeping the clean-to-scanned
 gap below one percentage point (\Cref{sec:design-domain}).
 \Cref{tab:results-headline} consolidates these headline numbers; the
@@ -248,15 +244,19 @@ End-to-end per-page latency was measured on the target RTX~3060 over a
 representative synthetic page ($2550\times3300$\,px, eight staves) with
 greedy decoding.
 The full \code{run\_pipeline} call completes in a median of
-\SI{111}{\milli\second} (mean \SI{111}{\milli\second}~$\pm$~\SI{2}{\milli\second}
+\SI{114}{\milli\second} (mean \SI{114}{\milli\second}~$\pm$~\SI{1}{\milli\second}
 over ten repetitions).
 \Cref{tab:latency} breaks this down by stage: staff detection and
 preprocessing dominate the budget, the two CRNN forward passes are
 comparatively cheap, and the deterministic grammar fixer is
 negligible.
+The per-stage rows are a single representative run and sum to about
+\SI{81}{\milli\second}; the rest of the end-to-end median is fixed
+\code{run\_pipeline} overhead, chiefly PNG-encoding the annotated page
+returned in the response.
 A standalone per-strip measurement on staves of width
 $\approx\SI{1500}{px}$ gives a median CRNN decode time of
-\SI{4.9}{\milli\second} (greedy, 20 repetitions).
+\SI{5.2}{\milli\second} (greedy, 20 repetitions).
 
 \begin{table}[h!]
     \centering
@@ -270,13 +270,13 @@ $\approx\SI{1500}{px}$ gives a median CRNN decode time of
         \toprule
         \textbf{Stage} & {\textbf{Time (ms)}} \\
         \midrule
-        Preprocessing (load + deskew + binarise) & 22.4 \\
-        Staff detection                          & 45.4 \\
-        Music CRNN (8 staves, greedy)            &  7.1 \\
-        Chord CRNN (8 strips)                    &  4.4 \\
+        Preprocessing (load + deskew + binarise) & 21.0 \\
+        Staff detection                          & 48.1 \\
+        Music CRNN (8 staves, greedy)            &  7.6 \\
+        Chord CRNN (8 strips)                    &  4.6 \\
         Grammar fixer                            &  0.1 \\
         \midrule
-        \textbf{End-to-end (median, 10 reps)}    & 111.0 \\
+        \textbf{End-to-end (median, 10 reps)}    & 114.0 \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -427,7 +427,7 @@ keeping every other hyperparameter identical to the headline run, and
 report aggregate SER, melodic SER and training wall time alongside
 the ResNet18 default.  Command:
 \code{poetry run python src/cli.py train --backbone vgg --model-dir
-models/abl\_vgg ...}.  Cost: $\approx 7$\,h.  Expected outcome:
+models/abl\_vgg ...}.  Cost: $\approx 6$\,h.  Expected outcome:
 ResNet18 converges faster but final SER comparable, justifying the
 default choice in \Cref{sec:design-model-alts}.}
 
@@ -441,17 +441,13 @@ direct experimental evidence for the augmentation design choice in
 \todo{Ablation: rare-token oversampling.  Re-train with
 \code{rare\_lmx\_oversample=1} (no oversampling) and compare tie-token
 substitution counts to the headline run.  Hypothesis: tie errors
-roughly double when oversampling is removed.  Cost: $\approx 7$\,h.}
+roughly double when oversampling is removed.  Cost: $\approx 6$\,h.}
 
-\todo{Ablation: header-less twin samples.  Re-train without the
-\code{\_\_nh} twin samples and evaluate on continuation lines
-(lines $\ge 2$) from a few real Real Book pages to quantify how much
-the header-less twin samples help. (Note: \code{strip\_header\_prob}
-is deprecated/inert; the augmentation is now provided as first-class
-twin samples generated at data time by
-\code{generate\_headerless\_twins.py} — see \Cref{sec:design-training}.
-The ablation is therefore: include vs.\ exclude the \code{\_\_nh} dir.
-Cost: $\approx 7$\,h.)}
+\todo{Ablation: virtual header injection.  Evaluate continuation lines
+(staves $\ge 2$) from a few real Real Book pages with and without
+prepending the reconstructed clef+key+time header before the CRNN
+(\Cref{sec:impl-inference}), to quantify how much injection recovers on
+header-less staves.  Cost: $\approx 6$\,h.}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Qualitative Examples}

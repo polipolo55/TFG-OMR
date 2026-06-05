@@ -253,19 +253,13 @@ LMX~\cite{mayerPracticalEndToEnd2024}       & High                     & Inherit
 compactness as a sequence-model target, expressiveness, fidelity of
 conversion back to MusicXML, and representative use. LMX combines the
 compactness of the linear formats with lossless round-tripping to
-MusicXML, which is why it is adopted in this work.}
+MusicXML.}
 \label{tab:omr-formats}
 \end{table}
 
-This work adopts LMX with a project-specific grammar that drops features
-outside the jazz lead-sheet domain (tuplets, slurs, articulations, double
-accidentals, non-treble clefs); the full grammar is described in
-\Cref{sec:lmx-format}.
-LMX was preferred over the PrIMuS native formats because it round-trips
-losslessly to MusicXML, the format expected by downstream music
-applications, and because using the same representation as the OLiMPiC
-reference work~\cite{mayerPracticalEndToEnd2024} keeps the present results
-directly comparable.
+This work adopts LMX; the subset grammar it uses and the rationale for
+choosing it over the alternatives above are developed in
+\Cref{sec:lmx-format} and \Cref{sec:design-lmx-alts}.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Evaluation Metrics}

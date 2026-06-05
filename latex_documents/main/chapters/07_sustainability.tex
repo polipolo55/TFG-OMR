@@ -117,9 +117,11 @@ The workstation pairs an NVIDIA RTX~3060 GPU (\SI{170}{\watt} TDP)
 with a desktop platform whose full-system draw under training load
 is approximately \SI{250}{\watt}.
 Cumulative GPU-engaged time totals approximately
-\SI{230}{\hour}, dominated by the main CRNN training (a 60-epoch
-run, plus ablation and chord-OCR fine-tuning runs), with smaller
-contributions from synthetic-data rendering and evaluation passes.
+\SI{230}{\hour}: a single 60-epoch CRNN training takes about
+\SI{6}{\hour}, and the figure aggregates the many re-trainings,
+ablation runs, and chord-OCR fine-tuning carried out over the project,
+with smaller contributions from synthetic-data rendering and
+evaluation passes.
 The energy estimate follows directly:
 $\SI{230}{\hour} \times \SI{0.25}{\kilo\watt} \approx
 \SI{57.5}{\kilo\watt\hour}$~\cite{strubellEnergyPolicyConsiderations2019,pattersonCarbonConsiderationsDeep2021,lacosteQuantifyingCarbonEmissions2019}.

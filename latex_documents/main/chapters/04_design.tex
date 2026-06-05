@@ -32,14 +32,9 @@ Pipeline structure (\S\ref{sec:design-pipeline})
   & No full-page Real Book corpus; opaque, page-wide failure modes. \\
 \tfgrowsep
 Staff detection (\S\ref{sec:design-staffdetect})
-  & Classical morphology
+  & Classical morphology + reject gate
   & Learned detector (YOLO, RT-DETR); projection-profile slicer
   & Regular staff geometry; no annotation budget; robust to chord text. \\
-\tfgrowsep
-Non-music rejection (\S\ref{sec:design-staff-reject})
-  & Geometric + OCR + CTC-confidence gate
-  & OCR-only rule; learned binary classifier
-  & Brittleness; labelling cost out of proportion to the gain. \\
 \tfgrowsep
 Training corpus (\S\ref{sec:design-data})
   & PrIMuS re-rendered in LilyJAZZ
@@ -57,24 +52,9 @@ Output format (\S\ref{sec:lmx-format})
   & Compact, round-trippable to MusicXML, comparable to OLiMPiC. \\
 \tfgrowsep
 Model family (\S\ref{sec:design-model})
-  & CRNN--CTC
-  & Encoder--decoder transformer; tree decoder; pure-CNN
+  & CRNN--CTC (ResNet18 + BiLSTM, greedy decode)
+  & Encoder--decoder / tree transformer; pure-CNN; beam / WFST decode
   & Data and compute budget; monotonic, length-bounded alignment. \\
-\tfgrowsep
-Backbone (\S\ref{sec:design-model})
-  & ResNet18, from scratch
-  & ResNet34/50; EfficientNet/MobileNet; ViT/Swin; VGG
-  & Capacity is not the bottleneck; data-hunger; convergence speed. \\
-\tfgrowsep
-Sequence layer (\S\ref{sec:design-model})
-  & Bidirectional LSTM
-  & GRU; temporal convolution / self-attention
-  & Marginal saving; recurrence fits the bounded-context regime. \\
-\tfgrowsep
-Decoding (\S\ref{sec:design-decoder})
-  & Greedy CTC
-  & Beam search; grammar-constrained beam; WFST
-  & Marginal accuracy gain over cost; grammar handled in a post-pass. \\
 \tfgrowsep
 Grammar enforcement (\S\ref{sec:design-grammar})
   & Deterministic post-pass
@@ -85,11 +65,6 @@ Chord recognition (\S\ref{sec:design-twostream})
   & Separate CRNN stream
   & Multi-task shared backbone; full-page transformer; general OCR
   & Disjoint visual features; stylised-glyph OCR errors. \\
-\tfgrowsep
-Rare tokens (\S\ref{sec:design-training})
-  & Sample-level oversampling
-  & Class-weighted CTC; focal CTC; synthetic over-generation
-  & CTC admits no per-class weights; rarity is frequency, not difficulty. \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -702,43 +677,22 @@ ImageNet weights: the input is a single-channel monochrome strip far
 from the natural-image distribution, and the corpus is large enough
 that random initialisation converges in comparable time without the
 channel-averaging indirection ImageNet weights would require.
+The same asymmetric strides set the temporal resolution: width is
+compressed by the smallest fixed factor that keeps every in-scope
+sample within the CTC length constraint (at least as many input frames
+as output tokens) while still separating adjacent notes on densely
+engraved staves. The exact value lives in \Cref{ch:impl}.
 
 \subsubsection*{Alternatives considered}
 
-\paragraph{Deeper ResNets (ResNet34, ResNet50).}
-Tested as ablations and rejected: the increase in parameter count
-slowed each epoch noticeably without measurable SER improvement on
-the validation split. The bottleneck on this task is the
-synthetic-to-real domain gap, not backbone capacity.
-
-\paragraph{EfficientNet / MobileNet.}
-Lightweight backbones tuned for natural-image classification on mobile
-hardware, not for a tall, narrow monochrome strip. EfficientNet-B0
-converged more slowly than ResNet18 in preliminary tests with no
-inference-speed advantage on the project's hardware.
-
-\paragraph{Vision Transformer (ViT, Swin).}
-A patch-based transformer encoder, rejected on the same data-hunger
-argument as the encoder--decoder transformer above: the synthetic
-corpus, though large, has lower visual diversity than the datasets
-ViTs need.
-
-\paragraph{VGG-style stack (legacy).}
-A five-block VGG-style stack with progressive max-pooling is retained
-in the codebase as a legacy alternative for backward compatibility
-with earlier checkpoints. It converged more slowly than ResNet18 on
-the same data and is not used for new experiments.
-
-\subsection{Temporal resolution and width compression}
-
-The backbone compresses the input width by a fixed factor, trading the
-number of CTC time steps against compute: too little compression is
-wasteful, while too much can leave fewer time steps than output tokens
-and break the CTC length constraint. The design fixes this factor at
-the smallest ratio that keeps every in-scope sample within the
-constraint while leaving the time axis rich enough to separate adjacent
-notes on densely engraved staves; the exact value lives in
-\Cref{ch:impl}.
+Deeper ResNets (ResNet34/50) slowed each epoch with no SER gain in
+ablations --- capacity is not the bottleneck, the synthetic-to-real
+gap is. EfficientNet/MobileNet and ViT/Swin both converge more slowly
+on a tall, narrow monochrome strip: the lightweight nets are tuned for
+natural images, and the transformers carry the data-hunger of the
+encoder--decoder above. The legacy VGG-style stack is kept only for
+backward compatibility with earlier checkpoints and is not used for
+new experiments.
 
 \subsection{Recurrent layer}
 
@@ -754,25 +708,14 @@ in \Cref{ch:impl}.
 
 \subsubsection*{Alternatives considered}
 
-\paragraph{GRU in place of LSTM.}
-A gated recurrent unit uses two gates instead of the LSTM's three and
-trains slightly faster with a smaller parameter count.
-Not the default: the recurrent stage is not the memory bottleneck at
-the chosen depth (the convolutional backbone dominates both parameters
-and compute), so the saving is marginal, and the LSTM is the more
-thoroughly characterised cell for CTC-based recognisers.
-There was no accuracy argument for deviating from it.
-
-\paragraph{Temporal convolution or self-attention instead of recurrence.}
-Replace the BiLSTM with a temporal-convolutional stack or a
-self-attention layer over the feature columns.
-A temporal-convolutional network has a fixed receptive field that must
-be sized in advance for the longest context dependency, which on
-densely engraved staves is data-dependent and awkward to bound,
-whereas the BiLSTM adapts its effective context to the input.
-Self-attention, in turn, reintroduces the data-hunger of transformer
-components (\Cref{sec:design-model-alts}) without a clear accuracy gain
-on the length-bounded monophonic input this model sees.
+A GRU trains marginally faster, but the recurrent stage is not the
+bottleneck (the backbone dominates compute) and the LSTM is the
+better-characterised cell for CTC, so there was no reason to switch.
+A temporal-convolutional stack fixes its receptive field in advance,
+awkward to bound on densely engraved staves where the BiLSTM adapts to
+the input; self-attention reintroduces transformer data-hunger
+(\Cref{sec:design-model-alts}) with no accuracy gain on this
+length-bounded input.
 
 \subsection{Decoding strategy}
 \label{sec:design-decoder}
@@ -895,6 +838,11 @@ listed in \Cref{ch:impl}.
 \section{Training Strategy}
 \label{sec:design-training}
 
+The supervision signal is the LMX token sequence and the loss is CTC,
+whose alignment-free property (\Cref{sec:soa-crnn}) lets the synthetic
+corpus serve as ground truth without per-frame labels; the loss
+mechanics are in \Cref{ch:impl}.
+
 \subsection{Two-phase plan}
 
 The training procedure has two distinct phases.
@@ -912,13 +860,6 @@ This is a textbook synthetic-pretrain $\to$ real-fine-tune transfer
 learning plan; its effectiveness is the principal experimental
 question of \Cref{ch:results}.
 
-\subsection{Loss and supervision signal}
-
-The supervision signal is the LMX token sequence and the loss is CTC,
-whose alignment-free property (\Cref{sec:soa-crnn}) is what makes the
-synthetic corpus usable as ground truth without per-frame labels.
-The mechanics of the loss are in \Cref{ch:impl}.
-
 \subsection{Data splits}
 
 The corpus is partitioned deterministically into train, validation,
@@ -929,22 +870,22 @@ decimal places --- and the same sample identifier always falls into
 the same split across runs, so successive experiments are directly
 comparable. Exact split fractions are stated in \Cref{ch:impl}.
 
-\subsection{Header-less continuation staves}
+\subsection{Continuation staves}
 
-Real Book pages span multiple staves per system, and continuation
-staves typically do not reprint the clef and time signature.
-The synthetic corpus therefore includes \textit{header-less} variants:
-a fraction of treble samples are re-rendered with the clef and
-time-signature glyphs hidden and labelled with the corresponding
-tokens removed. The key signature is retained, since continuation
-staves normally reprint it and hiding it would force explicit
-accidentals onto key-altered notes, altering the label body.
-Re-rendering keeps image and label consistent by construction; this is
-preferable to cropping the header from a full render, where the header
-boundary cannot be located reliably and a crop desynchronises the
-pixels from the removed tokens. The model then learns pitch and rhythm
-without an explicit clef, which the treble-only contract makes
-unambiguous.
+Real Book pages place several staves under one system, and every staff
+after the first omits the clef, key, and time signature.
+Rather than teach the recogniser to read such header-less staves, the
+design keeps the training distribution uniformly full-header and
+repairs the mismatch at inference: each continuation staff has a
+reconstructed clef--key--time header prepended before the CRNN, so the
+model only ever sees the full-header staves it was trained on.
+The key and time signature to inject are taken from the first staff
+that prints them, with a $4/4$ fallback. The mechanism --- prerendered
+header templates injected by the inference pipeline --- is described in
+\Cref{sec:impl-inference}.
+An earlier design instead trained on header-less render variants; it
+was dropped because injecting a known-correct header at inference keeps
+the training set single-distribution and needs no header-less labels.
 
 \subsection{Rare-token oversampling}
 
@@ -961,22 +902,12 @@ which does not admit per-class weights in its standard formulation.
 
 \subsubsection*{Alternatives considered}
 
-\paragraph{Class-weighted CTC loss.}
-Up-weight rare tokens in the loss. Standard CTC marginalises over
-alignments and does not factorise into independently weightable
-per-token terms; approximate weighting introduces gradient bias that
-is hard to characterise.
-
-\paragraph{Focal-style CTC.}
-Down-weight easy samples so hard ones dominate the gradient. Rejected
-because tie rarity is a label-frequency issue, not sample difficulty,
-so focal weighting does not target the under-represented classes.
-
-\paragraph{Synthetic over-generation of rare-token samples.}
-Generate extra PrIMuS-style samples containing ties. Ruled out because
-altering the generator's musical content risks musically improbable
-tie patterns, distorting the training distribution rather than fixing
-the imbalance.
+Class-weighted CTC does not work: standard CTC marginalises over
+alignments and does not factorise into weightable per-token terms.
+Focal-style CTC targets sample difficulty, not the label-frequency
+issue that ties actually are. Synthetic over-generation of tie samples
+risks musically improbable patterns that would distort the training
+distribution rather than fix the imbalance.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Grammar Correction as a Design Layer}
@@ -1036,56 +967,39 @@ that produce those numbers and the protocol under which they are
 collected, so that \Cref{ch:results} can adjudicate against them
 without ambiguity.
 
-\subsection{Primary metric: Symbol Error Rate}
+\subsection{Metrics}
 
-The primary metric is SER as defined in \Cref{sec:soa-metrics},
-reported separately on the clean and scanned test splits so that the
-contribution of the augmentation pipeline is visible.
+The primary metric is the Symbol Error Rate (SER) defined in
+\Cref{sec:soa-metrics}, reported separately on the clean and scanned
+test splits so the contribution of the augmentation pipeline is
+visible. Because SER aggregates errors of very different musical
+significance --- a missed barline counts identically to a wrong pitch
+--- the evaluation also reports a category-level breakdown of the
+edits attributable to each LMX token family (\code{measure} tokens,
+tie tokens, pitch letters, octaves, durations, accidentals, and
+key/time-signature tokens), the diagnostic information that OMR-NED
+folds into a single number~\cite{martinezSevillaOMRNED2025} but
+expressed here as a table. Finally, a complementary \textit{melodic}
+SER is computed on the same edit distance after stripping
+\code{measure} and tie tokens: structural tokens dominate the absolute
+edit count but are largely musically irrelevant once a downstream
+renderer re-bars the output, so melodic SER captures how often the
+model gets the actual notes right. It is the metric the
+\SI{0.5}{\percent} target in \Cref{sec:design-domain} commits to.
 
-\subsection{Category-level error breakdown}
-
-SER aggregates errors of very different musical significance: a missed
-barline counts identically to a wrong pitch.
-To make this distribution legible, the evaluation reports a
-category-level breakdown of edits attributable to each LMX token
-family: \code{measure} tokens, tie tokens, pitch letters, octaves,
-durations, accidentals, and key/time-signature tokens.
-This is the same diagnostic information that OMR-NED provides as a
-single number~\cite{martinezSevillaOMRNED2025}, expressed here as a
-table rather than committed to a specific normalisation.
-
-\subsection{Melodic SER}
-
-A complementary \textit{melodic} SER is also reported, computed on the
-same edit distance after stripping \code{measure} and tie tokens.
-Structural tokens dominate the absolute edit count on the current
-corpus but are largely musically irrelevant once a downstream renderer
-re-bars the output; the melodic SER captures how often the model gets
-the actual notes right.
-This is the metric that the \SI{0.5}{\percent} target in
-\Cref{sec:design-domain} commits to.
-
-\subsection{Domain-gap evaluation}
+\subsection{Protocol}
 
 Whether synthetic pretraining plus fine-tuning closes the
-synthetic-to-real gap is measured by two ablations:
-(i)~the model trained only on clean LilyJAZZ renders, evaluated on
-real Real Book pages, exposing the raw gap; and
-(ii)~the same model after fine-tuning on a small annotated real set,
-evaluated on the same pages, quantifying the reduction.
-The fine-tuning protocol is that of \Cref{sec:design-training}.
-
-\subsection{Reporting protocol}
-
-To make the four numeric targets falsifiable, the evaluation protocol
-commits in advance to:
-(a)~the split definitions and seed used to construct them, fixed once
-and not retuned per experiment;
-(b)~the decoding strategy used to produce predictions: greedy CTC
-decoding as the primary number, with beam search reported as an
-ablation, as set out in \Cref{sec:design-decoder};
-(c)~the metric aggregation rule (micro-averaged: total edits divided
-by total ground-truth length across the split, not the mean of
-per-sample SERs).
-\Cref{ch:results} reports its primary numbers under this protocol;
-any deviation is called out explicitly.
+synthetic-to-real gap is measured by two ablations: (i)~the model
+trained only on clean LilyJAZZ renders, evaluated on real Real Book
+pages, exposing the raw gap; and (ii)~the same model after fine-tuning
+on a small annotated real set, evaluated on the same pages,
+quantifying the reduction (protocol as in \Cref{sec:design-training}).
+To keep the four numeric targets falsifiable, the protocol commits in
+advance to: (a)~the split definitions and seed, fixed once and not
+retuned per experiment; (b)~greedy CTC decoding as the primary number,
+with beam search reported as an ablation (\Cref{sec:design-decoder});
+and (c)~micro-averaged aggregation (total edits over total
+ground-truth length across the split, not the mean of per-sample
+SERs). \Cref{ch:results} reports its primary numbers under this
+protocol; any deviation is called out explicitly.

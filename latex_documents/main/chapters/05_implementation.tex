@@ -49,8 +49,8 @@ locked in \code{poetry.lock} so the environment is reproducible with
 
 The data pipeline of \Cref{sec:design-data} is implemented as five
 offline stages orchestrated by \code{pipeline} and \code{pipeline-train}:
-\code{render}, \code{convert}, header-less twin generation
-(\code{generate\_headerless\_twins.py}), \code{augment}, and \code{vocab}.
+\code{render}, \code{convert}, header-template generation
+(\code{generate\_header\_templates.py}), \code{augment}, and \code{vocab}.
 Incremental runs skip stages whose outputs are already up to date;
 \code{--force-all} rebuilds everything from scratch.
 \Cref{fig:data-pipeline-impl} shows the full flow.
@@ -83,37 +83,37 @@ Python GIL; see \Cref{sec:impl-performance}.
   \node[io]                       (raw)    {PrIMuS\\raw data};
   \node[stage, below=of raw]      (render) {LilyJAZZ render\\\footnotesize\ttfamily generate\_realbook.py};
   \node[stage, below=of render]   (conv)   {Semantic-to-LMX conversion\\\footnotesize\ttfamily semantic\_to\_lmx.py};
-  \node[stage, below=of conv]     (twins)  {Header-less twin generation\\\footnotesize\ttfamily generate\_headerless\_twins.py};
-  \node[stage, below=of twins]    (aug)    {Scan-simulation augmentation\\\footnotesize\ttfamily augment\_scanned.py};
+  \node[stage, below=of conv]     (tmpl)   {Header-template generation\\\footnotesize\ttfamily generate\_header\_templates.py};
+  \node[stage, below=of tmpl]     (aug)    {Scan-simulation augmentation\\\footnotesize\ttfamily augment\_scanned.py};
   \node[stage, below=of aug]      (vocab)  {Vocabulary construction\\\footnotesize\ttfamily cli.py~vocab};
   \node[io, below=of vocab]       (split)  {Train / val\\/ test splits};
 
   % ── Output annotations ───────────────────────────────────────────────────
   \node[note, right=0.9cm of conv]  (n1) {PNG\,+\,\texttt{.lmx} label pairs};
-  \node[note, right=0.9cm of twins] (n2) {\texttt{\_\_nh} header-less variants};
+  \node[note, right=0.9cm of tmpl]  (n2) {120 templates in \texttt{header\_templates/}};
   \node[note, right=0.9cm of aug]   (n3) {distorted copies in \texttt{scanned/}};
   \node[note, right=0.9cm of vocab] (n4) {\texttt{data/vocab/primus\_lmx.txt}};
 
   % ── Arrows ───────────────────────────────────────────────────────────────
   \draw[flow] (raw)    -- (render);
   \draw[flow] (render) -- (conv);
-  \draw[flow] (conv)   -- (twins);
-  \draw[flow] (twins)  -- (aug);
+  \draw[flow] (conv)   -- (tmpl);
+  \draw[flow] (tmpl)   -- (aug);
   \draw[flow] (aug)    -- (vocab);
   \draw[flow] (vocab)  -- (split);
 
   % ── Outer system box + bold label ────────────────────────────────────────
   % fit= is unreliable when notes extend rightward; use explicit coordinates.
-  % twins.west gives the leftmost stage edge; n4.east the rightmost note edge.
+  % tmpl.west gives the leftmost stage edge; n4.east the rightmost note edge.
   \begin{scope}[on background layer]
-    \draw ([xshift=-0.4cm, yshift=0.4cm]  raw.north   -| twins.west)
+    \draw ([xshift=-0.4cm, yshift=0.4cm]  raw.north   -| tmpl.west)
           rectangle
           ([xshift=0.5cm,  yshift=-0.4cm] split.south -| n4.east);
   \end{scope}
   % title north must be below the rectangle bottom (split.south - 0.4cm);
   % use -0.45cm so there is a small gap, matching the other pipeline figures
   \node[anchor=north, font=\small\bfseries\sffamily, inner sep=3pt]
-    at ($([xshift=-0.4cm] split.south -| twins.west)!0.5!([xshift=0.5cm] split.south -| n4.east)+(0,-0.45cm)$)
+    at ($([xshift=-0.4cm] split.south -| tmpl.west)!0.5!([xshift=0.5cm] split.south -| n4.east)+(0,-0.45cm)$)
     {Data preparation pipeline};
 
 \end{tikzpicture}
@@ -524,6 +524,23 @@ The decode cost of each mode is examined in
 \Cref{sec:impl-performance}; the accuracy comparison is reported in
 \Cref{ch:results}.
 
+\subsection{Virtual header injection}
+
+Continuation staves carry no clef, key, or time signature
+(\Cref{sec:design-training}), so recognition runs in two passes. A
+first CRNN pass decodes every staff; the first staff to emit a key and
+time signature fixes the page header. Each later non-rejected staff
+then has the matching prerendered header template prepended to its left
+edge and is decoded again, so the model sees the full-header input it
+was trained on. If no time signature is found anywhere on the page, a
+$4/4$ default is injected.
+The templates are the 120 clef+key+time strips (15 key signatures
+$\times$ 8 time signatures) prerendered by
+\code{generate-header-templates} into \code{data/header\_templates/}
+and prepended by \code{header\_injector.py}, resized to the staff
+height before concatenation; a missing template falls back to decoding
+the staff without injection.
+
 \subsection{Chord recognition}
 
 The chord strip from each system is trimmed at its left edge to
@@ -692,73 +709,39 @@ symbols, shrinking the CTC forward--backward proportionally.
 
 \subsection{Engineering optimisations}
 
-\paragraph{Process-based parallelism for the data pipeline.}
-The five offline stages (\code{render}, \code{convert}, twins,
-\code{augment}, \code{vocab}) are CPU-bound: LilyPond invocation, image augmentation
-under \code{albumentations}, and string parsing dominate their cost,
-none of which release the Python Global Interpreter Lock for long
-enough to make threading useful.
-The implementation uses \code{multiprocessing.Pool} with a default of
-\num{8} worker processes (configurable via \code{--workers}); on the
-target machine this saturates the available CPU cores during dataset
-generation.
-A thread-based alternative was rejected by direct measurement during
-development: the threaded variant was slower because of GIL
-contention on the per-sample LilyPond subprocess wrapper.
+The concrete training settings are listed with the training loop
+(\Cref{sec:impl-model}); this section records why each matters for
+speed or memory.
 
-\paragraph{Mixed-precision training (AMP).}
-The training loop wraps the forward pass in
-\code{torch.amp.autocast(device\_type=}\allowbreak\code{"cuda")} and
-scales the loss with \code{torch.amp.GradScaler}.
-Numerically delicate operations (the CTC forward--backward,
-log-softmax) are kept in single precision, while the convolutional
-and LSTM bodies run in \code{float16}.
-The principal benefit on the target hardware is VRAM rather than
-throughput: AMP keeps peak memory below
-\SI{8.5}{\giga\byte} at \code{batch\_size=16}, leaving headroom for
-the data-loader workers and the validation pass.
+\paragraph{Process-based parallelism.}
+The CPU-bound data stages (\Cref{sec:impl-data}) use
+\code{multiprocessing.Pool} rather than threads: LilyPond invocation,
+\code{albumentations}, and string parsing all hold the Python GIL, and
+a threaded variant measured slower during development because of GIL
+contention on the per-sample LilyPond wrapper.
+
+\paragraph{Mixed precision and fused optimiser.}
+AMP is used primarily for memory, not throughput: keeping the
+convolutional and LSTM bodies in \code{float16}, with the CTC
+forward--backward and log-softmax in single precision, holds peak VRAM
+near \SI{8.5}{\giga\byte} at batch~\num{16} and leaves room for the
+loader workers and the validation pass. The fused AdamW kernel saves a
+few hundred milliseconds per epoch at no numerical cost.
 
 \paragraph{Batch size against the VRAM ceiling.}
-The default batch size of \num{16} was selected as the largest value
-that fits within \SI{12}{\giga\byte} of VRAM at the target image
-height of \SI{128}{px}, with AMP enabled and \code{num\_workers=10}
-on the data-loader.
-Batches of \num{24} are feasible on the target hardware at the cost
-of slightly tighter memory headroom; batch \num{32} requires either
-disabling AMP-safe activations or reducing image height.
-Gradient accumulation was not implemented because the CTC gradient is
-well-behaved at the current batch size; the LSTM gradient is the
-primary source of instability and is controlled by the global-norm
-clip of \num{5.0} rather than by a larger effective batch.
-A larger effective batch would in principle improve gradient noise but
-would also lengthen the OneCycleLR cycle and slow time-to-convergence.
-
-\paragraph{DataLoader configuration.}
-The training and validation loaders use \code{num\_workers=10},
-\code{pin\_memory=True}, and \code{persistent\_workers=True}.
-The first parameter sets the number of CPU processes feeding the
-GPU; ten was chosen empirically as the value at which the GPU is no
-longer waiting for I/O on the target machine.
-\code{pin\_memory} accelerates host-to-device transfers by allocating
-pinned memory buffers, and \code{persistent\_workers} keeps the workers
-alive between epochs, avoiding the cost of respawning ten processes at
-each epoch boundary.
-
-\paragraph{Fused AdamW.}
-On CUDA, the optimiser is constructed with \code{fused=True}, which
-collapses the parameter-update kernel into a single CUDA launch per
-parameter group rather than one launch per tensor.  The saving is
-small in absolute terms (a few hundred milliseconds per epoch) but
-free, since the fused implementation is identical numerically.
+Batch~\num{16} is the largest that fits \SI{12}{\giga\byte} at
+\SI{128}{px} height with AMP; \num{24} fits with tighter headroom, and
+\num{32} needs a shorter image or fewer AMP-safe activations. Gradient
+accumulation was not added: the LSTM gradient, not batch noise, is the
+instability source and is held by the global-norm clip of \num{5.0},
+and a larger effective batch would lengthen the OneCycleLR cycle and
+slow convergence. The data loader's ten worker processes are sized to
+the point at which the GPU stops waiting on input.
 
 \paragraph{Inference model caching.}
-Both CRNN checkpoints (music and chord) are loaded into memory once
-per process and reused across calls.
-The first request to the API pays the full checkpoint-load cost,
-later requests do not.
-For the FastAPI deployment this matters because the typical
-deployment runs a single Uvicorn worker process per GPU; cold-start
-latency is paid once at process start, not per request.
+Both CRNN checkpoints are loaded once per process and reused, so the
+single Uvicorn worker per GPU pays the checkpoint-load cost once at
+start-up rather than per request.
 
 \subsection{Inference latency}
 
@@ -816,7 +799,9 @@ nondeterminism noted below.
 
 \paragraph{Deterministic dataset splits.}
 The \code{make\_splits} function partitions samples by hashing the
-sample identifier and bucketing the hash modulo a fixed denominator.
+sample identifier and bucketing the hash modulo a fixed denominator,
+holding out \SI{10}{\percent} for validation and \SI{10}{\percent} for
+test (the remaining \SI{80}{\percent} for training).
 The same sample always falls into the same split across runs and
 across machines, so any difference between two evaluation runs comes
 from training, not from the split.

@@ -73,9 +73,9 @@ from the single best checkpoint without loss of generality.
 The entire test-set evaluation is reproduced by
 %
 \begin{quote}
-\code{poetry run python scripts/evaluate\_full.py
-  --checkpoint models/latest/best\_model.pt
-  --split test --both-splits}
+\code{poetry run python scripts/evaluate\_full.py}\\
+\code{\quad --checkpoint models/latest/best\_model.pt}\\
+\code{\quad --split test --both-splits}
 \end{quote}
 %
 which runs greedy decoding on the clean and scanned variants of the
@@ -162,7 +162,7 @@ gap below one percentage point (\Cref{sec:design-domain}).
 \Cref{tab:results-headline} consolidates these headline numbers; the
 remainder of the chapter decomposes them rather than re-quoting them.
 
-\begin{table}[h!]
+\begin{table}[ht]
     \centering
     \caption{Headline test-set results on the epoch-59 checkpoint
     (\code{models/latest/best\_model.pt}), greedy CTC decoding,
@@ -254,7 +254,7 @@ A standalone per-strip measurement on staves of width
 $\approx\SI{1500}{px}$ gives a median CRNN decode time of
 \SI{5.2}{\milli\second} (greedy, 20 repetitions).
 
-\begin{table}[h!]
+\begin{table}[ht]
     \centering
     \caption{Per-stage inference latency on a representative
     eight-staff page (RTX~3060, greedy decoding, single run).}
@@ -341,7 +341,7 @@ content-level confusions are both rare and unsystematic: the three
 joint-most-frequent substitutions span a duration pair, a pitch pair,
 and a tie pair, with no single failure mode standing out.
 
-\begin{table}[h!]
+\begin{table}[ht]
     \centering
     \caption{Top-5 substitution pairs (reference\,$\to$\,prediction)
     by count on the scanned test split.  The three leading pairs are
@@ -605,7 +605,7 @@ within a single-GPU, single-afternoon training budget, whereas the
 transformer systems that report lower error on broader corpora do so at
 a training and inference cost an order of magnitude larger.
 
-\begin{table}[h!]
+\begin{table}[ht]
     \centering
     \caption{Positioning of this work against three reference OMR
     families.  Numbers across rows are \emph{not} strictly comparable:
@@ -827,7 +827,7 @@ here plays the role that SER plays for the melody network.
 \Cref{tab:chord-eval} consolidates the three evaluation conditions; the
 numbers are reproduced by \code{scripts/evaluate\_chord.py}.
 
-\begin{table}[h!]
+\begin{table}[ht]
     \centering
     \caption{Chord-OCR evaluation across the three conditions, all with
     greedy decoding.  The synthetic-pretrain checkpoint is evaluated on

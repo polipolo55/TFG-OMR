@@ -167,17 +167,19 @@ number and the most visible target for further improvement.
 A grammar-aware decoder or a richer beat-counting validator could
 reduce them further, at the cost of additional engineering.
 
-\paragraph{No comparison to existing OMR tools.}
-The evaluation reports synthetic-split numbers against the
-acceptance criteria of \Cref{sec:design-domain}, but does not
-compare the system head-to-head against established OMR tools
-such as the open-source Audiveris or the commercial SmartScore on
-the same input.
-A qualitative comparison on a small sample of Real Book pages would
-strengthen the case for the chosen architecture and is feasible
-within the existing infrastructure;
-it is flagged in \Cref{sec:res-domaingap}
-and noted as future work below.
+\paragraph{The comparison to existing tools is qualitative.}
+The system is positioned against prior work in \Cref{sec:res-soa}
+through a published-numbers table (\Cref{tab:soa-comparison}) and a
+head-to-head run against the open-source Audiveris engine on a genuine
+Real Book scan (\Cref{fig:audiveris-vs-ours}), on which Audiveris
+recovers a correct clef on only two of nine staves and no chord symbols,
+while this system reconstructs the melody and the harmony.
+That comparison is, however, qualitative and confined to a single page:
+there is no shared ground-truth transcription, so no head-to-head error
+rate is reported, and the commercial engines (SmartScore, PhotoScore)
+were not run.
+A quantitative, multi-page comparison against several engines would
+further strengthen the case and remains future work.
 
 \paragraph{Chord recognition sits outside the headline metric.}
 The chord stream (\Cref{sec:impl-chord}) is trained and wired into the

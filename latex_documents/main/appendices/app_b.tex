@@ -13,36 +13,16 @@ for each sample.
 \section{Worst-Case Predictions on the Synthetic Test Split}
 \label{sec:qual-worst}
 
-\crefrange{fig:qual-worst-1}{fig:qual-worst-5} show the five samples
-with the highest edit distance on the scanned test split (epoch-59
-checkpoint, greedy decoding).
+The rank-1 worst prediction is shown in \Cref{fig:qual-worst-1} of the
+body (\Cref{sec:res-qualitative}).
+\crefrange{fig:qual-worst-2}{fig:qual-worst-5} collect the next four
+samples (ranks 2--5) with the highest edit distance on the scanned test
+split (epoch-59 checkpoint, greedy decoding).
 In every case the dominant failure mode is barline misplacement
 (missed or spurious \code{measure} tokens), consistent with the
 error budget of \Cref{sec:res-errors}; melodic content
 (pitch, duration, accidental) is correct on most tokens even in
 the worst predictions.
-
-\begin{figure}[htbp]
-    \centering
-    \begin{subfigure}{\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{figures/worst/worst_1_input}
-        \caption{Input: scan-augmented staff strip.}
-        \label{fig:qual-worst-1-input}
-    \end{subfigure}\\[0.6em]
-    \begin{subfigure}{\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{figures/worst/worst_1_pred}
-        \caption{LilyPond re-render of the predicted LMX sequence.}
-        \label{fig:qual-worst-1-pred}
-    \end{subfigure}
-    \caption{Rank-1 worst prediction (sample \texttt{210017589-1\_51\_1}):
-    edit distance \num{11}, SER \num{0.112}.
-    Errors are barline shifts --- the model misplaces measure boundaries
-    across several dense eighth-note runs, leaving pitch and duration
-    content intact.}
-    \label{fig:qual-worst-1}
-\end{figure}
 
 \begin{figure}[htbp]
     \centering

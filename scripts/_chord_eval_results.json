@@ -1,0 +1,292 @@
+{
+  "synth_val": {
+    "cer": 0.0,
+    "exact_match": 1.0,
+    "n": 2000
+  },
+  "real_zeroshot_all": {
+    "cer": 0.7396911898274297,
+    "exact_match": 0.0,
+    "n": 291
+  },
+  "confusion": {
+    "substitutions": [
+      [
+        "7->9",
+        123
+      ],
+      [
+        "7->A",
+        62
+      ],
+      [
+        "--> ",
+        55
+      ],
+      [
+        "7-> ",
+        52
+      ],
+      [
+        "D->A",
+        39
+      ],
+      [
+        "B->A",
+        31
+      ],
+      [
+        "C-> ",
+        24
+      ],
+      [
+        "-->A",
+        24
+      ],
+      [
+        "7->C",
+        23
+      ],
+      [
+        "\u00f8->9",
+        23
+      ]
+    ],
+    "insertions": [
+      [
+        " ",
+        957
+      ],
+      [
+        "A",
+        417
+      ],
+      [
+        "7",
+        125
+      ],
+      [
+        "9",
+        111
+      ],
+      [
+        "F",
+        110
+      ],
+      [
+        "C",
+        98
+      ],
+      [
+        "#",
+        98
+      ],
+      [
+        "b",
+        84
+      ]
+    ],
+    "deletions": [
+      [
+        "-",
+        86
+      ],
+      [
+        "7",
+        77
+      ],
+      [
+        "j",
+        36
+      ],
+      [
+        "a",
+        19
+      ],
+      [
+        "m",
+        17
+      ],
+      [
+        "d",
+        12
+      ],
+      [
+        "F",
+        11
+      ],
+      [
+        "i",
+        11
+      ]
+    ]
+  },
+  "real_heldout_val": {
+    "n": 29,
+    "zeroshot": {
+      "cer": 0.6988155668358714,
+      "exact_match": 0.0
+    },
+    "finetuned": {
+      "cer": 0.05922165820642978,
+      "exact_match": 0.5862068965517241
+    }
+  },
+  "finetuned_residual_confusion": {
+    "substitutions": [
+      [
+        "9->1",
+        2
+      ],
+      [
+        "B->a",
+        1
+      ],
+      [
+        "s-> ",
+        1
+      ],
+      [
+        "F->E",
+        1
+      ],
+      [
+        "7->\u00f8",
+        1
+      ],
+      [
+        "G->B",
+        1
+      ],
+      [
+        "+->#",
+        1
+      ],
+      [
+        " ->/",
+        1
+      ],
+      [
+        "D->B",
+        1
+      ]
+    ],
+    "insertions": [
+      [
+        "b",
+        3
+      ],
+      [
+        "9",
+        1
+      ],
+      [
+        "-",
+        1
+      ],
+      [
+        "G",
+        1
+      ],
+      [
+        " ",
+        1
+      ],
+      [
+        "7",
+        1
+      ]
+    ],
+    "deletions": [
+      [
+        "m",
+        3
+      ],
+      [
+        "i",
+        3
+      ],
+      [
+        "d",
+        3
+      ],
+      [
+        " ",
+        2
+      ],
+      [
+        "-",
+        2
+      ],
+      [
+        "u",
+        1
+      ],
+      [
+        "s",
+        1
+      ],
+      [
+        "7",
+        1
+      ]
+    ],
+    "wrong_pairs": [
+      [
+        "B-\u00f8 E7b99 A- B\u00f8 E7b9",
+        "B\u00f8 E7b9 A- B\u00f8 E7b9"
+      ],
+      [
+        "Ab6 Eb7#1 Ab6 E-7 A7 D6 D-7 C6 B7 Bb7 A7Ab7",
+        "Ab6 Eb7#9 Ab6 E-7 A7 D6 D-7 C6 B7 Bb7 A7 Ab7"
+      ],
+      [
+        "a7 Db7 D7",
+        "B7 Db7 D7"
+      ],
+      [
+        "G\u00f8 C7b9 Fmaj7 F7 Bb-7 A-7 Ab7",
+        "G\u00f8 C7b9 Fmaj7 F7 Bb-7 A-7 Abdim7"
+      ],
+      [
+        "Gmaj7 E-7 Bb7 ",
+        "Gmaj7 F-7 Bb7sus"
+      ],
+      [
+        "C7 C-7 D\u00f8 G7 C-7",
+        "C7 C-7 D-7 G7 C-7"
+      ],
+      [
+        "A-7 Ab7 G-7 C7",
+        "A-7 Abdim7 G-7 C7"
+      ],
+      [
+        "F7 Bb7 Ebmaj7 G7",
+        "F-7 Bb7 Ebmaj7"
+      ],
+      [
+        "F#7 C-7 F7 Bb",
+        "F+7 C-7 F7 Gb"
+      ],
+      [
+        "Db7 E7#9 D7#9 E7#9 D7#1 Db7/C7",
+        "Db7 E7#9 D7 D7#9 E7#9 D7#9 Db7 C7"
+      ],
+      [
+        "Dbmaj7 Bb-7 Eb-7 Ab7bbb F-7 Bb7 Eb-7 Ab7",
+        "Dbmaj7 Db-7 Eb-7 Ab7 F-7 Bb7 Eb-7 Ab7"
+      ],
+      [
+        "Eb-7 Ab7 F\u00f8 Bbb9",
+        "Eb-7 Ab7 F\u00f8 Bbdimb9"
+      ]
+    ]
+  },
+  "meta": {
+    "pretrain_ckpt": "models/chord/run_20260601_111856/best_model.pt",
+    "finetune_ckpt": "models/chord/finetune_20260601_114246/best_model.pt",
+    "vocab_size": 29,
+    "device": "cuda",
+    "seed": 42
+  }
+}

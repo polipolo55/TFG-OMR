@@ -422,6 +422,21 @@ lengths the system encounters.
 \section{Ablations}
 \label{sec:res-ablations}
 
+The design decisions of \Cref{ch:design} were each argued against
+rejected alternatives, but several of those arguments can be turned into
+direct experiments by re-training the model with a single choice
+reverted and holding everything else fixed.
+Four such ablations are specified below: the backbone family
+(\Cref{sec:design-model}), the scan-augmentation pipeline
+(\Cref{sec:design-data}), the rare-token oversampling of the tie tokens
+(\Cref{sec:design-training}), and the virtual header injection for
+continuation staves (\Cref{sec:impl-inference}).
+Each requires a full from-scratch training run of roughly the same cost
+as the headline model ($\approx 6$\,h on the target RTX~3060), so the
+series is reported as planned rather than executed: it strengthens the
+design justifications of \Cref{ch:design} but, unlike the domain-gap
+work of \Cref{sec:res-domaingap}, is not on the deposit critical path.
+
 \todo{Ablation: backbone.  Train one CRNN with \code{backbone="vgg"}
 keeping every other hyperparameter identical to the headline run, and
 report aggregate SER, melodic SER and training wall time alongside
@@ -516,28 +531,44 @@ produces images that resemble phone photographs of moderately worn
 print (\Cref{sec:design-data}), and in both cases the rendered
 prediction reproduces the input notation.
 
-\todo{Add a worst-case figure (95th-percentile SER) here or in
-\Cref{app:qual}.  Source: notebook \code{02\_evaluate\_model.ipynb},
-section 6.1 ``Worst predictions'' (cell that computes
-\code{worst = np.argsort(ed\_vals)[::-1][:8]} and renders the
-input/prediction pairs via \code{show\_predictions(... render=True)}).
-Pick the rank-1 sample, export its input strip and LilyPond-rendered
-prediction as PNGs into \code{latex\_documents/main/figures/} (e.g.\
-\code{fig\_qual\_worst\_input.png}, \code{fig\_qual\_worst\_rendered.png}),
-include them here as a two-subfigure block matching the style of
-\Cref{fig:qual-median}, and place ranks 2--5 in \Cref{app:qual}.  The
-per-sample edit-operation overlay (S/I/D) is produced by
-\code{\_edit\_ops(pred, ref)} from section 6.2 of the same notebook.}
+\Cref{fig:qual-worst-1} shows the single worst prediction in the test
+set by edit distance.  Even here the failure is structural rather than
+melodic: the model misplaces barlines across several dense eighth-note
+runs while leaving the pitch and duration content intact, exactly the
+error profile that dominates the aggregate budget
+(\Cref{sec:res-errors}).  The four next-worst predictions (ranks 2--5),
+together with a per-sample edit-operation breakdown, are collected in
+\Cref{app:qual}.
 
-\todo{Add at least one qualitative example on a \emph{real} Real Book
-scan, even before fine-tuning.  Upload a page via the FastAPI endpoint
-(\code{POST /api/omr/lead-sheet}) or call \code{run\_pipeline} directly
-from a script, then present the staff strip plus rendered prediction in
-the same format as \Cref{fig:qual-median}.  Without this, the chapter
-has no figure demonstrating model behaviour on the input distribution
-the system is actually meant for.
-Note: there is no \code{cli.py run} subcommand; single-page inference
-goes through the API (\Cref{sec:impl-api}).}
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/worst/worst_1_input}
+        \caption{Input: scan-augmented staff strip.}
+        \label{fig:qual-worst-1-input}
+    \end{subfigure}\\[0.6em]
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/worst/worst_1_pred}
+        \caption{LilyPond re-render of the predicted LMX sequence.}
+        \label{fig:qual-worst-1-pred}
+    \end{subfigure}
+    \caption{The rank-1 worst prediction on the scanned test split
+    (sample \texttt{210017589-1\_51\_1}): edit distance \num{11},
+    SER \num{0.112}.
+    The errors are barline shifts across dense eighth-note runs; the
+    pitch and duration content is reproduced correctly, so the entire
+    edit budget for this sample falls in the structural-token class.}
+    \label{fig:qual-worst-1}
+\end{figure}
+
+The examples above are drawn from the synthetic test split.
+A qualitative example on a genuine \textit{real} Real Book scan, where
+no ground-truth transcription exists, is deferred to
+\Cref{sec:res-realpage}, which runs the full inference pipeline on a
+scanned page and pairs a recognised staff with its rendered prediction
+(\Cref{fig:realpage-staff}).
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Comparison to the State of the Art}
@@ -575,24 +606,127 @@ canonical free-software baseline.  A side-by-side qualitative
 comparison on a real Real Book page is the natural way to position
 this system against an established off-the-shelf tool.
 
-\todo{Build a comparison table along the following lines: rows =
-\{Audiveris (off-the-shelf), Calvo-Zaragoza CRNN-CTC baseline, SMT /
-SMT++ transformer OMR, this work\}; columns = \{corpus, SER (aggregate
-or OMR-NED), training cost, inference cost, monophonic/polyphonic\}.
-Numbers for prior systems can be taken directly from
-\cite{calvoZaragozaEndToEndNeural2018,riosVilaSheetMusicTransformer2024,riosVilaSMTPlusPlus2024,mayerPracticalEndToEnd2024};
-this work's row is filled from \Cref{tab:results-headline}.  Add the
-table as a single \code{booktabs} block and note in the caption that
-numbers across rows are not strictly comparable due to differing
-corpora.}
+\Cref{tab:soa-comparison} consolidates this positioning across the
+three reference families and the present system.
+The table is read down the rows, not across them: each system targets a
+different corpus and, in several cases, reports a different primary
+metric, so the error column is not a like-for-like ranking.
+The one column that does compare directly is voicing and compute
+envelope, where the contrast the project was scoped around is clear ---
+the present system reaches sub-percent SER on its monophonic target
+within a single-GPU, single-afternoon training budget, whereas the
+transformer systems that report lower error on broader corpora do so at
+a training and inference cost an order of magnitude larger.
 
-\todo{Run Audiveris on one representative Real Book page (the same
-page used for the headline qualitative figure) and produce a
-side-by-side figure: Audiveris output (MusicXML rendered back to
-notation) vs.\ this system's output (LMX rendered back to notation),
-on the same input.  Audiveris is a one-line invocation:
-\code{Audiveris -batch -export <page>.pdf}.  This satisfies the
-tribunal-rubric requirement for an explicit SoA comparison.}
+\begin{table}[h!]
+    \centering
+    \caption{Positioning of this work against three reference OMR
+    families.  Numbers across rows are \emph{not} strictly comparable:
+    the systems target different corpora and report different primary
+    metrics (SER for the CRNN--CTC systems, the tree-edit metric TEDn
+    for the transformer systems, and no standard sequence metric for
+    the rule-based engine).  Entries marked \enquote{n/r} were not
+    reported in a form comparable to the others.  This work's row is
+    taken from \Cref{tab:results-headline}, with the compute figures of
+    \Cref{tab:latency}.}
+    \label{tab:soa-comparison}
+    \scriptsize
+    \setlength{\tabcolsep}{4pt}
+    \renewcommand{\arraystretch}{1.3}
+    \begin{tabularx}{\linewidth}{@{} >{\raggedright\arraybackslash}p{2.4cm} L c L L @{}}
+        \toprule
+        \textbf{System} & \textbf{Corpus / domain} & \textbf{Voicing}
+            & \textbf{Reported error} & \textbf{Compute (train / inference)} \\
+        \midrule
+        Audiveris~\cite{audiverisAudiveris}
+            & Printed scores, classical engraving
+            & Poly
+            & n/r (rule-based engine, no sequence metric)
+            & No end-to-end training (template matching + small CNN); CPU inference \\
+        \tfgrowsep
+        Calvo-Zaragoza CRNN--CTC~\cite{calvoZaragozaEndToEndNeural2018}
+            & PrIMuS (monophonic, typeset)
+            & Mono
+            & SER \SI{0.8}{\percent} (semantic encoding)
+            & GPU training (cost n/r); single-pass decode \\
+        \tfgrowsep
+        SMT / SMT++~\cite{riosVilaSheetMusicTransformer2024,riosVilaSMTPlusPlus2024}
+            & Pianoform / polyphonic (GrandStaff)
+            & Poly
+            & TEDn-based (state of the art on pianoform); not an SER
+            & High (transformer, GPU-intensive); autoregressive decode \\
+        \tfgrowsep
+        \textbf{This work}
+            & LilyJAZZ-rendered PrIMuS, Real Book style (monophonic)
+            & Mono
+            & SER \SI{0.23}{\percent} scanned / \SI{0.28}{\percent} clean
+            & $\approx$\,6\,h on one RTX~3060; \SI{114}{\milli\second}/page \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+The qualitative counterpart to \Cref{tab:soa-comparison} is a
+head-to-head run of Audiveris and this system on the same genuine Real
+Book scan.  \Cref{fig:audiveris-vs-ours} shows the result on the
+hand-lettered \textit{Satin Doll} lead sheet.
+Audiveris~\cite{audiverisAudiveris} (v5.10, the current release)
+detects the staff grid but recognises a header clef on only two of the
+nine staves; lacking a clef it defaults the remaining staves to bass
+clef and places their notes on the wrong lines, it recovers no time
+signature on any system, and it extracts no chord symbols at all.
+The exported MusicXML, re-rendered to notation in
+\Cref{fig:audiveris-vs-ours-aud}, is musically unusable: the clef flips
+between treble and bass from line to line, octaves are displaced, and
+the harmony is absent.
+These failures are specific to the hand-lettered engraving rather than
+to the tool's configuration: Audiveris is built for, and performs
+adequately on, cleanly typeset scores (\Cref{sec:soa-classical}), but
+the rounded hand-drawn noteheads, free-hand clefs, and dense chord text
+of a Real Book page fall outside the operating envelope its
+template-matching front-end assumes.
+
+Run on the identical scan, this system recognises seven of the nine
+staves --- the other two are the title band and the bottom credit line,
+both correctly rejected (\Cref{sec:res-realpage}) --- and reconstructs
+both the melody and the harmony (\Cref{fig:audiveris-vs-ours-ours}):
+every recognised staff is rendered on the correct treble clef, and the
+chord stream recovers \num{36} symbols across the page, the
+\textit{ii--V} changes of the tune (\code{D-7 G7}, \code{E-7 A7},
+\code{G-7 C7 Fmaj7}, \dots) reading correctly.
+The comparison is qualitative --- the page has no ground-truth
+transcription --- but the gap in output usability is categorical, and
+it follows directly from the two design choices Audiveris does not
+make: virtual header injection for clef-less staves
+(\Cref{sec:impl-inference}) and a dedicated chord-recognition stream
+(\Cref{sec:design-twostream}).
+
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/real_page/satin_audiveris}
+        \caption{Audiveris 5.10: exported MusicXML re-rendered to
+        notation.}
+        \label{fig:audiveris-vs-ours-aud}
+    \end{subfigure}\hfill
+    \begin{subfigure}{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/real_page/satin_ours_stacked}
+        \caption{This system: the seven recognised staves, LMX
+        re-rendered.}
+        \label{fig:audiveris-vs-ours-ours}
+    \end{subfigure}
+    \caption{Audiveris versus this system on the same genuine
+    \textit{Satin Doll} Real Book scan.
+    \textbf{Left:} Audiveris recognises a header clef on only two of the
+    nine staves, so most lines default to bass clef with displaced
+    octaves, and it recovers no chord symbols.
+    \textbf{Right:} this system renders all seven recognised staves on
+    the correct treble clef and recovers the chord progression.
+    Neither output is checked against a ground truth; the contrast is
+    qualitative.}
+    \label{fig:audiveris-vs-ours}
+\end{figure}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{The Synthetic-to-Real Domain Gap}
@@ -641,33 +775,155 @@ Expected delta: fine-tuning on even a small real set typically
 reduces SER on in-domain real scans by 30--60\,\% relative.}
 
 \subsection{Qualitative inference on a complete Real Book page}
+\label{sec:res-realpage}
 
-\todo{Pick one representative page from The Real Book
-(e.g.\ ``Autumn Leaves'', p.\,1) and run the full inference pipeline
-via \code{POST /api/omr/lead-sheet} (or call \code{run\_pipeline}
-from a script — there is no \code{cli.py run} subcommand; single-page
-inference goes through the FastAPI service of \Cref{sec:impl-api}).
-Produce a figure showing (a) the full page scan with staff bounding
-boxes overlaid (from \code{staff\_bbox} fields in the JSON), (b) the
-predicted LMX token array for each detected staff printed beneath
-the corresponding staff strip, and (c) the recognised chord symbols
-above each staff.  This figure is the natural headline qualitative
-result for the thesis and demonstrates the end-to-end pipeline on a
-genuine Real Book scan.}
+While the zero-shot SER above awaits its annotation, the full pipeline
+can still be inspected qualitatively on a genuine scanned Real Book
+page, the input distribution the system is ultimately meant for.
+\Cref{fig:realpage-annotated} shows the end-to-end run on the
+\textit{Satin Doll} lead sheet.
+Staff detection finds nine candidate systems; the two-tier reject gate
+(\Cref{sec:design-staff-reject}) discards the title band (its
+staff-like rules are too irregularly spaced) and the bottom attribution
+line (rejected on OCR text density), and the remaining seven music
+staves are recognised, each annotated with its detected chord symbols
+(\num{36} across the page).
+\Cref{fig:realpage-staff} pairs one recognised staff with the
+LilyPond re-render of its predicted LMX.
+
+This is qualitative evidence only --- the page carries no ground-truth
+transcription, so no SER is reported, and the quantitative zero-shot
+measurement above remains the missing experiment.
+What it does show is that the melody recogniser and the chord stream
+both produce clef-correct, harmonically sensible output on a real
+handwritten scan and not only on the synthetic split, and that the
+reject gate behaves as designed on genuine page furniture.
+The recovered chords are the correct changes of the tune, and the
+rendered melody follows the contour of the input staff.
+One limitation is visible on the densest line, where the OCR-density
+gate rejects a true music staff carrying heavy chord and volta text ---
+a deliberate consequence of not overriding the OCR signal with CTC
+confidence (\Cref{sec:design-staff-reject}).
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.74\textwidth]{figures/real_page/satin_annotated}
+    \caption{End-to-end inference on the genuine \textit{Satin Doll}
+    Real Book scan.
+    Green boxes are recognised staves (labelled with their detected
+    chord symbols); red boxes are regions the reject gate discarded ---
+    the title band (\code{geometry\_spacing\_cov}) and the bottom credit
+    line (\code{ocr\_text\_density}).
+    Seven of the nine detected systems are recognised, with \num{36}
+    chord symbols read across the page.}
+    \label{fig:realpage-annotated}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/real_page/satin_staffA_input}
+        \caption{Input: one staff strip from the scanned page.}
+        \label{fig:realpage-staff-input}
+    \end{subfigure}\\[0.6em]
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/real_page/satin_staffA_pred}
+        \caption{LilyPond re-render of the predicted LMX; recognised
+        chords \code{D-7 G-7 D-7 G7 E-7 A7}.}
+        \label{fig:realpage-staff-pred}
+    \end{subfigure}
+    \caption{One recognised staff from the \textit{Satin Doll} scan of
+    \Cref{fig:realpage-annotated}: the input strip (top) and the
+    re-rendered prediction (bottom).
+    The melody contour and rhythmic figures of the handwritten input are
+    reproduced on the correct treble clef; the comparison is
+    qualitative, as the page has no ground-truth transcription.}
+    \label{fig:realpage-staff}
+\end{figure}
 
 \subsection{Chord OCR}
+\label{sec:res-chord}
 
-\todo{Chord OCR is evaluated separately because its training data and
-metric are different from the music CRNN.  Report:
-character-level error rate on the synthetic chord-strip validation
-split (\code{data/chord\_synth/val}); exact-match accuracy and
-character-level error rate on the hand-labelled real strips
-(\code{data/chord\_real/labels.jsonl}, after filtering to
-\code{status: done}); a confusion summary on the small set of
-characters that the model gets wrong most often (often \code{6}/\code{b},
-\code{/}/\code{1}, etc.).  These numbers may not yet exist; flag
-explicitly that this is a separate evaluation track from the music
-SER above.}
+The chord stream is evaluated on its own track, because its training
+data, vocabulary, and metric all differ from the music CRNN
+(\Cref{sec:impl-chord}).
+The reported metric is the \term{character error rate} (CER), the
+Levenshtein edit distance over the predicted character string
+normalised by the reference length, together with the
+\term{exact-match} rate (fraction of strips decoded with no character
+error).  The \num{29}-class chord vocabulary is character-level, so CER
+here plays the role that SER plays for the melody network.
+\Cref{tab:chord-eval} consolidates the three evaluation conditions; the
+numbers are reproduced by \code{scripts/evaluate\_chord.py}.
+
+\begin{table}[h!]
+    \centering
+    \caption{Chord-OCR evaluation across the three conditions, all with
+    greedy decoding.  The synthetic-pretrain checkpoint is evaluated on
+    the clean synthetic validation strips and, zero-shot, on the real
+    strips it never saw; the fine-tuned checkpoint is evaluated on a
+    held-out real split (the seed-42 90/10 partition of the fine-tuning
+    set, so the \num{29} strips reported here were excluded from
+    fine-tuning).}
+    \label{tab:chord-eval}
+    \small
+    \setlength{\tabcolsep}{6pt}
+    \renewcommand{\arraystretch}{1.25}
+    \begin{tabular}{@{} l l S[table-format=2.1] S[table-format=3.1] r @{}}
+        \toprule
+        \textbf{Condition} & \textbf{Checkpoint} & {\textbf{CER (\%)}}
+            & {\textbf{Exact (\%)}} & \textbf{Strips} \\
+        \midrule
+        Synthetic val          & pretrain   &  0.0 & 100.0 & 2000 \\
+        Real, zero-shot        & pretrain   & 74.0 &   0.0 &  291 \\
+        Real held-out, zero-shot & pretrain & 69.9 &   0.0 &   29 \\
+        Real held-out, fine-tuned & fine-tune &  5.9 &  58.6 &   29 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+The synthetic-pretrain model is effectively perfect on clean synthetic
+strips (\SI{0.0}{\percent} CER, every one of the \num{2000} validation
+strips decoded exactly), but it collapses on real strips when applied
+zero-shot: \SI{74.0}{\percent} CER over the \num{291} hand-labelled
+strips, with not a single strip decoded correctly.  The dominant
+zero-shot error is spurious insertion (the model hallucinates extra
+characters on the unfamiliar hand-lettered glyphs and page clutter
+rather than substituting one character for another), which is the chord
+analogue of the synthetic-to-real gap framed for the melody stream
+above, but far more severe: the chord glyphs of a real Real Book page
+diverge from the LilyJAZZ renders more sharply than staff notation
+does, and the chord strip additionally carries binder-hole shadows,
+staff-line bleed, and slash-repeat marks (\Cref{sec:impl-chord}).
+
+Fine-tuning on the small real set closes most of that gap.  On the
+\num{29} held-out real strips the same architecture, after fine-tuning
+on the other \num{262} real strips, drops from \SI{69.9}{\percent} to
+\SI{5.9}{\percent} CER and reaches a \SI{58.6}{\percent} exact-match
+rate (17 of 29 strips decoded with zero character errors).  This is the
+direct chord-stream evidence for the synthetic-pretrain then
+real-fine-tune plan of \Cref{sec:design-training}: for the chord
+branch, unlike the melody branch, the real fine-tuning phase is not an
+optional refinement but a prerequisite for usable accuracy.
+
+The residual errors of the deployed (fine-tuned) model are
+unsystematic and concentrated in the stylised quality glyphs: the
+spelled-out diminished suffix is occasionally dropped
+(\code{Abdim7}\,$\to$\,\code{Ab7}), the altered-dominant extension digit
+is confused (\code{7\#9}\,$\to$\,\code{7\#1}), the augmented sign is read
+as a sharp (\code{F+7}\,$\to$\,\code{F\#7}), and a handful of root
+letters are mis-read.  These match the stylised-glyph failure modes
+anticipated when the two-stream design rejected general-purpose OCR
+(\Cref{sec:design-twostream-alts}).
+
+\paragraph{Caveat.}
+The held-out real chord set is only \num{29} strips, so the
+fine-tuned percentages above carry wide confidence intervals and are
+reported with their raw counts.  Enlarging the hand-labelled real set
+is the same annotation-bound constraint that gates the melody
+domain-gap experiment at the head of this section.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Summary}

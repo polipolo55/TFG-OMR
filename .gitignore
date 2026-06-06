@@ -68,5 +68,8 @@ notebooks/*.pdf
 _minted*/
 pythontex-files-*/
 
+# Audiveris OMR engine artifacts (SoA-comparison runs; .mxl kept as figure source)
+*.omr
+
 
 .env

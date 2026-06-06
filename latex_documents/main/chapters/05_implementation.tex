@@ -307,9 +307,10 @@ Each epoch runs the following steps in order:
           label tensor, per-sample label lengths, and per-sample image
           widths.
     \item Forward pass through the CRNN inside an
-          \code{torch.amp.autocast} context for mixed-precision
-          training; the CTC loss itself is computed in single
-          precision, the model body in \code{float16}.
+          \code{torch.amp.autocast} context for automatic
+          mixed-precision (AMP) training; the CTC loss itself is
+          computed in single precision, the model body in
+          \code{float16}.
     \item Backward pass via a \code{torch.amp.GradScaler} on the
           scaled loss; gradient norm clipped at \num{5.0} to stabilise
           the LSTM.
@@ -690,7 +691,7 @@ The choice over the legacy VGG stack is argued in \Cref{sec:design-model}.
 
 \paragraph{BiLSTM recurrent stack.}
 The two-layer BiLSTM with hidden size \num{256} per direction has on
-the order of \num{2.6}~M parameters and runs in
+the order of \num{3.2}~M parameters and runs in
 $\mathcal{O}(T\cdot d^2)$ per layer, with $d = 512$ as the combined
 hidden width.
 A Transformer encoder layer over the same time axis would run in

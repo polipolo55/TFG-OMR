@@ -3,60 +3,64 @@
 \chapter*{Resum}
 \addcontentsline{toc}{chapter}{Resum (Català)}
 
-El \term{Reconeixement Òptic de Música} (OMR) és el procés d'obtenir representacions
-simbòliques llegibles per màquina a partir d'imatges de partitures. Malgrat els avenços
-en el camp, la transcripció automàtica de partitures reals de baixa qualitat continua
-essent un repte obert. Aquesta memòria presenta un sistema OMR orientat a línies de
-melodia monofòniques de jazz del recull \textit{The Real Book}.
+El \term{Reconeixement Òptic de Música} (OMR) consisteix a convertir automàticament
+imatges de partitures en representacions simbòliques que una màquina pugui llegir. Tot i
+els avenços de la disciplina, transcriure escaneigs reals de fonts informals o de baixa
+qualitat continua sent un problema obert. Aquesta memòria presenta un sistema OMR
+d'extrem a extrem per a la melodia monofònica i els acords de les partitures de jazz, amb
+una atenció especial al recull \textit{The Real Book}.
 
-El sistema adopta una arquitectura de dos fluxos: un model \term{CRNN-CTC} per al
-reconeixement de la línia melòdica i un segon CRNN-CTC per a l'extracció dels símbols
-d'acords. Tots dos models s'entrenen de manera independent sobre dades sintètiques
-generades a partir del conjunt PrIMuS. Per reduir la diferència entre imatges sintètiques
-i escaneigs reals, s'aplica una etapa d'augmentació que simula artefactes fotogràfics
-habituals. Avaluat amb la \term{Taxa d'Error de Símbols} (SER), el model assoleix un
-\textbf{0{,}28\%} sobre el conjunt de prova sintètic net i un \textbf{0{,}23\%} sobre la
-versió simulada com a escanejada; la SER melòdica (excloent-hi els tokens de compàs i
-lligadura) és de \textbf{0{,}02\%} i \textbf{0{,}03\%} respectivament, i el
-\textbf{92\%} i \textbf{94\%} de les transcripcions són perfectes per a cada versió.
+El sistema es basa en dues xarxes independents de la mateixa arquitectura, una \term{Xarxa
+Neuronal Convolucional i Recurrent} entrenada amb la funció de pèrdua de \term{Classificació
+Temporal Connexionista} (CRNN-CTC): la primera llegeix la línia melòdica del pentagrama i
+la segona, els acords escrits a sobre. Totes dues s'entrenen amb dades sintètiques
+derivades del conjunt PrIMuS i tornades a renderitzar amb una tipografia d'estil jazz. Com
+que no hi ha cap corpus etiquetat de partitures reals, una etapa d'augmentació de dades
+simula els defectes propis dels escaneigs (desenfocament, soroll, distorsió i il·luminació
+desigual) perquè el model aprengui a tolerar-los. Avaluat amb la \term{Taxa d'Error de
+Símbols} (SER), el model de melodia obté un 0{,}28\% sobre el conjunt de prova sintètic net
+i un 0{,}23\% sobre la versió que simula un escaneig; si no es compten els tokens de compàs
+i de lligadura, la SER melòdica baixa fins al 0{,}02\% i el 0{,}03\%, i el 92\% i el 94\%
+dels pentagrames es transcriuen sense cap error.
 
-El sistema complet integra detecció de pentagrames, reconeixement de melodia, extracció
-de símbols d'acords i correcció gramatical, i accepta fitxers PDF o imatges com a
-entrada. La sortida és un document JSON estructurat que inclou la seqüència de tokens LMX
-i els acords per a cada pentagrama detectat. Aquest treball demostra la viabilitat dels
-models CRNN-CTC per al domini específic de les línies de jazz monofòniques i estableix
-les bases per a extensions futures cap a la transcripció polifònica.
+El sistema complet encadena la detecció de pentagrames, el reconeixement de la melodia i
+dels acords, i una correcció gramatical determinista; admet un PDF o una imatge i retorna
+un document JSON estructurat amb la seqüència de tokens LMX i els acords de cada pentagrama
+detectat. Els resultats confirmen que un sistema CRNN-CTC és una solució pràctica per a les
+línies de jazz monofòniques; ampliar-lo a la notació polifònica i a pàgines escanejades
+reals queda com a treball futur.
 
 % ── Resumen (Español) ──────────────────────────────────────────────────────────
 \selectlanguage{spanish}
 \chapter*{Resumen}
 \addcontentsline{toc}{chapter}{Resumen (Español)}
 
-El \term{Reconocimiento Óptico de Música} (OMR) es el proceso de obtener
-representaciones simbólicas legibles por máquina a partir de imágenes de partituras.
-A pesar de los avances en el campo, la transcripción automática de partituras reales
-de baja calidad sigue siendo un desafío abierto. Esta memoria presenta un sistema OMR
-orientado a líneas de melodía monofónicas de jazz de la colección \textit{The Real Book}.
+El \term{Reconocimiento Óptico de Música} (OMR) consiste en convertir automáticamente
+imágenes de partituras en representaciones simbólicas que una máquina pueda leer. Pese a
+los avances de la disciplina, transcribir escaneos reales de fuentes informales o de baja
+calidad sigue siendo un problema abierto. Esta memoria presenta un sistema OMR de extremo
+a extremo para la melodía monofónica y los acordes de las partituras de jazz, con especial
+atención a la colección \textit{The Real Book}.
 
-El sistema adopta una arquitectura de dos flujos: un modelo \term{CRNN-CTC} para el
-reconocimiento de la línea melódica y un segundo CRNN-CTC para la extracción de los
-símbolos de acorde. Ambos modelos se entrenan de forma independiente sobre datos
-sintéticos generados a partir del conjunto PrIMuS. Para reducir la brecha entre imágenes
-sintéticas y escáneres reales, se aplica una etapa de aumento que simula artefactos
-fotográficos habituales. Evaluado con la \term{Tasa de Error de Símbolos} (SER), el
-modelo alcanza un \textbf{0{,}28\%} sobre el conjunto de prueba sintético limpio y un
-\textbf{0{,}23\%} sobre la versión simulada como escaneada; la SER melódica (excluyendo
-tokens de compás y ligadura) es de \textbf{0{,}02\%} y \textbf{0{,}03\%}
-respectivamente, y el \textbf{92\%} y \textbf{94\%} de las transcripciones son perfectas
-para cada versión.
+El sistema se basa en dos redes independientes de la misma arquitectura, una \term{Red
+Neuronal Convolucional y Recurrente} entrenada con la función de pérdida de
+\term{Clasificación Temporal Conexionista} (CRNN-CTC): la primera lee la línea melódica del
+pentagrama y la segunda, los acordes escritos encima. Ambas se entrenan con datos sintéticos
+derivados del conjunto PrIMuS y vueltos a renderizar con una tipografía de estilo jazz. Como
+no existe ningún corpus etiquetado de partituras reales, una etapa de aumento de datos simula
+los defectos propios de los escaneos (desenfoque, ruido, distorsión e iluminación desigual)
+para que el modelo aprenda a tolerarlos. Evaluado con la \term{Tasa de Error de Símbolos}
+(SER), el modelo de melodía obtiene un 0{,}28\% sobre el conjunto de prueba sintético limpio
+y un 0{,}23\% sobre la versión que simula un escaneo; si no se cuentan los tokens de compás y
+de ligadura, la SER melódica baja hasta el 0{,}02\% y el 0{,}03\%, y el 92\% y el 94\% de los
+pentagramas se transcriben sin ningún error.
 
-El sistema completo integra detección de pentagramas, reconocimiento de melodía,
-extracción de símbolos de acorde y corrección gramatical, y acepta archivos PDF o
-imágenes como entrada. La salida es un documento JSON estructurado que incluye la
-secuencia de tokens LMX y los acordes para cada pentagrama detectado. Este trabajo
-demuestra la viabilidad de los modelos CRNN-CTC para el dominio específico de las líneas
-de jazz monofónicas y sienta las bases para extensiones futuras hacia la transcripción
-polifónica.
+El sistema completo encadena la detección de pentagramas, el reconocimiento de la melodía y
+de los acordes, y una corrección gramatical determinista; admite un PDF o una imagen y
+devuelve un documento JSON estructurado con la secuencia de tokens LMX y los acordes de cada
+pentagrama detectado. Los resultados confirman que un sistema CRNN-CTC es una solución
+práctica para las líneas de jazz monofónicas; ampliarlo a la notación polifónica y a páginas
+escaneadas reales queda como trabajo futuro.
 
 % ── Abstract (English) ─────────────────────────────────────────────────────────
 \selectlanguage{english}
@@ -64,25 +68,27 @@ polifónica.
 \addcontentsline{toc}{chapter}{Abstract (English)}
 
 \term{Optical Music Recognition} (OMR) is the task of automatically converting images
-of musical scores into machine-readable symbolic representations. Despite advances in
-the field, transcribing real-world scans of informal or low-quality sources remains an
-open challenge. This thesis presents an end-to-end OMR system targeting monophonic
-melody lines in jazz lead sheets, with a focus on the \textit{Real Book} collection.
+of musical scores into machine-readable symbolic representations. Despite steady
+progress, transcribing real-world scans of informal or low-quality sources remains an
+open problem. This thesis presents an end-to-end OMR system for the monophonic melody
+lines and chord symbols of jazz lead sheets, with a focus on the \textit{Real Book}
+collection.
 
-The system follows a two-stream architecture: a \term{Convolutional Recurrent Neural
-Network with Connectionist Temporal Classification} loss (CRNN-CTC) for melody
-recognition, and a second CRNN-CTC for chord symbol extraction. Both streams are trained
-independently on synthetic data derived from the PrIMuS dataset. To bridge the gap
-between clean synthetic renderings and real scans, an augmentation stage simulates common
-photographic artefacts. Evaluated using the \term{Symbol Error Rate} (SER), the melody
-model achieves \textbf{0.28\%} SER on
-the clean synthetic set and \textbf{0.23\%} on its scan-simulated counterpart, with
-melodic SER (barline and tie tokens excluded) of \textbf{0.02\%} and \textbf{0.03\%}
-respectively, and perfect transcription rates of \textbf{92\%} and \textbf{94\%}.
+The system pairs two independent networks of the same type, a \term{Convolutional
+Recurrent Neural Network} trained with the \term{Connectionist Temporal Classification}
+loss (CRNN-CTC): one reads the melody line on the staff, the other the chord symbols
+printed above it. Both are trained on synthetic data derived from the PrIMuS dataset,
+re-rendered in a jazz engraving style. Since no labelled corpus of real lead sheets
+exists, an augmentation stage simulates the photographic artefacts of real scans, such
+as blur, noise, warping, and uneven lighting, so the model learns to read through them.
+Measured with the \term{Symbol Error Rate} (SER), the melody model reaches 0.28\% on the
+clean synthetic test set and 0.23\% on its scan-simulated version; once barline and tie
+tokens are set aside, the melodic SER falls to 0.02\% and 0.03\%, and 92\% and 94\% of
+staves come out without a single error.
 
-The full inference pipeline integrates staff detection, melody recognition, chord symbol
-extraction, and a grammar correction stage, accepting PDF or image input and returning a
-structured JSON document with LMX token sequences and chord annotations for each
-detected staff. This work demonstrates the feasibility of CRNN-CTC-based OMR for the
-specific domain of monophonic jazz lead sheets and lays the groundwork for future
-extensions towards polyphonic transcription.
+The full pipeline runs staff detection, melody recognition, chord recognition, and a
+deterministic grammar-correction stage. It takes a PDF or image as input and returns a
+structured JSON document with the LMX token sequence and the chord list for each detected
+staff. The results show that CRNN-CTC recognition is a practical approach for monophonic
+jazz lead sheets; extending it to polyphonic notation and to genuine scanned pages is
+left for future work.

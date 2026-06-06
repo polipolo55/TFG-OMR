@@ -100,7 +100,7 @@ Voicing & Monophonic: one melody line per staff. \\
 \tfgrowsep
 Clef & Treble (\code{clef:G2}) only. \\
 \tfgrowsep
-Key signatures & Any of \code{key:fifths:N}, $N \in [-6,\,+7]$. \\
+Key signatures & Any of \code{key:fifths:N}, $N \in [-7,\,+7]$. \\
 \tfgrowsep
 Time signatures & One of $\{4/4,\,3/4,\,2/4,\,2/2,\,6/8,\,6/4,\,5/4,\,12/8\}$. \\
 \tfgrowsep
@@ -362,7 +362,7 @@ augmentation} for realism.
 
 \subsection{Synthetic supervision from PrIMuS}
 
-PrIMuS~\cite{PrIMuSDataset} provides roughly 87\,000 monophonic music
+PrIMuS~\cite{PrIMuSDataset} provides roughly 88\,000 monophonic music
 incipits, each accompanied by ground-truth symbolic annotations
 (clef, key, time signature, and the sequence of notes and rests on the
 staff).
@@ -595,7 +595,7 @@ deferred to \Cref{ch:impl}.
 
 \textbf{MusicXML} is too verbose as a direct model target: each note is wrapped in nested XML tags that inflate sequence length with no musical content; it is the downstream target that LMX round-trips to via a deterministic post-processor.
 \textbf{PrIMuS \code{.semantic}} encodes pitch and accidentals jointly (\code{note-Bb5\_quarter}), uses a project-internal vocabulary not adopted by downstream tooling, and does not round-trip to MusicXML; LMX is more compact and aligns with the OLiMPiC reference work.
-\textbf{Humdrum \code{**kern}}~\cite{huronHumdrum2002,Humdrum} and \textbf{ABC}~\cite{walshawABC2011} are compact but have thin tooling ecosystems outside musicology and folk music respectively, and their per-cell escape-character and header conventions complicate CTC training.
+\textbf{Humdrum \code{**kern}}~\cite{huronHumdrum2002} and \textbf{ABC}~\cite{walshawABC2011} are compact but have thin tooling ecosystems outside musicology and folk music respectively, and their per-cell escape-character and header conventions complicate CTC training.
 
 
 % ─────────────────────────────────────────────────────────────────────────────
@@ -708,7 +708,7 @@ in \Cref{ch:impl}.
 
 \subsubsection*{Alternatives considered}
 
-A GRU trains marginally faster, but the recurrent stage is not the
+A gated recurrent unit (GRU) trains marginally faster, but the recurrent stage is not the
 bottleneck (the backbone dominates compute) and the LSTM is the
 better-characterised cell for CTC, so there was no reason to switch.
 A temporal-convolutional stack fixes its receptive field in advance,

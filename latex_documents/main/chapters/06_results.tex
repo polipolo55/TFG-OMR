@@ -50,7 +50,7 @@ measured from the training log of the selected checkpoint.
 The headline metric is the token-level \term{Symbol Error Rate} (SER)
 defined in \Cref{sec:soa-metrics} --- total edit distance over the test
 set divided by total ground-truth
-length~\cite{SymbolErrorRate,hajicOMRMetricsEvaluation2019} --- reported
+length~\cite{levenshteinBinaryCodes1966,hajicOMRMetricsEvaluation2019} --- reported
 on both the clean and scanned splits. The \term{melodic SER} (the same
 measure after stripping the \code{measure} and tie tokens) and the
 \term{perfect-transcription rate} (fraction of samples decoded with
@@ -189,7 +189,7 @@ remainder of the chapter decomposes them rather than re-quoting them.
     \centering
     \includegraphics[width=\textwidth]{figures/fig_ser_distribution}
     \caption{Per-sample SER distribution on the scanned test split,
-    overlaid with its empirical CDF.
+    overlaid with its empirical cumulative distribution function (CDF).
     The count axis is logarithmic, so that both the dominant spike at
     zero and the sparse high-error tail are legible on the same plot.
     The aggregate SER of \num{0.0023} is dominated by a long but
@@ -455,7 +455,8 @@ design choice justified in \Cref{sec:design-data}.
 \label{sec:res-qualitative}
 
 This section shows representative predictions drawn from the perfect
-and near-median tails of the SER distribution.
+(\Cref{fig:qual-perfect}) and near-median (\Cref{fig:qual-median})
+tails of the SER distribution.
 Each figure pairs the input image presented to the model (a
 scan-augmented LilyJAZZ render from the held-out test split) with a
 clean LilyPond rendering of the predicted LMX sequence, so the reader
@@ -715,6 +716,17 @@ make: virtual header injection for clef-less staves
 \end{figure}
 
 % ─────────────────────────────────────────────────────────────────────────────
+% REMINDER (Pol, 2026-06-06): O7 is intentionally left open for now.
+%   Plan: finish the document first, then hand-label AT LEAST 40 real staff
+%   strips with the /music-labeler UI (model-assisted: correct the first-pass
+%   prediction, don't transcribe from scratch). With those labels:
+%     1. fill the two \todo{} items below (zero-shot real SER + before/after
+%        fine-tuning on a held-out real split), and
+%     2. flip O7 in sec:conc-objectives from "partially met / deferred" to
+%        "met", and drop it from the future-work list in sec:future-work.
+%   The fine-tune infra already exists (--finetune-data-dir flag, music-labeler).
+%   This is annotation-bound, not method-bound; revisit after the doc is done.
+% ─────────────────────────────────────────────────────────────────────────────
 \section{The Synthetic-to-Real Domain Gap}
 \label{sec:res-domaingap}
 
@@ -758,10 +770,9 @@ handwritten scan and not only on the synthetic split, and that the
 reject gate behaves as designed on genuine page furniture.
 The recovered chords are the correct changes of the tune, and the
 rendered melody follows the contour of the input staff.
-One limitation is visible on the densest line, where the OCR-density
-gate rejects a true music staff carrying heavy chord and volta text ---
-a deliberate consequence of not overriding the OCR signal with CTC
-confidence (\Cref{sec:design-staff-reject}).
+The two rejected regions are both non-music: the title band at the top
+and the attribution line at the bottom, both correctly filtered by the
+gate (\Cref{sec:design-staff-reject}).
 
 \begin{figure}[htbp]
     \centering

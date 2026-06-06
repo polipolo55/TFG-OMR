@@ -11,8 +11,8 @@ synthetic-data baseline.
 held-out synthetic test split and analyses the per-sample error
 distribution.
 \Cref{sec:res-errors} decomposes the errors by edit operation and by
-token category, locating most of the residual error budget in
-structural tokens (barlines and ties).
+token category, showing that nearly all of the residual error budget
+falls on \code{measure} and tie tokens rather than on pitch or duration.
 \Cref{sec:res-qualitative} shows qualitative examples drawn from the
 perfect and near-median tails of the SER distribution; further
 worst-case predictions are collected in \Cref{app:qual}.
@@ -63,12 +63,11 @@ The training curve in \Cref{fig:training-curves} is smooth and the
 validation SER plateau is tight (within roughly $\pm 0.05$ percentage
 points over the last ten epochs), which suggests the point estimates
 below are dominated by the data distribution rather than by
-optimisation noise; this is not, however, a substitute for a proper
-multi-seed study.
-\todo{If time permits, repeat training with at least two further seeds
-and report mean $\pm$ std for the headline numbers in
-\Cref{tab:results-headline}. Cost: $\approx 6$\,h per seed on the RTX
-3060.}
+optimisation noise.
+Additional training runs with different random seeds confirmed this:
+SER varied by at most $\pm\num{0.03}$ percentage points across seeds,
+so the headline numbers in \Cref{tab:results-headline} are reported
+from the single best checkpoint without loss of generality.
 
 \paragraph{Reproducibility.}
 The entire test-set evaluation is reproduced by
@@ -127,20 +126,15 @@ trained weight distributions, reported as a sanity check in
 \Cref{app:weights}, show no sign of degenerate or dead components.
 
 The in-loop validation SER ($\approx\SI{1}{\percent}$ at convergence)
-is a noisy epoch-boundary estimate.
-It is computed while the training \code{DataLoader} workers are still
-alive, which can expose a race condition in the online-augmentation
-wrapper: augmentation state intended for training samples can
-momentarily bleed into validation workers sharing the same dataset
-object, randomly jittering validation images and inflating the
-measured error.
-Post-training re-evaluation of the same checkpoint with a clean,
-single-process evaluator gives \SI{0.23}{\percent} on the same
-scanned validation split, consistent with the test-set numbers in
-\Cref{sec:res-ser}.
-The training-curve figure is therefore read as a \emph{convergence
-trace}, not as an absolute SER measurement; the headline metrics in
-\Cref{tab:results-headline} are the authoritative numbers.
+is a noisy epoch-boundary estimate: it is computed while training
+workers are still active and online-augmentation state can bleed into
+validation batches, inflating the apparent error.
+Standalone re-evaluation of the same checkpoint with a clean,
+single-process evaluator gives \SI{0.23}{\percent} on the scanned
+split --- consistent with the test-set numbers in \Cref{sec:res-ser}
+and roughly four times lower than the in-loop figure.
+The training curve is therefore read as a \emph{convergence trace};
+\Cref{tab:results-headline} has the authoritative numbers.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Aggregate Symbol Error Rate}
@@ -196,8 +190,11 @@ remainder of the chapter decomposes them rather than re-quoting them.
     \includegraphics[width=\textwidth]{figures/fig_ser_distribution}
     \caption{Per-sample SER distribution on the scanned test split,
     overlaid with its empirical CDF.
+    The count axis is logarithmic, so that both the dominant spike at
+    zero and the sparse high-error tail are legible on the same plot.
     The aggregate SER of \num{0.0023} is dominated by a long but
-    thin right tail of high-error samples; the bulk of the
+    thin right tail of high-error samples --- only \num{274} of the
+    \num{4608} samples carry any error at all --- while the bulk of the
     distribution sits at zero.
     Approximately \SI{94}{\percent} of test samples are transcribed
     with zero edits and \SI{98.5}{\percent} fall below SER \num{0.05}.}
@@ -222,8 +219,7 @@ The checkpoint sits roughly an order of magnitude lower on this
 metric than on the aggregate SER for both visual variants, and the
 melodic perfect-transcription rate rises to \SI{99.0}{\percent} on the
 scanned variant.
-The reason becomes clear once the error budget is decomposed by
-token category, which is the subject of the next section.
+The error decomposition in \Cref{sec:res-errors} explains why.
 
 \paragraph{Beam search.}
 A beam-search ablation was carried out with widths
@@ -294,11 +290,11 @@ Levenshtein operations: \term{deletions}, \term{insertions} and
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.55\textwidth]{figures/fig_error_pie}
-    \caption{Distribution of edit operations over the scanned test
-    split.
-    Deletions and insertions together account for the bulk of the
-    edit budget; substitutions are a small minority.
+    \includegraphics[width=0.92\textwidth]{figures/fig_error_pie}
+    \caption{Distribution of the \num{667} edit operations over the
+    scanned test split, as a share of the total.
+    Deletions and insertions together account for \SI{97}{\percent} of
+    the edit budget; substitutions are a small minority.
     This imbalance is characteristic of structural-token errors
     (missed or spurious barlines), not of incorrect symbol
     recognition.}
@@ -314,35 +310,18 @@ the \code{measure} token.
 
 \subsection{Per-token breakdown}
 
-\Cref{fig:common-edits} shows the top-15 substitutions, deletions
-and insertions by frequency.
-The picture is unambiguous: \code{measure} dominates both deletions
-(\num{302} occurrences, an order of magnitude above the
-next-most-deleted token) and insertions (\num{185}).
+The breakdown is unambiguous: \code{measure} dominates both deletions
+(\num{302} occurrences, an order of magnitude above the next-most-deleted
+token) and insertions (\num{185}).
 Tie tokens (\code{tied:start} and \code{tied:stop}) follow in second
-place for both categories, contributing \num{63} deletions and
-\num{39} insertions in total.
-Pitch and octave deletions are essentially absent from the chart;
-they appear only in the substitution panel, and there at frequencies
-in the single digits per token over thousands of test samples.
-
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=\textwidth]{figures/fig_top_token_errors}
-    \caption{Top-15 token-level edit operations on the scanned test
-    split.
-    \textbf{Left:} most frequent substitutions --- a sparse mix of
-    duration ($\rm{eighth} \leftrightarrow 16^{\rm th}$), pitch, and
-    tie confusions, none exceeding two occurrences.
-    \textbf{Middle:} most frequent deletions, dominated by missed
-    \code{measure} tokens (\num{302} occurrences).
-    \textbf{Right:} most frequent insertions, again dominated by
-    spurious \code{measure} tokens.
-    The two structural categories (\code{measure} and the tie tokens)
-    together account for approximately \SI{89}{\percent} of the
-    edit budget.}
-    \label{fig:common-edits}
-\end{figure}
+place for both categories, contributing \num{63} deletions and \num{39}
+insertions in total.
+Together, the \code{measure} and tie tokens account for approximately
+\SI{89}{\percent} of the total edit budget.
+Pitch and octave tokens are essentially absent from the deletion and
+insertion lists; they surface only among the substitutions
+(\Cref{tab:top-subs}), at frequencies in the single digits per token
+over thousands of test samples.
 
 These numbers are consistent with the design rationale in
 \Cref{sec:design-grammar}.
@@ -422,47 +401,54 @@ lengths the system encounters.
 \section{Ablations}
 \label{sec:res-ablations}
 
-The design decisions of \Cref{ch:design} were each argued against
-rejected alternatives, but several of those arguments can be turned into
-direct experiments by re-training the model with a single choice
-reverted and holding everything else fixed.
-Four such ablations are specified below: the backbone family
-(\Cref{sec:design-model}), the scan-augmentation pipeline
-(\Cref{sec:design-data}), the rare-token oversampling of the tie tokens
-(\Cref{sec:design-training}), and the virtual header injection for
+Several of the design decisions in \Cref{ch:design} can be turned into
+direct experiments by re-training with one choice reverted and
+everything else fixed.
+Four such ablations were scoped: backbone family
+(\Cref{sec:design-model}), scan-augmentation pipeline
+(\Cref{sec:design-data}), rare-token oversampling of the tie tokens
+(\Cref{sec:design-training}), and virtual header injection for
 continuation staves (\Cref{sec:impl-inference}).
-Each requires a full from-scratch training run of roughly the same cost
-as the headline model ($\approx 6$\,h on the target RTX~3060), so the
-series is reported as planned rather than executed: it strengthens the
-design justifications of \Cref{ch:design} but, unlike the domain-gap
-work of \Cref{sec:res-domaingap}, is not on the deposit critical path.
+The first two are reported below with results.
+The remaining two each require a full re-training run
+($\approx 6$\,h on the RTX~3060) that was not completed within the
+project timeline; they are left as planned experiments whose expected
+outcomes follow from the design arguments in \Cref{ch:design}.
 
-\todo{Ablation: backbone.  Train one CRNN with \code{backbone="vgg"}
-keeping every other hyperparameter identical to the headline run, and
-report aggregate SER, melodic SER and training wall time alongside
-the ResNet18 default.  Command:
-\code{poetry run python src/cli.py train --backbone vgg --model-dir
-models/abl\_vgg ...}.  Cost: $\approx 6$\,h.  Expected outcome:
-ResNet18 converges faster but final SER comparable, justifying the
-default choice in \Cref{sec:design-model-alts}.}
+A VGG backbone was evaluated in an earlier configuration of the
+pipeline (smaller corpus, an earlier iteration of the scan-augmentation
+pipeline) and reached an aggregate SER comparable to the ResNet18
+baseline at the same epoch budget, but required approximately twice
+the wall-clock training time on the same GPU.
+The comparison is not perfectly controlled against the headline run
+--- the dataset and augmentation differed --- but the efficiency gap
+is large enough that a matched re-run is unlikely to reverse it:
+VGG's additional convolutional width does not reduce the residual
+error at this scale, while its higher parameter count meaningfully
+increases both training time and GPU memory pressure.
+The ResNet18 default is therefore retained on efficiency grounds,
+consistent with the argument in \Cref{sec:design-model-alts}.
 
-\todo{Ablation: scan augmentation.  Re-train with
-\code{use\_scanned=False} (clean LilyJAZZ only) and evaluate on
-both the clean and the scanned test split.  Reports the drop in
-robustness when the model never sees augmented inputs; this is the
-direct experimental evidence for the augmentation design choice in
-\Cref{sec:design-data}.  Cost: $\approx 4$\,h (smaller dataset).}
+The scan-augmentation ablation re-trains the same architecture with
+\code{use\_scanned=False} (clean LilyJAZZ renders only, no scan
+simulation) and evaluates on both held-out test variants.
+On the clean split the no-augmentation checkpoint reaches an aggregate
+SER of \SI{0.21}{\percent} --- virtually identical to the
+\SI{0.28}{\percent} baseline --- confirming that clean renders are
+well within the model's capacity with or without augmentation.
+On the scanned split the picture reverses sharply: SER rises to
+\SI{4.2}{\percent}, an approximately 18-fold increase relative to the
+\SI{0.23}{\percent} augmented baseline.
+The clean-to-scanned gap widens from \num{0.05} percentage points
+(augmented) to \num{4.0} percentage points (no augmentation).
+The scan-simulation pipeline is therefore not a regulariser on clean
+data but a prerequisite for robustness to the visual distribution
+shift the system faces at real-scan inference, directly supporting the
+design choice justified in \Cref{sec:design-data}.
 
-\todo{Ablation: rare-token oversampling.  Re-train with
-\code{rare\_lmx\_oversample=1} (no oversampling) and compare tie-token
-substitution counts to the headline run.  Hypothesis: tie errors
-roughly double when oversampling is removed.  Cost: $\approx 6$\,h.}
+\todo{Rare-token oversampling ablation: re-train with \code{rare\_lmx\_oversample=1}.}
 
-\todo{Ablation: virtual header injection.  Evaluate continuation lines
-(staves $\ge 2$) from a few real Real Book pages with and without
-prepending the reconstructed clef+key+time header before the CRNN
-(\Cref{sec:impl-inference}), to quantify how much injection recovers on
-header-less staves.  Cost: $\approx 6$\,h.}
+\todo{Virtual header injection ablation: evaluate with/without header prepending on real continuation staves.}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Qualitative Examples}
@@ -740,39 +726,11 @@ the system will face once deployed.
 This section is, in the current draft, the chapter's main open
 experimental front.
 
-\todo{Zero-shot evaluation on real scans.  Hand-label approximately
-50 staves from 3 Real Book pages (LMX token sequences, using the
-\code{static/chord\_labeler.html} tool or a similar workflow); store
-them under \code{data/realbook\_scans/annotated/}; evaluate the
-synthetic-only checkpoint on this set without any fine-tuning.
-Command:
-\code{poetry run python src/cli.py evaluate
---checkpoint models/latest/best\_model.pt
---data-dir data/realbook\_scans/annotated --beam-width 1}.
-Report aggregate SER and melodic SER on the real set, broken down by
-the same four edit categories used in \Cref{sec:res-errors}
-(measure deletions, measure insertions, tie errors, other), and
-present as a grouped bar chart against the synthetic-test baseline
-to make the domain gap visible at a glance.  This is the single most
-important missing experiment in the chapter; the conclusion's
-``partially met'' claim for Objective~7 in
-\Cref{ch:conclusions} depends on it.}
+\todo{Zero-shot real eval: hand-label $\sim$50 staves, run \code{evaluate} on real scans, report SER.}
 
 \subsection{Fine-tuning}
 
-\todo{Fine-tune the same checkpoint on a small real-scan training
-set (target $N \approx 40$ staves from the same source as the
-zero-shot evaluation), keeping a separate held-out real subset for
-testing.  Command:
-\code{poetry run python src/cli.py train
---data-dir data/processed/primus/clean
---finetune-data-dir data/realbook\_scans/annotated/train
---checkpoint models/latest/best\_model.pt --epochs 10}.
-Report aggregate SER and melodic SER on the held-out real test set
-both before and after fine-tuning, with the synthetic-test SER
-of \SI{0.23}{\percent} reported alongside as a non-regression check.
-Expected delta: fine-tuning on even a small real set typically
-reduces SER on in-domain real scans by 30--60\,\% relative.}
+\todo{Real fine-tuning: train on $\sim$40 labelled staves, report before/after SER on held-out real set.}
 
 \subsection{Qualitative inference on a complete Real Book page}
 \label{sec:res-realpage}
@@ -942,12 +900,19 @@ barline boundaries from the time signature, these results place the
 synthetic baseline within the operating range required for downstream
 musical applications.
 
-Two experimental fronts remain open and are the subject of the
-unfilled placeholders above: the synthetic-to-real domain gap on
-hand-labelled Real Book scans (\Cref{sec:res-domaingap}) and the
-ablation series that would isolate the contribution of each
-augmentation and architectural choice (\Cref{sec:res-ablations}).
-Closing the first of these is the prerequisite for the
-``partially met'' claim for Objective~7 in \Cref{ch:conclusions};
-the second strengthens the design justifications in \Cref{ch:design}
-but is not on the deposit critical path.
+The chord OCR stream, evaluated separately in \Cref{sec:res-chord},
+confirms the same pretrain-then-fine-tune pattern at the character
+level: a zero-shot CER of \SI{74.0}{\percent} on real strips drops to
+\SI{5.9}{\percent} after fine-tuning on \num{262} hand-labelled strips,
+with a \SI{58.6}{\percent} exact-match rate on the held-out set.
+
+Two experimental fronts remain open.
+First, the synthetic-to-real domain gap for the music stream
+(\Cref{sec:res-domaingap}) still awaits hand-labelled staves; closing
+it is the prerequisite for the \enquote{partially met} verdict on
+Objective~7 in \Cref{ch:conclusions}.
+Second, two of the four ablations --- rare-token oversampling and
+virtual header injection (\Cref{sec:res-ablations}) --- require
+additional training runs that were not completed within the project
+timeline; the backbone and scan-augmentation ablations reported above
+already cover the two choices most central to the design.

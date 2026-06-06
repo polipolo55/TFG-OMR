@@ -28,8 +28,8 @@ Goal of the memoir:
 | Rule | Source | Detail |
 |---|---|---|
 | Abstract in **three languages** | Art. 22 | 1 or 2 *pages* each in Catalan, Spanish, English. **Not** word-counted. Missing any one is a formal defect. |
-| Cover includes specialty | Art. 22 | After degree name (apartat e), append specialty (Computació). |
-| Cover required fields | Art. 12 a–g | Title, author, defense date, director (+ dept), degree, FIB, UPC-BarcelonaTech. Modality B/D adds h (company). |
+| Cover includes specialty | Art. 22 | After degree name (apartat e), append specialty (Computació). **Already satisfied** on this thesis: the mandated `portada.pdf` reads "Bachelor's Degree in Informatics Engineering (Computing)". |
+| Cover required fields | Art. 12 a–g | Title, author, defense date, director (+ dept), degree, FIB, UPC-BarcelonaTech. Modality B/D adds h (company). **This thesis's cover:** title "END-TO-END OPTICAL MUSIC RECOGNITION USING CONVOLUTIONAL RECURRENT NEURAL NETWORKS"; author POL CASANOVAS PUIG; supervisor MANEL FRIGOLA BOURLON (Dept. of Automatic Control); defense date blank (filled at submission). Cover is the FIB-mandated form in `portada.pdf` — do not modify or retypeset it. |
 | Sustainability & ethics section | Art. 12 | Mandatory per Acord Consell de Govern UPC 07/2023. Not optional. |
 | Source code only | Art. 22 | If software is submitted: source files only, no compiled binaries or object files. |
 | Memoir language | Art. 16 | Catalan, Spanish, **or** English. Stay consistent throughout the body. |

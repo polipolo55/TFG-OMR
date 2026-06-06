@@ -71,11 +71,7 @@ a pointer to the evidence.
           is specified in \Cref{sec:design-training}.
           The end-to-end measurement on hand-annotated Real Book pages
           is not concluded in this memoir and is carried forward as
-          the first item of \Cref{sec:future-work}.\todo{verify:
-          confirm against the final state of \S\ref{sec:res-domaingap}
-          at deposit time. If real-page numbers are produced before
-          deposit, upgrade this entry to ``met''. If not, the wording
-          here is the honest version.}
+          the first item of \Cref{sec:future-work}.
 \end{itemize}
 
 % ─────────────────────────────────────────────────────────────────────────────
@@ -114,22 +110,27 @@ samples per split with greedy CTC decoding.
           ($\approx\num{0.003}$ pp of SER) at $\approx 8.4\times$ the
           decode cost; greedy decoding is therefore the deployed default
           (\Cref{sec:impl-inference}).
+    \item \textbf{Chord OCR:} after fine-tuning on \num{262} real
+          chord strips, the chord model reaches \SI{5.9}{\percent} CER
+          and a \SI{58.6}{\percent} exact-match rate on the held-out
+          real set, down from a zero-shot CER of \SI{74.0}{\percent}
+          (\Cref{tab:chord-eval}).
 \end{itemize}
 
 The four acceptance criteria from \Cref{sec:design-domain} are met
 without exception on the synthetic test split.
-The principal open question is the model's behaviour on genuine,
-unaugmented Real Book pages, which is treated in
-\Cref{sec:res-domaingap} and revisited as the leading future-work item.
+The main open question is how the model performs on genuine,
+unaugmented Real Book pages; it is treated in \Cref{sec:res-domaingap}
+and is the leading item in \Cref{sec:future-work}.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Critical Assessment and Limitations}
 \label{sec:conc-limitations}
 
-The system meets its declared targets, but the breadth of those targets
-is itself a deliberate restriction.
+The system meets its declared targets, but those targets were
+deliberately narrow.
 The limitations below follow from the design decisions of
-\Cref{ch:design}: some were contracted out of scope from the start,
+\Cref{ch:design}: some were ruled out of scope from the start,
 others surfaced during implementation.
 
 \paragraph{Scope restrictions, by design.}
@@ -158,12 +159,11 @@ The end-to-end measurement on real pages is therefore the most
 important uncovered question.
 
 \paragraph{Structural errors dominate the residual SER.}
-About \SI{89}{\percent} of the residual edits are barline and tie
-tokens (\Cref{sec:res-errors}).
-These are largely musically irrelevant once a downstream renderer
-re-bars the output, which is the reason for reporting a separate
-melodic SER, but they remain the largest contributor to the headline
-number and the most visible target for further improvement.
+The large majority of residual edits are \code{measure} and tie tokens
+(\Cref{sec:res-errors}), which are largely musically irrelevant once a
+downstream renderer re-bars the output (hence the separate melodic
+SER), but they remain the biggest single contributor to the headline
+number and the most visible target for improvement.
 A grammar-aware decoder or a richer beat-counting validator could
 reduce them further, at the cost of additional engineering.
 
@@ -178,19 +178,20 @@ That comparison is, however, qualitative and confined to a single page:
 there is no shared ground-truth transcription, so no head-to-head error
 rate is reported, and the commercial engines (SmartScore, PhotoScore)
 were not run.
-A quantitative, multi-page comparison against several engines would
-further strengthen the case and remains future work.
+A quantitative, multi-page comparison against several engines would be
+the natural next step.
 
-\paragraph{Chord recognition sits outside the headline metric.}
+\paragraph{Chord recognition is evaluated separately.}
 The chord stream (\Cref{sec:impl-chord}) is trained and wired into the
-pipeline, but its accuracy is reported on a separate track from the
-melody model and is not folded into the SER figures of
-\Cref{sec:conc-results}: the melody numbers are well characterised,
-whereas the chord network is assessed with its own character-level
-measure on a smaller set of strips. The headline results therefore
-quantify the melodic half of the two-stream output far more thoroughly
-than the harmonic half, and an end-to-end quality figure for the merged
-JSON is not among the numbers reported here.
+pipeline, and its accuracy is reported in \Cref{sec:res-chord}.
+The chord numbers (\SI{5.9}{\percent} CER after fine-tuning,
+\SI{58.6}{\percent} exact-match) are character-level figures on a
+\num{29}-strip held-out set, not token-level SER on thousands of
+samples, so they are reported on a separate track rather than folded
+into the headline metric.
+No combined melody-plus-chord quality figure is reported; the harmonic
+half of the output is less thoroughly benchmarked than the melodic half,
+and no unified end-to-end metric has been defined.
 
 \paragraph{CTC-confidence reject gate is checkpoint-bound.}
 The staff rejection gate of \Cref{sec:design-staff-reject} uses a
@@ -228,12 +229,11 @@ infrastructure rather than as an open research direction.
 \paragraph{Real-data fine-tuning and end-to-end measurement on Real
 Book pages.}
 The synthetic-to-real gap remains the most important open question.
-A natural follow-up is to assemble a hand-annotated set of approximately \num{40}
-staves drawn from real Real Book scans, run the fine-tuning protocol
-specified in \Cref{sec:design-training} with the convolutional
-backbone frozen and only the BiLSTM and CTC head updated, and
-measure aggregate and melodic SER on the same pages before and after
-fine-tuning.
+Closing it means assembling a hand-annotated set of approximately
+\num{40} staves from real Real Book scans, running the fine-tuning
+protocol of \Cref{sec:design-training} with the convolutional backbone
+frozen and only the BiLSTM and CTC head updated, and measuring
+aggregate and melodic SER before and after fine-tuning.
 The infrastructure (the music-strip labelling UI of
 \Cref{sec:impl-api} and the \code{--finetune-data-dir} flag of the
 training CLI) is already in place;
@@ -314,7 +314,7 @@ implement the solution which guarantees the best performance according
 to the established requirements.'' (In depth.)
 
 \textbf{Where evidence lives.}
-The principal venue is the comparative analysis of architectural
+The clearest evidence is in the comparative analysis of architectural
 alternatives in \Cref{ch:design}, where each major design decision is
 adjudicated against rejected alternatives on complexity and
 performance grounds. The pipeline decomposition weighs a modular

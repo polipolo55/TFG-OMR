@@ -1,12 +1,5 @@
 \chapter{Software Availability}
 \label{app:code}
 
-The complete source code, training scripts, and trained model weights for this project are published in a public Git repository; the URL appears on the cover page of this document.
+The complete source code, training scripts, and trained model weights for this project are published at \url{https://github.com/polipolo55/TFG-OMR}.
 The environment is fully reproducible with \code{poetry install} followed by the relevant \code{src/cli.py} subcommands documented in \Cref{tab:cli-subcommands} (\Cref{app:hyperparams}).
-
-Readers wishing to inspect the most instructive implementation files are directed to:
-\begin{itemize}
-    \item the LilyJAZZ rendering loop: \code{src/data\_processing/generate\_realbook.py}
-    \item the augmentation pipeline parameters: \code{src/data\_processing/augment\_scanned.py}
-    \item the grammar fixer state machine: \code{src/omr\_pipeline/grammar\_fix.py}
-\end{itemize}

@@ -36,6 +36,33 @@ OUT = REPO / "latex_documents/main/figures/real_page"
 OUT.mkdir(parents=True, exist_ok=True)
 SHOW = {"A": 1, "B": 4}  # representative recognised segments
 
+# Figure-only LilyPond template: full-width, justified systems so every staff
+# in the stacked figure renders to the SAME width and the lines align like a
+# real lead sheet. This is a local override passed via render_tokens(template=);
+# it deliberately does NOT modify the shared LY_TEMPLATE used for training data
+# (those renders must stay natural-width incipits to match the trained model).
+FIG_LY_TEMPLATE = r"""
+\version "2.26.0"
+{staff_size_directive}
+\include "lilyjazz.ily"
+\header {{ tagline = ##f }}
+\paper {{
+  indent = 0
+  ragged-right = ##f
+  top-margin = 6\mm
+  bottom-margin = 6\mm
+  left-margin = 8\mm
+  right-margin = 8\mm
+  paper-width = 200\mm
+  line-width = 184\mm
+  paper-height = 55\mm
+}}
+\score {{
+  \new Staff {{ {music} }}
+  \layout {{ \context {{ \Score \omit BarNumber }} }}
+}}
+""".strip()
+
 
 def _decode_page(data_url: str) -> np.ndarray:
     b64 = data_url.split(",", 1)[1]
@@ -54,6 +81,26 @@ def _stack(images: list[np.ndarray], gap: int = 30, pad: int = 20) -> np.ndarray
         rows.append(canvas)
         rows.append(sep)
     return np.vstack(rows[:-1])
+
+
+def _with_chords(render: np.ndarray, chords: list[str], *, pad: int = 10) -> np.ndarray:
+    """Prepend a band above *render* showing the recognised chords in reading
+    order, evenly spaced across the staff width (not beat-aligned: the chord
+    stream carries no per-chord beat offset)."""
+    if not chords:
+        return render
+    h, w = render.shape
+    font = cv2.FONT_HERSHEY_DUPLEX
+    scale = max(0.8, w / 1100.0)
+    thick = max(1, round(scale * 1.5))
+    (_, th), _ = cv2.getTextSize("Cmaj7", font, scale, thick)
+    band = np.full((th + 2 * pad, w), 255, np.uint8)
+    slot = w / len(chords)
+    for i, ch in enumerate(chords):
+        (tw, _), _ = cv2.getTextSize(ch, font, scale, thick)
+        x = min(int(i * slot) + pad, max(pad, w - tw - pad))
+        cv2.putText(band, ch, (x, pad + th), font, scale, 0, thick, cv2.LINE_AA)
+    return np.vstack([band, render])
 
 
 def main():
@@ -91,9 +138,10 @@ def main():
     for i, s in enumerate(segs):
         if s.get("rejected") or not s.get("lmx_tokens"):
             continue
-        r = render_tokens(s["lmx_tokens"], name=f"satin_stack_{i}")
+        r = render_tokens(s["lmx_tokens"], name=f"satin_stack_{i}",
+                          template=FIG_LY_TEMPLATE)
         if r is not None:
-            renders.append(r)
+            renders.append(_with_chords(r, s.get("chords", [])))
     if renders:
         stacked = _stack(renders)
         cv2.imwrite(str(OUT / "satin_ours_stacked.png"), stacked)

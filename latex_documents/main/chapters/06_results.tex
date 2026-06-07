@@ -64,11 +64,7 @@ The training curve in \Cref{fig:training-curves} is smooth and the
 validation SER plateau is tight (within roughly $\pm 0.05$ percentage
 points over the last ten epochs), which suggests the point estimates
 below are dominated by the data distribution rather than by
-optimisation noise.
-Additional training runs with different random seeds confirmed this:
-SER varied by at most $\pm\num{0.03}$ percentage points across seeds,
-so the headline numbers in \Cref{tab:results-headline} are reported
-from the single best checkpoint without loss of generality.
+optimisation noise or the choice of a single seed.
 
 \paragraph{Reproducibility.}
 The entire test-set evaluation is reproduced by
@@ -181,7 +177,6 @@ remainder of the chapter decomposes them rather than re-quoting them.
         Melodic SER (\%)                 & 0.03 & 0.02 \\
         Perfect transcriptions (\%)      & 94.1 & 92.1 \\
         Samples with SER $\le 0.05$ (\%) & 98.5 & 98.4 \\
-        Samples with SER $\le 0.10$ (\%) & 99.7 & {\textemdash} \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -251,9 +246,11 @@ The per-stage rows are a single representative run and sum to about
 \SI{81}{\milli\second}; the rest of the end-to-end median is fixed
 \code{run\_pipeline} overhead, chiefly PNG-encoding the annotated page
 returned in the response.
-A standalone per-strip measurement on staves of width
-$\approx\SI{1500}{px}$ gives a median CRNN decode time of
-\SI{5.2}{\milli\second} (greedy, 20 repetitions).
+A standalone, unbatched per-strip measurement on a single wide staff
+($\approx\SI{1500}{px}$) gives a median CRNN decode time of
+\SI{5.2}{\milli\second} (greedy, 20 repetitions); the lower per-staff
+cost implied by \Cref{tab:latency} reflects batching the page's staves
+into one forward pass.
 
 \begin{table}[ht]
     \centering
@@ -318,7 +315,7 @@ Tie tokens (\code{tied:start} and \code{tied:stop}) follow in second
 place for both categories, contributing \num{63} deletions and \num{39}
 insertions in total.
 Together, the \code{measure} and tie tokens account for approximately
-\SI{89}{\percent} of the total edit budget.
+\SI{88}{\percent} of the total edit budget.
 Pitch and octave tokens are essentially absent from the deletion and
 insertion lists; they surface only among the substitutions
 (\Cref{tab:top-subs}), at frequencies in the single digits per token
@@ -461,7 +458,7 @@ tails of the SER distribution.
 Each figure pairs the input image presented to the model (a
 scan-augmented LilyJAZZ render from the held-out test split) with a
 clean LilyPond rendering of the predicted LMX sequence, so the reader
-can compare what the model output against the input notation without
+can compare what the model produced against the input notation without
 inspecting a raw token list.
 Further high-SER samples are collected in \Cref{app:qual}.
 
@@ -906,7 +903,7 @@ figures of \Cref{tab:results-headline}: aggregate SER around
 splits, melodic SER an order of magnitude lower, and a
 perfect-transcription rate above \SI{90}{\percent}.
 The residual error budget is concentrated in the \code{measure} and
-tie tokens, which together account for $\approx \SI{89}{\percent}$ of
+tie tokens, which together account for $\approx \SI{88}{\percent}$ of
 all edits, while pitch and octave errors are negligible.
 Combined with the deterministic grammar fixer that reconstructs
 barline boundaries from the time signature, these results place the

@@ -292,7 +292,7 @@ composer credits) that morphological staff detection can falsely
 accept when their layout is staff-like, for instance a row of small
 print that produces five collinear ink runs.
 A staff mis-detected on such a region is then fed to the
-CRNN, which dutifully emits a high-confidence but musically nonsense
+CRNN, which emits a high-confidence but musically nonsensical
 token sequence.
 
 The design therefore inserts a two-tier rejection gate between the

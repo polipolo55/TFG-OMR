@@ -52,6 +52,36 @@
 % ── Cross-references (must come after hyperref, which tfg.sty loads) ──────────
 \usepackage[capitalize, nameinlink]{cleveref}
 
+% ── Paragraph style (space between paragraphs + a small first-line indent) ────
+\usepackage{parskip}
+\setlength{\parindent}{1em}
+
+% ── Tighter chapter headings ─────────────────────────────────────────────────
+% Stock report-class spacing wastes ~50pt above the title and 40pt below.
+% These redefinitions keep the default "Chapter N / Title" look but cut the
+% whitespace (top 50->10, label-to-title 20->12, title-to-body 40->22).
+\makeatletter
+\def\@makechapterhead#1{%
+  \vspace*{10\p@}%
+  {\parindent\z@ \raggedright \normalfont
+    \ifnum \c@secnumdepth >\m@ne
+      \huge\bfseries \@chapapp\space \thechapter
+      \par\nobreak
+      \vskip 12\p@
+    \fi
+    \interlinepenalty\@M
+    \Huge \bfseries #1\par\nobreak
+    \vskip 22\p@
+  }}
+\def\@makeschapterhead#1{%
+  \vspace*{10\p@}%
+  {\parindent\z@ \raggedright \normalfont
+    \interlinepenalty\@M
+    \Huge \bfseries #1\par\nobreak
+    \vskip 22\p@
+  }}
+\makeatother
+
 % ── TODO helper ────────────────────────────────────────────────────────────────
 % Usage: \todo{What needs to be written here.}
 % \long allows multi-paragraph notes. Empty test uses \detokenize so that

@@ -637,9 +637,25 @@ contract.
 A minimal HTML upload UI is served at the root path (\code{GET /});
 it displays the rendered page with detected staff bounding boxes
 overlaid, the recognised LMX token sequence per segment, and the
-extracted chord list.
+extracted chord list (\Cref{fig:web-ui}).
 The UI functions as a debugging aid and demonstration interface rather
 than a primary deliverable.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.72\textwidth]{figures/web_example}
+    \caption{The web interface wrapping the inference pipeline, shown
+    transcribing the genuine \textit{Satin Doll} Real Book scan.
+    A PDF or image is uploaded through the drop zone at the top; the
+    pipeline then returns the rendered page below with each detected
+    staff system outlined, and lists the recognised chord symbols and
+    LMX token sequence for every system.
+    On this page the service detects nine staff systems, rejects two
+    (the title band and the bottom credit line) at the staff gate, and
+    transcribes the remaining seven; the same scan is shown with the
+    reject-gate decisions annotated in \Cref{fig:realpage-annotated}.}
+    \label{fig:web-ui}
+\end{figure}
 End-to-end per-page latency on the target hardware is reported in
 \Cref{ch:results}.
 The full response schema is documented in

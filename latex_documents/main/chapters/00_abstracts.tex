@@ -10,9 +10,9 @@ qualitat continua sent un problema obert. Aquesta memòria presenta un sistema O
 d'extrem a extrem per a la melodia monofònica i els acords de les partitures de jazz, amb
 una atenció especial al recull \textit{The Real Book}.
 
-El sistema es basa en dues xarxes independents de la mateixa arquitectura, una \term{Xarxa
-Neuronal Convolucional i Recurrent} entrenada amb la funció de pèrdua de \term{Classificació
-Temporal Connexionista} (CRNN-CTC): la primera llegeix la línia melòdica del pentagrama i
+Arquitectònicament, el sistema combina dues xarxes independents de la mateixa mena, una
+\term{Xarxa Neuronal Convolucional i Recurrent} entrenada amb la funció de pèrdua de
+\term{Classificació Temporal Connexionista} (CRNN-CTC): la primera llegeix la línia melòdica del pentagrama i
 la segona, els acords escrits a sobre. Totes dues s'entrenen amb dades sintètiques
 derivades del conjunt PrIMuS i tornades a renderitzar amb una tipografia d'estil jazz. Com
 que no hi ha cap corpus etiquetat de partitures reals, una etapa d'augmentació de dades
@@ -23,7 +23,7 @@ i un 0{,}23\% sobre la versió que simula un escaneig; si no es compten els toke
 i de lligadura, la SER melòdica baixa fins al 0{,}02\% i el 0{,}03\%, i el 92\% i el 94\%
 dels pentagrames es transcriuen sense cap error.
 
-El sistema complet encadena la detecció de pentagrames, el reconeixement de la melodia i
+El procés complet encadena la detecció de pentagrames, el reconeixement de la melodia i
 dels acords, i una correcció gramatical determinista; admet un PDF o una imatge i retorna
 un document JSON estructurat amb la seqüència de tokens LMX i els acords de cada pentagrama
 detectat. Els resultats confirmen que un sistema CRNN-CTC és una solució pràctica per a les
@@ -42,8 +42,8 @@ calidad sigue siendo un problema abierto. Esta memoria presenta un sistema OMR d
 a extremo para la melodía monofónica y los acordes de las partituras de jazz, con especial
 atención a la colección \textit{The Real Book}.
 
-El sistema se basa en dos redes independientes de la misma arquitectura, una \term{Red
-Neuronal Convolucional y Recurrente} entrenada con la función de pérdida de
+Arquitectónicamente, el sistema combina dos redes independientes del mismo tipo, una
+\term{Red Neuronal Convolucional y Recurrente} entrenada con la función de pérdida de
 \term{Clasificación Temporal Conexionista} (CRNN-CTC): la primera lee la línea melódica del
 pentagrama y la segunda, los acordes escritos encima. Ambas se entrenan con datos sintéticos
 derivados del conjunto PrIMuS y vueltos a renderizar con una tipografía de estilo jazz. Como
@@ -55,7 +55,7 @@ y un 0{,}23\% sobre la versión que simula un escaneo; si no se cuentan los toke
 de ligadura, la SER melódica baja hasta el 0{,}02\% y el 0{,}03\%, y el 92\% y el 94\% de los
 pentagramas se transcriben sin ningún error.
 
-El sistema completo encadena la detección de pentagramas, el reconocimiento de la melodía y
+El proceso completo encadena la detección de pentagramas, el reconocimiento de la melodía y
 de los acordes, y una corrección gramatical determinista; admite un PDF o una imagen y
 devuelve un documento JSON estructurado con la secuencia de tokens LMX y los acordes de cada
 pentagrama detectado. Los resultados confirman que un sistema CRNN-CTC es una solución

@@ -196,9 +196,9 @@ To the author's knowledge none of these corpora captures the
 LilyJAZZ-style engraving of \textit{The Real Book}, and none labels chord
 symbols as first-class objects. The only directly comparable corpus emerged
 contemporaneously with this work~\cite{martinezSevillaJazzLeadSheets2025}
-and, at 293 annotated sheets, is far below the scale of the tens of
-thousands of samples used to train the CRNN--CTC models surveyed above, and
-so is too small to train such a model from scratch. Every recent end-to-end
+and, at 293 annotated sheets, is far smaller than the tens of
+thousands of samples those CRNN--CTC models require, and so cannot train
+one from scratch. Every recent end-to-end
 system (SMT, SMT++, OLiMPiC, LEGATO, and Camera-PrIMuS itself) addresses an
 equivalent scarcity by synthetic pretraining followed by fine-tuning on a
 small annotated target set.
@@ -322,9 +322,8 @@ transformer decoder), in chord handling (a two-stream design with
 independent staff and chord networks merged in post-processing versus a
 unified single-stream model), and in output format
 (LMX versus \code{**kern}).
-The two systems are thus complementary points in the design space, and
-both contribute training corpora, models, and evaluation protocols that
-future work can compare and combine.
-Together they constitute the first two deep-learning efforts focused
-on jazz lead-sheet OMR; the design choices in \Cref{ch:design} follow
+The two systems are thus complementary points in the design space that
+future work can compare against and build on.
+Together they are the earliest deep-learning efforts focused
+specifically on jazz lead-sheet OMR; the design choices in \Cref{ch:design} follow
 from this survey.

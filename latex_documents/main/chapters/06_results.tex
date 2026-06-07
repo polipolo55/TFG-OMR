@@ -156,8 +156,8 @@ marginally closer to its training distribution than the pristine clean
 renders do.  Either way the augmentation
 pipeline meets its acceptance criterion of keeping the clean-to-scanned
 gap below one percentage point (\Cref{sec:design-domain}).
-\Cref{tab:results-headline} consolidates these headline numbers; the
-remainder of the chapter decomposes them rather than re-quoting them.
+\Cref{tab:results-headline} consolidates these headline numbers, which
+the rest of the chapter decomposes.
 
 \begin{table}[ht]
     \centering
@@ -379,7 +379,7 @@ samples remain in alignment.
     whose SER lies above the per-length median; there is a mild
     increase in tail thickness around \num{120}-token sequences but
     no systematic divergence at long lengths.
-    The CTC alignment remains robust over the full range of
+    The CTC alignment holds over the full range of
     sequence lengths in the corpus.}
     \label{fig:ser-vs-length}
 \end{figure}
@@ -388,7 +388,7 @@ samples remain in alignment.
 essentially zero across the full range of sequence lengths in the
 corpus (\num{20} to \num{140} tokens).
 The tail of the distribution broadens slightly at the longest
-lengths, but the model does not exhibit the catastrophic alignment
+lengths, but the model does not exhibit the alignment
 breakdown that CTC can occasionally produce when the input is too
 short for the target.
 This confirms that the $W/4$ width-compression factor of the CNN
@@ -517,8 +517,8 @@ print (\Cref{sec:design-data}), and in both cases the rendered
 prediction reproduces the input notation.
 
 \Cref{fig:qual-worst-1} shows the single worst prediction in the test
-set by edit distance.  Even here the failure is structural rather than
-melodic: the model misplaces barlines across several dense eighth-note
+set by edit distance.  Even the worst case is a barline-placement
+error: the model misplaces barlines across several dense eighth-note
 runs while leaving the pitch and duration content intact, exactly the
 error profile that dominates the aggregate budget
 (\Cref{sec:res-errors}).  The four next-worst predictions (ranks 2--5),
@@ -599,7 +599,7 @@ metric, so the error column is not a like-for-like ranking.
 The one column that does compare directly is voicing and compute
 envelope, where the contrast the project was scoped around is clear ---
 the present system reaches sub-percent SER on its monophonic target
-within a single-GPU, single-afternoon training budget, whereas the
+within a single-GPU, roughly six-hour training budget, whereas the
 transformer systems that report lower error on broader corpora do so at
 a training and inference cost an order of magnitude larger.
 
@@ -657,8 +657,8 @@ hand-lettered \textit{Satin Doll} lead sheet.
 Audiveris~\cite{audiverisAudiveris} (v5.10, the current release)
 detects the staff grid but recognises a header clef on only two of the
 nine staves; lacking a clef it defaults the remaining staves to bass
-clef and places their notes on the wrong lines, it recovers no time
-signature on any system, and it extracts no chord symbols at all.
+clef and places their notes on the wrong lines. It recovers no time
+signature on any system and extracts no chord symbols at all.
 The exported MusicXML, re-rendered to notation in
 \Cref{fig:audiveris-vs-ours-aud}, is musically unusable: the clef flips
 between treble and bass from line to line, octaves are displaced, and
@@ -679,8 +679,8 @@ chord stream recovers \num{36} symbols across the page, the
 \textit{ii--V} changes of the tune (\code{D-7 G7}, \code{E-7 A7},
 \code{G-7 C7 Fmaj7}, \dots) reading correctly.
 The comparison is qualitative --- the page has no ground-truth
-transcription --- but the gap in output usability is categorical, and
-it follows directly from the two design choices Audiveris does not
+transcription --- but the output is far more usable, a difference that
+comes from the two design choices Audiveris does not
 make: virtual header injection for clef-less staves
 (\Cref{sec:impl-inference}) and a dedicated chord-recognition stream
 (\Cref{sec:design-twostream}).
@@ -765,7 +765,7 @@ transcription, so no SER is reported, and the quantitative zero-shot
 measurement above remains the missing experiment.
 What it does show is that the melody recogniser and the chord stream
 both produce clef-correct, harmonically sensible output on a real
-handwritten scan and not only on the synthetic split, and that the
+handwritten scan, not just on the synthetic split, and that the
 reject gate behaves as designed on genuine page furniture.
 The recovered chords are the correct changes of the tune, and the
 rendered melody follows the contour of the input staff.

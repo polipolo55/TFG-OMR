@@ -119,8 +119,8 @@ Out of scope & Tuplets, slurs, articulations, repeats, voltas, D.C., double acci
 \end{tabularx}
 \end{table}
 
-The contract follows the genre rather than papering over missing
-features. The Real Book is monophonic by construction, and the
+The contract is dictated by the genre, not by an effort to disguise the
+features it leaves out. The Real Book is monophonic by construction, and the
 multi-voice piano grand staff is a different genre; exotic meters and
 non-treble clefs are common in printed music at large but vanishingly
 rare in the corpus that motivates the project.
@@ -282,7 +282,7 @@ A learned detector would gain little on this domain: there is no
 visual ambiguity to resolve, only routine pattern matching.
 It would, however, add a second training pipeline, a second
 annotation effort, and a second source of failure modes, none of which
-the time budget supports without a corresponding accuracy gain to claim.
+the time budget justifies without a clear accuracy gain.
 
 \subsection{Rejection gate}
 \label{sec:design-staff-reject}
@@ -712,8 +712,8 @@ A gated recurrent unit (GRU) trains marginally faster, but the recurrent stage i
 bottleneck (the backbone dominates compute) and the LSTM is the
 better-characterised cell for CTC, so there was no reason to switch.
 A temporal-convolutional stack fixes its receptive field in advance,
-awkward to bound on densely engraved staves where the BiLSTM adapts to
-the input; self-attention reintroduces transformer data-hunger
+which is awkward to bound on densely engraved staves, whereas the BiLSTM
+adapts to the input; self-attention reintroduces transformer data-hunger
 (\Cref{sec:design-model-alts}) with no accuracy gain on this
 length-bounded input.
 
@@ -809,7 +809,7 @@ At inference the staff-detection stage emits both a staff image and a
 chord-strip image for each system; the two are recognised in parallel
 and their outputs joined into a single JSON segment keyed by the
 system's bounding box. No cross-attention or shared representation
-links the networks, a deliberate simplicity choice.
+links the networks; this is a deliberate choice to keep the design simple.
 
 \subsection{Chord vocabulary and notation conventions}
 

@@ -141,28 +141,23 @@ makes it tractable: optimising training reduces the total far more
 than optimising the rest of the workflow.
 
 \textbf{Minimisation plan.}
-Four mitigations together keep the training-time energy cost
-within the estimated envelope.
-First, the architecture choice (\Cref{sec:design-model})
-favours a \textit{lightweight} backbone, ResNet18, over the
-heavier alternatives that would yield only marginal accuracy
-gains on monophonic input;
-\Cref{sec:mgmt-justification} makes this trade-off
-explicit.
-Second, \textit{mixed-precision training} via PyTorch's
-\code{torch.amp} reduces both VRAM occupancy and the cycle time
-per training step, which translates directly into fewer
-GPU-hours per converged model.
-Third, \textit{early stopping} with a twelve-epoch patience is
-configured to halt training once the validation SER stops improving,
-avoiding the common pattern of running well past convergence ``to be
-safe''; on the final run the validation SER kept improving slowly to
-the end, so the run reached the 60-epoch cap without the patience
-triggering.
-Fourth, the project \textit{reuses existing hardware} rather than
-provisioning new equipment specifically for the thesis; the
-embodied energy of manufacturing a new workstation would dwarf
-the operational energy of the project by an order of magnitude.
+Four measures together keep the training-time energy within the
+estimated envelope.
+The architecture choice (\Cref{sec:design-model}) favours the
+lightweight ResNet18 backbone over heavier alternatives that would add
+only marginal accuracy on monophonic input, a trade-off made explicit
+in \Cref{sec:mgmt-justification}.
+Mixed-precision training via PyTorch's \code{torch.amp} cuts both VRAM
+use and per-step time, which translates into fewer GPU-hours per
+converged model.
+Early stopping with a twelve-epoch patience halts training once the
+validation SER stops improving, avoiding the common habit of running
+well past convergence ``to be safe'' (on the final run the SER kept
+improving slowly to the end, so the run reached the 60-epoch cap
+without the patience triggering).
+Finally, the project reuses existing hardware rather than provisioning
+new equipment, whose embodied manufacturing energy would dwarf the
+project's operational energy by an order of magnitude.
 
 Data generation and training are also organised in batches to
 avoid redundant runs: the dataset is fixed before model training
@@ -312,9 +307,8 @@ The Real Book itself is a copyrighted commercial publication (Hal
 Leonard), and any private scans used by the author are restricted
 to evaluation and qualitative inspection in a strictly academic
 context; they are never redistributed, and the released model
-weights do not embed reconstructable copies of those pages, because
-both CRNN-CTC pipelines learn symbolic token sequences rather than
-reproducible pixel data.
+weights do not embed recoverable copies of those pages: both pipelines
+learn symbolic token sequences, not pixels.
 This use falls within the academic exceptions granted by Spanish
 intellectual-property law (\textit{Real Decreto Legislativo
 1/1996}, art.~32, on quotation and illustration for teaching and
@@ -388,9 +382,8 @@ the thesis demonstrates is that the technical preconditions for a
 low-friction deployment are met.
 This shape was a planned design decision, but its sustainability
 significance only becomes visible once the technical work is
-complete: a model with the same accuracy and no accessible
-deployment surface would have substantially less potential social
-impact regardless of its training-time efficiency.
+complete: without an accessible deployment surface, the same accuracy
+would reach far fewer people.
 
 A residual concern is the \textbf{lifecycle} of the trained model
 weights, which become obsolete as new architectures are released,

@@ -119,8 +119,8 @@ compression artefacts. A model trained exclusively on clean synthetic data gener
 poorly to real scans: the feature distribution shifts substantially when crisp black
 symbols on a white background are replaced by blurred, uneven, noisy images with
 variable contrast. Closing this \term{domain gap} without real annotated training data
-requires a scan-simulation augmentation pipeline that teaches the model to be invariant
-to scan-related distortions.
+requires a scan-simulation augmentation pipeline that trains the model to tolerate
+scan-related distortions.
 
 \textbf{Domain specificity and data scarcity.}
 As argued above, jazz lead sheets use an engraving style for which no publicly labelled
@@ -149,7 +149,7 @@ unified output by the inference pipeline.
 
 The \textbf{general objective} of this project is to develop, evaluate, and document a
 proof-of-concept end-to-end OMR system for monophonic jazz lead sheets, and to
-demonstrate that a CRNN-CTC architecture trained on synthetic data can span the
+demonstrate that a CRNN-CTC architecture trained on synthetic data can close the
 domain gap between clean rendered images and degraded scans, achieving an aggregate
 Symbol Error Rate (SER) of at most \SI{3}{\percent} on a held-out scan-simulated test
 split so that the outcome can be assessed quantitatively in \Cref{ch:conclusions}.
@@ -249,4 +249,19 @@ The project is bounded by the following scope definition.
           coda), which do not appear frequently enough in the in-scope repertoire to
           justify the vocabulary and grammar extensions they would require.
 \end{itemize}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Document Structure}
+\label{sec:intro-structure}
+
+The remainder of this document is organised as follows.
+\Cref{ch:soa} surveys the state of the art in OMR and positions this work
+within it. \Cref{ch:mgmt} describes the project management: methodology,
+planning, the risk register, and the budget. \Cref{ch:design} sets out the
+system design and the rationale behind each major decision, and
+\Cref{ch:impl} details how that design is realised in code.
+\Cref{ch:results} reports the experimental protocol and the quantitative and
+qualitative results. \Cref{ch:sustain} analyses the sustainability and
+ethical dimensions of the project, and \Cref{ch:conclusions} revisits the
+objectives, draws conclusions, and outlines future work.
 

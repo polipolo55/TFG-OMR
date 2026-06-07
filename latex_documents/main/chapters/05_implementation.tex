@@ -549,9 +549,9 @@ remove binder-hole shadows (up to \SI{10}{\percent} of strip width,
 controlled by a column-wise ink-density threshold of $\geq 50\%$),
 resized to the chord network's training height of \SI{64}{px},
 batched, and decoded.
-\code{<unk>} tokens emitted when the network encounters clutter the
-synthetic training set never saw are treated as word separators
-rather than as character errors.
+When the network meets clutter absent from the synthetic training set it
+emits \code{<unk>} tokens, which are treated as word separators rather
+than as character errors.
 The decoded character string is then passed to a jazz-chord grammar
 filter (\code{chord\_postprocess.clean\_chord\_line}) that validates
 against \code{ROOT [ACC] [QUALITY] [EXTEN] [ALT]* [SLASH]} and drops
@@ -734,7 +734,7 @@ speed or memory.
 The CPU-bound data stages (\Cref{sec:impl-data}) use
 \code{multiprocessing.Pool} rather than threads: LilyPond invocation,
 \code{albumentations}, and string parsing all hold the Python GIL, and
-a threaded variant measured slower during development because of GIL
+a threaded variant ran slower in development because of GIL
 contention on the per-sample LilyPond wrapper.
 
 \paragraph{Mixed precision and fused optimiser.}

@@ -97,8 +97,8 @@ samples per split with greedy CTC decoding.
           \SI{99}{\percent} of tokens.
     \item \textbf{Perfect-transcription rate:} \SI{92.1}{\percent}
           (clean) and \SI{94.1}{\percent} (scanned); more than nine
-          in ten input staves come out token-identical to the ground
-          truth (\Cref{sec:res-ser}).
+          in ten input staves are transcribed token-identically to the
+          ground truth (\Cref{sec:res-ser}).
     \item \textbf{Error composition:} approximately \SI{73}{\percent}
           of edits are \code{measure} tokens and \SI{15}{\percent} are
           ties; together these two structural classes account for
@@ -360,7 +360,7 @@ architectural choice in published baselines; \Cref{sec:design-model}
 commits to a CRNN--CTC stack supervised by the CTC
 loss~\cite{gravesConnectionistTemporal2006} on LMX token sequences,
 which learns the frame-to-token alignment without per-frame
-supervision and underpins the melody-recognition stage.
+supervision; it is the basis of the melody-recognition stage.
 
 The data dimension is large by Bachelor's-thesis standards. PrIMuS
 contributes 87\,678 monophonic incipits, each re-rendered in LilyJAZZ

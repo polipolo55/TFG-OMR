@@ -402,16 +402,15 @@ lengths the system encounters.
 Several of the design decisions in \Cref{ch:design} can be turned into
 direct experiments by re-training with one choice reverted and
 everything else fixed.
-Four such ablations were scoped: backbone family
+Three such ablations were scoped: backbone family
 (\Cref{sec:design-model}), scan-augmentation pipeline
-(\Cref{sec:design-data}), rare-token oversampling of the tie tokens
-(\Cref{sec:design-training}), and virtual header injection for
+(\Cref{sec:design-data}), and virtual header injection for
 continuation staves (\Cref{sec:impl-inference}).
 The first two are reported below with results.
-The remaining two each require a full re-training run
+The last requires a full re-training run
 ($\approx 6$\,h on the RTX~3060) that was not completed within the
-project timeline; they are left as planned experiments whose expected
-outcomes follow from the design arguments in \Cref{ch:design}.
+project timeline; it is left as a planned experiment whose expected
+outcome follows from the design arguments in \Cref{ch:design}.
 
 A VGG backbone was evaluated in an earlier configuration of the
 pipeline (smaller corpus, an earlier iteration of the scan-augmentation
@@ -443,8 +442,6 @@ The scan-simulation pipeline is therefore not a regulariser on clean
 data but a prerequisite for robustness to the visual distribution
 shift the system faces at real-scan inference, directly supporting the
 design choice justified in \Cref{sec:design-data}.
-
-\todo{Rare-token oversampling ablation: re-train with \code{rare\_lmx\_oversample=1}.}
 
 \todo{Virtual header injection ablation: evaluate with/without header prepending on real continuation staves.}
 
@@ -921,8 +918,8 @@ First, the synthetic-to-real domain gap for the music stream
 (\Cref{sec:res-domaingap}) still awaits hand-labelled staves; closing
 it is the prerequisite for the \enquote{partially met} verdict on
 Objective~7 in \Cref{ch:conclusions}.
-Second, two of the four ablations --- rare-token oversampling and
-virtual header injection (\Cref{sec:res-ablations}) --- require
-additional training runs that were not completed within the project
-timeline; the backbone and scan-augmentation ablations reported above
-already cover the two choices most central to the design.
+Second, one of the three ablations --- virtual header injection
+(\Cref{sec:res-ablations}) --- requires an additional training run that
+was not completed within the project timeline; the backbone and
+scan-augmentation ablations reported above already cover the two choices
+most central to the design.

@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Count LMX token frequencies over a recursive dataset tree.
 
-Used to decide rare-token oversampling (see Config.rare_lmx_oversample).
-
   poetry run python scripts/audit_lmx_corpus.py data/processed/primus/clean
 """
 from __future__ import annotations

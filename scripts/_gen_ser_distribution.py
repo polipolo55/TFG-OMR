@@ -74,7 +74,6 @@ def compute_sers(cfg: Config, checkpoint: Path) -> tuple[np.ndarray, float]:
         filter_multi_staff=cfg.filter_multi_staff,
         max_source_height=cfg.max_source_height,
         online_aug_prob=0.0,
-        rare_lmx_oversample=1,
     )
     loader = DataLoader(test_ds, batch_size=cfg.batch_size, shuffle=False,
                         num_workers=cfg.num_workers, collate_fn=collate_fn, pin_memory=True)

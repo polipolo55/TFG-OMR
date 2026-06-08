@@ -36,7 +36,7 @@ deep-learning shift discussed in \Cref{sec:soa-crnn}.
     \textcite{bainbridgeChallengeOpticalMusic2001}, showing the four-stage
     structure (preprocessing, staff handling, primitive recognition, and
     semantic reconstruction) that organised the field for two decades.
-    Source: Wikimedia Commons, redrawn from the cited work.}
+    Redrawn by the author after WikiWriter123, Wikimedia Commons (CC BY-SA 4.0).}
   \label{fig:soa-arch-bainbridge}
 \end{figure}
 
@@ -46,7 +46,8 @@ deep-learning shift discussed in \Cref{sec:soa-crnn}.
   \caption[Classical OMR pipeline (Rebelo et al., 2012).]{The widely-cited
     OMR block diagram of \textcite{rebeloOpticalMusicRecognition2012}, which
     explicitly shows the feedback loops from musical knowledge into the
-    recognition stages. Source: Wikimedia Commons, redrawn from the cited work.}
+    recognition stages. Redrawn by the author after WikiWriter123,
+    Wikimedia Commons (CC BY-SA 4.0).}
   \label{fig:soa-arch-rebelo}
 \end{figure}
 
@@ -103,13 +104,11 @@ representations, including two purpose-built token formats.
 The \term{agnostic} encoding lists visual primitives without musical
 interpretation; the \term{semantic} encoding lists musical events such as
 \code{note-C4\_eighth} or \code{keySignature-DM} directly.
-The CRNN--CTC architecture trained on this corpus achieves a Symbol Error
-Rate (SER) of \SI{1.0}{\percent} on the agnostic encoding and \SI{0.8}{\percent}
-on the semantic encoding, with sequence-level error rates of
-\SI{17.9}{\percent} and \SI{12.5}{\percent} respectively
-(\textcite{calvoZaragozaEndToEndNeural2018}, Sec.~5.2).
-This established the reference baseline that subsequent monophonic OMR
-work, including Camera-PrIMuS and the present thesis, builds upon.
+The CRNN--CTC architecture trained on this corpus attains a low Symbol Error
+Rate (SER) on both the agnostic and semantic
+encodings~\cite{calvoZaragozaEndToEndNeural2018}, establishing the reference
+baseline that subsequent monophonic OMR work, including the present thesis,
+builds upon.
 A follow-up release, Camera-PrIMuS~\cite{calvoZaragozaCameraPrimus2018},
 augments the same incipits with synthetic photographic distortion and
 shows that the same network retains useful accuracy on
@@ -136,8 +135,8 @@ linearised target representation, dispensing with CTC entirely.
 full-page pianoform input and, at its 2024 release, defined the state of
 the art on that task.
 \term{LEGATO}~\cite{yangLEGATO2025}, released in mid-2025, takes the
-trend further with a vision-LLM backbone, an ABC-notation decoder, and over
-214\,000 typeset pages of pretraining, reporting on its most challenging
+trend further with a pretrained vision encoder, an ABC-notation decoder, and over
+214\,000 typeset pages of pretraining, reporting on its most realistic
 evaluation set absolute error reductions of up to \SI{68}{\percent} on the
 tree-edit metric TEDn and \SI{47.6}{\percent} on OMR-NED over the previous
 state of the art.
@@ -157,7 +156,6 @@ The quantitative justification is in \Cref{ch:design}; the
 project-management argument is in \Cref{sec:mgmt-justification}.
 
 % ─────────────────────────────────────────────────────────────────────────────
-\newpage
 \section{Datasets for OMR Training}
 \label{sec:soa-datasets}
 
@@ -199,7 +197,7 @@ contemporaneously with this work~\cite{martinezSevillaJazzLeadSheets2025}
 and, at 293 annotated sheets, is far smaller than the tens of
 thousands of samples those CRNN--CTC models require, and so cannot train
 one from scratch. Every recent end-to-end
-system (SMT, SMT++, OLiMPiC, LEGATO, and Camera-PrIMuS itself) addresses an
+system (SMT, SMT++, OLiMPiC, and LEGATO) addresses an
 equivalent scarcity by synthetic pretraining followed by fine-tuning on a
 small annotated target set.
 

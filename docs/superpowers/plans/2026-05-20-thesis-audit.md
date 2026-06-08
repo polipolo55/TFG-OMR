@@ -304,7 +304,7 @@ The `\todo{FIGURE: CRNN--CTC block diagram}` in §"Model Design" should be repla
 
 - [ ] **Step 4.6: Verify training strategy section**
 
-§"Header-stripping augmentation": training-only (must be stated). §"Rare-token oversampling": ties are the target (no mention of key:fifths:0 which was a now-fixed bug). §"Data splits": val=10%, test=10% — verify against `Config` defaults.
+§"Header-stripping augmentation": training-only (must be stated). §"Data splits": val=10%, test=10% — verify against `Config` defaults.
 
 - [ ] **Step 4.7: Cross-ref SoA**
 

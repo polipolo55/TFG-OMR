@@ -173,7 +173,6 @@ def run_eval(
         extra_data_dirs=cfg.extra_data_dirs or None,
         extra_scanned_dirs=cfg.extra_scanned_dirs or None,
         online_aug_prob=0.0,
-        rare_lmx_oversample=1,
     )
     ds = {"train": train_ds, "val": val_ds, "test": test_ds}[split]
     loader = DataLoader(

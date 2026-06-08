@@ -212,7 +212,6 @@ def _build_config_from_args(args: argparse.Namespace):
         "num_workers": "num_workers",
         "early_stopping_patience": "early_stopping_patience",
         "max_source_height": "max_source_height",
-        "rare_lmx_oversample": "rare_lmx_oversample",
         "strip_header_prob": "strip_header_prob",
         "online_aug_prob": "online_aug_prob",
     }
@@ -241,10 +240,6 @@ def _build_config_from_args(args: argparse.Namespace):
     ft_scanned = getattr(args, "finetune_scanned_dir", None)
     if ft_scanned:
         overrides["finetune_scanned_dirs"] = [Path(p) for p in ft_scanned]
-
-    rlx = getattr(args, "rare_lmx_tokens", None)
-    if rlx is not None:
-        overrides["rare_lmx_tokens"] = tuple(t.strip() for t in rlx.split(",") if t.strip())
 
     # Convert string paths to Path objects
     for key in ("data_dir", "scanned_dir", "model_dir", "vocab_path"):
@@ -914,13 +909,6 @@ def build_parser() -> argparse.ArgumentParser:
         "the latest run's checkpoint, or supply an explicit .pt path.",
     )
     g_train.add_argument(
-        "--rare-lmx-oversample",
-        type=int,
-        default=None,
-        help="Repeat training indices for samples containing rare LMX tokens "
-        "(default: 2; 1 disables). Tokens: --rare-lmx-tokens.",
-    )
-    g_train.add_argument(
         "--strip-header-prob",
         type=float,
         default=None,
@@ -932,13 +920,6 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Probability of applying lightweight online jitter (brightness, "
         "noise, ±2 px shift) per training sample (default: 0.5; 0 disables).",
-    )
-    g_train.add_argument(
-        "--rare-lmx-tokens",
-        type=str,
-        default=None,
-        help="Comma-separated LMX tokens to up-weight (default: tied:start,tied:stop). "
-        "Pass empty string to disable token-based oversampling.",
     )
     g_train.add_argument(
         "--finetune-data-dir",

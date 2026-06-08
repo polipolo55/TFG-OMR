@@ -887,28 +887,6 @@ An earlier design instead trained on header-less render variants; it
 was dropped because injecting a known-correct header at inference keeps
 the training set single-distribution and needs no header-less labels.
 
-\subsection{Rare-token oversampling}
-
-Two LMX tokens (\code{tied:start} and \code{tied:stop}) are visually
-subtle and statistically rare in the corpus, so the model
-under-predicts them.
-The design choice is to oversample at the dataset level (duplicating
-samples whose label contains a rare token, in the training split
-only) rather than to up-weight the rare token in the loss.
-Sample-level oversampling preserves the natural distribution of
-context (the rare token appears in its real visual context, with the
-correct surrounding tokens) and, crucially, is compatible with CTC,
-which does not admit per-class weights in its standard formulation.
-
-\subsubsection*{Alternatives considered}
-
-Class-weighted CTC does not work: standard CTC marginalises over
-alignments and does not factorise into weightable per-token terms.
-Focal-style CTC targets sample difficulty, not the label-frequency
-issue that ties actually are. Synthetic over-generation of tie samples
-risks musically improbable patterns that would distort the training
-distribution rather than fix the imbalance.
-
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Grammar Correction as a Design Layer}
 \label{sec:design-grammar}

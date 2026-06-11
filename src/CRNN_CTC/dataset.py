@@ -36,6 +36,34 @@ from .vocab import Vocabulary
 
 log = logging.getLogger(__name__)
 
+# Tokens that are rare at the *sample* level but error-prone at evaluation.
+# PrIMuS ties appear in ~10% of in-domain samples yet account for a large
+# share of remaining edit errors. Keep this set narrow so we do not up-weight
+# most of the corpus (e.g. every sample with a key signature).
+_DEFAULT_RARE_LMX_TOKENS: frozenset[str] = frozenset({"tied:start", "tied:stop"})
+
+
+def _train_indices_with_rare_oversample(
+    full_ds: "OMRDataset",
+    train_idx: list[int],
+    *,
+    oversample: int,
+    rare_tokens: frozenset[str],
+) -> list[int]:
+    """Duplicate training indices for samples whose LMX contains *rare_tokens*."""
+    if oversample <= 1 or not rare_tokens:
+        return train_idx
+    expanded: list[int] = []
+    for i in train_idx:
+        expanded.append(i)
+        _sid, _png, lmx_path = full_ds._samples[i]
+        tokens = _load_lmx_tokens(lmx_path)
+        if any(t in rare_tokens for t in tokens):
+            for _ in range(oversample - 1):
+                expanded.append(i)
+    return expanded
+
+
 # ---------------------------------------------------------------------------
 # Domain filters
 # ---------------------------------------------------------------------------
@@ -517,6 +545,8 @@ def make_splits(
     extra_data_dirs: list[Path] | None = None,
     extra_scanned_dirs: list[Path] | None = None,
     online_aug_prob: float = 0.0,
+    rare_lmx_oversample: int = 1,
+    rare_lmx_tokens: frozenset[str] | None = None,
     finetune_data_dirs: list[Path] | None = None,
     finetune_scanned_dirs: list[Path] | None = None,
 ) -> tuple[Dataset, Dataset, Dataset]:
@@ -562,6 +592,15 @@ def make_splits(
     n_train = n - n_val - n_test
 
     train_idx = perm[:n_train]
+    rare_set = rare_lmx_tokens if rare_lmx_tokens is not None else _DEFAULT_RARE_LMX_TOKENS
+    train_idx = _train_indices_with_rare_oversample(
+        full_ds, train_idx, oversample=rare_lmx_oversample, rare_tokens=rare_set,
+    )
+    if rare_lmx_oversample > 1 and rare_set:
+        log.info(
+            "Rare-token oversample: factor=%d tokens=%s → train virtual size %d (unique %d)",
+            rare_lmx_oversample, sorted(rare_set), len(train_idx), n_train,
+        )
     val_idx = perm[n_train : n_train + n_val]
     test_idx = perm[n_train + n_val :]
 

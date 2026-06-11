@@ -81,6 +81,14 @@ class Config:
     # Applied to training only; 0 disables.  Cost: ~50 µs per sample.
     online_aug_prob: float = 0.5
 
+    # rare_lmx_oversample: repeat training indices for samples containing
+    # rare_lmx_tokens (N-1 extra times).  1 = disabled.
+    rare_lmx_oversample: int = 2
+    rare_lmx_tokens: tuple[str, ...] = (
+        "tied:start",
+        "tied:stop",
+    )
+
     # filter_non_leadsheet_clef: drop samples containing any clef token except
     # clef:G2.  C3 (alto), C4 (tenor), G1 (French violin), and F4 (bass) appear
     # in orchestral PrIMuS excerpts but never in jazz lead sheets.  Keeping them

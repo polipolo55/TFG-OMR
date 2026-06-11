@@ -119,6 +119,8 @@ def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
         extra_data_dirs=cfg.extra_data_dirs or None,
         extra_scanned_dirs=(cfg.extra_scanned_dirs if cfg.use_scanned else None) or None,
         online_aug_prob=cfg.online_aug_prob,
+        rare_lmx_oversample=cfg.rare_lmx_oversample,
+        rare_lmx_tokens=frozenset(cfg.rare_lmx_tokens) if cfg.rare_lmx_tokens else frozenset(),
         finetune_data_dirs=cfg.finetune_data_dirs or None,
         finetune_scanned_dirs=(cfg.finetune_scanned_dirs if cfg.use_scanned else None) or None,
     )

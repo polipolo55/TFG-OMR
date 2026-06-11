@@ -369,6 +369,20 @@ class OMRDataset(Dataset):
         return len(self._samples)
 
     def __getitem__(self, idx: int) -> dict[str, Tensor | list[str] | str]:
+        return self.get_item(idx)
+
+    def get_item(
+        self,
+        idx: int,
+        *,
+        online_aug_prob: float | None = None,
+    ) -> dict[str, Tensor | list[str] | str]:
+        """Load one sample; *online_aug_prob* overrides the instance default.
+
+        ``None`` (the default) falls back to the constructor's
+        ``online_aug_prob``.  Train-split wrappers pass it explicitly so the
+        shared dataset instance never has to be mutated.
+        """
         sid, png_path, lmx_path = self._samples[idx]
 
         # Optionally swap the image source to the scanned directory
@@ -393,7 +407,8 @@ class OMRDataset(Dataset):
         # sees the exact same pixel grid for each sample → the model overfits
         # to those specific augmentations.  Cheap to compute (no morphology,
         # no albumentations) so it does not bottleneck the dataloader.
-        if self._online_aug_prob > 0 and random.random() < self._online_aug_prob:
+        prob = self._online_aug_prob if online_aug_prob is None else online_aug_prob
+        if prob > 0 and random.random() < prob:
             img = _online_jitter(img)
 
         # Normalise to zero-mean, unit-variance
@@ -467,36 +482,23 @@ def collate_fn(
 
 
 class _AugSubset(Dataset):
-    """Thin wrapper around a ``Subset`` that enables training-only online augmentation.
+    """Train-split wrapper enabling per-call augmentation.
 
-    ``OMRDataset.__getitem__`` reads ``self._online_aug_prob`` to decide
-    whether to jitter each image.  The original implementation temporarily
-    mutated that attribute and restored it afterwards, which was unsafe when
-    train and val DataLoaders ran concurrently with multiple workers: a train
-    worker's write could race with a val worker's read on the shared dataset
-    object (before forking), causing augmentation to bleed into val images and
-    inflate the in-loop SER.
-
-    The fix: set ``_online_aug_prob`` permanently on the underlying dataset at
-    construction time.  ``make_splits`` creates a separate ``OMRDataset``
-    instance (``full_ds``) that is not shared with the val/test Subsets once
-    the DataLoader workers have forked, so mutating it here is safe.
+    Must NOT mutate the shared OMRDataset: the val/test Subsets wrap the same
+    instance, so writing flags onto it bleeds augmentation into evaluation
+    (this inflated in-loop val SER in all runs before 2026-06-10).
     """
 
-    def __init__(self, subset: Dataset, online_aug_prob: float) -> None:
-        self._subset = subset
+    def __init__(self, subset, online_aug_prob: float) -> None:
+        self._ds: OMRDataset = subset.dataset  # type: ignore[attr-defined]
+        self._indices: list[int] = list(subset.indices)  # type: ignore[attr-defined]
         self._online_prob = online_aug_prob
-        # Permanently set the prob on the underlying dataset so that every
-        # __getitem__ call in this wrapper (and its forked worker copies) sees
-        # the correct value without any save/restore dance.
-        ds: OMRDataset = self._subset.dataset  # type: ignore[attr-defined]
-        ds._online_aug_prob = online_aug_prob
 
     def __len__(self) -> int:
-        return len(self._subset)  # type: ignore[arg-type]
+        return len(self._indices)
 
     def __getitem__(self, idx: int):
-        return self._subset[idx]
+        return self._ds.get_item(self._indices[idx], online_aug_prob=self._online_prob)
 
 
 def make_splits(

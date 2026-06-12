@@ -17,6 +17,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
+from CRNN_CTC.config import ensure_config_defaults
 from CRNN_CTC.vocab import Vocabulary
 from CRNN_CTC.model import CRNN
 from CRNN_CTC.evaluate import greedy_decode
@@ -41,7 +42,7 @@ WORST = [
 
 # Load model
 ckpt   = torch.load(CKPT, map_location="cpu", weights_only=False)
-cfg    = ckpt["config"]
+cfg    = ensure_config_defaults(ckpt["config"])
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 vocab  = Vocabulary.from_file(REPO / cfg.vocab_path)
 model  = CRNN(vocab_size=len(vocab), cnn_out_channels=cfg.cnn_out_channels,

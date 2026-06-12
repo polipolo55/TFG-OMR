@@ -122,3 +122,26 @@ class Config:
 
     def __post_init__(self) -> None:
         self.model_dir.mkdir(parents=True, exist_ok=True)
+
+
+def ensure_config_defaults(cfg: "Config") -> "Config":
+    """Backfill fields added after a checkpoint's Config was pickled.
+
+    Checkpoints serialize Config instances; unpickling an old checkpoint yields
+    an instance missing fields added since. Backfill them with current defaults
+    so downstream code can use plain attribute access.
+    """
+    from dataclasses import MISSING, fields
+
+    # Key on the instance __dict__, not hasattr(): a dataclass field with a
+    # simple (non-factory) default is also set as a *class* attribute, so a
+    # field missing from an old pickled instance would still satisfy hasattr()
+    # via class lookup and be silently skipped. Checking __dict__ detects every
+    # genuinely-missing field and rebinds it as an instance attribute.
+    for f in fields(Config):
+        if f.name not in cfg.__dict__:
+            if f.default is not MISSING:
+                setattr(cfg, f.name, f.default)
+            elif f.default_factory is not MISSING:  # type: ignore[misc]
+                setattr(cfg, f.name, f.default_factory())  # type: ignore[misc]
+    return cfg

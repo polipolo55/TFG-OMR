@@ -81,3 +81,16 @@ def test_rare_token_oversampling_duplicates_tied_samples(corpus, tmp_path):
     )
     assert n_tied_in_train > 0, "no tied samples landed in train split — test is vacuous"
     assert len(train_over) == len(train_plain) + n_tied_in_train
+
+
+def test_ensure_config_defaults_backfills_missing_fields():
+    from CRNN_CTC.config import Config, ensure_config_defaults
+
+    cfg = Config()
+    del cfg.__dict__["rare_lmx_oversample"]  # simulate a pre-restore pickled instance
+    # A simple-default field is also a *class* attribute, so hasattr() still sees
+    # it via class lookup; the genuine "missing" signal is __dict__ membership.
+    assert "rare_lmx_oversample" not in cfg.__dict__
+    ensure_config_defaults(cfg)
+    assert "rare_lmx_oversample" in cfg.__dict__
+    assert cfg.rare_lmx_oversample == 2

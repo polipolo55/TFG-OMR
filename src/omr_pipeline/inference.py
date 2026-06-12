@@ -31,13 +31,13 @@ def _load_model(checkpoint_path: Path) -> dict:
     if key in _model_cache:
         return _model_cache[key]
 
-    from CRNN_CTC.config import Config
+    from CRNN_CTC.config import Config, ensure_config_defaults
     from CRNN_CTC.model import CRNN
     from CRNN_CTC.vocab import Vocabulary
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
-    cfg = ckpt.get("config", Config())
+    cfg = ensure_config_defaults(ckpt.get("config", Config()))
 
     # Resolve project root by walking up from the checkpoint until pyproject.toml is found
     repo_root = checkpoint_path.resolve().parent

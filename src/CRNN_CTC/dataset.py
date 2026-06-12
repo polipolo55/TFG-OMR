@@ -40,6 +40,9 @@ log = logging.getLogger(__name__)
 # PrIMuS ties appear in ~10% of in-domain samples yet account for a large
 # share of remaining edit errors. Keep this set narrow so we do not up-weight
 # most of the corpus (e.g. every sample with a key signature).
+# NOTE: keep in sync with ``Config.rare_lmx_tokens`` in ``config.py`` — this is
+# only the fallback used when ``make_splits`` is called without an explicit set
+# (train.py always passes Config's value).
 _DEFAULT_RARE_LMX_TOKENS: frozenset[str] = frozenset({"tied:start", "tied:stop"})
 
 

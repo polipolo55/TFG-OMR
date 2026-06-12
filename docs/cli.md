@@ -103,6 +103,8 @@ poetry run python src/cli.py train \
   [--no-filter-unwanted-clefs]
   [--no-filter-multi-staff]
   [--max-source-height 180]
+  [--rare-lmx-oversample 2]
+  [--rare-lmx-tokens tied:start,tied:stop]
   [--strip-header-prob 0.0]    # DEPRECATED/inert; kept for checkpoint compatibility
   [--online-aug-prob 0.5]      # 0 disables online jitter
 ```

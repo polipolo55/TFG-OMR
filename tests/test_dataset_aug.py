@@ -1,4 +1,4 @@
-"""Tests for training-only augmentation isolation in OMRDataset/make_splits."""
+"""Tests for train-split behavior in OMRDataset/make_splits: augmentation isolation and rare-token oversampling."""
 from pathlib import Path
 
 import numpy as np
@@ -79,4 +79,5 @@ def test_rare_token_oversampling_duplicates_tied_samples(corpus, tmp_path):
         1 for i in range(len(train_plain))
         if "tied:start" in train_plain[i]["tokens"]
     )
+    assert n_tied_in_train > 0, "no tied samples landed in train split — test is vacuous"
     assert len(train_over) == len(train_plain) + n_tied_in_train

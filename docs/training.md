@@ -49,6 +49,17 @@ Applied before splits. Filters are flags on `Config`:
 These three flags collectively realise the lead-sheet domain spec — see
 `docs/overview.md` → "Domain Specification" for the full rationale.
 
+### Rare Token Oversampling
+
+Samples whose `.lmx` contains any token in `Config.rare_lmx_tokens` are
+duplicated `rare_lmx_oversample` times (default: 2×) in the training index
+only.  The default set up-weights:
+
+- `tied:start` / `tied:stop` — visually subtle, under-predicted on real scans.
+
+(`key:fifths:0` was previously in this set; it was removed once the converter
+bug under-representing C major was fixed — see `docs/configuration.md`.)
+
 ### Image Preprocessing (at load time)
 
 1. Load PNG as grayscale uint8
@@ -110,6 +121,7 @@ Batch dict keys: `images`, `labels`, `label_lens`, `image_widths`
 | `test_frac` | 0.10 | test split fraction |
 | `use_scanned` | True | include augmented images |
 | `strip_header_prob` | 0.0 | DEPRECATED/inert — continuation staves handled at inference via virtual header injection |
+| `rare_lmx_oversample` | 2 | oversampling factor for ties |
 
 ## Checkpoint Files
 

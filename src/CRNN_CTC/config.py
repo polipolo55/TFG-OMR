@@ -83,6 +83,9 @@ class Config:
 
     # rare_lmx_oversample: repeat training indices for samples containing
     # rare_lmx_tokens (N-1 extra times).  1 = disabled.
+    # NOTE: rare_lmx_tokens must stay in sync with the fallback constant
+    # _DEFAULT_RARE_LMX_TOKENS in dataset.py (used when make_splits is called
+    # without an explicit set).
     rare_lmx_oversample: int = 2
     rare_lmx_tokens: tuple[str, ...] = (
         "tied:start",

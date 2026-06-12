@@ -60,6 +60,22 @@ only.  The default set up-weights:
 (`key:fifths:0` was previously in this set; it was removed once the converter
 bug under-representing C major was fixed — see `docs/configuration.md`.)
 
+### Scan-Variant Sampling (train-only)
+
+When `Config.scanned_variant_dirs` is set (CLI `--scanned-variant-dirs`), each
+training `__getitem__` picks uniformly among the base scanned image plus that
+sample's extra variants (`{sid}_augNN` dirs produced by `augment_scanned.py
+--copies N`). Val/test always use the deterministic base image. Because
+variants are keyed by sample id and the split is over ids, no variant can cross
+the train/val/test boundary — this is the **leakage-free** replacement for the
+header-stripped twins that were deleted on 2026-06-03 (those twins had been
+added to the *split pool*, leaking near-duplicates across train/test). See
+`docs/experiments/2026-06-10-volume-collapse-findings.md`.
+
+> **Note:** before 2026-06-10, `_AugSubset` mutated a shared dataset attribute,
+> so online jitter leaked into in-loop validation. Fixed in `e786a40`; offline
+> `scripts/evaluate_full.py` was never affected.
+
 ### Image Preprocessing (at load time)
 
 1. Load PNG as grayscale uint8

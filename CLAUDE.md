@@ -137,6 +137,14 @@ CRNN checkpoint's log-prob distribution. After every CRNN re-train, re-run
 - **Editing `generate_realbook.py` pitch logic without updating `semantic_to_lmx.py`.** Both
   scripts interpret PrIMuS pitch strings. If you fix a pitch parsing bug in one, check the other.
 
+- **Adding per-sample derived data via `extra_data_dirs` (LEAKAGE).** `extra_data_dirs` joins the
+  `make_splits` split pool *before* the `randperm` split, so any derived copy of an existing sample
+  (header-stripped twins, re-renders, augmented variants of the same music) can land in val/test
+  while its near-duplicate parent is in train. This silently inflated every CRNN metric before
+  2026-06-03 (see `docs/experiments/2026-06-10-volume-collapse-findings.md`). For train-time
+  diversity use `scanned_variant_dirs` instead — it is train-only by construction and keyed by
+  sample id, so variants can never cross the split.
+
 - **Running notebooks without `poetry run jupyter lab`.** The notebook kernel must use the
   Poetry virtualenv. Launching Jupyter from outside Poetry will miss all project dependencies.
 

@@ -207,13 +207,19 @@ latex_documents/gep/        GEP thesis-management deliverables
 
 ## Performance
 
-Held-out test split (4 604 samples), greedy CTC decoding, latest checkpoint
-(`models/latest/best_model.pt`, epoch 37):
+Held-out test split (4 608 samples), greedy CTC decoding, latest checkpoint
+(`models/latest/best_model.pt` = `run_20260608_102846`, best epoch 47):
 
-- **Aggregate SER:** 1.28 % (scanned), 1.19 % (clean) — token-level edit distance.
+> **Note on comparability.** Evaluation numbers from CRNN runs *before
+> 2026-06-03* (e.g. 0.23 % SER / 94.1 % perfect from `run_20260601_134845`)
+> used a header-stripped-twin split that leaked near-duplicate samples across
+> train/test and are **not comparable** to the numbers below. They are also not
+> reproducible — see `docs/experiments/2026-06-10-volume-collapse-findings.md`.
+
+- **Aggregate SER:** 1.31 % (scanned), 1.19 % (clean) — token-level edit distance.
 - **Melodic SER:** 0.18 % (scanned), 0.11 % (clean) — same metric with `measure`
   and tie tokens stripped, isolating actual pitch/duration/accidental errors.
-- **Perfect transcriptions:** 71 % (scanned), 73 % (clean).
+- **Perfect transcriptions:** 72 % (scanned), 73 % (clean).
 - **Error breakdown:** ≈74 % of all edits are barline (`measure`) tokens and
   ≈13 % are ties — together these structural tokens account for ~87 % of edits.
   Pitch/octave/duration error rates are each well below 0.15 %.

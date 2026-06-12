@@ -152,14 +152,33 @@ Bridges the synthetic-to-real domain gap by simulating real-world scanning artif
 > multiple lighting effects compose.
 
 **Online augmentation (training only).** On top of the offline-augmented PNG,
-`OMRDataset.__getitem__` applies a cheap per-sample jitter (brightness ±5%, contrast bias ±3%,
+the train-split wrapper applies (via `OMRDataset.get_item`) a cheap per-sample jitter (brightness ±5%, contrast bias ±3%,
 gaussian noise σ ≈ 0.005–0.015, ±2 px horizontal shift) with probability `Config.online_aug_prob`
-(default 0.5). Without this, every epoch sees identical pixel grids and the model overfits the
+(default 0.5). Val/test items are never jittered. Without this, every epoch sees identical pixel grids and the model overfits the
 exact augmentations baked into `scanned/`. Cost is ~50 µs per sample.
 
 **Output:** `data/processed/primus/scanned/{sample_id}/{sample_id}.png`
 
 Labels (`.lmx`) are identical to clean — copied unchanged. Existing scanned PNGs are skipped unless `--force-augment` or `--force-all` (or when implied by `--force-render`).
+
+**Extra scan variants (optional, train-time diversity).** Running the augmenter
+with `--copies N` and a distinct seed produces additional distorted renders per
+sample, named `{sid}_aug00 … {sid}_aug{N-1}`:
+
+```bash
+poetry run python src/data_processing/augment_scanned.py \
+  --source data/processed/primus/clean \
+  --output data/processed/primus/scanned_extra \
+  --copies 2 --seed 4242
+```
+
+Pointing training at this root (`--scanned-variant-dirs`, i.e.
+`Config.scanned_variant_dirs`) enables **train-only variant sampling**: each
+train `__getitem__` picks uniformly among the base scanned image plus that
+sample's variants. This is leakage-free — variants are keyed by sample id and
+the split is over ids — and restores the training-image diversity formerly
+provided incidentally by header-stripped twins. See
+`docs/experiments/2026-06-10-volume-collapse-findings.md`.
 
 ## Stage 5 — Vocabulary
 

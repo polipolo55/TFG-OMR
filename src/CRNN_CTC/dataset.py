@@ -307,6 +307,7 @@ class OMRDataset(Dataset):
         extra_data_dirs: list[Path] | None = None,
         extra_scanned_dirs: list[Path] | None = None,
         online_aug_prob: float = 0.0,
+        variant_dirs: list[Path] | None = None,
     ) -> None:
         self.data_dir = Path(data_dir)
         self.vocab = vocab
@@ -394,6 +395,24 @@ class OMRDataset(Dataset):
                 ", ".join(f"{tok!r} ×{cnt}" for tok, cnt in top5),
             )
 
+        # Per-sid extra scan variants ({sid}_aug00, {sid}_aug01, …) used for
+        # train-time variant sampling. Keyed by sample id so variants can never
+        # cross the train/val/test split (which is over ids).
+        self._variants: dict[str, list[Path]] = {}
+        for vd in [Path(p) for p in (variant_dirs or [])]:
+            if not vd.is_dir():
+                log.warning("variant dir missing, skipping: %s", vd)
+                continue
+            for sub in vd.iterdir():
+                vid = sub.name
+                if "_aug" not in vid:
+                    continue
+                png = sub / f"{vid}.png"
+                if png.exists():
+                    self._variants.setdefault(vid.rsplit("_aug", 1)[0], []).append(png)
+        if self._variants:
+            log.info("Variant sampling: %d sids have extra scan variants", len(self._variants))
+
     # -- Dataset protocol ---------------------------------------------------
 
     def __len__(self) -> int:
@@ -407,12 +426,18 @@ class OMRDataset(Dataset):
         idx: int,
         *,
         online_aug_prob: float | None = None,
+        variant_sampling: bool = False,
     ) -> dict[str, Tensor | list[str] | str]:
         """Load one sample; *online_aug_prob* overrides the instance default.
 
         ``None`` (the default) falls back to the constructor's
         ``online_aug_prob``.  Train-split wrappers pass it explicitly so the
         shared dataset instance never has to be mutated.
+
+        When *variant_sampling* is True (train-split wrapper only), the image
+        source is chosen uniformly among the base path and any extra offline
+        scan variants for this sid.  Defaults to False so val/test and direct
+        users always get the deterministic base image.
         """
         sid, png_path, lmx_path = self._samples[idx]
 
@@ -428,6 +453,14 @@ class OMRDataset(Dataset):
                     if alt2.exists():
                         png_path = alt2
                         break
+
+        # Train-time variant sampling: pick uniformly among the resolved base
+        # image and this sid's offline scan variants.  Independent of whether a
+        # scanned_dir swap happened — variants augment whatever the base is.
+        if variant_sampling:
+            pool = [png_path, *self._variants.get(sid, [])]
+            if len(pool) > 1:
+                png_path = random.choice(pool)
 
         # Image → (H, W) float32 [0, 1]
         img = _load_image(png_path, self.img_height, self.max_image_width)
@@ -520,16 +553,21 @@ class _AugSubset(Dataset):
     (this inflated in-loop val SER in all runs before 2026-06-10).
     """
 
-    def __init__(self, subset, online_aug_prob: float) -> None:
+    def __init__(self, subset, online_aug_prob: float, variant_sampling: bool = False) -> None:
         self._ds: OMRDataset = subset.dataset  # type: ignore[attr-defined]
         self._indices: list[int] = list(subset.indices)  # type: ignore[attr-defined]
         self._online_prob = online_aug_prob
+        self._variant_sampling = variant_sampling
 
     def __len__(self) -> int:
         return len(self._indices)
 
     def __getitem__(self, idx: int):
-        return self._ds.get_item(self._indices[idx], online_aug_prob=self._online_prob)
+        return self._ds.get_item(
+            self._indices[idx],
+            online_aug_prob=self._online_prob,
+            variant_sampling=self._variant_sampling,
+        )
 
 
 def make_splits(
@@ -552,6 +590,7 @@ def make_splits(
     rare_lmx_tokens: frozenset[str] | None = None,
     finetune_data_dirs: list[Path] | None = None,
     finetune_scanned_dirs: list[Path] | None = None,
+    variant_dirs: list[Path] | None = None,
 ) -> tuple[Dataset, Dataset, Dataset]:
     """Create train / val / test splits from a single data directory.
 
@@ -584,6 +623,7 @@ def make_splits(
         max_source_height=max_source_height,
         extra_data_dirs=extra_clean or None,
         extra_scanned_dirs=extra_scanned_combined or None,
+        variant_dirs=variant_dirs,
     )
     n = len(full_ds)
 
@@ -608,8 +648,8 @@ def make_splits(
     test_idx = perm[n_train + n_val :]
 
     train_ds: Dataset = Subset(full_ds, train_idx)
-    if online_aug_prob > 0:
-        train_ds = _AugSubset(train_ds, online_aug_prob)
+    if online_aug_prob > 0 or variant_dirs:
+        train_ds = _AugSubset(train_ds, online_aug_prob, variant_sampling=bool(variant_dirs))
 
     # Append fine-tune (real-domain) samples to the TRAIN set only. Built as a
     # separate OMRDataset so none of its samples can land in val/test.
@@ -628,12 +668,14 @@ def make_splits(
             max_source_height=max_source_height,
             extra_data_dirs=ft_dirs[1:] or None,
             extra_scanned_dirs=ft_scanned[1:] or None,
+            variant_dirs=variant_dirs,
         )
         ft_train: Dataset = finetune_ds
-        if online_aug_prob > 0:
+        if online_aug_prob > 0 or variant_dirs:
             ft_train = _AugSubset(
                 Subset(finetune_ds, list(range(len(finetune_ds)))),
                 online_aug_prob,
+                variant_sampling=bool(variant_dirs),
             )
         from torch.utils.data import ConcatDataset
 

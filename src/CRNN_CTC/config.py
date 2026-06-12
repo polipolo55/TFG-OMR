@@ -92,6 +92,11 @@ class Config:
         "tied:stop",
     )
 
+    # Extra offline scan-variant roots (dirs of {sid}_augNN sample dirs made by
+    # augment_scanned.py --copies N). Train-time only: each __getitem__ picks
+    # uniformly among scanned + variants. Empty = disabled.
+    scanned_variant_dirs: tuple[str, ...] = ()
+
     # filter_non_leadsheet_clef: drop samples containing any clef token except
     # clef:G2.  C3 (alto), C4 (tenor), G1 (French violin), and F4 (bass) appear
     # in orchestral PrIMuS excerpts but never in jazz lead sheets.  Keeping them

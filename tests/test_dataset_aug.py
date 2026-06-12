@@ -94,3 +94,35 @@ def test_ensure_config_defaults_backfills_missing_fields():
     ensure_config_defaults(cfg)
     assert "rare_lmx_oversample" in cfg.__dict__
     assert cfg.rare_lmx_oversample == 2
+
+
+def _add_variants(tmp_path: Path, data: Path, n_variants: int = 2) -> Path:
+    vroot = tmp_path / "scanned_extra"
+    rng = np.random.default_rng(7)
+    for d in data.iterdir():
+        sid = d.name
+        for k in range(n_variants):
+            vid = f"{sid}_aug{k:02d}"
+            vd = vroot / vid
+            vd.mkdir(parents=True)
+            img = (rng.random((100, 400)) * 255).astype(np.uint8)
+            cv2.imwrite(str(vd / f"{vid}.png"), img)
+    return vroot
+
+
+def test_variant_sampling_train_only(corpus, tmp_path):
+    import random as _random
+
+    data, vocab = corpus
+    vroot = _add_variants(tmp_path, data)
+    train_ds, val_ds, _ = make_splits(
+        data, vocab, img_height=64, val_frac=0.2, test_frac=0.2,
+        filter_multi_staff=False, variant_dirs=[vroot],
+    )
+    # val: two reads identical (never samples variants)
+    assert torch.equal(val_ds[0]["image"], val_ds[0]["image"])
+    # train: across many reads, at least two distinct images must appear
+    _random.seed(0)
+    reads = [train_ds[0]["image"] for _ in range(20)]
+    assert any(not torch.equal(reads[0], r) for r in reads[1:]), \
+        "train item never sampled a variant"

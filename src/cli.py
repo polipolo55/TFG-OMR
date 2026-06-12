@@ -246,6 +246,10 @@ def _build_config_from_args(args: argparse.Namespace):
     if rlx is not None:
         overrides["rare_lmx_tokens"] = tuple(t.strip() for t in rlx.split(",") if t.strip())
 
+    svd = getattr(args, "scanned_variant_dirs", None)
+    if svd is not None:
+        overrides["scanned_variant_dirs"] = tuple(svd)
+
     # Convert string paths to Path objects
     for key in ("data_dir", "scanned_dir", "model_dir", "vocab_path"):
         if key in overrides and isinstance(overrides[key], str):
@@ -731,6 +735,14 @@ def _add_common_data_args(parser: argparse.ArgumentParser) -> None:
         action="append",
         default=None,
         help="Additional scanned-image directory (repeatable)",
+    )
+    g.add_argument(
+        "--scanned-variant-dirs",
+        type=str,
+        nargs="*",
+        default=None,
+        help="Extra scan-variant roots from augment_scanned.py --copies N "
+        "(train-time variant sampling; default: none)",
     )
 
 

@@ -107,6 +107,7 @@ poetry run python src/cli.py train \
   [--rare-lmx-tokens tied:start,tied:stop]
   [--strip-header-prob 0.0]    # DEPRECATED/inert; kept for checkpoint compatibility
   [--online-aug-prob 0.5]      # 0 disables online jitter
+  [--scanned-variant-dirs data/processed/primus/scanned_extra ...]  # train-time variant sampling
 ```
 
 ---

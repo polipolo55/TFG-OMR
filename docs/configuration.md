@@ -54,6 +54,7 @@ These must stay in sync with `_COMMON_TIME_SIGS` in both `src/CRNN_CTC/dataset.p
 | `online_aug_prob` | 0.5 | Probability of light per-sample jitter (brightness, noise, ±2 px shift) on top of the offline-augmented PNG (training only) |
 | `rare_lmx_oversample` | 2 | Oversampling factor for samples containing rare tokens |
 | `rare_lmx_tokens` | `("tied:start", "tied:stop")` | Tokens that trigger oversampling.  Ties are visually subtle on degraded scans and chronically under-predicted.  `key:fifths:0` was previously included here because PrIMuS only had 8 explicit C-major labels; the root cause was a converter bug (missing default key injection) that is now fixed — C major is ~22.6 % of the corpus after the fix (19,778 / 87,677 samples) and needs no oversampling. |
+| `scanned_variant_dirs` | `()` | Extra offline scan-variant roots (dirs of `{sid}_augNN` sample dirs produced by `augment_scanned.py --copies N`). **Train-time only**: each train `__getitem__` picks uniformly among the base scanned image plus that sample's variants.  Leakage-free — variants are keyed by sample id and the split is over ids.  Empty disables.  CLI: `--scanned-variant-dirs`. |
 
 ## Model Architecture
 

@@ -1,0 +1,8 @@
+{
+  "min_line_span_frac": 0.25,
+  "max_spacing_cov": 0.10,
+  "min_interline_ink_frac": 0.10,
+  "max_text_area_frac": 0.10,
+  "min_mean_logprob": -0.15,
+  "confident_override_logprob": -0.05
+}

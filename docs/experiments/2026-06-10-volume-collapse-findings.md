@@ -144,3 +144,42 @@ default** afterward (commit `a2eb073`; `rare_lmx_oversample=1`), reclaiming ~10 
 train time at no measured tie cost. The tie problem wants a targeted fix
 (tie-specific augmentation or a structural post-processor), not sample
 duplication — logged as future work.
+
+## Reject-gate recalibration (CLAUDE.md #7)
+
+After the retrain the staff-reject gate was recalibrated against a hand-labelled
+fixture set of **276 music / 123 non-music** strips, harvested from the Real
+Book PDFs with `scripts/build_reject_label_set.py` and sorted in the browser at
+`/reject-labeler`.
+
+**The `calibrate-reject` tool's geometric sweep was rejected** — it pushed
+`min_line_span_frac` to 0.69 and would have **rejected 60 % of real music
+(FP=165/276)**. Root cause: with clean Real Book input the detector's
+false-positives are *hard negatives* (partial staves, full-width text/chord rows)
+that are geometrically staff-like — wider line-span than many genuinely short
+real staves — so the geometry features do not separate the classes. (Separately,
+the tool only sweeps geometry; it copies `min_mean_logprob` from the default and
+never calibrates the CTC gate — a tool gap, logged as future work.)
+
+The CTC confidence axis separates only weakly too (music mean-logprob median
+−0.032 but tails to −0.172; non-music median −0.053). Given the strong cost
+asymmetry — losing a real staff is far worse than passing a garbage strip that
+downstream can ignore — the gate was set **music-preserving** by hand:
+
+| `min_mean_logprob` | music kept | non-music rejected (combined w/ geometry) |
+|------|------|------|
+| −0.05 (old) | 93.3 % | — |
+| **−0.15 (chosen)** | **98.6 %** (272/276) | **30.1 %** (37/123) |
+
+Final `models/staff_reject/thresholds.json`: permissive geometry (the prior
+production values, unchanged) + `min_mean_logprob=-0.15`,
+`confident_override_logprob=-0.05`. This keeps 98.6 % of real staves (vs 93.3 %
+under the old −0.05) while the geometry gates still drop no-staff-line garbage
+and the CTC gate drops the lowest-confidence fragments. The 4 false-rejected
+music strips are degenerate partial staves (<5 detectable lines).
+
+**Future work:** the hard-negative overlap means a geometry+confidence gate
+cannot cleanly filter clean-Real-Book false-detections; meaningfully better
+rejection would need a small learned classifier on the strip, not threshold
+sweeps. And `calibrate-reject` should sweep `min_mean_logprob` with a
+cost-asymmetric objective rather than per-feature Youden-J on geometry only.

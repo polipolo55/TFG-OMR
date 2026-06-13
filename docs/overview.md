@@ -208,7 +208,7 @@ latex_documents/gep/        GEP thesis-management deliverables
 ## Performance
 
 Held-out test split (4 608 samples), greedy CTC decoding, latest checkpoint
-(`models/latest/best_model.pt` = `run_20260608_102846`, best epoch 47):
+(`models/latest/best_model.pt` = `run_20260612_101637`, best epoch 83):
 
 > **Note on comparability.** Evaluation numbers from CRNN runs *before
 > 2026-06-03* (e.g. 0.23 % SER / 94.1 % perfect from `run_20260601_134845`)
@@ -216,17 +216,18 @@ Held-out test split (4 608 samples), greedy CTC decoding, latest checkpoint
 > train/test and are **not comparable** to the numbers below. They are also not
 > reproducible — see `docs/experiments/2026-06-10-volume-collapse-findings.md`.
 
-- **Aggregate SER:** 1.31 % (scanned), 1.19 % (clean) — token-level edit distance.
-- **Melodic SER:** 0.18 % (scanned), 0.11 % (clean) — same metric with `measure`
+- **Aggregate SER:** 1.23 % (scanned), 1.17 % (clean) — token-level edit distance.
+- **Melodic SER:** 0.14 % (scanned), 0.10 % (clean) — same metric with `measure`
   and tie tokens stripped, isolating actual pitch/duration/accidental errors.
-- **Perfect transcriptions:** 72 % (scanned), 73 % (clean).
-- **Error breakdown:** ≈74 % of all edits are barline (`measure`) tokens and
-  ≈13 % are ties — together these structural tokens account for ~87 % of edits.
-  Pitch/octave/duration error rates are each well below 0.15 %.
+- **Perfect transcriptions:** 72.7 % (scanned), 73.7 % (clean).
+- **Error breakdown:** barline (`measure`) tokens ≈14.7 % per-category error and
+  ties ≈31 % together account for ~87 % of all edits.
+  Pitch/octave/duration error rates are each well below 0.1 %.
 - **Beam search** (width 5) yields ≤ 1 edit/1000 SER improvement at ~6× decode
   cost; greedy is the recommended default.
 - **Hardware target:** NVIDIA RTX 3060 (12 GB VRAM), batch size 16–24
-- **Training time:** ~60 epochs, early stopping at patience 12
+- **Training time:** 90-epoch OneCycle schedule (~8 min/epoch on the 3060),
+  early stopping at patience 12; best at epoch 83.
 
 Reproduce: `poetry run python scripts/evaluate_full.py --checkpoint models/latest/best_model.pt --split test --both-splits`
 

@@ -118,10 +118,29 @@ its results table will be appended below.
 
 ## Results
 
-*(to be filled in after the leakage-free retrain — see plan Task 16)*
+Greedy CTC, current leakage-free test split (4,608 samples), `scripts/evaluate_full.py
+--split test --both-splits`:
 
-| Model | Train data | Current test SER | Current test perfect | Notes |
-|-------|-----------|------------------|----------------------|-------|
-| `run_20260601_134845` | originals + twins (leaked split) | 0.23 % | 94.1 % | **invalid — memorization / leakage** |
-| `run_20260608_102846` | originals only | 1.31 % | 72.0 % | honest baseline |
-| *(retrain)* | originals + variant sampling + tie oversampling | TBD | TBD | leakage-free |
+| Model | Train data | Scanned SER | Scanned perfect | Clean SER | Clean perfect | Notes |
+|-------|-----------|------|------|------|------|-------|
+| `run_20260601_134845` | originals + twins (leaked split) | 0.23 % | 94.1 % | — | — | **invalid — memorization / leakage; not reproducible** |
+| `run_20260608_102846` | originals only | 1.31 % | 72.0 % | 1.19 % | 73 % | honest baseline |
+| **`run_20260612_101637`** (now `models/latest`, best epoch 83) | originals + variant sampling + tie oversampling 2× | **1.23 %** | **72.7 %** | **1.17 %** | **73.7 %** | leakage-free; best honest result |
+
+The retrain (variant sampling + jitter-bleed fix + tie oversampling) gives a
+**modest, real improvement** over the honest baseline on both splits — and is now
+the shipped checkpoint. The gap to the old 0.23 % is *not* a quality gap; that
+number was leakage (see above).
+
+**Per-category errors (scanned split, retrain).** Errors are almost entirely
+structural: barlines (`measure`) 14.7 % and ties 31.0 % together are ~87 % of all
+edits; pitch 0.06 %, duration 0.04 %, octave 0.02 %, key 0.00 %.
+
+**Tie oversampling did not pay off.** Despite 2× oversampling of tie-containing
+samples, the tie category still showed **31.0 %** error (scanned) / 30.2 %
+(clean) — duplicating whole staff images cannot teach the model to disambiguate
+a faint tie arc on a degraded scan. Oversampling was therefore **disabled by
+default** afterward (commit `a2eb073`; `rare_lmx_oversample=1`), reclaiming ~10 %
+train time at no measured tie cost. The tie problem wants a targeted fix
+(tie-specific augmentation or a structural post-processor), not sample
+duplication — logged as future work.

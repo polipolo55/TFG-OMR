@@ -82,11 +82,18 @@ class Config:
     online_aug_prob: float = 0.5
 
     # rare_lmx_oversample: repeat training indices for samples containing
-    # rare_lmx_tokens (N-1 extra times).  1 = disabled.
+    # rare_lmx_tokens (N-1 extra times).  1 = disabled (default).
+    # DISABLED by default since the 2026-06-12 retrain (run_20260612_101637):
+    # with 2× oversampling the tie category still showed 31% error on the test
+    # split — duplicating whole staff images does not teach the model to
+    # disambiguate visually subtle tie arcs on degraded scans, so the ~10%
+    # extra train time was not buying tie accuracy.  The machinery and the
+    # --rare-lmx-oversample CLI flag are kept so it can be re-enabled for
+    # ablations.  See docs/experiments/2026-06-10-volume-collapse-findings.md.
     # NOTE: rare_lmx_tokens must stay in sync with the fallback constant
     # _DEFAULT_RARE_LMX_TOKENS in dataset.py (used when make_splits is called
     # without an explicit set).
-    rare_lmx_oversample: int = 2
+    rare_lmx_oversample: int = 1
     rare_lmx_tokens: tuple[str, ...] = (
         "tied:start",
         "tied:stop",

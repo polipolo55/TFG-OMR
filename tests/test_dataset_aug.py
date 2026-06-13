@@ -86,6 +86,7 @@ def test_rare_token_oversampling_duplicates_tied_samples(corpus, tmp_path):
 def test_ensure_config_defaults_backfills_missing_fields():
     from CRNN_CTC.config import Config, ensure_config_defaults
 
+    expected_default = Config().rare_lmx_oversample  # current dataclass default
     cfg = Config()
     del cfg.__dict__["rare_lmx_oversample"]  # simulate a pre-restore pickled instance
     # A simple-default field is also a *class* attribute, so hasattr() still sees
@@ -93,7 +94,7 @@ def test_ensure_config_defaults_backfills_missing_fields():
     assert "rare_lmx_oversample" not in cfg.__dict__
     ensure_config_defaults(cfg)
     assert "rare_lmx_oversample" in cfg.__dict__
-    assert cfg.rare_lmx_oversample == 2
+    assert cfg.rare_lmx_oversample == expected_default
 
 
 def _add_variants(tmp_path: Path, data: Path, n_variants: int = 2) -> Path:

@@ -49,16 +49,24 @@ Applied before splits. Filters are flags on `Config`:
 These three flags collectively realise the lead-sheet domain spec — see
 `docs/overview.md` → "Domain Specification" for the full rationale.
 
-### Rare Token Oversampling
+### Rare Token Oversampling (disabled by default)
 
-Samples whose `.lmx` contains any token in `Config.rare_lmx_tokens` are
-duplicated `rare_lmx_oversample` times (default: 2×) in the training index
-only.  The default set up-weights:
+Samples whose `.lmx` contains any token in `Config.rare_lmx_tokens` can be
+duplicated `rare_lmx_oversample` times in the training index only. The intended
+target is `tied:start` / `tied:stop` (visually subtle, under-predicted on real
+scans).
 
-- `tied:start` / `tied:stop` — visually subtle, under-predicted on real scans.
+**This is disabled by default (`rare_lmx_oversample=1`) as of the 2026-06-12
+retrain.** That run used 2× oversampling and the tie category still showed
+**31 % error** on the test split — duplicating whole staff images does not teach
+the model to disambiguate faint tie arcs on degraded scans, so the ~10 % extra
+train time bought no tie accuracy. The machinery and `--rare-lmx-oversample`
+flag are kept for ablations. See
+`docs/experiments/2026-06-10-volume-collapse-findings.md`.
 
-(`key:fifths:0` was previously in this set; it was removed once the converter
-bug under-representing C major was fixed — see `docs/configuration.md`.)
+(`key:fifths:0` was previously in the target set; it was removed once the
+converter bug under-representing C major was fixed — see
+`docs/configuration.md`.)
 
 ### Scan-Variant Sampling (train-only)
 
@@ -137,7 +145,7 @@ Batch dict keys: `images`, `labels`, `label_lens`, `image_widths`
 | `test_frac` | 0.10 | test split fraction |
 | `use_scanned` | True | include augmented images |
 | `strip_header_prob` | 0.0 | DEPRECATED/inert — continuation staves handled at inference via virtual header injection |
-| `rare_lmx_oversample` | 2 | oversampling factor for ties |
+| `rare_lmx_oversample` | 1 | oversampling factor for ties (disabled by default; see above) |
 
 ## Checkpoint Files
 

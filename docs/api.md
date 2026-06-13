@@ -184,6 +184,65 @@ Persist a label or skip decision.
 
 **Response:** `{"ok": true}`
 
+## Music-Strip Labeling Endpoints
+
+These power `static/music_labeler.html`, the UI for hand-correcting note CRNN
+predictions on real Real Book staff crops to build the `--finetune-data-dir`
+set. Strips and pre-labels are produced by
+`src/data_processing/extract_real_music_strips.py`; data lives in
+`data/music_real/{strips/,labels.jsonl}`.
+
+### `GET /music-labeler`
+
+Serves `static/music_labeler.html`.
+
+### `GET /api/music-labeler/stats`
+
+Returns counts by status: `{"done", "skip", "pending", "total"}`.
+
+### `GET /api/music-labeler/next`
+
+Returns the next `pending` record, or 404 when none remain.
+
+### `GET /api/music-labeler/strip/{filename}`
+
+Returns the strip PNG.
+
+### `POST /api/music-labeler/render`
+
+Renders an LMX token string with LilyPond and returns a base64 PNG data URL.
+
+**Request body:** `{"lmx": "measure pitch:C octave:5 eighth ...", "render_time": "3/4"}`
+`render_time` is a layout-only hint (`"beats/beat-type"`) used to group bars when
+the LMX has no `time` token; it does not change the tokens.
+
+**Response:** `{"image": "data:image/png;base64,..."}`
+
+### `POST /api/music-labeler/predict`
+
+Re-predict a strip after injecting a virtual header, to get a cleaner pre-fill
+for header-less continuation staves. Mirrors the inference path: prepend the
+matching clef+key+time header template (`header_injector.inject_header`), run the
+CRNN on the *injected* image (the model's training distribution), grammar-fix,
+then strip the header tokens back out so the result stays header-less.
+
+**Request body:** `{"filename": "page0020_staff5.png", "key": "key:fifths:0", "render_time": "3/4"}`
+`render_time` defaults to `4/4` when omitted.
+
+**Response:** `{"tokens": "measure pitch:C octave:5 eighth ...", "header_injected": true}`
+`header_injected` is `false` when no template exists for that (key, time) combo
+— `inject_header` then returns the raw crop unchanged, so the prediction is *not*
+on-distribution and the UI warns.
+
+### `POST /api/music-labeler/save`
+
+Persist a corrected label or skip decision.
+
+**Request body:** `{"filename": "page0020_staff5.png", "label": "measure pitch:C octave:5 eighth ...", "status": "done"}`
+`status` must be `"done"` or `"skip"`; `label` may be `null` when skipping.
+
+**Response:** `{"ok": true}`
+
 ## Staff-Reject Calibration Labeling Endpoints
 
 These power `static/reject_labeler.html`, a binary sorter used to build the

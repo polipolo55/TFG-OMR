@@ -219,6 +219,33 @@
       margin-top: 6px;
       min-height: 18px;
     }
+
+    /* --- validation + beat-sum status lines --- */
+    .lint {
+      font-size: 12px;
+      margin-top: 6px;
+      min-height: 18px;
+      font-family: monospace;
+    }
+    .lint.ok { color: #1a7f37; }
+    .lint.bad { color: #cf222e; font-weight: 600; }
+    .bars { font-size: 12px; margin-top: 4px; font-family: monospace; color: #57606a; }
+    .bars .bar-ok { color: #1a7f37; }
+    .bars .bar-warn { color: #cf222e; font-weight: 600; }
+    .bars .bar-info { color: #9a6700; }
+    textarea.invalid { border-color: #cf222e; box-shadow: 0 0 0 2px #ffd7d5; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* --- atomic token palette --- */
+    .palette .quick-row > span.tag { min-width: 70px; }
+    button.btn-tok {
+      padding: 3px 8px;
+      font-size: 12px;
+      font-family: monospace;
+      background: #f6f8fa;
+    }
+    button.btn-tok:hover { background: #eaeef2; }
+    .autoprev { font-size: 12px; color: #57606a; display: flex; align-items: center; gap: 4px; }
   </style>
 </head>
 <body>
@@ -257,6 +284,12 @@
         <div id="render-status"></div>
         <div id="render-error" class="error-msg"></div>
         <div class="render-context">
+          <label class="autoprev">
+            <input type="checkbox" id="autoprev-cb" onchange="setAutoPreview(this.checked)" />
+            Auto-preview while typing
+          </label>
+        </div>
+        <div class="render-context">
           <span class="tag">Render bar layout in:</span>
           <button class="btn-quick btn-ctx" data-ctx="auto" onclick="setRenderCtx('auto', this)">auto (4/4)</button>
           <button class="btn-quick btn-ctx" data-ctx="3/4" onclick="setRenderCtx('3/4', this)">3/4</button>
@@ -268,6 +301,14 @@
             Layout only — does not change the saved label. Used when the LMX has no time token (continuation staves) so bars group correctly.
           </span>
         </div>
+        <div class="render-context">
+          <span class="tag">Re-predict header key:</span>
+          <select id="predict-key" onchange="setPredictKey(this.value)"></select>
+          <button class="btn-quick" onclick="repredict()">Re-predict w/ header</button>
+          <span class="ctx-hint">
+            Injects this key + the bar-layout time as a header, re-runs the model on the injected crop (its training distribution), then strips the header back out. Fills the editor. <kbd>Ctrl+R</kbd>.
+          </span>
+        </div>
       </div>
     </div>
 
@@ -276,7 +317,58 @@
       <div class="panel-title">LMX tokens — edit to correct</div>
       <textarea id="lmx-input" spellcheck="false" autocomplete="off" autocorrect="off"
                 autocapitalize="off"></textarea>
+      <div id="lint" class="lint"></div>
+      <div id="bars" class="bars"></div>
       <div class="pred-hint">Original prediction: <code id="pred-text">—</code></div>
+
+      <div class="quick-edit palette">
+        <div class="quick-edit-label">
+          Insert token at cursor — click or use the <kbd>Alt</kbd> hotkeys
+        </div>
+        <div class="quick-row">
+          <span class="tag">Structure:</span>
+          <button class="btn-tok" onclick="ins('measure')">measure <kbd>⌥M</kbd></button>
+          <button class="btn-tok" onclick="ins('rest')">rest <kbd>⌥R</kbd></button>
+          <button class="btn-tok" onclick="ins('dot')">dot <kbd>⌥.</kbd></button>
+        </div>
+        <div class="quick-row">
+          <span class="tag">Pitch <kbd>⌥</kbd>:</span>
+          <button class="btn-tok" onclick="ins('pitch:C')">C</button>
+          <button class="btn-tok" onclick="ins('pitch:D')">D</button>
+          <button class="btn-tok" onclick="ins('pitch:E')">E</button>
+          <button class="btn-tok" onclick="ins('pitch:F')">F</button>
+          <button class="btn-tok" onclick="ins('pitch:G')">G</button>
+          <button class="btn-tok" onclick="ins('pitch:A')">A</button>
+          <button class="btn-tok" onclick="ins('pitch:B')">B</button>
+        </div>
+        <div class="quick-row">
+          <span class="tag">Octave <kbd>⌥</kbd>:</span>
+          <button class="btn-tok" onclick="ins('octave:3')">3</button>
+          <button class="btn-tok" onclick="ins('octave:4')">4</button>
+          <button class="btn-tok" onclick="ins('octave:5')">5</button>
+          <button class="btn-tok" onclick="ins('octave:6')">6</button>
+          <button class="btn-tok" onclick="ins('octave:7')">7</button>
+        </div>
+        <div class="quick-row">
+          <span class="tag">Duration:</span>
+          <button class="btn-tok" onclick="ins('whole')">whole</button>
+          <button class="btn-tok" onclick="ins('half')">half</button>
+          <button class="btn-tok" onclick="ins('quarter')">quarter</button>
+          <button class="btn-tok" onclick="ins('eighth')">eighth</button>
+          <button class="btn-tok" onclick="ins('16th')">16th</button>
+          <button class="btn-tok" onclick="ins('32nd')">32nd</button>
+          <button class="btn-tok" onclick="ins('64th')">64th</button>
+        </div>
+        <div class="quick-row">
+          <span class="tag">Accidental:</span>
+          <button class="btn-tok" onclick="ins('flat')">flat</button>
+          <button class="btn-tok" onclick="ins('sharp')">sharp</button>
+          <button class="btn-tok" onclick="ins('natural')">natural</button>
+          <span class="tag" style="margin-left:12px">Tie:</span>
+          <button class="btn-tok" onclick="ins('tied:start')">tied:start</button>
+          <button class="btn-tok" onclick="ins('tied:stop')">tied:stop</button>
+        </div>
+      </div>
 
       <div class="quick-edit">
         <div class="quick-edit-label">
@@ -311,7 +403,7 @@
       </div>
 
       <div class="button-row">
-        <button class="btn-primary" onclick="save()">Save &amp; next</button>
+        <button id="save-btn" class="btn-primary" onclick="save()">Save &amp; next</button>
         <button class="btn-preview" onclick="preview()">Preview (LilyPond)</button>
         <button onclick="restorePrediction()">Restore original</button>
         <button onclick="clearLabel()">Clear</button>
@@ -338,6 +430,228 @@
     // Persists across strips so labeling all staves of a 3/4 song doesn't
     // require re-selecting on every strip. "auto" means no hint sent.
     let renderCtx = localStorage.getItem('musicLabeler.renderCtx') || 'auto';
+    // Key (fifths) used for the header-inject re-predict helper. Persists
+    // across strips like renderCtx, so a whole song in one key needs no
+    // re-selecting.
+    let predictKey = parseInt(localStorage.getItem('musicLabeler.predictKey') ?? '0', 10);
+
+    // fifths -7..+7 → major key name, for the re-predict key dropdown.
+    const _FIFTHS_NAMES = {
+      '-7':'Cb','-6':'Gb','-5':'Db','-4':'Ab','-3':'Eb','-2':'Bb','-1':'F',
+      '0':'C','1':'G','2':'D','3':'A','4':'E','5':'B','6':'F#','7':'C#'
+    };
+
+    function _initPredictKeyDropdown() {
+      const sel = document.getElementById('predict-key');
+      for (let f = -7; f <= 7; f++) {
+        const opt = document.createElement('option');
+        opt.value = String(f);
+        opt.textContent = `${_FIFTHS_NAMES[String(f)]} (${f >= 0 ? '+' : ''}${f})`;
+        if (f === predictKey) opt.selected = true;
+        sel.appendChild(opt);
+      }
+    }
+
+    function setPredictKey(v) {
+      predictKey = parseInt(v, 10);
+      localStorage.setItem('musicLabeler.predictKey', String(predictKey));
+    }
+
+    // --- Token validation ------------------------------------------------
+    // VOCAB is the authoritative training vocabulary; any editor token not in
+    // it would encode to <unk>, so we flag it and hard-block Save.
+    let VOCAB = new Set();
+    let hasUnknownTokens = false;
+
+    async function _loadVocab() {
+      try {
+        const r = await fetch('/api/music-labeler/vocab');
+        if (r.ok) VOCAB = new Set((await r.json()).tokens);
+      } catch (e) { /* validation degrades to off if vocab unavailable */ }
+    }
+
+    function validate() {
+      const lint = document.getElementById('lint');
+      const ta = document.getElementById('lmx-input');
+      const toks = ta.value.split(/\s+/).filter(Boolean);
+      if (VOCAB.size === 0 || toks.length === 0) {
+        lint.textContent = ''; lint.className = 'lint';
+        ta.classList.remove('invalid');
+        hasUnknownTokens = false;
+        _syncSaveEnabled();
+        return;
+      }
+      const unknown = [...new Set(toks.filter(t => !VOCAB.has(t)))];
+      hasUnknownTokens = unknown.length > 0;
+      if (hasUnknownTokens) {
+        lint.textContent = 'Unknown token' + (unknown.length > 1 ? 's' : '') +
+          ' (will train as <unk> — fix before saving): ' + unknown.join(', ');
+        lint.className = 'lint bad';
+        ta.classList.add('invalid');
+      } else {
+        lint.textContent = '✓ all tokens valid';
+        lint.className = 'lint ok';
+        ta.classList.remove('invalid');
+      }
+      _syncSaveEnabled();
+    }
+
+    function _syncSaveEnabled() {
+      const btn = document.getElementById('save-btn');
+      if (btn) btn.disabled = hasUnknownTokens;
+    }
+
+    // --- Beat-sum / bar checker (informational) --------------------------
+    // Duration token → length in whole notes; mirrors _DUR_WHOLE in
+    // src/CRNN_CTC/lilypond_render.py.
+    const _DUR_WHOLE = {
+      whole: 1, half: 1/2, quarter: 1/4, eighth: 1/8,
+      '16th': 1/16, '32nd': 1/32, '64th': 1/64,
+      '128th': 1/128, '256th': 1/256, breve: 2, longa: 4,
+    };
+
+    function _barLength(toks) {
+      // Expected bar length in whole notes: header time token, else the
+      // render bar-layout selection, else null (can't judge).
+      const ti = toks.indexOf('time');
+      if (ti >= 0 && ti + 2 < toks.length) {
+        const b = parseInt((toks[ti+1].split(':')[1]) || '', 10);
+        const bt = parseInt((toks[ti+2].split(':')[1]) || '', 10);
+        if (b && bt) return b / bt;
+      }
+      if (renderCtx && renderCtx !== 'auto') {
+        const [b, bt] = renderCtx.split('/').map(Number);
+        if (b && bt) return b / bt;
+      }
+      return null;
+    }
+
+    function beatCheck() {
+      const out = document.getElementById('bars');
+      const toks = document.getElementById('lmx-input').value.split(/\s+/).filter(Boolean);
+      const barLen = _barLength(toks);
+      if (!barLen) { out.innerHTML = ''; return; }
+
+      // Split into measures on `measure`, summing durations (dot ×1.5 each).
+      const measures = [];
+      let cur = 0, sawNote = false;
+      for (let i = 0; i < toks.length; i++) {
+        const t = toks[i];
+        if (t === 'measure') {
+          if (sawNote) { measures.push(cur); cur = 0; sawNote = false; }
+          continue;
+        }
+        if (t in _DUR_WHOLE) {
+          let v = _DUR_WHOLE[t], add = v, dots = 0;
+          while (toks[i+1] === 'dot') { add /= 2; v += add; dots++; i++; }
+          cur += v; sawNote = true;
+        }
+      }
+      if (sawNote) measures.push(cur);
+      if (measures.length === 0) { out.innerHTML = ''; return; }
+
+      const fmt = (x) => {
+        // Show as N/D of a bar relative to the time signature denominator-ish:
+        // simplest is beats given the bar; express in quarter notes.
+        const q = (x * 4);
+        return (Math.round(q * 100) / 100) + 'q';
+      };
+      const tol = 1e-6;
+      const parts = measures.map((m, idx) => {
+        const diff = m - barLen;
+        let cls, tag;
+        if (Math.abs(diff) < tol) { cls = 'bar-ok'; tag = '✓'; }
+        else if (m < barLen) {
+          // Short bar: a pickup (first) or trailing fragment (last) is expected.
+          if (idx === 0) { cls = 'bar-info'; tag = '(pickup)'; }
+          else if (idx === measures.length - 1) { cls = 'bar-info'; tag = '(short)'; }
+          else { cls = 'bar-warn'; tag = '⚠ short'; }
+        } else { cls = 'bar-warn'; tag = '⚠ over'; }
+        return `<span class="${cls}">bar${idx+1} ${fmt(m)} ${tag}</span>`;
+      });
+      out.innerHTML = 'beats (full bar = ' + fmt(barLen) + '): ' + parts.join(' · ');
+    }
+
+    // --- Atomic token insertion at cursor --------------------------------
+    function ins(token) {
+      const ta = document.getElementById('lmx-input');
+      const s = ta.selectionStart, e = ta.selectionEnd;
+      const before = ta.value.slice(0, s), after = ta.value.slice(e);
+      // Ensure a separating space before the token if needed.
+      const sep = (before.length && !/\s$/.test(before)) ? ' ' : '';
+      const insert = sep + token + ' ';
+      ta.value = before + insert + after;
+      const pos = s + insert.length;
+      ta.focus();
+      ta.setSelectionRange(pos, pos);
+      onEdit();
+    }
+
+    // --- Auto-preview (debounced) ----------------------------------------
+    let autoPreview = localStorage.getItem('musicLabeler.autoPreview') !== 'off';
+    let _previewTimer = null;
+
+    function setAutoPreview(on) {
+      autoPreview = on;
+      localStorage.setItem('musicLabeler.autoPreview', on ? 'on' : 'off');
+    }
+
+    // Runs on every edit: validate + beat-check immediately, schedule a
+    // debounced render. Skips auto-render while tokens are invalid.
+    function onEdit() {
+      validate();
+      beatCheck();
+      if (_previewTimer) clearTimeout(_previewTimer);
+      if (!autoPreview || hasUnknownTokens) return;
+      _previewTimer = setTimeout(() => { preview(); }, 700);
+    }
+
+    // Alt+<key> hotkeys insert tokens while the textarea stays focused.
+    const _ALT_PITCH = {c:'C', d:'D', e:'E', f:'F', g:'G', a:'A', b:'B'};
+    function _handleAltHotkey(e) {
+      if (!e.altKey || e.ctrlKey || e.metaKey) return false;
+      const k = e.key.toLowerCase();
+      if (_ALT_PITCH[k]) { ins('pitch:' + _ALT_PITCH[k]); return true; }
+      if (['3','4','5','6','7'].includes(k)) { ins('octave:' + k); return true; }
+      if (k === 'm') { ins('measure'); return true; }
+      if (k === 'r') { ins('rest'); return true; }
+      if (k === '.') { ins('dot'); return true; }
+      return false;
+    }
+
+    async function repredict() {
+      if (!current) return;
+      const status = document.getElementById('render-status');
+      const errDiv = document.getElementById('render-error');
+      errDiv.textContent = '';
+      status.textContent = 'Re-predicting with header…';
+      // Time comes from the render bar-layout selection; default 4/4 when "auto".
+      const renderTime = (renderCtx && renderCtx !== 'auto') ? renderCtx : '4/4';
+      const key = `key:fifths:${predictKey}`;
+      try {
+        const resp = await fetch('/api/music-labeler/predict', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({filename: current.filename, key, render_time: renderTime}),
+        });
+        if (!resp.ok) {
+          const detail = await resp.json().catch(() => ({}));
+          errDiv.textContent = 'Re-predict failed: ' + (detail.detail || resp.status);
+          status.textContent = '';
+          return;
+        }
+        const data = await resp.json();
+        document.getElementById('lmx-input').value = data.tokens || '';
+        document.getElementById('lmx-input').focus();
+        status.textContent = data.header_injected
+          ? `Re-predicted with ${key} + ${renderTime} header (stripped from label).`
+          : `Re-predicted, but NO header template for ${key} / ${renderTime} — ran on the raw crop.`;
+        preview();
+      } catch (e) {
+        errDiv.textContent = 'Network error: ' + e.message;
+        status.textContent = '';
+      }
+    }
 
     function setRenderCtx(ctx, btn) {
       renderCtx = ctx;
@@ -394,8 +708,10 @@
 
       await refreshStats();
 
-      // Auto-preview if there's a prediction to show
-      if (current.predicted && current.predicted.trim()) {
+      // Validate + beat-check the new strip, and preview if there's content.
+      validate();
+      beatCheck();
+      if (current.predicted && current.predicted.trim() && !hasUnknownTokens) {
         preview();
       }
     }
@@ -444,6 +760,12 @@
 
     async function save() {
       if (!current) return;
+      if (hasUnknownTokens) {
+        document.getElementById('lint').textContent =
+          'Cannot save: fix unknown tokens first (they would train as <unk>). Use Skip if the strip is garbage.';
+        document.getElementById('lint').className = 'lint bad';
+        return;
+      }
       const label = document.getElementById('lmx-input').value.trim();
       await fetch('/api/music-labeler/save', {
         method: 'POST',
@@ -570,8 +892,12 @@
     }
 
     document.addEventListener('keydown', (e) => {
+      if (e.altKey && !e.ctrlKey && !e.metaKey) {
+        if (_handleAltHotkey(e)) { e.preventDefault(); return; }
+      }
       if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); save(); }
       else if (e.key === 'p' && e.ctrlKey) { e.preventDefault(); preview(); }
+      else if (e.key === 'r' && e.ctrlKey) { e.preventDefault(); repredict(); }
       else if (e.key === 'Escape') { e.preventDefault(); skip(); }
       else if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey) {
         // Only intercept Tab when the textarea is NOT focused (to not break indentation)
@@ -582,9 +908,14 @@
       }
     });
 
+    // Live validation / beat-check / debounced auto-preview on every edit.
+    document.getElementById('lmx-input').addEventListener('input', onEdit);
+
     // Highlight the currently-selected render context on startup
     setRenderCtx(renderCtx);
-    loadNext();
+    _initPredictKeyDropdown();
+    document.getElementById('autoprev-cb').checked = autoPreview;
+    _loadVocab().then(() => loadNext());
   </script>
 </body>
 </html>

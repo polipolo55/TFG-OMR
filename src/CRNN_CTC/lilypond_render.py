@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 import subprocess
 import tempfile
+from fractions import Fraction
 from pathlib import Path
 
 import numpy as np
@@ -94,6 +95,80 @@ _SHARP_ORDER = list("FCGDAEB")
 _FLAT_ORDER = list("BEADGCF")
 _PITCH_STEPS = set("ABCDEFG")
 _DURATIONS = set(DUR_LY)
+
+# Duration token → length in whole notes (used to size pickup measures).
+_DUR_WHOLE: dict[str, Fraction] = {
+    "whole": Fraction(1), "half": Fraction(1, 2), "quarter": Fraction(1, 4),
+    "eighth": Fraction(1, 8), "16th": Fraction(1, 16), "32nd": Fraction(1, 32),
+    "64th": Fraction(1, 64), "128th": Fraction(1, 128), "256th": Fraction(1, 256),
+    "1024th": Fraction(1, 1024), "breve": Fraction(2), "longa": Fraction(4),
+}
+
+
+def _dur_whole(dur_tok: str, dots: int) -> Fraction:
+    """Length of a (possibly dotted) duration token, in whole notes."""
+    base = _DUR_WHOLE.get(dur_tok)
+    if base is None:
+        return Fraction(0)
+    total = base
+    add = base
+    for _ in range(dots):
+        add /= 2
+        total += add
+    return total
+
+
+def _leading_partial(
+    tokens: list[str], render_time_hint: tuple[int, int] | None
+) -> Fraction | None:
+    """Return the duration (in whole notes) of a leading pickup measure.
+
+    A pickup (anacrusis) is the first measure when it is *shorter* than a full
+    bar. LilyPond needs an explicit ``\\partial`` to bar it correctly; without
+    one it ignores the model's first barline and re-bars on the time-signature
+    grid, sliding barlines off the notes the tokens actually delimit.
+
+    Returns the pickup length when the first measure is short, else ``None``
+    (full or over-full first measure → normal automatic barring).
+    """
+    bar_len: Fraction | None = None
+    for i, t in enumerate(tokens):
+        if t == "time" and i + 2 < len(tokens):
+            try:
+                b = int(tokens[i + 1].split(":")[1])
+                bt = int(tokens[i + 2].split(":")[1])
+                bar_len = Fraction(b, bt)
+            except (ValueError, IndexError):
+                pass
+            break
+    if bar_len is None and render_time_hint is not None:
+        bar_len = Fraction(render_time_hint[0], render_time_hint[1])
+    if bar_len is None:
+        return None
+
+    acc = Fraction(0)
+    seen_note = False
+    i, n = 0, len(tokens)
+    while i < n:
+        t = tokens[i]
+        if t == "measure":
+            if seen_note:
+                break  # reached the first internal barline
+            i += 1
+            continue
+        if t in _DURATIONS:
+            dots = 0
+            j = i + 1
+            while j < n and tokens[j] == "dot":
+                dots += 1
+                j += 1
+            acc += _dur_whole(t, dots)
+            seen_note = True
+            i = j
+            continue
+        i += 1
+
+    return acc if (seen_note and Fraction(0) < acc < bar_len) else None
 
 LY_TEMPLATE = r"""
 \version "2.26.0"
@@ -179,8 +254,14 @@ def lmx_to_lilypond(
     cur_beats: int = 4  # numerator of current time signature
     cur_beat_type: int = 4  # denominator of current time signature
 
+    # Pickup-measure support: if the first measure is shorter than a full bar,
+    # emit \partial before the first note so LilyPond bars the anacrusis where
+    # the tokens say, instead of re-barring on the time-signature grid.
+    partial_frac = _leading_partial(tokens, render_time_hint)
+    partial_done = False
+
     def _flush() -> None:
-        nonlocal pending
+        nonlocal pending, partial_done
         if pending is None:
             return
         kind = pending["kind"]
@@ -188,6 +269,9 @@ def lmx_to_lilypond(
         if not dur:
             pending = None
             return
+        if not partial_done and partial_frac is not None:
+            lily.append(rf"\partial 1*{partial_frac.numerator}/{partial_frac.denominator}")
+            partial_done = True
         dots = "." * pending.get("dots", 0)
 
         if kind == "rest":

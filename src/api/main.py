@@ -225,6 +225,7 @@ async def labeler_save(req: SaveRequest):
 _MUSIC_LABELER_ROOT = _ROOT / "data" / "music_real"
 _MUSIC_LABELS_PATH = _MUSIC_LABELER_ROOT / "labels.jsonl"
 _MUSIC_STRIPS_DIR = _MUSIC_LABELER_ROOT / "strips"
+_MUSIC_VOCAB_PATH = _ROOT / "data" / "vocab" / "primus_lmx.txt"
 _music_labels_lock = Lock()
 _music_labels = _JsonlLabelStore(_MUSIC_LABELS_PATH)
 
@@ -243,6 +244,14 @@ class RenderRequest(BaseModel):
     render_time: str | None = None
 
 
+class PredictRequest(BaseModel):
+    filename: str
+    # Header to inject before re-running the CRNN. `key` is an LMX key token
+    # ("key:fifths:N"); `render_time` is "beats/beat-type" e.g. "3/4".
+    key: str = "key:fifths:0"
+    render_time: str | None = None  # defaults to 4/4 when omitted
+
+
 @app.get("/music-labeler")
 async def music_labeler_page():
     """Serve the music-strip labeling UI."""
@@ -250,6 +259,19 @@ async def music_labeler_page():
     if not page.exists():
         raise HTTPException(404, "music_labeler.html missing")
     return FileResponse(page)
+
+
+@app.get("/api/music-labeler/vocab")
+async def music_labeler_vocab():
+    """Return the LMX training vocabulary, for client-side token validation.
+
+    Any token the labeler editor contains that is absent from this list would
+    encode to ``<unk>`` at training time, so the UI flags it and blocks save.
+    """
+    if not _MUSIC_VOCAB_PATH.exists():
+        raise HTTPException(404, "vocab file not found")
+    tokens = [ln.strip() for ln in _MUSIC_VOCAB_PATH.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    return {"tokens": tokens}
 
 
 @app.get("/api/music-labeler/stats")
@@ -318,6 +340,59 @@ async def music_labeler_render(req: RenderRequest):
 
     data_url = "data:image/png;base64," + base64.b64encode(buf.tobytes()).decode()
     return {"image": data_url}
+
+
+@app.post("/api/music-labeler/predict")
+async def music_labeler_predict(req: PredictRequest):
+    """Re-predict a continuation strip after injecting a virtual header.
+
+    Mirrors the inference path for continuation staves: prepend the matching
+    clef+key+time header template, run the CRNN on the *injected* image (the
+    distribution the model was trained on), grammar-fix, then strip the header
+    tokens back out so the returned tokens stay header-less — ready to save
+    under the labeling convention. Speeds up labeling header-less crops, whose
+    raw pre-fill is off-distribution and noisier.
+    """
+    import cv2 as _cv2
+
+    from omr_pipeline.grammar_fix import fix_sequence
+    from omr_pipeline.header_injector import inject_header
+    from omr_pipeline.inference import recognize_music
+
+    # _strip_header_tokens is the same helper the offline extractor uses; reuse
+    # it rather than duplicate the token-stripping logic.
+    try:
+        from data_processing.extract_real_music_strips import _strip_header_tokens
+    except ImportError:
+        raise HTTPException(500, "extract_real_music_strips not importable")
+
+    if "/" in req.filename or ".." in req.filename:
+        raise HTTPException(400, "Invalid filename")
+    path = _MUSIC_STRIPS_DIR / req.filename
+    if not path.exists():
+        raise HTTPException(404, "Strip not found")
+
+    img = _cv2.imread(str(path), _cv2.IMREAD_GRAYSCALE)
+    if img is None:
+        raise HTTPException(422, "Could not read strip image")
+
+    render_time = req.render_time or "4/4"
+    try:
+        b_str, bt_str = render_time.split("/", 1)
+        time_tuple = ("time", f"beats:{int(b_str)}", f"beat-type:{int(bt_str)}")
+    except (ValueError, AttributeError):
+        raise HTTPException(400, f"Bad render_time {render_time!r}; expected 'beats/beat-type' e.g. '3/4'")
+
+    injected = inject_header(img, req.key, time_tuple)
+    # inject_header returns the image unchanged when no template exists for this
+    # (key, time) combo; a width increase means a template was actually prepended.
+    header_injected = injected.shape[1] > img.shape[1]
+
+    preds, _, _ = recognize_music([injected], _checkpoint_path())
+    raw = preds[0] if preds else ""
+    fixed, _, _ = fix_sequence(raw, global_key=None, global_time=None, force_clef=True)
+    tokens = _strip_header_tokens(fixed)
+    return {"tokens": tokens, "header_injected": header_injected}
 
 
 @app.post("/api/music-labeler/save")

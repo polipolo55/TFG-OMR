@@ -335,6 +335,92 @@ async def music_labeler_save(req: MusicSaveRequest):
     raise HTTPException(404, "Filename not in labels.jsonl")
 
 
+# ---------------------------------------------------------------------------
+# Staff-reject calibration labeling endpoints (used by static/reject_labeler.html)
+#
+# Binary sort of detector-candidate strips into music / non_music for
+# `cli.py calibrate-reject` (CLAUDE.md hard constraint #7). Strips are harvested
+# by scripts/build_reject_label_set.py; exporting back to the calibration
+# layout is `build_reject_label_set.py export`.
+# ---------------------------------------------------------------------------
+
+_REJECT_LABELER_ROOT = _ROOT / "data" / "staff_reject_label"
+_REJECT_LABELS_PATH = _REJECT_LABELER_ROOT / "labels.jsonl"
+_REJECT_STRIPS_DIR = _REJECT_LABELER_ROOT / "strips"
+_REJECT_VALID_LABELS = ("music", "non_music")
+_reject_labels_lock = Lock()
+_reject_labels = _JsonlLabelStore(_REJECT_LABELS_PATH)
+
+
+class RejectSaveRequest(BaseModel):
+    filename: str
+    label: str | None = None  # "music" | "non_music" (required when status="done")
+    status: str  # "done" | "skip"
+
+
+@app.get("/reject-labeler")
+async def reject_labeler_page():
+    """Serve the music/non-music sorting UI for reject calibration."""
+    page = _STATIC / "reject_labeler.html"
+    if not page.exists():
+        raise HTTPException(404, "reject_labeler.html missing")
+    return FileResponse(page)
+
+
+@app.get("/api/reject-labeler/stats")
+async def reject_labeler_stats():
+    with _reject_labels_lock:
+        records = _reject_labels.load()
+    counts = {"music": 0, "non_music": 0, "skip": 0, "pending": 0, "total": len(records)}
+    for r in records:
+        if r.get("status") == "done":
+            lbl = r.get("label")
+            if lbl in _REJECT_VALID_LABELS:
+                counts[lbl] += 1
+        else:
+            s = r.get("status", "pending")
+            counts[s] = counts.get(s, 0) + 1
+    return counts
+
+
+@app.get("/api/reject-labeler/next")
+async def reject_labeler_next():
+    """Return the next pending strip, or 404 if none remain."""
+    with _reject_labels_lock:
+        records = _reject_labels.load()
+    for r in records:
+        if r.get("status") == "pending":
+            return r
+    raise HTTPException(404, "No pending strips")
+
+
+@app.get("/api/reject-labeler/strip/{filename}")
+async def reject_labeler_strip(filename: str):
+    if "/" in filename or ".." in filename:
+        raise HTTPException(400, "Invalid filename")
+    path = _REJECT_STRIPS_DIR / filename
+    if not path.exists():
+        raise HTTPException(404, "Strip not found")
+    return FileResponse(path, media_type="image/png")
+
+
+@app.post("/api/reject-labeler/save")
+async def reject_labeler_save(req: RejectSaveRequest):
+    if req.status not in ("done", "skip"):
+        raise HTTPException(400, "status must be 'done' or 'skip'")
+    if req.status == "done" and req.label not in _REJECT_VALID_LABELS:
+        raise HTTPException(400, "label must be 'music' or 'non_music' when status='done'")
+    with _reject_labels_lock:
+        records = _reject_labels.load()
+        for r in records:
+            if r["filename"] == req.filename:
+                r["label"] = req.label
+                r["status"] = req.status
+                _reject_labels.save(records)
+                return {"ok": True}
+    raise HTTPException(404, "Filename not in labels.jsonl")
+
+
 if __name__ == "__main__":
     import uvicorn
 

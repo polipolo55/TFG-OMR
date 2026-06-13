@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Staff-reject labeler</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", monospace;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px;
+      background: #f8f9fa;
+      color: #222;
+    }
+    h1 { margin: 0 0 4px 0; font-size: 22px; }
+    .sub { color: #666; font-size: 14px; margin-bottom: 16px; }
+    .sub code { background: #eaecef; padding: 1px 6px; border-radius: 3px; }
+
+    .progress {
+      background: #fff;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin-bottom: 14px;
+      font-size: 14px;
+      color: #555;
+    }
+    .progress .bar {
+      height: 6px;
+      background: #eaecef;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .progress .bar > div {
+      height: 100%;
+      background: #2da44e;
+      transition: width 0.2s;
+    }
+
+    .strip-card {
+      background: #fff;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+    .strip-card img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      background: #fafafa;
+      border: 1px solid #eaecef;
+      padding: 6px;
+      border-radius: 3px;
+    }
+    .strip-meta { font-size: 12px; color: #888; margin-top: 6px; }
+
+    button {
+      padding: 12px 18px;
+      font-size: 16px;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      background: #f6f8fa;
+      cursor: pointer;
+    }
+    button:hover { background: #eaecef; }
+    .btn-music { background: #2da44e; color: white; border-color: #2da44e; }
+    .btn-music:hover { background: #2c974b; }
+    .btn-non { background: #cf222e; color: white; border-color: #cf222e; }
+    .btn-non:hover { background: #a40e26; }
+    .btn-skip { background: #fff; color: #57606a; }
+
+    .button-row { display: flex; gap: 10px; margin-top: 12px; }
+    .keymap { color: #888; font-size: 12px; margin-top: 10px; }
+    .keymap kbd {
+      background: #eaecef;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: inherit;
+      font-size: 11px;
+    }
+    .done { text-align: center; padding: 60px; color: #2da44e; font-size: 24px; }
+  </style>
+</head>
+<body>
+  <h1>Staff-reject labeler</h1>
+  <div class="sub">
+    Sort each detector candidate strip:
+    <strong>Music</strong> = a real single staff the recognizer should accept;
+    <strong>Non-music</strong> = a false detection (text block, chord row, page
+    furniture, fragment) the reject gate should drop.
+    When done, run <code>build_reject_label_set.py export</code> then
+    <code>cli.py calibrate-reject</code>.
+  </div>
+
+  <div id="progress" class="progress">
+    Loading…
+    <div class="bar"><div id="progress-bar" style="width:0"></div></div>
+  </div>
+
+  <div id="strip" class="strip-card" style="display:none">
+    <img id="strip-img" src="" alt="candidate strip" />
+    <div class="strip-meta" id="filename"></div>
+  </div>
+
+  <div id="input-area" style="display:none">
+    <div class="button-row">
+      <button class="btn-music" onclick="save('music')">Music (m)</button>
+      <button class="btn-non" onclick="save('non_music')">Non-music (n)</button>
+      <button class="btn-skip" onclick="skip()">Skip (s)</button>
+    </div>
+    <div class="keymap">
+      <kbd>m</kbd> / <kbd>←</kbd> music ·
+      <kbd>n</kbd> / <kbd>→</kbd> non-music ·
+      <kbd>s</kbd> / <kbd>Esc</kbd> skip
+    </div>
+  </div>
+
+  <div id="done" class="done" style="display:none">
+    🎉 All candidate strips sorted or skipped.
+  </div>
+
+  <script>
+    let current = null;
+    let busy = false;
+
+    async function refreshStats() {
+      const r = await fetch('/api/reject-labeler/stats');
+      const s = await r.json();
+      const labeled = s.music + s.non_music;
+      const decided = labeled + s.skip;
+      const pct = s.total ? (100 * decided / s.total) : 0;
+      document.getElementById('progress').firstChild.textContent =
+        `${s.music} music · ${s.non_music} non-music · ${s.skip} skipped · ${s.pending} remaining · ${s.total} total`;
+      document.getElementById('progress-bar').style.width = pct.toFixed(1) + '%';
+    }
+
+    async function loadNext() {
+      const r = await fetch('/api/reject-labeler/next');
+      if (r.status === 404) {
+        current = null;
+        document.getElementById('strip').style.display = 'none';
+        document.getElementById('input-area').style.display = 'none';
+        document.getElementById('done').style.display = 'block';
+        await refreshStats();
+        return;
+      }
+      current = await r.json();
+      document.getElementById('strip').style.display = 'block';
+      document.getElementById('input-area').style.display = 'block';
+      document.getElementById('done').style.display = 'none';
+      document.getElementById('strip-img').src =
+        '/api/reject-labeler/strip/' + encodeURIComponent(current.filename);
+      document.getElementById('filename').textContent = current.filename;
+      await refreshStats();
+    }
+
+    async function save(label) {
+      if (!current || busy) return;
+      busy = true;
+      await fetch('/api/reject-labeler/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({filename: current.filename, label, status: 'done'}),
+      });
+      busy = false;
+      loadNext();
+    }
+
+    async function skip() {
+      if (!current || busy) return;
+      busy = true;
+      await fetch('/api/reject-labeler/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({filename: current.filename, label: null, status: 'skip'}),
+      });
+      busy = false;
+      loadNext();
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'm' || e.key === 'ArrowLeft') { e.preventDefault(); save('music'); }
+      else if (e.key === 'n' || e.key === 'ArrowRight') { e.preventDefault(); save('non_music'); }
+      else if (e.key === 's' || e.key === 'Escape') { e.preventDefault(); skip(); }
+    });
+
+    loadNext();
+  </script>
+</body>
+</html>

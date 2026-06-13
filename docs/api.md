@@ -184,6 +184,47 @@ Persist a label or skip decision.
 
 **Response:** `{"ok": true}`
 
+## Staff-Reject Calibration Labeling Endpoints
+
+These power `static/reject_labeler.html`, a binary sorter used to build the
+`calibrate-reject` fixture set (CLAUDE.md hard constraint #7 — the CTC
+mean-logprob gate must be recalibrated after every CRNN re-train). Candidate
+strips are harvested by `scripts/build_reject_label_set.py harvest`; data lives
+in `data/staff_reject_label/{strips/,labels.jsonl}`. After labeling, run
+`build_reject_label_set.py export` to copy strips into
+`data/staff_reject/{music,non_music}/`, then `cli.py calibrate-reject`.
+
+### `GET /reject-labeler`
+
+Serves `static/reject_labeler.html`.
+
+### `GET /api/reject-labeler/stats`
+
+Returns counts by class/status: `{"music", "non_music", "skip", "pending", "total"}`.
+
+### `GET /api/reject-labeler/next`
+
+Returns the next `pending` record, or `404` if none remain.
+
+```json
+{"filename": "full_realbook_p012_s003.png", "label": null, "status": "pending"}
+```
+
+### `GET /api/reject-labeler/strip/{filename}`
+
+Serves the candidate PNG from `data/staff_reject_label/strips/`. Rejects paths containing `/` or `..`.
+
+### `POST /api/reject-labeler/save`
+
+**Request body:**
+```json
+{"filename": "full_realbook_p012_s003.png", "label": "music", "status": "done"}
+```
+`status` must be `"done"` or `"skip"`. When `status == "done"`, `label` must be
+`"music"` or `"non_music"` (else `400`). `label` may be `null` when skipping.
+
+**Response:** `{"ok": true}`
+
 ## Integration Notes
 
 - The CRNN model is loaded once at startup (lazy, on first request) and cached.

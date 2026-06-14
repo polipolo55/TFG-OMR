@@ -18,9 +18,9 @@ derivades del conjunt PrIMuS i tornades a renderitzar amb una tipografia d'estil
 que no hi ha cap corpus etiquetat de partitures reals, una etapa d'augmentació de dades
 simula els defectes propis dels escaneigs (desenfocament, soroll, distorsió i il·luminació
 desigual) perquè el model aprengui a tolerar-los. Avaluat amb la \term{Taxa d'Error de
-Símbols} (SER), el model de melodia obté un 0{,}28\% sobre el conjunt de prova sintètic net
-i un 0{,}23\% sobre la versió que simula un escaneig; si no es compten els tokens de compàs
-i de lligadura, la SER melòdica baixa fins al 0{,}02\% i el 0{,}03\%, i el 92\% i el 94\%
+Símbols} (SER), el model de melodia obté un 1{,}17\% sobre el conjunt de prova sintètic net
+i un 1{,}23\% sobre la versió que simula un escaneig; si no es compten els tokens de compàs
+i de lligadura, la SER melòdica baixa fins al 0{,}10\% i el 0{,}14\%, i el 73{,}7\% i el 72{,}7\%
 dels pentagrames es transcriuen sense cap error.
 
 El procés complet encadena la detecció de pentagrames, el reconeixement de la melodia i
@@ -50,9 +50,9 @@ derivados del conjunto PrIMuS y vueltos a renderizar con una tipografía de esti
 no existe ningún corpus etiquetado de partituras reales, una etapa de aumento de datos simula
 los defectos propios de los escaneos (desenfoque, ruido, distorsión e iluminación desigual)
 para que el modelo aprenda a tolerarlos. Evaluado con la \term{Tasa de Error de Símbolos}
-(SER), el modelo de melodía obtiene un 0{,}28\% sobre el conjunto de prueba sintético limpio
-y un 0{,}23\% sobre la versión que simula un escaneo; si no se cuentan los tokens de compás y
-de ligadura, la SER melódica baja hasta el 0{,}02\% y el 0{,}03\%, y el 92\% y el 94\% de los
+(SER), el modelo de melodía obtiene un 1{,}17\% sobre el conjunto de prueba sintético limpio
+y un 1{,}23\% sobre la versión que simula un escaneo; si no se cuentan los tokens de compás y
+de ligadura, la SER melódica baja hasta el 0{,}10\% y el 0{,}14\%, y el 73{,}7\% y el 72{,}7\% de los
 pentagramas se transcriben sin ningún error.
 
 El proceso completo encadena la detección de pentagramas, el reconocimiento de la melodía y
@@ -81,9 +81,9 @@ printed above it. Both are trained on synthetic data derived from the PrIMuS dat
 re-rendered in a jazz engraving style. Since no labelled corpus of real lead sheets
 exists, an augmentation stage simulates the photographic artefacts of real scans, such
 as blur, noise, warping, and uneven lighting, so the model learns to read through them.
-Measured with the \term{Symbol Error Rate} (SER), the melody model reaches 0.28\% on the
-clean synthetic test set and 0.23\% on its scan-simulated version; once barline and tie
-tokens are set aside, the melodic SER falls to 0.02\% and 0.03\%, and 92\% and 94\% of
+Measured with the \term{Symbol Error Rate} (SER), the melody model reaches 1.17\% on the
+clean synthetic test set and 1.23\% on its scan-simulated version; once barline and tie
+tokens are set aside, the melodic SER falls to 0.10\% and 0.14\%, and 73.7\% and 72.7\% of
 staves come out without a single error.
 
 The full pipeline runs staff detection, melody recognition, chord recognition, and a

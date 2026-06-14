@@ -17,7 +17,7 @@ The rank-1 worst prediction is shown in \Cref{fig:qual-worst-1} of the
 body (\Cref{sec:res-qualitative}).
 \crefrange{fig:qual-worst-2}{fig:qual-worst-5} collect the next four
 samples (ranks 2--5) with the highest edit distance on the scanned test
-split (epoch-59 checkpoint, greedy decoding).
+split (epoch-83 checkpoint, greedy decoding).
 In every case the dominant failure mode is barline misplacement
 (missed or spurious \code{measure} tokens), consistent with the
 error budget of \Cref{sec:res-errors}; melodic content
@@ -118,7 +118,7 @@ the worst predictions.
 \begin{table}[htbp]
 \centering
 \caption{Edit-operation breakdown for the five worst-case predictions
-on the synthetic scanned test split (epoch-59 checkpoint, greedy
+on the synthetic scanned test split (epoch-83 checkpoint, greedy
 decoding, 4\,608 samples).
 S~=~substitutions, I~=~insertions, D~=~deletions.}
 \label{tab:qual-worst-edits}
@@ -146,7 +146,7 @@ S~=~substitutions, I~=~insertions, D~=~deletions.}
 The marginal distribution of the model's weights at convergence is a
 useful diagnostic when comparing trained checkpoints.
 \Cref{fig:weight-dist} shows the distributions of the four principal
-parameter groups of the epoch-59 checkpoint: the classifier (final
+parameter groups of the epoch-83 checkpoint: the classifier (final
 linear layer), the convolutional and batch-normalisation weights of
 the ResNet backbone, the LSTM weights, and the biases.
 
@@ -154,7 +154,7 @@ the ResNet backbone, the LSTM weights, and the biases.
     \centering
     \includegraphics[width=\textwidth]{figures/fig_weight_distributions}
     \caption{Marginal weight distributions of the four principal
-    parameter groups of the trained CRNN at epoch 59.
+    parameter groups of the trained CRNN at epoch 83.
     All four are close to centred Gaussian with standard deviations
     in the $[0.22, 0.35]$ range (the classifier layer is the widest);
     AdamW's \num{1e-4} weight decay keeps the magnitudes bounded, and

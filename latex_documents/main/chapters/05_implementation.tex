@@ -199,6 +199,16 @@ the model overfits the exact augmentations baked into
 The online cost is approximately \SI{50}{\micro\second} per sample,
 small enough to be absorbed by the data-loader's worker processes.
 
+To widen visual diversity further, the \code{augment} stage is run a
+second time with a different seed to produce two extra scan variants
+per sample (\code{scanned\_variant\_dirs}); during training each staff
+draws uniformly among its base scanned render and these variants, while
+validation and test always use the single base render.
+Because the variants are keyed by sample identifier and the train/test
+split is over identifiers, no variant can cross the split boundary.
+This is the train-only diversity mechanism; it replaces an earlier
+continuation-staff scheme and carries no inference-time cost.
+
 \subsection{Vocab: build the token index}
 
 The \code{vocab} subcommand scans every \code{.lmx} file in the

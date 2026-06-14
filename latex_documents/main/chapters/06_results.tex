@@ -28,7 +28,7 @@ front.\
 \label{sec:res-protocol}
 
 All numbers in this chapter are produced from a single trained
-checkpoint, \code{models/latest/best\_model.pt} (epoch 59), with the
+checkpoint, \code{models/latest/best\_model.pt} (epoch 83), with the
 hyperparameters listed in \Cref{tab:hyperparams-omr} (\Cref{app:hyperparams}).
 The procedure is reproducible with the one-line command shown at the
 end of this section.
@@ -43,8 +43,8 @@ musical content under two visual regimes.
 
 \paragraph{Hardware and software.}
 The hardware and software stack is described in \Cref{ch:impl}.
-On that single-GPU configuration, the full 60-epoch run takes
-approximately 6\,h of wall time ($\approx 6$\,min/epoch),
+On that single-GPU configuration, the full 90-epoch run takes
+approximately 13\,h of wall time ($\approx 8.6$\,min/epoch),
 measured from the training log of the selected checkpoint.
 
 \paragraph{Metrics.}
@@ -59,9 +59,9 @@ zero edits) follow the definitions in \Cref{sec:design-eval}.
 
 \paragraph{Repetitions.}
 Numbers reported here come from a single training run, since each run
-costs $\approx 6$\,h on the available hardware.
+costs $\approx 13$\,h on the available hardware.
 The training curve in \Cref{fig:training-curves} is smooth and the
-validation SER plateau is tight (within roughly $\pm 0.05$ percentage
+validation SER plateau is tight (within roughly $\pm 0.02$ percentage
 points over the last ten epochs), which suggests the point estimates
 below are dominated by the data distribution rather than by
 optimisation noise or the choice of a single seed.
@@ -84,8 +84,8 @@ held-out split and prints both the aggregate and the melodic SER.
 
 \Cref{fig:training-curves} shows the trajectory of the CTC loss on
 the train and validation splits and the corresponding validation SER
-over the 60 epochs of the training run; the validation SER kept
-improving up to epoch 59, so the run reached the 60-epoch cap
+over the 90 epochs of the training run; the best validation SER was
+reached at epoch 83 and the run continued to the 90-epoch cap
 without the patience-12 early stopping ever triggering.
 
 \begin{figure}[htbp]
@@ -99,21 +99,20 @@ without the patience-12 early stopping ever triggering.
     bounded overfit margin.
     \textbf{Right:} in-loop validation SER over the same epochs,
     computed once per epoch boundary by the training harness.
-    The curve drops sharply from $\approx \SI{8}{\percent}$ to below
-    \SI{2}{\percent} within seven epochs and converges to
-    $\approx \SI{1.0}{\percent}$ by the end of training.
-    The best checkpoint is marked at epoch 59.
-    Note: this in-loop SER is an approximate convergence indicator,
-    not the deposited metric; the standalone evaluator applied to the
-    saved checkpoint yields \SI{0.23}{\percent} on the scanned test
-    split (see \Cref{sec:res-ser}).}
+    The curve drops sharply from $\approx \SI{12}{\percent}$ to
+    $\approx \SI{2}{\percent}$ within seven epochs and converges to
+    $\approx \SI{1.2}{\percent}$ by the end of training.
+    The best checkpoint is marked at epoch 83.
+    This in-loop estimate is consistent with the standalone evaluator,
+    which yields \SI{1.23}{\percent} on the scanned test split
+    (see \Cref{sec:res-ser}).}
     \label{fig:training-curves}
 \end{figure}
 
 Validation SER converges much faster than the loss curve suggests: by
-epoch 7 it is already below \SI{2}{\percent}, and the remaining
+epoch 7 it is already at $\approx \SI{2}{\percent}$, and the remaining
 epochs of training produce a further reduction of only
-$\approx 0.6$ percentage points.
+$\approx 0.9$ percentage points.
 In these runs the model appears to learn most of the CTC alignment
 early, with late training refining a small fraction of difficult
 samples.
@@ -122,14 +121,13 @@ regularisation choices justified in \Cref{sec:design-model}; the
 trained weight distributions, reported as a sanity check in
 \Cref{app:weights}, show no sign of degenerate or dead components.
 
-The in-loop validation SER ($\approx\SI{1}{\percent}$ at convergence)
-is a noisy epoch-boundary estimate: it is computed while training
-workers are still active and online-augmentation state can bleed into
-validation batches, inflating the apparent error.
-Standalone re-evaluation of the same checkpoint with a clean,
-single-process evaluator gives \SI{0.23}{\percent} on the scanned
-split --- consistent with the test-set numbers in \Cref{sec:res-ser}
-and roughly four times lower than the in-loop figure.
+The in-loop validation SER ($\approx\SI{1.2}{\percent}$ at convergence)
+is an epoch-boundary estimate computed by the training harness on the
+validation split.
+Standalone re-evaluation of the same checkpoint with the single-process
+evaluator gives \SI{1.23}{\percent} on the scanned split, in close
+agreement with the in-loop figure and with the test-set numbers in
+\Cref{sec:res-ser}.
 The training curve is therefore read as a \emph{convergence trace};
 \Cref{tab:results-headline} has the authoritative numbers.
 
@@ -139,29 +137,26 @@ The training curve is therefore read as a \emph{convergence trace};
 
 Evaluation is performed on the 4\,608-sample held-out test split with
 greedy CTC decoding.
-Aggregate SER is \SI{0.23}{\percent} on the scanned variant and
-\SI{0.28}{\percent} on the clean variant; melodic SER is
-\SI{0.03}{\percent} and \SI{0.02}{\percent} respectively.
-The perfect-transcription rate is \SI{94.1}{\percent} on the scanned
-variant and \SI{92.1}{\percent} on the clean variant.
-The two variants are statistically indistinguishable: the scanned one
-is marginally ahead on aggregate SER (by \num{0.05} percentage points)
-and on perfect-transcription rate, and marginally behind on melodic SER
-(by \num{0.01} percentage points), all within the per-sample noise at
-this error scale.  The slight scanned-side advantage on aggregate SER
-most plausibly reflects the online jitter applied throughout training
-(\Cref{sec:impl-data}): the model is always optimised on lightly
-perturbed inputs, so the scan-simulated test distribution sits
-marginally closer to its training distribution than the pristine clean
-renders do.  Either way the augmentation
-pipeline meets its acceptance criterion of keeping the clean-to-scanned
-gap below one percentage point (\Cref{sec:design-domain}).
+Aggregate SER is \SI{1.23}{\percent} on the scanned variant and
+\SI{1.17}{\percent} on the clean variant; melodic SER is
+\SI{0.14}{\percent} and \SI{0.10}{\percent} respectively.
+The perfect-transcription rate is \SI{72.7}{\percent} on the scanned
+variant and \SI{73.7}{\percent} on the clean variant.
+The two variants are very close: the clean one is marginally ahead on
+aggregate SER (by \num{0.06} percentage points) and on
+perfect-transcription rate, as expected, since the scan-simulated
+inputs add visual distortion the clean renders do not carry.  The gap
+is small because the model is trained throughout on scan-augmented
+inputs (\Cref{sec:impl-data}), so the two test distributions sit close
+together.  The augmentation pipeline meets its acceptance criterion of
+keeping the clean-to-scanned gap below one percentage point
+(\Cref{sec:design-domain}).
 \Cref{tab:results-headline} consolidates these headline numbers, which
 the rest of the chapter decomposes.
 
 \begin{table}[ht]
     \centering
-    \caption{Headline test-set results on the epoch-59 checkpoint
+    \caption{Headline test-set results on the epoch-83 checkpoint
     (\code{models/latest/best\_model.pt}), greedy CTC decoding,
     4\,608 held-out samples per visual variant.  Reproduced with
     \code{scripts/evaluate\_full.py --both-splits}.}
@@ -173,10 +168,10 @@ the rest of the chapter decomposes.
         \toprule
         \textbf{Metric} & {\textbf{Scanned}} & {\textbf{Clean}} \\
         \midrule
-        Aggregate SER (\%)               & 0.23 & 0.28 \\
-        Melodic SER (\%)                 & 0.03 & 0.02 \\
-        Perfect transcriptions (\%)      & 94.1 & 92.1 \\
-        Samples with SER $\le 0.05$ (\%) & 98.5 & 98.4 \\
+        Aggregate SER (\%)               & 1.23 & 1.17 \\
+        Melodic SER (\%)                 & 0.14 & 0.10 \\
+        Perfect transcriptions (\%)      & 72.7 & 73.7 \\
+        Samples with SER $\le 0.05$ (\%) & 90.3 & 90.7 \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -188,21 +183,21 @@ the rest of the chapter decomposes.
     overlaid with its empirical cumulative distribution function (CDF).
     The count axis is logarithmic, so that both the dominant spike at
     zero and the sparse high-error tail are legible on the same plot.
-    The aggregate SER of \num{0.0023} is dominated by a long but
-    thin right tail of high-error samples --- only \num{274} of the
-    \num{4608} samples carry any error at all --- while the bulk of the
-    distribution sits at zero.
-    Approximately \SI{94}{\percent} of test samples are transcribed
-    with zero edits and \SI{98.5}{\percent} fall below SER \num{0.05}.}
+    The aggregate SER of \num{0.0123} is dominated by a long
+    right tail of high-error samples --- \num{1260} of the
+    \num{4608} samples carry some error --- while the bulk of the
+    distribution still sits at zero.
+    Approximately \SI{72.7}{\percent} of test samples are transcribed
+    with zero edits and \SI{90.3}{\percent} fall below SER \num{0.05}.}
     \label{fig:ser-distribution}
 \end{figure}
 
 \Cref{fig:ser-distribution} shows the per-sample SER distribution on
 the scanned variant.
 The modal outcome is a perfect transcription
-($\approx \SI{94.1}{\percent}$ of samples have SER \num{0}), and the
-empirical CDF exceeds \num{0.95} by SER \num{0.05}.
-The distribution is bimodal, a tall spike at zero plus a thin right
+($\approx \SI{72.7}{\percent}$ of samples have SER \num{0}), and the
+empirical CDF exceeds \num{0.90} by SER \num{0.05}.
+The distribution is bimodal, a tall spike at zero plus a longer right
 tail: in these experiments the model tends either to read a sample
 correctly or to fail on a specific localised pattern.
 The samples in the right tail are analysed in
@@ -212,20 +207,19 @@ A complementary melodic SER is computed on the same edit distance
 after stripping the \code{measure} and the two tie tokens
 (see \Cref{tab:results-headline}).
 The checkpoint sits roughly an order of magnitude lower on this
-metric than on the aggregate SER for both visual variants, and the
-melodic perfect-transcription rate rises to \SI{99.0}{\percent} on the
-scanned variant.
+metric than on the aggregate SER for both visual variants
+(\SI{0.14}{\percent} scanned, \SI{0.10}{\percent} clean), so the bulk
+of the residual error is structural rather than melodic.
 The error decomposition in \Cref{sec:res-errors} explains why.
 
 \paragraph{Beam search.}
-A beam-search ablation was carried out with widths
-$\{1, 5, 10\}$ on the same checkpoint, reproducible with
+A beam-search ablation with widths $\{1, 5, 10\}$ is reproducible with
 \code{poetry run python src/cli.py evaluate-ab --beams 1,5,10}.
-Beam width 5 reduces the edit count from \num{667} to \num{659}
-(8 fewer edits over \num{285958} reference tokens, or
-$\approx\num{0.003}$ percentage points of SER) at
-$\approx 8.4\times$ the wall-clock decode time; width 10
-does not improve further.
+In earlier testing, beam search reduced the edit count by well under
+\num{0.01} percentage points of SER at roughly $8\times$ the
+wall-clock decode time, with width 10 offering no improvement over
+width 5 --- consistent with the near-deterministic posteriors of a
+monophonic CTC model.
 Greedy decoding is therefore the default used for every number in
 this chapter, and beam search is retained as an opt-in flag at
 inference time, consistent with the model documentation in
@@ -289,61 +283,64 @@ Levenshtein operations: \term{deletions}, \term{insertions} and
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.92\textwidth]{figures/fig_error_pie}
-    \caption{Distribution of the \num{667} edit operations over the
+    \caption{Distribution of the \num{3506} edit operations over the
     scanned test split, as a share of the total.
-    Deletions and insertions together account for \SI{97}{\percent} of
-    the edit budget; substitutions are a small minority.
+    Deletions and insertions together account for $\approx\SI{97}{\percent}$
+    of the edit budget; substitutions are a small minority.
     This imbalance is characteristic of structural-token errors
     (missed or spurious barlines), not of incorrect symbol
     recognition.}
     \label{fig:edit-dist}
 \end{figure}
 
-Substitutions are the rarest error type at \SI{3.0}{\percent} of the
-\num{667} total edits, which matters because substitutions are the
+Substitutions are the rarest error type at \SI{3.4}{\percent} of the
+\num{3506} total edits, which matters because substitutions are the
 errors that affect musical \textit{content}.
-Insertions (\SI{36.0}{\percent}) and deletions (\SI{61.0}{\percent})
+Insertions (\SI{38.8}{\percent}) and deletions (\SI{57.8}{\percent})
 dominate; as the next subsection shows, the majority of those concern
 the \code{measure} token.
 
 \subsection{Per-token breakdown}
 
 The breakdown is unambiguous: \code{measure} dominates both deletions
-(\num{302} occurrences, an order of magnitude above the next-most-deleted
-token) and insertions (\num{185}).
+(\num{1562} occurrences, an order of magnitude above the
+next-most-deleted token) and insertions (\num{1128}).
 Tie tokens (\code{tied:start} and \code{tied:stop}) follow in second
-place for both categories, contributing \num{63} deletions and \num{39}
+place for both categories, contributing \num{291} deletions and \num{148}
 insertions in total.
 Together, the \code{measure} and tie tokens account for approximately
-\SI{88}{\percent} of the total edit budget.
+\SI{90}{\percent} of the total edit budget.
 Pitch and octave tokens are essentially absent from the deletion and
 insertion lists; they surface only among the substitutions
-(\Cref{tab:top-subs}), at frequencies in the single digits per token
+(\Cref{tab:top-subs}), at low frequencies per token
 over thousands of test samples.
 
 These numbers are consistent with the design rationale in
 \Cref{sec:design-grammar}.
-The substitutions that do occur are sparse (\num{20} in total) and
-spread across duration confusions between visually similar values
+The substitutions that do occur (\num{119} in total) are spread across
+duration confusions between visually similar values
 ($\rm{eighth} \leftrightarrow 16^{\rm th}$,
-$\rm{half} \leftrightarrow \rm{quarter}$), a few pitch confusions
-(e.g.\ $\rm{pitch:A} \to \rm{pitch:B}$), and occasional octave
-(e.g.\ $\rm{octave:4} \to \rm{octave:5}$) or accidental slips, none
-occurring more than twice over the full test split.
+$\rm{eighth} \leftrightarrow \rm{quarter}$), pitch confusions between
+neighbouring letters (e.g.\ $\rm{pitch:B} \to \rm{pitch:G}$,
+$\rm{pitch:A} \to \rm{pitch:B}$), and occasional octave
+(e.g.\ $\rm{octave:6} \to \rm{octave:5}$) or accidental slips.
+A handful of substitutions are themselves structural --- an accidental
+or barline read as the other (e.g.\ $\rm{flat} \to \code{measure}$) ---
+rather than melodic.
 The residual error budget is therefore structural and rhythmic, not
 melodic.
 
 \Cref{tab:top-subs} lists the most frequent substitution pairs on the
-scanned test split.  No pair occurs more than twice, confirming that
-content-level confusions are both rare and unsystematic: the three
-joint-most-frequent substitutions span a duration pair, a pitch pair,
-and a tie pair, with no single failure mode standing out.
+scanned test split.  The leading pair (a pitch confusion) occurs eight
+times and the rest tail off quickly, confirming that no single
+content-level confusion dominates the budget.
 
 \begin{table}[ht]
     \centering
     \caption{Top-5 substitution pairs (reference\,$\to$\,prediction)
-    by count on the scanned test split.  The three leading pairs are
-    tied at two occurrences each.}
+    by count on the scanned test split.  The leading pair is a pitch
+    confusion; two of the five are structural (an accidental or barline
+    read as the other).}
     \label{tab:top-subs}
     \small
     \setlength{\tabcolsep}{8pt}
@@ -352,11 +349,11 @@ and a tie pair, with no single failure mode standing out.
         \toprule
         \textbf{Reference} & \textbf{Prediction} & \textbf{Count} \\
         \midrule
-        \code{pitch:A}    & \code{pitch:B}    & 2 \\
-        \code{eighth}     & \code{16th}       & 2 \\
-        \code{tied:start} & \code{tied:stop}  & 2 \\
-        \code{pitch:B}    & \code{pitch:G}    & 1 \\
-        \code{natural}    & \code{flat}       & 1 \\
+        \code{pitch:B}    & \code{pitch:G}    & 8 \\
+        \code{flat}       & \code{measure}    & 6 \\
+        \code{measure}    & \code{tied:stop}  & 6 \\
+        \code{16th}       & \code{eighth}     & 5 \\
+        \code{natural}    & \code{sharp}      & 5 \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -408,7 +405,7 @@ Three such ablations were scoped: backbone family
 continuation staves (\Cref{sec:impl-inference}).
 The first two are reported below with results.
 The last requires a full re-training run
-($\approx 6$\,h on the RTX~3060) that was not completed within the
+($\approx 13$\,h on the RTX~3060) that was not completed within the
 project timeline; it is left as a planned experiment whose expected
 outcome follows from the design arguments in \Cref{ch:design}.
 
@@ -429,25 +426,24 @@ consistent with the argument in \Cref{sec:design-model-alts}.
 The scan-augmentation ablation re-trains the same architecture with
 \code{use\_scanned=False} (clean LilyJAZZ renders only, no scan
 simulation) and evaluates on both held-out test variants.
-On the clean split the no-augmentation checkpoint reaches an aggregate
-SER of \SI{0.21}{\percent} --- virtually identical to the
-\SI{0.28}{\percent} baseline --- confirming that clean renders are
-well within the model's capacity with or without augmentation.
-On the scanned split the picture reverses sharply: SER rises to
-\SI{4.2}{\percent}, an approximately 18-fold increase relative to the
-\SI{0.23}{\percent} augmented baseline.
-The clean-to-scanned gap widens from \num{0.05} percentage points
-(augmented) to \num{4.0} percentage points (no augmentation).
+In an earlier configuration this ablation showed the expected pattern:
+a no-augmentation checkpoint stayed competitive on the clean split but
+its scanned-split SER rose by roughly an order of magnitude, the
+clean-to-scanned gap widening from a fraction of a percentage point to
+several points.
 The scan-simulation pipeline is therefore not a regulariser on clean
 data but a prerequisite for robustness to the visual distribution
 shift the system faces at real-scan inference, directly supporting the
 design choice justified in \Cref{sec:design-data}.
+\todo{Re-run the no-augmentation ablation against the epoch-83 baseline and report the matched clean/scanned SER pair.}
 
 \todo{Virtual header injection ablation: evaluate with/without header prepending on real continuation staves.}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Qualitative Examples}
 \label{sec:res-qualitative}
+
+\todo{fig\_qual\_perfect and fig\_qual\_median are illustrative hand-picked examples with no generator script; visually re-confirm them against the epoch-83 model (the median caption quotes a specific edit distance of 2 / SER 0.038). The worst-case figures, fig\_qual\_worst\_1, and the quantitative figures were regenerated against epoch 83.}
 
 This section shows representative predictions drawn from the perfect
 (\Cref{fig:qual-perfect}) and near-median (\Cref{fig:qual-median})
@@ -567,8 +563,9 @@ CRNN-CTC baseline on PrIMuS, which established the CTC-on-staff
 formulation as a credible approach to end-to-end staff-line
 recognition~\cite{calvoZaragozaEndToEndNeural2018,calvoZaragozaCameraPrimus2018}.
 The model here uses the same family of architectures and a derived
-PrIMuS corpus, and achieves sub-percent SER on a comparable synthetic
-split; the contribution is not a better number on PrIMuS but
+PrIMuS corpus, and achieves an aggregate SER of $\approx\SI{1.2}{\percent}$
+on a comparable synthetic split, of the same order as that baseline;
+the contribution is not a better number on PrIMuS but
 the addition of the LilyJAZZ render, the scan-simulation
 augmentation pipeline (\Cref{sec:design-data}) and the deterministic
 grammar fixer (\Cref{sec:design-grammar}), all aimed at the Real Book
@@ -595,10 +592,11 @@ different corpus and, in several cases, reports a different primary
 metric, so the error column is not a like-for-like ranking.
 The one column that does compare directly is voicing and compute
 envelope, where the contrast the project was scoped around is clear ---
-the present system reaches sub-percent SER on its monophonic target
-within a single-GPU, roughly six-hour training budget, whereas the
-transformer systems that report lower error on broader corpora do so at
-a training and inference cost an order of magnitude larger.
+the present system reaches $\approx\SI{1.2}{\percent}$ SER on its
+monophonic target within a single-GPU, roughly half-day training
+budget, whereas the transformer systems that report lower error on
+broader corpora do so at a training and inference cost an order of
+magnitude larger.
 
 \begin{table}[ht]
     \centering
@@ -641,8 +639,8 @@ a training and inference cost an order of magnitude larger.
         \textbf{This work}
             & LilyJAZZ-rendered PrIMuS, Real Book style (monophonic)
             & Mono
-            & SER \SI{0.23}{\percent} scanned / \SI{0.28}{\percent} clean
-            & $\approx$\,6\,h on one RTX~3060; \SI{114}{\milli\second}/page \\
+            & SER \SI{1.23}{\percent} scanned / \SI{1.17}{\percent} clean
+            & $\approx$\,13\,h on one RTX~3060; \SI{114}{\milli\second}/page \\
         \bottomrule
     \end{tabularx}
 \end{table}
@@ -895,12 +893,12 @@ domain-gap experiment at the head of this section.
 \label{sec:res-summary}
 
 The synthetic-data baseline trained from scratch reaches the headline
-figures of \Cref{tab:results-headline}: aggregate SER around
-\SIrange{0.2}{0.3}{\percent} on both the clean and the scan-augmented test
+figures of \Cref{tab:results-headline}: aggregate SER of
+$\approx\SI{1.2}{\percent}$ on both the clean and the scan-augmented test
 splits, melodic SER an order of magnitude lower, and a
-perfect-transcription rate above \SI{90}{\percent}.
+perfect-transcription rate of $\approx\SI{73}{\percent}$.
 The residual error budget is concentrated in the \code{measure} and
-tie tokens, which together account for $\approx \SI{88}{\percent}$ of
+tie tokens, which together account for $\approx \SI{90}{\percent}$ of
 all edits, while pitch and octave errors are negligible.
 Combined with the deterministic grammar fixer that reconstructs
 barline boundaries from the time signature, these results place the

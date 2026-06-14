@@ -21,9 +21,12 @@ Weight decay                    & \num{1e-4} \\
 LR schedule                     & OneCycleLR (cosine) \\
 Warm-up fraction                & 0.08 of total steps \\
 Annealing end LR                & peak / \num{1e4} \\
-Maximum epochs                  & 60 \\
+Maximum epochs                  & 90 \\
 Early-stopping patience         & 12 (epochs on val SER plateau) \\
 Train batch size                & 16 \\
+Online augmentation prob.\ (\texttt{online\_aug\_prob}) & 0.5 (training only) \\
+Scan-variant sampling (\texttt{scanned\_variant\_dirs}) & enabled (train-only; 2 extra variants/sample) \\
+Rare-token oversampling (\texttt{rare\_lmx\_oversample}) & 1 (disabled by default; opt-in for ties) \\
 Validation batch size           & 16 \\
 Gradient clipping (max norm)    & 5.0 \\
 Mixed precision (AMP)           & enabled on CUDA devices \\
@@ -182,7 +185,7 @@ Real-to-synthetic sampling weight & N/A                 & real 1.0 / synth 0.4 \
 \midrule
 PDF rasterisation DPI (\texttt{OMR\_PDF\_DPI})   & 300, clamped to $[72, 600]$ \\
 CTC decoder                                      & greedy (argmax then collapse-and-strip-blanks) \\
-Beam-search width (\texttt{OMR\_BEAM\_WIDTH})    & 1 (greedy). Width~5 saves 8 edits over 285\,958 tokens (${\approx}0.003$ pp SER) at ${\approx}8.4\times$ decode cost; width~10 does not improve further (\Cref{sec:res-ser}). \\
+Beam-search width (\texttt{OMR\_BEAM\_WIDTH})    & 1 (greedy). Beam search yields a negligible SER change (well under \num{0.01} pp) at ${\approx}8\times$ decode cost, with width~10 no better than width~5 (\Cref{sec:res-ser}). \\
 Multi-page handling                              & only page 0 of multi-page PDFs is processed \\
 Tiling mode (\texttt{OMR\_ENABLE\_TILING})       & disabled (legacy mode) \\
 Chord checkpoint (\texttt{OMR\_CHORD\_CHECKPOINT}) & \texttt{models/chord/latest/best\_model.pt} \\

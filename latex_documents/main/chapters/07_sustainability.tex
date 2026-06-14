@@ -117,19 +117,19 @@ The workstation pairs an NVIDIA RTX~3060 GPU (\SI{170}{\watt} TDP)
 with a desktop platform whose full-system draw under training load
 is approximately \SI{250}{\watt}.
 Cumulative GPU-engaged time totals approximately
-\SI{230}{\hour}: a single 60-epoch CRNN training takes about
-\SI{6}{\hour}, and the figure aggregates the many re-trainings,
+\SI{250}{\hour}: a single 90-epoch CRNN training takes about
+\SI{13}{\hour}, and the figure aggregates the many re-trainings,
 ablation runs, and chord-OCR fine-tuning carried out over the project,
 with smaller contributions from synthetic-data rendering and
 evaluation passes.
 The energy estimate follows directly:
-$\SI{230}{\hour} \times \SI{0.25}{\kilo\watt} \approx
-\SI{57.5}{\kilo\watt\hour}$~\cite{strubellEnergyPolicyConsiderations2019,pattersonCarbonConsiderationsDeep2021,lacosteQuantifyingCarbonEmissions2019}.
+$\SI{250}{\hour} \times \SI{0.25}{\kilo\watt} \approx
+\SI{62.5}{\kilo\watt\hour}$~\cite{strubellEnergyPolicyConsiderations2019,pattersonCarbonConsiderationsDeep2021,lacosteQuantifyingCarbonEmissions2019}.
 Applying the Spanish electricity emission factor of approximately
 \SI{0.23}{\kilo\gram\per\kilo\watt\hour} of CO\textsubscript{2}
 reported by Red El\'ectrica de Espa\~na and
 MITECO~\cite{reeInformeSistemaElectrico2024,mitecoFactorEmision2025}
-yields roughly \SI{13.2}{\kilo\gram} of CO\textsubscript{2}e
+yields roughly \SI{14.4}{\kilo\gram} of CO\textsubscript{2}e
 emitted during the project's execution.
 
 The dominant contributor to the total is GPU training time.
@@ -152,9 +152,9 @@ use and per-step time, which translates into fewer GPU-hours per
 converged model.
 Early stopping with a twelve-epoch patience halts training once the
 validation SER stops improving, avoiding the common habit of running
-well past convergence ``to be safe'' (on the final run the SER kept
-improving slowly to the end, so the run reached the 60-epoch cap
-without the patience triggering).
+well past convergence ``to be safe'' (on the final run the best SER
+was reached near the end, at epoch 83 of 90, so the run reached the
+cap without the patience triggering).
 Finally, the project reuses existing hardware rather than provisioning
 new equipment, whose embodied manufacturing energy would dwarf the
 project's operational energy by an order of magnitude.
@@ -358,11 +358,11 @@ discovering its limitations through failure in production.
 Revisiting the sustainability assessment at the end of the project,
 two updates are worth recording.
 
-First, the \textbf{environmental} estimate of $\approx 57.5$\,kWh
-made at the planning stage is consistent with the executed
-training profile: the best checkpoint was reached at epoch
-\num{59} of a 60-epoch run (\Cref{sec:res-training}) and the full
-training run including ablations fits within the planned envelope.
+First, the \textbf{environmental} estimate of $\approx 62.5$\,kWh
+is consistent with the executed training profile: the best checkpoint
+was reached at epoch \num{83} of a 90-epoch run (\Cref{sec:res-training})
+and the full training run including ablations fits within the planned
+envelope.
 Mixed-precision training was the single most effective mitigation:
 it reduced VRAM usage enough that the entire pipeline runs on a
 consumer GPU, avoiding the cloud-rental scenario reserved as the

@@ -43,8 +43,8 @@ a pointer to the evidence.
           with the protocol of \Cref{sec:design-training}, and
           evaluated against the acceptance criteria of
           \Cref{sec:design-domain}; the headline numbers reach
-          \SI{0.28}{\percent} aggregate SER on the clean test split and
-          \SI{0.23}{\percent} on the scanned split
+          \SI{1.17}{\percent} aggregate SER on the clean test split and
+          \SI{1.23}{\percent} on the scanned split
           (\Cref{tab:results-headline}), well below the
           \SI{2}{\percent} and \SI{3}{\percent} targets set in advance.
     \item \textbf{O5 — Quantitative error analysis.}
@@ -79,37 +79,36 @@ a pointer to the evidence.
 \label{sec:conc-results}
 
 The headline figures from \Cref{ch:results} are restated here for
-reference. All numbers refer to the epoch-59 checkpoint at
+reference. All numbers refer to the epoch-83 checkpoint at
 \code{models/latest/best\_model.pt}, evaluated on 4\,608 held-out
 samples per split with greedy CTC decoding.
 
 \begin{itemize}
-    \item \textbf{Aggregate SER:} \SI{0.28}{\percent} (clean) and
-          \SI{0.23}{\percent} (scanned).
-          The two splits differ by \num{0.05} percentage points,
+    \item \textbf{Aggregate SER:} \SI{1.17}{\percent} (clean) and
+          \SI{1.23}{\percent} (scanned).
+          The two splits differ by \num{0.06} percentage points,
           well inside the one-percentage-point margin set as the
           augmentation acceptance criterion in
           \Cref{sec:design-domain}.
-    \item \textbf{Melodic SER:} \SI{0.02}{\percent} (clean) and
-          \SI{0.03}{\percent} (scanned), measured after stripping
+    \item \textbf{Melodic SER:} \SI{0.10}{\percent} (clean) and
+          \SI{0.14}{\percent} (scanned), measured after stripping
           \code{measure} and tie tokens; the model gets the actual
           pitch, duration, and accidental content right on more than
           \SI{99}{\percent} of tokens.
-    \item \textbf{Perfect-transcription rate:} \SI{92.1}{\percent}
-          (clean) and \SI{94.1}{\percent} (scanned); more than nine
+    \item \textbf{Perfect-transcription rate:} \SI{73.7}{\percent}
+          (clean) and \SI{72.7}{\percent} (scanned); roughly seven
           in ten input staves are transcribed token-identically to the
           ground truth (\Cref{sec:res-ser}).
-    \item \textbf{Error composition:} approximately \SI{73}{\percent}
-          of edits are \code{measure} tokens and \SI{15}{\percent} are
+    \item \textbf{Error composition:} approximately \SI{77}{\percent}
+          of edits are \code{measure} tokens and \SI{13}{\percent} are
           ties; together these two structural classes account for
-          about \SI{88}{\percent} of the residual SER, while
+          about \SI{90}{\percent} of the residual SER, while
           per-category pitch, octave, and duration error rates each
-          remain below \SI{0.05}{\percent} (\Cref{sec:res-errors}).
-    \item \textbf{Beam-vs-greedy decoding:} beam search at width 5
-          reduces the edit count by 8 over \num{285958} tokens
-          ($\approx\num{0.003}$ pp of SER) at $\approx 8.4\times$ the
-          decode cost; greedy decoding is therefore the deployed default
-          (\Cref{sec:impl-inference}).
+          remain below \SI{0.1}{\percent} (\Cref{sec:res-errors}).
+    \item \textbf{Beam-vs-greedy decoding:} beam search yields a
+          negligible SER change (well under \num{0.01} pp) at roughly
+          $8\times$ the decode cost; greedy decoding is therefore the
+          deployed default (\Cref{sec:impl-inference}).
     \item \textbf{Chord OCR:} after fine-tuning on \num{262} real
           chord strips, the chord model reaches \SI{5.9}{\percent} CER
           and a \SI{58.6}{\percent} exact-match rate on the held-out
@@ -330,9 +329,9 @@ and VRAM headroom.
 The implementation chapter contributes further evidence. The
 asymmetric-stride ResNet18 that preserves the CTC time axis at a
 \(4\times\) compression ratio is described in \Cref{sec:impl-model}.
-The beam-versus-greedy decoding trade-off, where width-5 beam search
-saves 8 edits over \num{285958} tokens at $\approx 8.4\times$ the
-decode cost, is measured in \Cref{ch:results} and restated in
+The beam-versus-greedy decoding trade-off, where beam search buys a
+negligible SER change at roughly $8\times$ the decode cost, is
+discussed in \Cref{ch:results} and restated in
 \Cref{sec:conc-results}. The use of \code{multiprocessing} for the
 CPU-bound data stages is set out in \Cref{sec:impl-data}, and the
 choice of a deterministic stateful grammar walker over a constrained

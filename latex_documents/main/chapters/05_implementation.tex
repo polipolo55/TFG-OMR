@@ -891,7 +891,7 @@ guaranteed even with the above settings.
 
 \paragraph{Checkpoint contents.}
 Each saved checkpoint is a PyTorch dictionary with keys
-\code{model\_state\_dict}, \code{optimizer\_state\_dict},
+\code{model\_state\_dict}, \code{optimiser\_state\_dict},
 \code{epoch}, \code{val\_ser}, and \code{config}.  The optimiser
 state is preserved so that \code{--resume} restores the AdamW
 moments and the OneCycleLR schedule from the last completed epoch.

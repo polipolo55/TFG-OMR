@@ -15,7 +15,7 @@ This appendix collects the exact hyperparameters, architectural sizes, augmentat
 \toprule
 \textbf{Hyperparameter} & \textbf{Value} \\
 \midrule
-Optimizer                       & AdamW \\
+Optimiser                      & AdamW \\
 Peak learning rate              & \num{1e-3} \\
 Weight decay                    & \num{1e-4} \\
 LR schedule                     & OneCycleLR (cosine) \\
@@ -146,7 +146,7 @@ The chord-symbol recognition stage uses a separate, smaller CRNN trained on synt
 \toprule
 \textbf{Hyperparameter} & \textbf{From scratch} & \textbf{Fine-tune} \\
 \midrule
-Optimizer                         & AdamW               & AdamW \\
+Optimiser                        & AdamW               & AdamW \\
 Peak learning rate                & \num{1e-3}          & \num{2e-4} \\
 Weight decay                      & \num{1e-4}          & \num{1e-4} \\
 LR schedule                       & OneCycleLR (cosine) & OneCycleLR (cosine) \\
@@ -228,7 +228,7 @@ environment is reproducible across machines with \code{poetry install}.
 Deep learning            & PyTorch $\geq 2.10$~\cite{paszkeImperativeStyleHighPerformance2019} & Model, loss, optimiser, mixed-precision training. \\ \tfgrowsep
 CNN backbone             & \code{torchvision} $\geq 0.25$~\cite{torchvision2016} & ResNet18 module definition. \\ \tfgrowsep
 Image processing         & OpenCV $\geq 4.13$~\cite{bradskiOpenCVLibrary2000} & Binarisation, deskewing, morphological staff detection. \\ \tfgrowsep
-PDF rasterisation        & PyMuPDF (\code{fitz}) $\geq 1.27$~\cite{artifexPyMuPDF} & Render PDF pages to grayscale arrays at configurable DPI. \\ \tfgrowsep
+PDF rasterisation        & PyMuPDF (\code{fitz}) $\geq 1.27$~\cite{artifexPyMuPDF} & Render PDF pages to greyscale arrays at configurable DPI. \\ \tfgrowsep
 Music rendering          & LilyPond $\geq 2.25$ + LilyJAZZ~\cite{nienhuysLilyPondSystem2003,hammerleOpenLilyPondFontsLilyJAZZ} & Generate training PNGs from PrIMuS semantic files. \\ \tfgrowsep
 Data augmentation        & \code{albumentations} $\geq 2.0$\,\cite{AlbumentationsFastFlexible} & Scan-simulation transform pipeline. \\ \tfgrowsep
 Numerics                 & NumPy $\geq 2.4$~\cite{harrisArrayProgramming2020} & Tensor / array interop. \\ \tfgrowsep

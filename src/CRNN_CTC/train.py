@@ -178,6 +178,24 @@ def train(
     n_params = sum(p.numel() for p in model.parameters())
     log.info("Model parameters: %s", f"{n_params:,}")
 
+    # ── Warm-start fine-tuning (load weights only, fresh optimiser/schedule) ──
+    if init_weights is not None:
+        iw_path = Path(init_weights)
+        if not iw_path.exists():
+            raise FileNotFoundError(f"init-weights checkpoint not found: {iw_path}")
+        iw_ckpt = torch.load(iw_path, map_location=device, weights_only=False)
+        missing, unexpected = model.load_state_dict(iw_ckpt["model_state_dict"], strict=False)
+        if missing or unexpected:
+            log.warning(
+                "Warm-start: %d missing / %d unexpected keys (vocab or backbone changed?)",
+                len(missing), len(unexpected),
+            )
+        log.info(
+            "Warm-start from %s (epoch %s, val_SER %.4f) → fresh OneCycle at lr=%.1e for %d epochs",
+            iw_path, iw_ckpt.get("epoch", "?"), iw_ckpt.get("val_ser", float("nan")),
+            cfg.lr, cfg.epochs,
+        )
+
     # ── Optimiser & scheduler ──────────────────────────────────────────────
     criterion = nn.CTCLoss(blank=vocab.blank_idx, zero_infinity=True)
     try:

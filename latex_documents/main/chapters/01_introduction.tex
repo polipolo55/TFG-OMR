@@ -3,8 +3,8 @@
 
 Music notation is a dense, two-dimensional graphical system that encodes pitch, rhythm,
 dynamics, and phrasing precisely enough for performers to reproduce a composer's
-intentions from a printed page. Yet most notated music exists today only as paper or
-low-resolution scanned image, inaccessible to the computational tools that drive music
+intentions from a printed page. Yet most notated music exists today only on paper or as
+low-resolution scanned images, inaccessible to the computational tools that drive music
 education, \term{Music Information Retrieval (MIR)}, computational musicology, and digital
 archiving. \term{Optical Music Recognition} (OMR) closes this gap: it translates
 images of musical scores into structured, machine-readable representations, much as
@@ -27,10 +27,10 @@ pipeline, and error analysis of the following chapters assume that material.
 \section{Motivation}
 \label{sec:motivation}
 
-\subsection{The Digitization Gap in Music}
+\subsection{The Digitisation Gap in Music}
 
 Music archives, educational institutions, and individual musicians hold large quantities
-of repertoire that exists only in paper or low-resolution scans. These collections cannot
+of repertoire that exists only on paper or low-resolution scans. These collections cannot
 be searched, transposed, played back, or analysed quantitatively without manual
 transcription into notation software, a slow process that demands specialist
 training and is repeatedly identified as a principal cost driver in corpus-level
@@ -53,8 +53,8 @@ Notated music exists in many formats, from full orchestral scores to piano reduc
 chord charts, and tablatures. Among these, jazz lead sheets occupy a particular position.
 A lead sheet is a compact score format that encodes only the essential musical
 information: a single-voice melody line written on a staff, chord symbols printed above it
-indicating the harmonic context, and occasionally lyrics beneath the staff. It lets
-musicians memorise and improvise over a tune from a minimal, portable representation
+indicating the harmonic context, and occasionally lyrics beneath the staff. It enables
+musicians to memorise and improvise over a tune using a minimal, portable representation
 without the burden of a full orchestral score~\cite{reedHonorsLeadSheets2018}.
 
 \textit{The Real Book} is the most widely circulated collection of jazz lead
@@ -65,13 +65,13 @@ jazz standards and sits on the music stand of jazz musicians worldwide at virtua
 level of practice.
 
 Despite its cultural centrality, the content of \textit{The Real Book} remains almost
-entirely locked in paper or scanned-image form. The officially published editions exist
-as PDFs, but those are image-based: the musical content is not encoded as symbolic
-data, and standard music notation software cannot interpret them directly. Digitising
-\textit{The Real Book}, and the broader class of jazz lead sheets it represents, would
-enable automatic transposition for B\(\flat\), E\(\flat\), and F instruments, MIDI
-playback for practice, corpus-level harmonic analysis, and better search and cataloguing
-in digital music libraries.
+entirely locked in paper or scanned-image form. Although officially published editions
+exist as PDFs, they are entirely image-based; consequently, the musical content is not
+encoded as symbolic data, preventing standard music notation software from interpreting
+them directly. Digitising \textit{The Real Book}, and the broader class of jazz lead
+sheets it represents, would enable automatic transposition for B\(\flat\), E\(\flat\),
+and F instruments, MIDI playback for practice, corpus-level harmonic analysis, and better
+search and cataloguing in digital music libraries.
 
 \subsection{Why Existing OMR Tools Fall Short}
 
@@ -81,10 +81,8 @@ classical full-score notation in standard engraving styles (Finale, Sibelius, Do
 LilyPond's default font). Lead sheets sit outside that comfort zone: their hand-lettered
 jazz engraving, their reliance on free-form chord symbols above the staff, and the absence
 of any public labelled corpus of Real Book pages all push beyond what general-purpose
-systems handle well. The result is that a musician with a worn photocopy has no tool that
-reliably turns it into editable, symbolic data. The technical difficulties behind this gap
-are formalised in \Cref{sec:problem-formulation}, and the prior art is surveyed in
-\Cref{ch:soa}.
+systems handle well. The technical difficulties behind this gap are formalised in
+\Cref{sec:problem-formulation}, and the prior art is surveyed in \Cref{ch:soa}.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Problem Formulation}

@@ -179,14 +179,36 @@ poetry run python src/cli.py train \
 
 ## Fine-tuning
 
-Use `--finetune-data-dir` (repeatable) to inject additional labeled samples into the training split only (not val/test). This is designed for fine-tuning on real scanned Real Book pages.
+Warm-start fine-tuning adapts a trained model to real data. It combines two flags:
+
+- `--init-weights <ckpt>` loads **only** the model weights from a checkpoint, then
+  starts a **fresh** run (new run dir, fresh optimiser, fresh OneCycle at `--lr`).
+  This is the correct way to fine-tune — it does **not** touch the baseline run, and
+  it lets you pick a low LR. Mutually exclusive with `--resume`.
+- `--finetune-data-dir <dir>` (repeatable) appends labeled real samples to the
+  **train split only** (never val/test — see `dataset.py::make_splits`), so the
+  synthetic→real domain-gap measurement on val/test stays honest.
 
 ```bash
 poetry run python src/cli.py train \
   --data-dir data/processed/primus/clean \
-  --finetune-data-dir data/realbook_scans/annotated \
-  --checkpoint models/latest/best_model.pt
+  --scanned-dir data/processed/primus/scanned \
+  --vocab-path data/vocab/primus_lmx.txt \
+  --init-weights models/latest/best_model.pt \
+  --finetune-data-dir data/finetune/realbook/clean \
+  --model-dir models/finetune_realbook \
+  --epochs 12 --lr 1e-4
 ```
+
+Use a **low `--lr`** (≈1e-4) and **few `--epochs`** (≈10–15): a small real set
+overfits fast. After fine-tuning, re-calibrate the staff-reject gate
+(`cli.py calibrate-reject …`, CLAUDE.md hard constraint #7).
+
+> **`--init-weights` vs `--resume`.** `--resume` *continues an interrupted run*:
+> it restores optimiser + scheduler + epoch counter and keeps training the **same**
+> run in place (used to recover from a crash). It is **not** a fine-tuning tool —
+> resuming a finished run replays the decayed tail of its LR schedule and would
+> overwrite the original checkpoints. For fine-tuning always use `--init-weights`.
 
 ## Evaluation
 

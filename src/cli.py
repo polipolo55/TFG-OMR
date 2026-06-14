@@ -309,7 +309,18 @@ def cmd_train(args: argparse.Namespace) -> None:
         else:
             resume_from = Path(resume_arg)
 
-    best_ckpt = train(cfg, resume_from=resume_from)
+    init_weights: Path | None = None
+    iw_arg = getattr(args, "init_weights", None)
+    if iw_arg:
+        if resume_from is not None:
+            log.error("Pass either --resume or --init-weights, not both.")
+            sys.exit(1)
+        init_weights = Path(iw_arg)
+        if not init_weights.exists():
+            log.error("--init-weights checkpoint not found: %s", init_weights)
+            sys.exit(1)
+
+    best_ckpt = train(cfg, resume_from=resume_from, init_weights=init_weights)
     log.info("Best checkpoint saved to %s", best_ckpt)
 
 
@@ -924,6 +935,15 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="CHECKPOINT",
         help="Resume from a checkpoint. Omit a path to auto-use "
         "the latest run's checkpoint, or supply an explicit .pt path.",
+    )
+    g_train.add_argument(
+        "--init-weights",
+        type=str,
+        default=None,
+        metavar="CHECKPOINT",
+        help="Warm-start fine-tuning: load ONLY model weights from this .pt, then "
+        "start a fresh run (new dir, fresh optimiser + OneCycle at --lr). Use with "
+        "--finetune-data-dir to adapt to real data. Mutually exclusive with --resume.",
     )
     g_train.add_argument(
         "--rare-lmx-oversample",

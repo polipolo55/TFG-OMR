@@ -37,7 +37,7 @@ Published accuracy on monophonic input must be competitive with the state of the
 Training must fit within the 12\,GB VRAM of the available NVIDIA RTX~3060 without cloud rental.
 
 \textit{Data requirements.}
-The architecture must be trainable on PrIMuS~\cite{PrIMuSDataset} ($\approx$88\,000 incipits), the only substantial labelled corpus for monophonic OMR.
+The architecture must be trainable on PrIMuS~\cite{PrIMuSDataset} (87\,678 incipits), the only substantial labelled corpus for monophonic OMR.
 
 \textit{Implementation complexity.}
 A single-person project requires a well-documented architecture with mature open-source reference implementations.
@@ -47,6 +47,9 @@ Each sprint must produce a measurable, reproducible result; architectures requir
 
 \textit{Extension potential for future work.}
 The chosen architecture should support natural extensions to polyphony, full-page input, and chord-symbol integration.
+
+\Cref{tab:alt-comparison} compares the three architectural families
+against these criteria from a project-management perspective.
 
 \begin{table}[ht]
     \centering
@@ -72,8 +75,7 @@ The chosen architecture should support natural extensions to polyphony, full-pag
     \end{tabularx}
 \end{table}
 
-\Cref{tab:alt-comparison} shows that CRNN--CTC is the best fit
-for this stage: it provides enough modelling capacity for monophonic
+CRNN--CTC is the best fit for this stage: it provides enough modelling capacity for monophonic
 lead sheets while remaining trainable and debuggable within the
 available timeframe and hardware budget.
 The transformer alternatives are penalised principally by the data
@@ -252,7 +254,7 @@ The conditional extension task is the most important schedule
 buffer in the plan, since it can be reduced to zero without
 compromising the core deliverable.
 T5.3 is allocated to fine-tuning the chord CRNN against
-hand-labelled real Real Book strips (using the
+hand-labelled Real Book strips (using the
 \code{extract\_real\_chord\_strips} utility) and to tightening the
 chord post-processing grammar, which together realise the
 chord-recognition extension foreshadowed in
@@ -424,7 +426,7 @@ risks without triggering the budget-control mechanism of
         \toprule
         \textbf{ID} & \textbf{Risk} & \textbf{Likelihood} & \textbf{Impact} & \textbf{Alternative plan} & \textbf{Schedule impact} & \textbf{Extra resources} \\
         \midrule
-        R1 & Limited ground-truth data on real Real Book pages
+        R1 & Limited ground-truth data on genuine Real Book pages
             & High & High
             & Fall back to synthetic / typeset sources and strengthen the augmentation pipeline.
             & Reallocate up to 10\,h.

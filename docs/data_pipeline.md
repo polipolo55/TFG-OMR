@@ -313,9 +313,9 @@ augmentation + synthetic Real Book clutter
 (`_add_realbook_clutter`: binder-hole shadow, staff-line bleed, slash repeat marks).
 
 ```bash
-# Generate 12 000 train + 1 200 val strips:
-cd src && poetry run python -m data_processing.generate_chord_crops \
-    --output ../data/chord_synth --train 12000 --val 1200
+# Generate 30 000 train + 2 000 val strips:
+poetry run python src/data_processing/generate_chord_crops.py \
+    --output data/chord_synth --num-train 30000 --num-val 2000
 ```
 
 **Output:**
@@ -347,7 +347,7 @@ Checkpoint saved to `models/chord/run_TIMESTAMP/best_model.pt`.
 
 **File:** `src/data_processing/extract_real_chord_strips.py`
 
-Extracts chord-strip crops from real Real Book PDF pages using the same staff
+Extracts chord-strip crops from genuine Real Book PDF pages using the same staff
 detection pipeline as inference, then pre-labels them with the current chord CRNN
 so the human reviewer can correct rather than type from scratch.
 

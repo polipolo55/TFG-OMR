@@ -125,7 +125,7 @@ Greedy CTC, current leakage-free test split (4,608 samples), `scripts/evaluate_f
 |-------|-----------|------|------|------|------|-------|
 | `run_20260601_134845` | originals + twins (leaked split) | 0.23 % | 94.1 % | — | — | **invalid — memorization / leakage; not reproducible** |
 | `run_20260608_102846` | originals only | 1.31 % | 72.0 % | 1.19 % | 73 % | honest baseline |
-| **`run_20260612_101637`** (now `models/latest`, best epoch 83) | originals + variant sampling + tie oversampling 2× | **1.23 %** | **72.7 %** | **1.17 %** | **73.7 %** | leakage-free; best honest result |
+| **`run_20260612_101637`** (synthetic baseline, best epoch 83) | originals + variant sampling + tie oversampling 2× | **1.23 %** | **72.7 %** | **1.17 %** | **73.7 %** | leakage-free; best honest synthetic result |
 
 The retrain (variant sampling + jitter-bleed fix + tie oversampling) gives a
 **modest, real improvement** over the honest baseline on both splits — and is now

@@ -126,7 +126,7 @@ The energy estimate follows directly:
 $\SI{250}{\hour} \times \SI{0.25}{\kilo\watt} \approx
 \SI{62.5}{\kilo\watt\hour}$~\cite{strubellEnergyPolicyConsiderations2019,pattersonCarbonConsiderationsDeep2021,lacosteQuantifyingCarbonEmissions2019}.
 Applying the Spanish electricity emission factor of approximately
-\SI{0.23}{\kilo\gram\per\kilo\watt\hour} of CO\textsubscript{2}
+\SI{0.23}{\kilo\gram\per\kilo\watt\hour} of CO\textsubscript{2}e
 reported by Red El\'ectrica de Espa\~na and
 MITECO~\cite{reeInformeSistemaElectrico2024,mitecoFactorEmision2025}
 yields roughly \SI{14.4}{\kilo\gram} of CO\textsubscript{2}e
@@ -187,7 +187,7 @@ The operational figure above excludes two lifecycle stages that are
 harder to quantify: the embodied energy of manufacturing the GPU and
 workstation, paid once at fabrication and amortised across every run
 on the reused hardware, and end-of-life disposal of the GPU through
-the domestic e-waste channel.\todo{cite: figure for embodied carbon of a consumer GPU or workstation if a defensible source can be located (e.g.\ NVIDIA or Dell product carbon-footprint disclosures); otherwise leave as qualitative.}
+the domestic e-waste channel.
 
 \subsection{Social dimension}
 \label{sec:sust-social}
@@ -335,11 +335,16 @@ The open-source release also lowers the barrier for foreseeable
 misuse: at-scale digitisation and redistribution of copyrighted lead
 sheets, circumvention of paid score libraries, or unlicensed
 derivative works generated from the symbolic output.
-The released artefacts are limited to code, training scripts, and
-weights trained exclusively on synthetic PrIMuS-derived data, with
-no Real-Book-derived corpus or pre-extracted symbol library, and the
-capabilities and limitations are documented in this thesis and in
-the public \code{README}.
+The released artefacts are limited to code, training scripts, synthetic
+pre-training checkpoints, and the small fine-tuned checkpoints described
+in \Cref{ch:results}. The release does not include any
+Real-Book-derived corpus, page images, extracted staff strips, chord
+strips, or pre-extracted symbol library, and the capabilities and
+limitations are documented in this thesis and in the public
+\code{README}. This is why the headline SER figures in
+\Cref{ch:results} remain attached to the synthetic baseline: the
+fine-tuned melody checkpoint is the deployed model, but it does not yet
+have a held-out real melody benchmark.
 
 \textit{Documented limitations.}
 The known limitations of the system---the monophonic contract,

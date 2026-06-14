@@ -158,10 +158,12 @@ when content could go in either, put justification in Ch. 4 and engineering deta
 
 ## Common Pitfalls (specific to this source)
 
-- **Quoting the numbers.** Headline metrics (SER 0.28% clean / 0.23% scan-simulated, melodic
-  SER 0.02% clean / 0.03% scan, perfect-transcription 92.1% clean / 94.1% scan, 4 608-sample
-  test split) appear in the abstract, intro, results, and conclusions. If a result changes, it
-  must change in **all** places — grep the figure before editing one occurrence.
+- **Quoting the numbers.** Headline synthetic-baseline metrics (SER 1.17% clean / 1.23% scan-simulated, melodic
+  SER 0.10% clean / 0.14% scan, perfect-transcription 73.7% clean / 72.7% scan, 4 608-sample
+  test split; checkpoint `models/run_20260612_101637/best_model.pt`) appear in the abstract,
+  results, conclusions, and overview docs. The deployed `models/latest` checkpoint is fine-tuned
+  and has no held-out real melody SER. If a result changes, it must change in **all** places —
+  grep the figure before editing one occurrence.
 - **Objectives are measurable and are revisited.** Ch. 1 states numeric targets (aggregate SER
   ≤ 3% scan-simulated, ≤ 2% clean, ≥ 30% relative reduction on fine-tuned real pages). Ch. 8
   must tick each off as met/partial/dropped. Don't soften a Ch. 1 target without updating Ch. 8.

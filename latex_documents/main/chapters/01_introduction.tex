@@ -77,7 +77,7 @@ search and cataloguing in digital music libraries.
 
 General-purpose OMR systems have advanced substantially in recent
 years~\cite{shatriOPTICALMUSICRECOGNITION}, but they are designed and evaluated mostly on
-classical full-score notation in standard engraving styles (Finale, Musescore, Sibelius, Dorico, or
+classical full-score notation in standard engraving styles (Finale, MuseScore, Sibelius, Dorico, or
 LilyPond's default font). Lead sheets sit outside that comfort zone: their hand-lettered
 jazz engraving, their reliance on free-form chord symbols above the staff, and the absence
 of any public labelled corpus of Real Book pages all push beyond what general-purpose
@@ -129,7 +129,8 @@ jazz style.
 \textbf{Dual-stream recognition.}
 The lead-sheet format requires processing two distinct visual streams from the same
 image region at once: the melodic staff content, which calls for pattern-based sequence
-recognition, and the chord symbols above the staff, which call for text OCR. These two
+recognition, and the chord symbols above the staff, which call for character-level
+sequence recognition. These two
 streams require different feature representations and must ultimately be integrated into
 a coherent structured output. Existing OMR pipelines address only the first.
 A complete lead-sheet system must solve both and align their results.
@@ -147,7 +148,7 @@ output the inference pipeline fuses with the melody.
 
 The \textbf{general objective} of this project is to develop, evaluate, and document a
 proof-of-concept end-to-end OMR system for monophonic jazz lead sheets, and to
-demonstrate that a CRNN-CTC architecture trained on synthetic data can close the
+demonstrate that a CRNN--CTC architecture trained on synthetic data can close the
 domain gap between clean rendered images and degraded scans, achieving an aggregate
 Symbol Error Rate (SER) of at most \SI{3}{\percent} on a held-out scan-simulated test
 split so that the outcome can be assessed quantitatively in \Cref{ch:conclusions}.
@@ -156,7 +157,7 @@ The \textbf{specific objectives} are:
 
 \begin{enumerate}
     \item Survey the state of the art in OMR, covering traditional modular pipelines,
-          CRNN-CTC sequence models, and transformer-based end-to-end approaches, and
+          CRNN--CTC sequence models, and transformer-based end-to-end approaches, and
           justify the architectural choices made in this project.
 
     \item Design and implement a synthetic training dataset by rendering excerpts from
@@ -165,10 +166,10 @@ The \textbf{specific objectives} are:
           \term{Linearised MusicXML} (LMX) token format~\cite{OMRResearchLmx2025}.
 
     \item Design and implement a scan-simulation augmentation pipeline calibrated
-          against real Real Book scan characteristics, to close the domain gap at
+          against characteristics of genuine Real Book scans, to close the domain gap at
           training time without requiring manually labelled real-world data.
 
-    \item Design, implement, and train a CRNN-CTC model for monophonic staff-line
+    \item Design, implement, and train a CRNN--CTC model for monophonic staff-line
           recognition, and evaluate it rigorously using the SER~\cite{hajicOMRMetricsEvaluation2019}
           metric, targeting an aggregate SER of at most \SI{2}{\percent} on the clean
           test split and at most \SI{3}{\percent} on the scan-simulated test split.
@@ -178,32 +179,35 @@ The \textbf{specific objectives} are:
 
     \item Build a complete inference pipeline that returns structured JSON output
           suitable for downstream musical applications, covering PDF input handling,
-          staff detection, melody recognition, grammar correction, and chord-symbol
-          extraction.
+          staff detection, parallel melody and chord-symbol recognition, and
+          grammar correction on the melody stream.
 
     \item Quantify the synthetic-to-scan domain gap as the aggregate-SER difference
           between the clean and scan-simulated test splits, and reduce the residual gap
-          on genuine scans by fine-tuning on a small set ($\approx$\,40 staves) of
-          manually annotated Real Book pages, targeting at least a \SI{30}{\percent}
-          relative SER reduction on those pages.
+          on genuine scans by fine-tuning on a small set of manually annotated
+          Real Book pages (initial target: roughly \num{40} staves; usable set
+          obtained: \num{36} staves), targeting at
+          least a \SI{30}{\percent} relative SER reduction if a held-out real
+          set is large enough to benchmark.
 \end{enumerate}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Proposed Approach}
 \label{sec:approach}
 
-The core design choice is a CRNN-CTC architecture, which maps staff images to
+The core design choice is a CRNN--CTC architecture, which maps staff images to
 token sequences without requiring per-symbol segmentation; the full justification
 is in \Cref{ch:design,sec:mgmt-justification}.
 
-The system is organised around a five-stage inference pipeline (preprocessing, staff
-detection, melody recognition, grammar correction, and chord recognition) whose outputs are
-merged into a structured JSON document. The decomposition, the contracts between
-stages, and its design rationale are presented in detail in \Cref{ch:design}.
+The system is organised around a five-stage inference pipeline: preprocessing,
+staff detection, parallel melody and chord recognition, grammar correction on
+the melody token stream, and JSON serialisation. The decomposition, the
+contracts between stages, and its design rationale are presented in detail in
+\Cref{ch:design}.
 
 In the absence of labelled real-world data, the model is first trained on synthetic
 LilyJAZZ-rendered images augmented with scan simulation and then fine-tuned on a small
-annotated set of real Real Book pages. This two-phase approach is a standard
+annotated set of genuine Real Book pages. This two-phase approach is a standard
 domain-adaptation technique and is the practical answer to the data scarcity problem
 described in \Cref{sec:problem-formulation}.
 
@@ -223,7 +227,7 @@ The project is bounded by the following scope definition.
     \item Scan-simulation augmentation modelling noise, blur, perspective distortion,
           ink bleed, and photometric variation.
     \item Staff region detection as a preprocessing module.
-    \item Design, training, and evaluation of a CRNN-CTC model for single-staff
+    \item Design, training, and evaluation of a CRNN--CTC model for single-staff
           melody recognition.
     \item Chord symbol extraction via a dedicated chord-recognition network.
     \item Quantitative evaluation using SER and qualitative error analysis.

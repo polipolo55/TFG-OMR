@@ -50,7 +50,7 @@ poetry run python src/cli.py api --port 8000
 
 ```
 src/
-├── cli.py                       Unified CLI (12 subcommands; see cli.md)
+├── cli.py                       Unified CLI (13 subcommands; see cli.md)
 ├── style.py                     Matplotlib theme for figures
 │
 ├── CRNN_CTC/

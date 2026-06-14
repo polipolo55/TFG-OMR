@@ -100,7 +100,7 @@ Voicing & Monophonic: one melody line per staff. \\
 \tfgrowsep
 Clef & Treble (\code{clef:G2}) only. \\
 \tfgrowsep
-Key signatures & Any of \code{key:fifths:N}, $N \in [-7,\,+7]$. \\
+Key signatures & Any of \code{key:fifths:N}, $N \in [-6,\,+7]$. \\
 \tfgrowsep
 Time signatures & One of $\{4/4,\,3/4,\,2/4,\,2/2,\,6/8,\,6/4,\,5/4,\,12/8\}$. \\
 \tfgrowsep
@@ -170,10 +170,11 @@ the chord strip above it, and a page bounding box); everything
 downstream operates on one staff at a time.
 \textbf{Melody recognition}, the core machine-learning stage, reads a
 staff image into a flat sequence of LMX tokens.
-\textbf{Grammar correction} then repairs structural errors
-deterministically, without inventing musical content.
 \textbf{Chord recognition} reads the chord-strip image with a separate
-network, independent of melody recognition.
+network, independent of melody recognition, so the two recognisers can
+run in parallel on the same detected staff system.
+\textbf{Grammar correction} then repairs structural errors in the
+melody token stream deterministically, without inventing musical content.
 
 \input{figures/fig_pipeline_design}
 
@@ -292,7 +293,7 @@ composer credits) that morphological staff detection can falsely
 accept when their layout is staff-like, for instance a row of small
 print that produces five collinear ink runs.
 A staff mis-detected on such a region is then fed to the
-CRNN, which emits a high-confidence but musically nonsensical
+CRNN, which emits a confident but musically nonsensical
 token sequence.
 
 The design therefore inserts a two-tier rejection gate between the
@@ -300,7 +301,7 @@ staff detector and the recogniser. A pre-CRNN tier uses cheap
 geometric and OCR signals to discard obvious non-music regions before
 the recogniser is invoked, and a post-CRNN tier reads the CTC mean
 log-probability of the output and drops strips that fall below a
-calibrated confidence threshold. A confidence override re-admits
+hand-tuned confidence threshold. A confidence override re-admits
 geometry-rejected strips on which the recogniser is confident, but it
 deliberately does not override the OCR-text rejection, since high CRNN
 confidence on running text is a known false-positive mode.
@@ -362,7 +363,7 @@ augmentation} for realism.
 
 \subsection{Synthetic supervision from PrIMuS}
 
-PrIMuS~\cite{PrIMuSDataset} provides roughly 88\,000 monophonic music
+PrIMuS~\cite{PrIMuSDataset} provides 87\,678 monophonic music
 incipits, each accompanied by ground-truth symbolic annotations
 (clef, key, time signature, and the sequence of notes and rests on the
 staff).
@@ -418,12 +419,14 @@ real-world scans: page warping and lens distortion, scan misalignment,
 focus blur, exposure variation, sensor noise, uneven illumination, ink
 bleed, halftone banding, and JPEG compression
 (\Cref{fig:aug-gallery}).
-The model is trained on the union of clean and augmented samples, with
-the augmented copies sharing the same ground-truth label.
+The model is trained on scan-simulated inputs, with train-only scanned
+variants sharing the same ground-truth label; the clean renders are
+retained as a separate evaluation regime so the clean-to-scanned gap can
+be measured directly.
 This recipe is standard across recent end-to-end OMR
 systems~\cite{calvoZaragozaCameraPrimus2018,mayerPracticalEndToEnd2024,riosVilaSMTPlusPlus2024,yangLEGATO2025};
 the specific list of distortions used here is calibrated against a
-sample of real Real Book scans.
+sample of genuine Real Book scans.
 
 \subsubsection*{Alternatives considered}
 
@@ -443,7 +446,7 @@ learn; a hand-crafted pipeline instead gives explicit, debuggable
 control over each distortion's intensity.
 
 \paragraph{Real-only training (no synthetic).}
-Hand-label enough real Real Book pages to train from scratch.
+Hand-label enough genuine Real Book pages to train from scratch.
 The cost rules this out: producing a fully labelled corpus of even a
 few thousand staves is well outside the time budget, and the resulting
 dataset would still be smaller than PrIMuS by orders of magnitude.
@@ -495,7 +498,7 @@ than teach new musical concepts. The procedure is detailed in
 
 The model's output is a flat sequence of \term{Linearised MusicXML}
 (LMX) tokens. LMX is the symbolic encoding introduced by
-\textcite{mayerPracticalEndToEnd2024} as part of the OLIMPIC
+\textcite{mayerPracticalEndToEnd2024} as part of the OLiMPiC
 benchmark and maintained as an open
 specification~\cite{OMRResearchLmx2025}: a depth-first traversal of
 the MusicXML score tree emits one whitespace-separated token per leaf
@@ -562,7 +565,7 @@ $12/8$ share \code{beat-type:8}).
 \textbf{Bare accidental tokens.}
 Accidentals appear as bare words (\code{flat}, \code{sharp},
 \code{natural}) rather than prefixed (\code{acc:flat}).
-This matches the OLIMPIC LMX
+This matches the OLiMPiC LMX
 convention~\cite{mayerPracticalEndToEnd2024} and keeps the token
 sequence compact.
 Accidentals appear \textit{after} the duration in the token stream
@@ -847,18 +850,20 @@ mechanics are in \Cref{ch:impl}.
 
 The training procedure has two distinct phases.
 \textit{Phase 1} trains the model from scratch on the synthetic
-LilyJAZZ corpus, with both clean and augmented versions of every
-sample included in each epoch.
+LilyJAZZ corpus using scan-simulated inputs as the training view.
+Clean renders remain available for evaluation, but they are not mixed
+into each training epoch; scan variants and online jitter provide the
+visual diversity seen by the model.
 \textit{Phase 2} fine-tunes the resulting checkpoint on a small
-manually-annotated set of Real Book pages, injected into the training
+manually annotated set of Real Book pages, injected into the training
 split only.
 The validation and test splits remain drawn exclusively from the
 synthetic corpus throughout, so that phase-2 fine-tuning does not
 contaminate the held-out evaluation.
 
-This is a textbook synthetic-pretrain $\to$ real-fine-tune transfer
-learning plan; its effectiveness is the principal experimental
-question of \Cref{ch:results}.
+This follows the standard synthetic pre-training, real fine-tuning
+recipe; its effectiveness is the principal experimental question of
+\Cref{ch:results}.
 
 \subsection{Data splits}
 
@@ -931,7 +936,7 @@ error analysis (\Cref{ch:results}).
 \label{sec:design-grammar-alts}
 
 \textbf{Grammar-aware beam search} restricts prefixes to valid sequences at $\mathcal{O}(T\cdot V\cdot k)$ cost; the accuracy gain over the free post-pass is negligible because the LMX grammar is a small finite-state object.
-\textbf{WFST composition} at decode time is over-engineered for a vocabulary this small; the hand-written stateful walker is shorter, easier to debug, and equally expressive.
+\textbf{WFST composition} at decode time is over-engineered for a vocabulary this small; the handwritten stateful walker is shorter, easier to debug, and equally expressive.
 \textbf{A learned sequence-to-sequence corrector} requires a corpus of model errors that is only available after training, and introduces a second learned component with harder-to-debug failure modes.
 \textbf{An end-to-end grammar-aware loss} complicates CTC optimisation for marginal gain on a small, well-structured vocabulary, and conflates training-time and inference-time concerns that are easier to analyse in isolation.
 
@@ -967,12 +972,12 @@ model gets the actual notes right. It is the metric the
 
 \subsection{Protocol}
 
-Whether synthetic pretraining plus fine-tuning closes the
-synthetic-to-real gap is measured by two ablations: (i)~the model
-trained only on clean LilyJAZZ renders, evaluated on real Real Book
-pages, exposing the raw gap; and (ii)~the same model after fine-tuning
-on a small annotated real set, evaluated on the same pages,
-quantifying the reduction (protocol as in \Cref{sec:design-training}).
+The planned synthetic-to-real test compares the synthetic checkpoint
+against the same model after fine-tuning on a small annotated real set.
+For the melody branch this protocol requires a held-out real set large
+enough for SER, so the current thesis reports the phase qualitatively;
+for the chord branch, the same idea is measured on a held-out real
+strip split (protocol as in \Cref{sec:design-training}).
 To keep the four numeric targets falsifiable, the protocol commits in
 advance to: (a)~the split definitions and seed, fixed once and not
 retuned per experiment; (b)~greedy CTC decoding as the primary number,

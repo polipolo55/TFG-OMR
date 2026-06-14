@@ -131,7 +131,10 @@ The \code{render} subcommand walks the PrIMuS package directories and,
 for each \code{.semantic} file, normalises the clef to G2 (transposing
 pitches to the treble-clef equivalent when the source clef is C1, C2,
 or F3), constructs a LilyPond source file, and invokes the
-\code{lilypond} subprocess at \SI{200}{DPI}.
+\code{lilypond} subprocess at the requested DPI. A single value fixes
+the render resolution; the full \code{pipeline} and \code{pipeline-train}
+paths pass \SI{200}{DPI}, \SI{250}{DPI}, and \SI{300}{DPI}, which makes
+the renderer sample one of the three per score.
 The output PNG is auto-cropped to remove white margins.
 
 Four per-sample parameters are drawn independently to cover the visual
@@ -183,9 +186,9 @@ The \code{augment} subcommand applies the ten-transform
 clean image, followed by six post-processing steps applied in fixed
 order: morphological ink dilation (0, 1, or 2 erosion iterations),
 staff-line thickness variation ($p=0.40$), paper-tone remapping to
-$[28, 245]$, a radial vignette ($p=0.55$), a directional
-uneven-illumination gradient ($p=0.45$), and halftone banding
-($p=0.25$).
+$[28, 245]$, a mutually exclusive lighting roll (approximately
+$p=0.50$ radial vignette, $p=0.35$ directional uneven illumination,
+and $p=0.15$ neither), and halftone banding ($p=0.25$).
 The full parameter list is in \Cref{tab:aug} (\Cref{app:hyperparams}).
 Representative outputs are in \Cref{fig:aug-gallery}.
 
@@ -392,8 +395,9 @@ half-diminished, diminished, augmented, suspended) together with their
 sampling weights, which are derived from the empirical frequency of
 each quality in the Real Book.
 The \code{generate\_chord\_crops} script renders strips of one to five
-chords each, in the LilyJAZZ font, at the same DPI as the staff
-renders.  It then applies an \code{albumentations} pipeline tuned for
+chords each, in the LilyJAZZ font, with its own DPI jitter range
+(\SIrange{140}{260}{DPI}) chosen for the effective size of cropped
+chord text. It then applies an \code{albumentations} pipeline tuned for
 the visual conditions of the chord strip (smaller scale, less
 geometric distortion, more colour-channel jitter) and an additional
 \textit{Real Book clutter} overlay
@@ -401,8 +405,8 @@ geometric distortion, more colour-channel jitter) and an additional
 binder-hole shadows, staff-line bleed from the staff below, and
 occasional slash-repeat marks.
 
-The default configuration produces \num{12000} training strips and
-\num{1200} validation strips; the chord training script consumes them
+The default configuration produces \num{30000} training strips and
+\num{2000} validation strips; the chord training script consumes them
 via a CSV manifest.
 
 \subsection{Chord network architecture and training}
@@ -421,7 +425,7 @@ network), and the CNN applies an additional inter-block dropout of
 \num{0.15}.
 
 Training runs in two phases.
-The synthetic pretraining phase uses AdamW with a peak learning rate
+The synthetic pre-training phase uses AdamW with a peak learning rate
 of $1{\times}10^{-3}$ and OneCycleLR with a \SI{5}{\percent}
 warm-up fraction, a batch size of \num{32}, and early stopping with a
 patience of \num{8} epochs.
@@ -430,7 +434,7 @@ validation strips within ten to fifteen epochs.
 The fine-tuning phase starts from the synthetic checkpoint and runs
 for up to \num{20} epochs at a reduced peak learning rate of
 $2{\times}10^{-4}$; the lower rate prevents the small real-strip set
-from overwriting chord representations built during pretraining.
+from overwriting chord representations built during pre-training.
 The full parameter set for both phases is in \Cref{tab:hyperparams-chord}
 of \Cref{app:hyperparams}.
 
@@ -819,8 +823,8 @@ latency / accuracy frontier.
 \textbf{Knob} & \textbf{Throughput effect} & \textbf{Latency effect} & \textbf{Accuracy effect} \\
 \midrule
 Beam width $k$ (\code{OMR\_BEAM\_WIDTH}) & $\sim 1/k$ at fixed throughput per stripe. & $\sim k\times$ per strip. & Small SER reduction on dense passages (\Cref{ch:results}). \\ \tfgrowsep
-PDF DPI (\code{OMR\_PDF\_DPI}) & Linear: image area scales as DPI$^2$. & Linear in image area. & Higher DPI improves CRNN accuracy up to roughly \SI{300}{DPI}; beyond that the gain saturates and pre-processing dominates. \\ \tfgrowsep
-Pre-CRNN reject gate & Improves throughput by skipping non-music strips' CRNN call. & Reduces the average latency per page. & Trade-off between false-positive rejection of valid staves and false-negative acceptance of text; thresholds are calibrated on labelled fixtures. \\
+PDF DPI (\code{OMR\_PDF\_DPI}) & Linear: image area scales as DPI$^2$. & Linear in image area. & Higher DPI preserves more staff detail up to the \SI{300}{DPI} operating point; beyond that pre-processing cost grows quickly. \\ \tfgrowsep
+Pre-CRNN reject gate & Improves throughput by skipping non-music strips' CRNN call. & Reduces the average latency per page. & Trade-off between false-positive rejection of valid staves and false-negative acceptance of text; geometric thresholds are calibrated on labelled fixtures, while the CTC confidence gate is hand-tuned. \\
 \bottomrule
 \end{tabularx}
 \caption{Three operator-tunable knobs that move along the throughput,
@@ -831,8 +835,8 @@ numbers themselves are reported in \Cref{ch:results}.}
 \end{table}
 
 The default configuration of the system commits to greedy decoding,
-\SI{300}{DPI} rasterisation, and the calibrated rejection thresholds
-in \code{models/staff\_reject/thresholds.json}: this is the operating
+\SI{300}{DPI} rasterisation, and the rejection thresholds in
+\code{models/staff\_reject/thresholds.json}: this is the operating
 point that minimises latency while remaining within the accuracy
 targets stated in \Cref{sec:design-domain}.
 Other operating points are reachable by setting the corresponding
@@ -847,13 +851,13 @@ Three mechanisms together make any experiment reported in
 nondeterminism noted below.
 
 \paragraph{Deterministic dataset splits.}
-The \code{make\_splits} function partitions samples by hashing the
-sample identifier and bucketing the hash modulo a fixed denominator,
+The \code{make\_splits} function builds the filtered sample list in a
+stable order and applies a seeded random permutation (\code{seed=42}),
 holding out \SI{10}{\percent} for validation and \SI{10}{\percent} for
 test (the remaining \SI{80}{\percent} for training).
-The same sample always falls into the same split across runs and
-across machines, so any difference between two evaluation runs comes
-from training, not from the split.
+The same source tree and seed produce the same split across runs, so
+any difference between two evaluation runs comes from training, not
+from the split.
 
 \paragraph{Embedded configuration.}
 Every checkpoint contains a JSON-serialised copy of the \code{Config}

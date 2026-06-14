@@ -226,10 +226,10 @@ are handled.
     \end{tabular}
 \end{table}
 
-Because chord symbols are text rather than staff glyphs, recovering them is an
-\term{optical character recognition} (OCR) problem distinct from the staff-pattern
-recognition used for the melody. This split motivates the two-stream architecture of
-\Cref{ch:design}.
+Because chord symbols are text rather than staff glyphs, recovering them is a
+character-sequence recognition problem: analogous to OCR, but implemented here
+with a dedicated CRNN--CTC network rather than an off-the-shelf OCR engine.
+This split motivates the two-stream architecture of \Cref{ch:design}.
 
 \section{The Lead-Sheet Format}
 
@@ -261,6 +261,9 @@ elements labelled.
     \centering
     \includegraphics[width=\textwidth]{figures/fig_realbook_labeled}
     \caption{Excerpt from \textit{The Real Book} (``Black Orpheus'', L.\ Bonfá),
-    showing the hand-engraved notation the OMR system must transcribe: \textbf{(1)} Header metadata. \textbf{(2)} Chord symbol regions targeted by the OCR stream. \textbf{(3)} Monophonic staff systems targeted by the CRNN-CTC model.}
+    showing the hand-engraved notation the OMR system must transcribe.
+    The annotations mark \textbf{(1)} header metadata, \textbf{(2)} chord
+    symbol regions targeted by the chord-recognition stream, and
+    \textbf{(3)} monophonic staff systems targeted by the CRNN--CTC model.}
     \label{fig:realbook-annotated}
 \end{figure}

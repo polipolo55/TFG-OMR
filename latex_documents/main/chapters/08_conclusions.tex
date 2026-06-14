@@ -9,13 +9,24 @@ source.
 \section{Objectives Revisited}
 \label{sec:conc-objectives}
 
-The seven specific objectives listed in \Cref{sec:objectives} are
-revisited below.
+The general objective and the seven specific objectives listed in
+\Cref{sec:objectives} are revisited below.
 Each is classified as \textbf{met}, \textbf{partially met}, or
 \textbf{deferred to future work}, with a one-sentence justification and
 a pointer to the evidence.
 
 \begin{itemize}
+    \item \textbf{General objective — end-to-end OMR for monophonic jazz
+          lead sheets.}
+          Met for the synthetic and scan-simulated benchmark, and
+          partially met for genuine scans.
+          The baseline CRNN--CTC system reaches \SI{1.23}{\percent}
+          aggregate SER on the held-out scan-simulated split
+          (\Cref{tab:results-headline}), below the
+          \SI{3}{\percent} target; the fine-tuned deployed checkpoint
+          improves qualitative real-page transcription, but a held-out
+          real melody SER remains future work
+          (\Cref{sec:res-finetune,sec:res-realpage}).
     \item \textbf{O1 — State-of-the-art survey and architectural
           justification.}
           Met.
@@ -26,13 +37,13 @@ a pointer to the evidence.
           Met.
           The render-convert-header-template-augment-vocab pipeline of
           \Cref{sec:impl-data} produces a paired
-          \texttt{PNG+LMX} corpus from the original PrIMuS
+          \code{PNG+LMX} corpus from the original PrIMuS
           semantic files, with the engraving style aligned to the
           target domain.
     \item \textbf{O3 — Scan-simulation augmentation pipeline.}
           Met.
-          The \texttt{albumentations}-based pipeline calibrated against
-          real Real Book scans is described in \Cref{sec:design-data}
+          The \code{albumentations}-based pipeline calibrated against
+          genuine Real Book scans is described in \Cref{sec:design-data}
           and its concrete parameter set is in \Cref{tab:aug}
           (\Cref{app:hyperparams}); its effectiveness is quantified by
           the small clean-to-scanned gap reported below.
@@ -63,12 +74,12 @@ a pointer to the evidence.
           \Cref{sec:impl-api}, and returns the JSON schema documented
           in the same section.
     \item \textbf{O7 — Domain-gap quantification and fine-tuning on
-          real Real Book pages.}
+          genuine Real Book pages.}
           \emph{Partially met.}
           The synthetic-to-scan gap is quantified by the
           clean-versus-scanned comparison
           (\Cref{tab:results-headline}), and the fine-tuning phase was
-          carried out: a \num{36}-staff real set was hand-annotated and
+          carried out: \num{36} usable real staves were hand-labelled and
           used to warm-start the synthetic checkpoint
           (\Cref{sec:res-finetune}), and the resulting model, now the
           deployed default, transcribes genuine scans visibly better
@@ -161,7 +172,7 @@ The scanned-split SER is close to the clean-split SER, which bounds
 the residual gap on the augmentation distribution, but the
 augmentation pipeline cannot reproduce every visual idiosyncrasy of
 genuine Real Book paper: ink-pen artefacts, paper grain, show-through
-from the back side of the page, and hand-written annotations are
+from the back side of the page, and handwritten annotations are
 absent from the synthetic distribution and are explicitly listed as
 unimplemented in the project documentation.
 The end-to-end measurement on real pages is therefore the most
@@ -208,8 +219,8 @@ CTC mean log-probability threshold whose value is hand-tuned against
 the confidence distribution of the current checkpoint rather than
 fitted automatically.
 It must therefore be re-tuned by hand whenever the recogniser is
-retrained, which is documented as a hard constraint in the
-project's contributor guide.
+retrained, which is documented in the project documentation and in
+\Cref{sec:impl-inference}.
 The gate is robust within a checkpoint family but it is not
 self-calibrating; a learned out-of-distribution detector would be a
 cleaner long-term solution.
@@ -241,7 +252,7 @@ The melody fine-tuning phase has been run and deployed
 (\Cref{sec:res-finetune}): a \num{36}-staff real set warm-starts the
 synthetic checkpoint and improves transcription on genuine scans.
 What is still missing is a \emph{quantitative} real-domain SER.
-Producing one means enlarging the hand-annotated set well beyond the
+Producing one means enlarging the hand-labelled set well beyond the
 current \num{36} staves so that a real held-out split can be reserved,
 as was done for the \num{29}-strip chord test of
 \Cref{tab:chord-eval}, and then reporting aggregate and melodic SER
@@ -379,9 +390,11 @@ contributes 87\,678 raw monophonic incipits, of which \num{46089}
 survive the three domain filters (\Cref{sec:design-data}) and are
 partitioned 36\,873 / 4\,608 / 4\,608 into train, validation, and test.
 Every retained sample is re-rendered in LilyJAZZ both clean and
-scan-simulated, and each training sample additionally draws from two
-extra scan variants, so the model trains on the order of \num{150000}
-distinct rendered images. The design choices that exploit this volume
+scan-simulated, and the training split additionally has two extra
+scan-simulated variants per sample. This yields roughly \num{150000}
+rendered assets on disk, while the training loop samples from the
+scan-simulated views rather than mixing clean images into each epoch.
+The design choices that exploit this volume
 are developed elsewhere: synthetic supervision in place of manual
 annotation, virtual header injection for the
 continuation-line case (\Cref{sec:impl-inference}), and a deterministic
@@ -392,7 +405,7 @@ The structured-output side is satisfied by the choice of LMX as the
 model's symbolic target, argued in
 \Cref{sec:lmx-format,sec:design-lmx-alts}. The chord-recognition network
 (\Cref{sec:impl-chord}) applies the same pattern to a different visual
-language through synthetic pretraining followed by domain-targeted
+language through synthetic pre-training followed by domain-targeted
 fine-tuning on hand-labelled real strips. The full inference pipeline
 (\Cref{sec:impl-inference}) closes the loop: it accepts an unseen
 page, extracts the symbolic content as structured JSON, and serves the

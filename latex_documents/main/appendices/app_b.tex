@@ -19,10 +19,11 @@ body (\Cref{sec:res-qualitative}).
 \crefrange{fig:qual-worst-2}{fig:qual-worst-5} collect the next four
 samples (ranks 2--5) with the highest edit distance on the scanned test
 split (epoch-83 checkpoint, greedy decoding).
-In every case the dominant failure mode is barline misplacement
+In most cases the dominant failure mode is barline misplacement
 (missed or spurious \code{measure} tokens), consistent with the
-error budget of \Cref{sec:res-errors}; melodic content
-(pitch, duration, accidental) is correct on most tokens even in
+error budget of \Cref{sec:res-errors}; the rank-3 sample is the main
+exception, where octave confusions dominate. Melodic content
+(pitch, duration, accidental) is still correct on most tokens even in
 the worst predictions.
 
 \begin{figure}[htbp]
@@ -157,7 +158,8 @@ the ResNet backbone, the LSTM weights, and the biases.
     \caption{Marginal weight distributions of the four principal
     parameter groups of the trained CRNN at epoch 83.
     All four are close to centred Gaussian with standard deviations
-    in the $[0.22, 0.35]$ range (the classifier layer is the widest);
+    in the $[0.22, 0.40]$ range (the classifier layer is the widest, at
+    $\approx 0.39$);
     AdamW's \num{1e-4} weight decay keeps the magnitudes bounded, and
     no output row is dead.
     The small spikes near $\pm 1$ in the classifier panel are an

@@ -10,9 +10,9 @@ qualitat continua sent un problema obert. Aquesta memòria presenta un sistema O
 d'extrem a extrem per a la melodia monofònica i els acords de les partitures de jazz, amb
 una atenció especial al recull \textit{The Real Book}.
 
-Arquitectònicament, el sistema combina dues xarxes independents del mateix tipus, una
+Arquitectònicament, el sistema combina dues xarxes independents del mateix tipus: una
 \term{Xarxa Neuronal Convolucional i Recurrent} entrenada amb la funció de pèrdua de
-\term{Classificació Temporal Connexionista} (CRNN-CTC): la primera llegeix la línia melòdica del pentagrama i
+\term{Classificació Temporal Connexionista} (CRNN--CTC). La primera llegeix la línia melòdica del pentagrama i
 la segona, els acords escrits al damunt. Totes dues xarxes s'entrenen amb dades sintètiques
 derivades del conjunt PrIMuS i tornades a renderitzar amb una tipografia d'estil jazz. Com
 que no hi ha cap corpus etiquetat de partitures reals, una etapa d'augmentació de dades
@@ -25,9 +25,10 @@ i de lligadura, la SER melòdica baixa fins al 0{,}10\% en el primer cas i al 0{
 El procés complet encadena la detecció de pentagrames, el reconeixement de la melodia i
 dels acords, i una correcció gramatical determinista; admet un PDF o una imatge i retorna
 un document JSON estructurat amb la seqüència de tokens LMX i els acords de cada pentagrama
-detectat. Els resultats confirmen que un sistema CRNN-CTC és una solució pràctica per a les
-línies de jazz monofòniques; ampliar-lo a la notació polifònica i a pàgines escanejades
-reals queda com a treball futur.
+detectat. Els resultats confirmen que un sistema CRNN--CTC és una solució pràctica per a les
+línies de jazz monofòniques. El sistema ja s'ha ajustat i inspeccionat qualitativament en
+escaneigs reals; el que queda com a treball futur és mesurar-ne quantitativament la SER de
+melodia sobre un conjunt real prou gran, i ampliar-lo a la notació polifònica.
 
 % ── Resumen (Español) ──────────────────────────────────────────────────────────
 \selectlanguage{spanish}
@@ -41,9 +42,9 @@ calidad sigue siendo un problema abierto. Esta memoria presenta un sistema OMR d
 a extremo para la melodía monofónica y los acordes de las partituras de jazz, con especial
 atención a la colección \textit{The Real Book}.
 
-Arquitectónicamente, el sistema combina dos redes independientes del mismo tipo, una
+Arquitectónicamente, el sistema combina dos redes independientes del mismo tipo: una
 \term{Red Neuronal Convolucional y Recurrente} entrenada con la función de pérdida de
-\term{Clasificación Temporal Conexionista} (CRNN-CTC): la primera lee la línea melódica del
+\term{Clasificación Temporal Conexionista} (CRNN--CTC). La primera lee la línea melódica del
 pentagrama y la segunda, los acordes escritos encima. Ambas redes se entrenan con datos sintéticos
 derivados del conjunto PrIMuS y vueltos a renderizar con una tipografía de estilo jazz. Como
 no existe ningún corpus etiquetado de partituras reales, una etapa de aumento de datos simula
@@ -51,16 +52,19 @@ los defectos propios de los escaneos (desenfoque, ruido, distorsión e iluminaci
 para que el modelo aprenda a tolerarlos. Evaluado con la \term{Tasa de Error de Símbolos}
 (SER), el modelo de melodía obtiene un 1{,}17\% sobre el conjunto de prueba sintético limpio
 y un 1{,}23\% sobre la versión que simula un escaneo; si no se cuentan los tokens de compás y
-de ligadura, la SER melódica baja, en el primer caso y en el segundo, hasta el 0{,}10\% y el 0{,}14\%.
+de ligadura, la SER melódica baja en los conjuntos limpio y simulado, respectivamente, hasta el
+0{,}10\% y el 0{,}14\%.
 Como resultados globales, el 73{,}7\% de los pentagramas en el conjunto sintético y el 72{,}7\%
 en el conjunto simulado se transcriben sin ningún error.
 
 El proceso completo encadena la detección de pentagramas, el reconocimiento de la melodía y
 de los acordes, y una corrección gramatical determinista; admite un PDF o una imagen y
 devuelve un documento JSON estructurado con la secuencia de tokens LMX y los acordes de cada
-pentagrama detectado. Los resultados confirman que un sistema CRNN-CTC es una solución
-práctica para las líneas de jazz monofónicas; ampliarlo a la notación polifónica y a páginas
-escaneadas reales queda como trabajo futuro.
+pentagrama detectado. Los resultados confirman que un sistema CRNN--CTC es una solución
+práctica para las líneas de jazz monofónicas. El sistema ya se ha ajustado e inspeccionado
+cualitativamente en escaneos reales; lo que queda como trabajo futuro es medir cuantitativamente
+la SER de melodía sobre un conjunto real suficientemente grande y ampliarlo a la notación
+polifónica.
 
 % ── Abstract (English) ─────────────────────────────────────────────────────────
 \selectlanguage{english}
@@ -71,12 +75,11 @@ escaneadas reales queda como trabajo futuro.
 of musical scores into machine-readable symbolic representations. Despite steady
 progress, transcribing real-world scans of informal or low-quality sources remains an
 open problem. This thesis presents an end-to-end OMR system for the monophonic melody
-lines and chord symbols of jazz lead sheets, with a focus on \textit{The Real Book}
-collection.
+lines and chord symbols of jazz lead sheets, with a focus on \textit{The Real Book}.
 
-The system pairs two independent networks of the same type, a \term{Convolutional
+The system pairs two independent networks of the same type: a \term{Convolutional
 Recurrent Neural Network} trained with the \term{Connectionist Temporal Classification}
-loss (CRNN-CTC): one reads the melody line on the staff, the other the chord symbols
+loss (CRNN--CTC). One reads the melody line on the staff, the other the chord symbols
 printed above it. Both networks are trained on synthetic data derived from the PrIMuS dataset,
 re-rendered in a jazz engraving style. Since no labelled corpus of real lead sheets
 exists, an augmentation stage simulates the photographic artefacts of real scans, such
@@ -90,6 +93,7 @@ synthetic set and 72.7\% on the scan-simulated set are transcribed completely er
 The full pipeline runs staff detection, melody recognition, chord recognition, and a
 deterministic grammar-correction stage. It takes a PDF or image as input and returns a
 structured JSON document with the LMX token sequence and the chord list for each detected
-staff. The results show that CRNN-CTC recognition is a practical approach for monophonic
-jazz lead sheets; extending it to polyphonic notation and to genuine scanned pages is
-left for future work.
+staff. The results show that CRNN--CTC recognition is a practical approach for monophonic
+jazz lead sheets. The system has been fine-tuned and inspected qualitatively on genuine scans;
+what remains for future work is a quantitative real-domain melody SER benchmark and an
+extension to polyphonic notation.

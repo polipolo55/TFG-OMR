@@ -19,19 +19,25 @@ worst-case predictions are collected in \Cref{app:qual}.
 \Cref{sec:res-soa} positions these numbers against the published
 state of the art.
 \Cref{sec:res-domaingap} addresses the synthetic-to-real domain gap
-and is, in the current draft, the chapter's main open experimental
-front.
+and identifies the main open experimental question: measuring real-domain
+melody SER once enough ground-truth pages are available.
 
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Experimental Protocol}
 \label{sec:res-protocol}
 
-All numbers in this chapter are produced from a single trained
-checkpoint, \code{models/latest/best\_model.pt} (epoch 83), with the
-hyperparameters listed in \Cref{tab:hyperparams-omr} (\Cref{app:hyperparams}).
-The procedure is reproducible with the one-line command shown at the
-end of this section.
+All quantitative SER numbers in this chapter are produced from the
+synthetic-data baseline at its best epoch (epoch 83 of the 90-epoch run;
+\Cref{sec:res-training}), with the hyperparameters listed in
+\Cref{tab:hyperparams-omr} (\Cref{app:hyperparams}). This distinction is
+deliberate: the baseline is the model with a clean held-out synthetic
+test protocol, whereas the real-data fine-tuned model deployed as
+\code{models/latest/best\_model.pt} (\Cref{sec:res-finetune}) has no
+held-out real melody set large enough for a stable SER. On the synthetic
+validation split, the fine-tuned checkpoint remains within run-to-run
+noise of the baseline. The procedure for reproducing the baseline
+numbers is shown at the end of this section.
 
 \paragraph{Datasets and splits.}
 The corpora, the three domain filters, and the deterministic
@@ -71,7 +77,7 @@ The entire test-set evaluation is reproduced by
 %
 \begin{quote}
 \code{poetry run python scripts/evaluate\_full.py}\\
-\code{\quad --checkpoint models/latest/best\_model.pt}\\
+\code{\quad --checkpoint models/run\_20260612\_101637/best\_model.pt}\\
 \code{\quad --split test --both-splits}
 \end{quote}
 %
@@ -152,12 +158,14 @@ together.  The augmentation pipeline meets its acceptance criterion of
 keeping the clean-to-scanned gap below one percentage point
 (\Cref{sec:design-domain}).
 \Cref{tab:results-headline} consolidates these headline numbers, which
-the rest of the chapter decomposes.
+the rest of the chapter decomposes, and \Cref{fig:ser-distribution}
+shows the corresponding per-sample SER distribution on the scanned
+variant.
 
 \begin{table}[ht]
     \centering
-    \caption{Headline test-set results on the epoch-83 checkpoint
-    (\code{models/latest/best\_model.pt}), greedy CTC decoding,
+    \caption{Headline test-set results on the epoch-83 synthetic
+    baseline checkpoint, greedy CTC decoding,
     4\,608 held-out samples per visual variant.  Reproduced with
     \code{scripts/evaluate\_full.py --both-splits}.}
     \label{tab:results-headline}
@@ -192,8 +200,6 @@ the rest of the chapter decomposes.
     \label{fig:ser-distribution}
 \end{figure}
 
-\Cref{fig:ser-distribution} shows the per-sample SER distribution on
-the scanned variant.
 The modal outcome is a perfect transcription
 ($\approx \SI{72.7}{\percent}$ of samples have SER \num{0}), and the
 empirical CDF exceeds \num{0.90} by SER \num{0.05}.
@@ -364,6 +370,7 @@ A natural question is whether long sequences accumulate more errors
 than short ones, since the CTC time-step budget is proportional to
 image width and there is no \textit{a priori} guarantee that long
 samples remain in alignment.
+\Cref{fig:ser-vs-length} plots this relationship directly.
 
 \begin{figure}[htbp]
     \centering
@@ -381,9 +388,8 @@ samples remain in alignment.
     \label{fig:ser-vs-length}
 \end{figure}
 
-\Cref{fig:ser-vs-length} shows that the median per-sample SER is
-essentially zero across the full range of sequence lengths in the
-corpus (\num{20} to \num{140} tokens).
+The median per-sample SER is essentially zero across the full range of
+sequence lengths in the corpus (\num{20} to \num{140} tokens).
 The tail of the distribution broadens slightly at the longest
 lengths, but the model does not exhibit the alignment
 breakdown that CTC can occasionally produce when the input is too
@@ -435,15 +441,10 @@ The scan-simulation pipeline is therefore not a regulariser on clean
 data but a prerequisite for robustness to the visual distribution
 shift the system faces at real-scan inference, directly supporting the
 design choice justified in \Cref{sec:design-data}.
-\todo{Re-run the no-augmentation ablation against the epoch-83 baseline and report the matched clean/scanned SER pair.}
-
-\todo{Virtual header injection ablation: evaluate with/without header prepending on real continuation staves.}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Qualitative Examples}
 \label{sec:res-qualitative}
-
-\todo{fig\_qual\_perfect and fig\_qual\_median are illustrative hand-picked examples with no generator script; visually re-confirm them against the epoch-83 model (the median caption quotes a specific edit distance of 2 / SER 0.038). The worst-case figures, fig\_qual\_worst\_1, and the quantitative figures were regenerated against epoch 83.}
 
 This section shows representative predictions drawn from the perfect
 (\Cref{fig:qual-perfect}) and near-median (\Cref{fig:qual-median})
@@ -542,7 +543,7 @@ together with a per-sample edit-operation breakdown, are collected in
 \end{figure}
 
 The examples above are drawn from the synthetic test split.
-A qualitative example on a genuine \textit{real} Real Book scan, where
+A qualitative example on a genuine Real Book scan, where
 no ground-truth transcription exists, is deferred to
 \Cref{sec:res-realpage}, which runs the full inference pipeline on a
 scanned page and pairs a recognised staff with its rendered prediction
@@ -559,7 +560,7 @@ What is reported below is therefore a positioning rather than a
 benchmark.
 
 The closest direct point of comparison is Calvo-Zaragoza et\,al.'s
-CRNN-CTC baseline on PrIMuS, which established the CTC-on-staff
+CRNN--CTC baseline on PrIMuS, which established the CTC-on-staff
 formulation as a credible approach to end-to-end staff-line
 recognition~\cite{calvoZaragozaEndToEndNeural2018,calvoZaragozaCameraPrimus2018}.
 The model here uses the same family of architectures and a derived
@@ -576,13 +577,13 @@ Transformer-based OMR systems
 have since pushed published SER lower on broader corpora, but at the
 cost of training-time and inference-time budgets that are out of
 reach for the hardware envelope of this project (RTX 3060, 12\,GB).
-The CRNN-CTC choice was justified in \Cref{sec:design-model-alts} on
+The CRNN--CTC choice was justified in \Cref{sec:design-model-alts} on
 the basis of this budget; the numbers above show the resulting system
 is competitive on the narrow lead-sheet domain it was scoped to.
 
 The Audiveris~\cite{audiverisAudiveris} symbolic OMR engine is the
 canonical free-software baseline.  A side-by-side qualitative
-comparison on a real Real Book page is the natural way to position
+comparison on a genuine Real Book page is the natural way to position
 this system against an established off-the-shelf tool.
 
 \Cref{tab:soa-comparison} consolidates this positioning across the
@@ -710,31 +711,18 @@ make: virtual header injection for clef-less staves
 \end{figure}
 
 % ─────────────────────────────────────────────────────────────────────────────
-% REMINDER (Pol, 2026-06-06): O7 is intentionally left open for now.
-%   Plan: finish the document first, then hand-label AT LEAST 40 real staff
-%   strips with the /music-labeler UI (model-assisted: correct the first-pass
-%   prediction, don't transcribe from scratch). With those labels:
-%     1. fill the two \todo{} items below (zero-shot real SER + before/after
-%        fine-tuning on a held-out real split), and
-%     2. flip O7 in sec:conc-objectives from "partially met / deferred" to
-%        "met", and drop it from the future-work list in sec:future-work.
-%   The fine-tune infra already exists (--finetune-data-dir flag, music-labeler).
-%   This is annotation-bound, not method-bound; revisit after the doc is done.
-% ─────────────────────────────────────────────────────────────────────────────
 \section{The Synthetic-to-Real Domain Gap}
 \label{sec:res-domaingap}
 
 The numbers reported above are all measured on the held-out
 \textit{synthetic} test split.
 The question of practical importance is whether the same model
-generalises to scans of real Real Book pages, the input distribution
+generalises to scans of genuine Real Book pages, the input distribution
 the system will face once deployed.
 The fine-tuning experiment of \Cref{sec:res-finetune} answers this
 qualitatively and supplies the deployed model; a \textit{quantitative}
 real-domain SER, both zero-shot and after fine-tuning, is the part that
-remains open, gated on a larger hand-annotated set.
-
-\todo{Zero-shot real eval: hand-label $\sim$50 staves, run \code{evaluate} on real scans, report SER.}
+remains open, gated on a larger hand-labelled set.
 
 \subsection{Fine-tuning on real pages}
 \label{sec:res-finetune}
@@ -781,7 +769,7 @@ indistinguishable from the baseline: validation SER moves from
 metric, and the experiment does not expect them to: what it confirms is
 that fine-tuning causes no measurable regression on the synthetic
 distribution, that is, no catastrophic forgetting.  On genuine scans the
-effect is visible.  Run on three real Real Book sheets that were not part
+effect is visible.  Run on three genuine Real Book sheets that were not part
 of the annotation set, the fine-tuned checkpoint produced cleaner
 transcriptions than the synthetic baseline on all three, with fewer
 spurious duration and accidental tokens and better-aligned barlines.
@@ -802,9 +790,10 @@ annotated set discussed in \Cref{sec:future-work}.
 \subsection{Qualitative inference on a complete Real Book page}
 \label{sec:res-realpage}
 
-While the zero-shot SER above awaits its annotation, the full pipeline
-can still be inspected qualitatively on a genuine scanned Real Book
-page, the input distribution the system is ultimately meant for.
+Although quantitative real-domain melody SER still awaits a larger
+annotation set, the full pipeline can be inspected qualitatively on a
+genuine scanned Real Book page, the input distribution the system is
+ultimately meant for.
 \Cref{fig:realpage-annotated} shows the end-to-end run on the
 \textit{Satin Doll} lead sheet.
 Staff detection finds nine candidate systems; the two-tier reject gate
@@ -817,11 +806,11 @@ staves are recognised, each annotated with its detected chord symbols
 LilyPond re-render of its predicted LMX.
 
 This is qualitative evidence only --- the page carries no ground-truth
-transcription, so no SER is reported, and the quantitative zero-shot
-measurement above remains the missing experiment.
+transcription, so no SER is reported, and the quantitative real-domain
+measurement remains the missing experiment.
 What it does show is that the melody recogniser and the chord stream
 both produce clef-correct, harmonically sensible output on a real
-handwritten scan, not just on the synthetic split, and that the
+hand-lettered scan, not just on the synthetic split, and that the
 reject gate behaves as designed on genuine page furniture.
 The recovered chords are the correct changes of the tune, and the
 rendered melody follows the contour of the input staff.
@@ -861,7 +850,7 @@ gate (\Cref{sec:design-staff-reject}).
     \caption{One recognised staff from the \textit{Satin Doll} scan of
     \Cref{fig:realpage-annotated}: the input strip (top) and the
     re-rendered prediction (bottom).
-    The melody contour and rhythmic figures of the handwritten input are
+    The melody contour and rhythmic figures of the hand-lettered input are
     reproduced on the correct treble clef; the comparison is
     qualitative, as the page has no ground-truth transcription.}
     \label{fig:realpage-staff}
@@ -885,7 +874,7 @@ numbers are reproduced by \code{scripts/evaluate\_chord.py}.
 \begin{table}[ht]
     \centering
     \caption{Chord-recognition evaluation across the three conditions, all with
-    greedy decoding.  The synthetic-pretrain checkpoint is evaluated on
+    greedy decoding.  The synthetic pre-trained checkpoint is evaluated on
     the clean synthetic validation strips and, zero-shot, on the real
     strips it never saw; the fine-tuned checkpoint is evaluated on a
     held-out real split (the seed-42 90/10 partition of the fine-tuning
@@ -900,15 +889,15 @@ numbers are reproduced by \code{scripts/evaluate\_chord.py}.
         \textbf{Condition} & \textbf{Checkpoint} & {\textbf{CER (\%)}}
             & {\textbf{Exact (\%)}} & \textbf{Strips} \\
         \midrule
-        Synthetic val          & pretrain   &  0.0 & 100.0 & 2000 \\
-        Real, zero-shot        & pretrain   & 74.0 &   0.0 &  291 \\
-        Real held-out, zero-shot & pretrain & 69.9 &   0.0 &   29 \\
+        Synthetic val          & pre-trained &  0.0 & 100.0 & 2000 \\
+        Real, zero-shot        & pre-trained & 74.0 &   0.0 &  291 \\
+        Real held-out, zero-shot & pre-trained & 69.9 &   0.0 &   29 \\
         Real held-out, fine-tuned & fine-tune &  5.9 &  58.6 &   29 \\
         \bottomrule
     \end{tabular}
 \end{table}
 
-The synthetic-pretrain model is effectively perfect on clean synthetic
+The synthetic pre-trained model is effectively perfect on clean synthetic
 strips (\SI{0.0}{\percent} CER, every one of the \num{2000} validation
 strips decoded exactly), but it collapses on real strips when applied
 zero-shot: \SI{74.0}{\percent} CER over the \num{291} hand-labelled
@@ -917,7 +906,7 @@ zero-shot error is spurious insertion (the model hallucinates extra
 characters on the unfamiliar hand-lettered glyphs and page clutter
 rather than substituting one character for another), which is the chord
 analogue of the synthetic-to-real gap framed for the melody stream
-above, but far more severe: the chord glyphs of a real Real Book page
+above, but far more severe: the chord glyphs of a genuine Real Book page
 diverge from the LilyJAZZ renders more sharply than staff notation
 does, and the chord strip additionally carries binder-hole shadows,
 staff-line bleed, and slash-repeat marks (\Cref{sec:impl-chord}).
@@ -927,8 +916,8 @@ Fine-tuning on the small real set closes most of that gap.  On the
 on the other \num{262} real strips, drops from \SI{69.9}{\percent} to
 \SI{5.9}{\percent} CER and reaches a \SI{58.6}{\percent} exact-match
 rate (17 of 29 strips decoded with zero character errors).  This is the
-direct chord-stream evidence for the synthetic-pretrain then
-real-fine-tune plan of \Cref{sec:design-training}: for the chord
+direct chord-stream evidence for the synthetic pre-training then
+real fine-tuning plan of \Cref{sec:design-training}: for the chord
 branch, unlike the melody branch, the real fine-tuning phase is not an
 optional refinement but a prerequisite for usable accuracy.
 
@@ -967,7 +956,7 @@ synthetic baseline within the operating range required for downstream
 musical applications.
 
 The chord-recognition stream, evaluated separately in \Cref{sec:res-chord},
-confirms the same pretrain-then-fine-tune pattern at the character
+confirms the same pre-training then fine-tuning pattern at the character
 level: a zero-shot CER of \SI{69.9}{\percent} on the held-out real split drops
 to \SI{5.9}{\percent} after fine-tuning on the other \num{262} hand-labelled
 strips, with a \SI{58.6}{\percent} exact-match rate.

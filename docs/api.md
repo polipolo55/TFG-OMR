@@ -187,7 +187,7 @@ Persist a label or skip decision.
 ## Music-Strip Labeling Endpoints
 
 These power `static/music_labeler.html`, the UI for hand-correcting note CRNN
-predictions on real Real Book staff crops to build the `--finetune-data-dir`
+predictions on genuine Real Book staff crops to build the `--finetune-data-dir`
 set. Strips and pre-labels are produced by
 `src/data_processing/extract_real_music_strips.py`; data lives in
 `data/music_real/{strips/,labels.jsonl}`.

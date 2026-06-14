@@ -31,7 +31,7 @@
   node distance=0.85cm and 1.6cm
 ]
   % ── Main vertical pipeline ───────────────────────────────────────────────
-  \node[io]                       (img)     {Staff image\\$H\times W$, grayscale};
+  \node[io]                       (img)     {Staff image\\$H\times W$, greyscale};
   \node[stage, below=of img]      (cnn)     {Convolutional backbone (ResNet18)};
   \node[stage, below=of cnn]      (reshape) {Column reshape\\\footnotesize collapse height; width $\to W/4$ frames};
   \node[stage, below=1.4cm of reshape] (lstm) {Bidirectional LSTM};
@@ -48,7 +48,7 @@
   \node[aux, right=2.2cm of lin] (vocab) {Vocabulary\\$|V|$ tokens $+$ blank};
 
   % ── Annotations on the left (tensor flow) ────────────────────────────────
-  \node[note, left=0.45cm of cnn]     (n1) {grayscale\\strip input};
+  \node[note, left=0.45cm of cnn]     (n1) {greyscale\\strip input};
   \node[note, left=0.45cm of reshape] (n2) {feature map\\$C'\times H'\times \frac{W}{4}$};
   \node[note, left=0.45cm of lstm]    (n3) {context-rich\\frame states};
   \node[note, left=0.45cm of ctc]     (n4) {alignment over\\$\frac{W}{4}$ frames};
@@ -79,7 +79,7 @@
 \caption[CRNN--CTC pipeline for monophonic OMR.]{%
   The CRNN--CTC pipeline applied to a single music staff, drawn in three
   phases. A \emph{visual encoder} (a ResNet18 convolutional backbone)
-  turns the grayscale staff strip into a feature map and reshapes it into a
+  turns the greyscale staff strip into a feature map and reshapes it into a
   left-to-right sequence of $W/4$ frames; a \emph{sequence model} (a
   bidirectional LSTM) contextualises each frame; and the \emph{CTC
   transcription} stage projects every frame to a distribution over the

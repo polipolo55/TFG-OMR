@@ -96,8 +96,8 @@ distribution into a token sequence using the CTC
 alignment~\cite{gravesConnectionistTemporal2006}, removing the need for
 per-symbol segmentation~\cite{shiEndToEndTrainable2017}.
 
-Alongside the architecture, Calvo-Zaragoza and Rizo released the
-\term{PrIMuS} corpus~\cite{PrIMuSDataset,calvoZaragozaEndToEndNeural2018}: 87\,678 monophonic
+Alongside the architecture, \textcite{calvoZaragozaEndToEndNeural2018}
+released the \term{PrIMuS} corpus~\cite{PrIMuSDataset}: 87\,678 monophonic
 incipits sourced from the R\'epertoire International des Sources
 Musicales (RISM) and distributed in five
 representations, including two purpose-built token formats.
@@ -135,8 +135,8 @@ linearised target representation, dispensing with CTC entirely.
 full-page pianoform input and, at its 2024 release, defined the state of
 the art on that task.
 \term{LEGATO}~\cite{yangLEGATO2025}, released in mid-2025, takes the
-trend further with a pretrained vision encoder, an ABC-notation decoder, and over
-214\,000 typeset pages of pretraining, reporting on its most realistic
+trend further with a pre-trained vision encoder, an ABC-notation decoder, and over
+214\,000 typeset pages of pre-training, reporting on its most realistic
 evaluation set absolute error reductions of up to \SI{68}{\percent} on the
 tree-edit metric TEDn and \SI{47.6}{\percent} on OMR-NED over the previous
 state of the art; both metrics are defined in \Cref{sec:soa-metrics}. \Cref{fig:soa-transformer-pipeline} shows the generic encoder--decoder
@@ -197,7 +197,7 @@ and, at 293 annotated sheets, is far smaller than the tens of
 thousands of samples those CRNN--CTC models require, and so cannot train
 one from scratch. Recent end-to-end
 systems such as SMT, SMT++, OLiMPiC, and LEGATO address an
-equivalent scarcity by synthetic pretraining followed by fine-tuning on a
+equivalent scarcity by synthetic pre-training followed by fine-tuning on a
 small annotated target set.
 
 % ─────────────────────────────────────────────────────────────────────────────
@@ -311,7 +311,7 @@ presented at ISMIR 2025 and roughly contemporaneous with the final stages
 of this thesis.
 That work introduces a 293-sheet dataset of \textit{handwritten} jazz lead
 sheets with \code{**kern} and MusicXML ground truth, and trains a
-transformer-decoder model with symbolic-aware tokenisation, pretrained on
+transformer-decoder model with symbolic-aware tokenisation, pre-trained on
 synthetic data and fine-tuned on the handwritten target set.
 
 The present work differs in input domain (printed and scanned Real Book

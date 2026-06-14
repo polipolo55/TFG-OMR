@@ -145,7 +145,7 @@ Input (PDF / image bytes)
 
 ```
 src/
-├── cli.py                      unified CLI (12 subcommands; see docs/cli.md)
+├── cli.py                      unified CLI (13 subcommands; see docs/cli.md)
 ├── style.py                    matplotlib theme
 ├── CRNN_CTC/                   model, training, vocab, evaluation
 │   ├── model.py                CRNN-CTC architecture (ResNet18 / VGG backbone)
@@ -183,7 +183,7 @@ data/
 ├── chord_synth/            synthetic chord-strip images + CSV labels
 │   ├── train/  val/        split folders
 │   └── train_labels.csv  val_labels.csv
-├── chord_real/             real Real Book chord strips for fine-tuning
+├── chord_real/             genuine Real Book chord strips for fine-tuning
 │   ├── strips/             cropped PNG images from real PDF pages
 │   └── labels.jsonl        hand-corrected labels (status: pending/done/skip)
 └── vocab/
@@ -207,8 +207,8 @@ latex_documents/gep/        GEP thesis-management deliverables
 
 ## Performance
 
-Held-out test split (4 608 samples), greedy CTC decoding, latest checkpoint
-(`models/latest/best_model.pt` = `run_20260612_101637`, best epoch 83):
+Held-out test split (4 608 samples), greedy CTC decoding, synthetic baseline
+checkpoint (`models/run_20260612_101637/best_model.pt`, best epoch 83):
 
 > **Note on comparability.** Evaluation numbers from CRNN runs *before
 > 2026-06-03* (e.g. 0.23 % SER / 94.1 % perfect from `run_20260601_134845`)
@@ -223,13 +223,13 @@ Held-out test split (4 608 samples), greedy CTC decoding, latest checkpoint
 - **Error breakdown:** barline (`measure`) tokens ≈14.7 % per-category error and
   ties ≈31 % together account for ~87 % of all edits.
   Pitch/octave/duration error rates are each well below 0.1 %.
-- **Beam search** (width 5) yields ≤ 1 edit/1000 SER improvement at ~6× decode
+- **Beam search** (width 5) yields ≤ 1 edit/1000 SER improvement at ~8× decode
   cost; greedy is the recommended default.
 - **Hardware target:** NVIDIA RTX 3060 (12 GB VRAM), batch size 16–24
-- **Training time:** 90-epoch OneCycle schedule (~8 min/epoch on the 3060),
+- **Training time:** 90-epoch OneCycle schedule (~8.6 min/epoch on the 3060),
   early stopping at patience 12; best at epoch 83.
 
-Reproduce: `poetry run python scripts/evaluate_full.py --checkpoint models/latest/best_model.pt --split test --both-splits`
+Reproduce: `poetry run python scripts/evaluate_full.py --checkpoint models/run_20260612_101637/best_model.pt --split test --both-splits`
 
 ## Known Limitations and Out-of-Scope Notation
 

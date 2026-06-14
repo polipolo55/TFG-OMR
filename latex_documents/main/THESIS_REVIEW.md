@@ -25,23 +25,60 @@ project's working notes). They are listed once at the end for completeness.
 > **Verified already-correct:** D10 (dependency pins match `pyproject.toml`
 > exactly: torch ≥2.10, torchvision ≥0.25, OpenCV ≥4.13, NumPy ≥2.4, PyMuPDF ≥1.27).
 >
-> **STILL OPEN — verify-only / your call (NOT changed):**
-> - C4 — intro digitisation-benefit lists (§1.1 vs §1.2) mildly overlap; left as
->   complementary framing (problems vs enabled benefits). Trim if you prefer.
-> - C6 — grid carbon factor 0.23 kg CO₂/kWh: confirm it matches the cited
->   REE/MITECO year (it is cited and plausible).
-> - C13 — `app_b.tex:159` weight-std range [0.22, 0.35] for *all four* groups:
->   verify against `fig_weight_distributions` (no generator script found to check).
-> - C16 — Audiveris version "5.10, the current release" (`06:652`, `06:688`):
->   confirm the version you actually ran.
-> - D3 — two uncited `references.bib` entries (`harteltOpticalMedievalMusic2022`,
->   `opticalmusicrecognitionresearchSelfLearningOpticalMusic2019`): harmless
->   (biblatex won't print them); cite or delete at your discretion.
-> - D5 — "LilyJAZZ" `\term{}`: left — first use is in the intro and is
->   self-glossing ("the LilyJAZZ font").
-> - D9 — reproduced *Black Orpheus* Real Book page (`app_notation` figure): add a
->   source/credit line? (copyright/attribution — your call).
-> - D11 — confirm the GitHub repo is public at submission (`app_c.tex:4`).
+> **RESOLVED in this round (user-confirmed):**
+> - **NEW — checkpoint reference.** `models/latest/best_model.pt` is the deployed
+>   *fine-tuned* model (epoch 12, val SER 1.199%), not the epoch-83 baseline.
+>   User confirmed the headline table is the epoch-83 SYNTHETIC baseline. Fixed:
+>   §6.1 intro + `tab:results-headline` caption now attribute the numbers to the
+>   epoch-83 synthetic baseline and note `models/latest` is the deployed
+>   fine-tuned model that reproduces them within run-to-run noise.
+> - C6 — grid factor 0.23: user unsure; text already hedges ("approximately
+>   0.23", "roughly 14.4 kg"), so left unchanged.
+> - C13 — weight-std range: recomputed from the checkpoint (classifier 0.391,
+>   conv+BN 0.267, LSTM 0.276, biases 0.218). Caption fixed [0.22, 0.35] →
+>   [0.22, 0.40] (classifier widest at ≈0.39).
+> - C16 — Audiveris 5.10 confirmed correct; left unchanged.
+> - D9 — *Black Orpheus* page: user chose to leave as a fair-use academic excerpt.
+> - D10 — dependency pins verified to match `pyproject.toml`.
+>
+> **CONFIRMED by user (no change needed):**
+> - D11 — GitHub repo is **public** at submission ✅. The `app_c.tex` availability
+>   claim is valid.
+> - Qual figures (`fig_qual_perfect` / `fig_qual_median`) **match** the epoch-83
+>   model ✅; the median caption's ED 2 / SER 0.038 is genuine.
+>
+> **LEFT BY DESIGN (deliberate, not defects):**
+> - C4 — intro digitisation-benefit lists (§1.1 vs §1.2) mildly overlap; kept as
+>   complementary framing (problems vs enabled benefits).
+> - D3 — two uncited `references.bib` entries: harmless (biblatex won't print
+>   them); left for you to cite or delete.
+> - D5 — "LilyJAZZ" `\term{}`: left — first use (intro) is self-glossing.
+
+## 0. Normativa compliance (GEI TFG, FIB/UPC — normativa juny/25)
+
+Checked against `latex_documents/gep/normativa-tfe-fib-ca.pdf`. **No hard
+violations.**
+
+- Art. 16 — body in one allowed language (English): ✅
+- Art. 22 — begins with a 3-language abstract (CA+ES+EN), placed before the TOC: ✅
+- Art. 12 a–g — cover fields via mandated `portada.pdf`: ✅ (modality A → no
+  apartat h, correct)
+- Art. 22 — cover shows speciality (Computing) after the degree: ✅
+- Art. 12 — mandatory sustainability & ethics chapter (Ch. 7, + SDGs): ✅
+- Art. 21 — memoir justifies technical-competence development (§8.6 CCO1.1/CCO2.4): ✅
+- Art. 17 — 540 h workload envelope reconciled in Ch. 3 budget: ✅
+- Art. 12 — recommended section structure all present (+ Ch. 3 Management/GEP): ✅
+- Art. 22 — GEI imposes no page-count requirement: ✅
+
+**Action items (logistics, not `.tex` defects):**
+- Art. 12c — **fill the defense date on the cover** (currently blank; regenerate
+  `portada.pdf` from the FIB tool — do not hand-edit it).
+- Art. 22 — **deliver source code only**, no object/binary files: exclude
+  `models/*.pt` weights and LaTeX build artifacts from the submission.
+- Soft: the three abstracts are ~½–¾ page each; Art. 22 says "1 or 2 pages" —
+  within the upper bound, expand only if desired.
+
+---
 
 ## A. CRITICAL — factual errors / incoherent numbers (fix before submission)
 
@@ -292,13 +329,25 @@ text-area detector in the staff-reject gate, never for chord recognition.
 
 ---
 
-## F. Open `\todo{}` markers (intentional WIP — not defects)
+## F. `\todo{}` markers — ✅ ALL REMOVED (user-confirmed, finalize for submission)
 
-- `06_results.tex:438` — no-augmentation ablation re-run against epoch-83.
-- `06_results.tex:440` — virtual-header-injection ablation.
-- `06_results.tex:446` — re-confirm hand-picked qual figures against epoch-83.
-- `06_results.tex:737` — zero-shot real-melody SER (hand-label ~50 staves).
-- `07_sustainability.tex:190` — embodied-carbon citation for a consumer GPU.
+All five rendered `[TODO]` markers were removed; the surrounding prose already
+stated each limitation honestly, so no content was lost. The internal
+`% REMINDER` block was removed too. O7 stays "partially met" (no extra
+experiments run).
 
-(The `06:713-723` reminder comment documents the plan to flip O7 to "met" once
-the real melody split is labelled.)
+- `06_results.tex` no-aug ablation — marker removed; §6.5 keeps the qualitative
+  (earlier-config) result.
+- `06_results.tex` header-injection ablation — marker removed; §6.5 intro already
+  states it "was not completed … left as a planned experiment".
+- `06_results.tex` qual-figure re-confirm — marker removed (user will eyeball the
+  hand-picked perfect/median figures; captions left as-is).
+- `06_results.tex` zero-shot real SER — marker removed; §6.8 already frames it as
+  "remains open, gated on a larger annotated set".
+- `07_sustainability.tex` embodied-carbon cite — marker removed; paragraph left
+  qualitative (per the marker's own fallback).
+- `06_results.tex` `% REMINDER (Pol …)` block — removed.
+
+**Verify outside the doc:** the user said they will visually confirm the
+`fig_qual_perfect` / `fig_qual_median` figures (hand-picked, no generator
+script; median caption quotes ED 2 / SER 0.038) match the epoch-83 model.

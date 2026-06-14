@@ -729,14 +729,75 @@ The numbers reported above are all measured on the held-out
 The question of practical importance is whether the same model
 generalises to scans of real Real Book pages, the input distribution
 the system will face once deployed.
-This section is, in the current draft, the chapter's main open
-experimental front.
+The fine-tuning experiment of \Cref{sec:res-finetune} answers this
+qualitatively and supplies the deployed model; a \textit{quantitative}
+real-domain SER, both zero-shot and after fine-tuning, is the part that
+remains open, gated on a larger hand-annotated set.
 
 \todo{Zero-shot real eval: hand-label $\sim$50 staves, run \code{evaluate} on real scans, report SER.}
 
-\subsection{Fine-tuning}
+\subsection{Fine-tuning on real pages}
+\label{sec:res-finetune}
 
-\todo{Real fine-tuning: train on $\sim$40 labelled staves, report before/after SER on held-out real set.}
+The two-phase plan of \Cref{sec:design-training} also calls for a
+real-data phase on the melody stream.  That phase was carried out, and
+the resulting checkpoint is the model now deployed by the pipeline.  The
+evidence it produces is weaker than for the chord branch, for a reason
+that follows from the leakage-safe split design rather than from the
+method itself.
+
+\paragraph{Annotation set.}
+\num{36} real staves were hand-labelled with the model-assisted
+music-strip UI of \Cref{sec:impl-api}, correcting the synthetic model's
+first-pass prediction rather than transcribing from scratch.  The strips
+were harvested from \num{13} scanned Real Book pages; a further
+\num{212} candidate strips were skipped as illegible or non-lead-sheet
+(title bands, attribution lines, multi-staff systems), an
+$\approx\SI{85}{\percent}$ discard rate that doubles as a measure of the
+staff detector's precision on raw pages.  Of the \num{36} kept staves,
+\num{7} carry a printed header and \num{29} are continuation staves
+labelled header-less, matching the inference contract of
+\Cref{sec:design-pipeline}.
+
+\paragraph{Protocol.}
+Fine-tuning is a warm start rather than a fresh run: the converged
+synthetic checkpoint (epoch \num{83}) is loaded with the
+\code{--init-weights} flag described in \Cref{sec:impl-finetune}, which
+restores the weights only and then begins a fresh OneCycle schedule at a
+reduced peak learning rate of $1{\times}10^{-4}$ for \num{12} epochs.
+The \num{36} real staves are appended to the \emph{training} split alone
+through \code{--finetune-data-dir}; validation and test stay drawn from
+the synthetic corpus, so the held-out synthetic numbers remain directly
+comparable to the baseline.  This is the melody analogue of the chord
+fine-tuning of \Cref{sec:res-chord}, with one structural difference noted
+below.
+
+\paragraph{Result.}
+On the synthetic validation split the fine-tuned checkpoint is
+indistinguishable from the baseline: validation SER moves from
+\SI{1.18}{\percent} to \SI{1.19}{\percent}, inside run-to-run noise.  The
+\num{36} real staves are roughly \SI{0.1}{\percent} of the
+\num{36873}-sample training pool, far too few to shift a synthetic
+metric, and the experiment does not expect them to: what it confirms is
+that fine-tuning causes no measurable regression on the synthetic
+distribution, that is, no catastrophic forgetting.  On genuine scans the
+effect is visible.  Run on three real Real Book sheets that were not part
+of the annotation set, the fine-tuned checkpoint produced cleaner
+transcriptions than the synthetic baseline on all three, with fewer
+spurious duration and accidental tokens and better-aligned barlines.
+
+\paragraph{Why no held-out real SER.}
+The chord branch reserved \num{29} of its real strips for a quantitative
+held-out test (\Cref{tab:chord-eval}); the melody fine-tune set is
+instead appended in full to the training split.  This is a deliberate
+consequence of the leakage-safe split of \Cref{sec:design-training}:
+real staves are kept out of the synthetic validation and test pools so
+that no real sample can leak into evaluation, but with only \num{36}
+staves there are too few to also carve out a real held-out split that
+would give a stable SER.  The melody real-domain result is therefore
+qualitative at this scale, and the measurable
+$\geq\SI{30}{\percent}$-reduction target of Objective~7 awaits the larger
+annotated set discussed in \Cref{sec:future-work}.
 
 \subsection{Qualitative inference on a complete Real Book page}
 \label{sec:res-realpage}
@@ -913,9 +974,11 @@ with a \SI{58.6}{\percent} exact-match rate on the held-out set.
 
 Two experimental fronts remain open.
 First, the synthetic-to-real domain gap for the music stream
-(\Cref{sec:res-domaingap}) still awaits hand-labelled staves; closing
-it is the prerequisite for the \enquote{partially met} verdict on
-Objective~7 in \Cref{ch:conclusions}.
+(\Cref{sec:res-domaingap}): the melody fine-tuning phase has been run
+and deployed and improves transcription on genuine scans qualitatively
+(\Cref{sec:res-finetune}), but a quantitative held-out real SER still
+awaits a larger annotated set, which is what keeps the verdict on
+Objective~7 at \enquote{partially met} in \Cref{ch:conclusions}.
 Second, one of the three ablations --- virtual header injection
 (\Cref{sec:res-ablations}) --- requires an additional training run that
 was not completed within the project timeline; the backbone and

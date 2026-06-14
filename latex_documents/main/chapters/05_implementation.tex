@@ -353,6 +353,25 @@ The complete parameter list is in \Cref{tab:hyperparams-omr} and
 noting here is batch size~16, which keeps peak VRAM at
 $\approx$\,\SI{8.5}{\giga\byte} on the target hardware.
 
+\subsection{Warm-start fine-tuning}
+\label{sec:impl-finetune}
+
+The second training phase of \Cref{sec:design-training} reuses the same
+loop with two changes.  The \code{--init-weights} flag loads the model
+weights from a converged synthetic checkpoint and discards its optimiser
+and scheduler state, so training opens a fresh OneCycle schedule instead
+of resuming the decayed tail of the original run; this is what separates
+a fine-tune from the crash-recovery \code{--resume} path, which restores
+the full optimiser state and continues the same run in place.  The peak
+learning rate is lowered to $1{\times}10^{-4}$, against the
+$1{\times}10^{-3}$ of phase one, so the small real set shifts the feature
+distribution without overwriting the synthetic representations.  Real
+staves enter through \code{--finetune-data-dir}, which appends them to
+the training split only (\Cref{sec:design-training}); the annotation
+itself uses the model-assisted music-strip UI served at
+\code{/music-labeler} (\Cref{sec:impl-api}), the melody counterpart of
+the chord labeller below.
+
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Chord OCR Implementation}
 \label{sec:impl-chord}

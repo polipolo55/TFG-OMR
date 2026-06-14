@@ -64,14 +64,22 @@ a pointer to the evidence.
           in the same section.
     \item \textbf{O7 — Domain-gap quantification and fine-tuning on
           real Real Book pages.}
-          \emph{Partially met / deferred.}
+          \emph{Partially met.}
           The synthetic-to-scan gap is quantified by the
           clean-versus-scanned comparison
-          (\Cref{tab:results-headline}), and the fine-tuning protocol
-          is specified in \Cref{sec:design-training}.
-          The end-to-end measurement on hand-annotated Real Book pages
-          is not concluded in this memoir and is carried forward as
-          the first item of \Cref{sec:future-work}.
+          (\Cref{tab:results-headline}), and the fine-tuning phase was
+          carried out: a \num{36}-staff real set was hand-annotated and
+          used to warm-start the synthetic checkpoint
+          (\Cref{sec:res-finetune}), and the resulting model, now the
+          deployed default, transcribes genuine scans visibly better
+          than the synthetic baseline.
+          What remains open is the \emph{quantitative} half of the
+          objective: with only \num{36} real staves, all of them needed
+          for training, no real held-out split large enough for a stable
+          SER could be reserved, so the
+          $\geq\SI{30}{\percent}$-reduction target is not yet verified.
+          Enlarging the annotation set is carried forward as the first
+          item of \Cref{sec:future-work}.
 \end{itemize}
 
 % ─────────────────────────────────────────────────────────────────────────────
@@ -79,9 +87,11 @@ a pointer to the evidence.
 \label{sec:conc-results}
 
 The headline figures from \Cref{ch:results} are restated here for
-reference. All numbers refer to the epoch-83 checkpoint at
-\code{models/latest/best\_model.pt}, evaluated on 4\,608 held-out
-samples per split with greedy CTC decoding.
+reference. All numbers refer to the synthetic-baseline checkpoint
+(epoch \num{83}), evaluated on 4\,608 held-out samples per split with
+greedy CTC decoding; the real-data fine-tuned checkpoint that the
+pipeline deploys (\Cref{sec:res-finetune}) leaves these synthetic
+numbers unchanged within run-to-run noise.
 
 \begin{itemize}
     \item \textbf{Aggregate SER:} \SI{1.17}{\percent} (clean) and
@@ -225,19 +235,21 @@ detector is not designed to solve.
 Each extension below is scoped against the existing codebase and
 infrastructure rather than as an open research direction.
 
-\paragraph{Real-data fine-tuning and end-to-end measurement on Real
-Book pages.}
-The synthetic-to-real gap remains the most important open question.
-Closing it means assembling a hand-annotated set of approximately
-\num{40} staves from real Real Book scans, running the fine-tuning
-protocol of \Cref{sec:design-training} with the convolutional backbone
-frozen and only the BiLSTM and CTC head updated, and measuring
-aggregate and melodic SER before and after fine-tuning.
+\paragraph{Quantitative real-domain measurement.}
+The melody fine-tuning phase has been run and deployed
+(\Cref{sec:res-finetune}): a \num{36}-staff real set warm-starts the
+synthetic checkpoint and improves transcription on genuine scans.
+What is still missing is a \emph{quantitative} real-domain SER.
+Producing one means enlarging the hand-annotated set well beyond the
+current \num{36} staves so that a real held-out split can be reserved,
+as was done for the \num{29}-strip chord test of
+\Cref{tab:chord-eval}, and then reporting aggregate and melodic SER
+before and after fine-tuning on that split.
 The infrastructure (the music-strip labelling UI of
-\Cref{sec:impl-api} and the \code{--finetune-data-dir} flag of the
-training CLI) is already in place;
-what is missing is the manual annotation effort, which is the binding
-constraint.
+\Cref{sec:impl-api}, with the \code{--init-weights} and
+\code{--finetune-data-dir} flags of the training CLI) is already in
+place; what is missing is the manual annotation effort, which is the
+binding constraint.
 
 \paragraph{Vocabulary extension to tuplets.}
 Tuplets are absent from both the training distribution and the LMX

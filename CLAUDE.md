@@ -72,11 +72,22 @@ The allowed set is `{4/4, 3/4, 2/4, 2/2, 6/8, 6/4, 5/4, 12/8}` and is defined in
 The project uses Poetry for dependency isolation. Never run `python src/...` directly;
 always `poetry run python src/...`.
 
-**7. CTC mean-logprob threshold in `staff_reject.py` is checkpoint-dependent.**
-The CTC-confidence gate uses `min_mean_logprob` calibrated against the current
-CRNN checkpoint's log-prob distribution. After every CRNN re-train, re-run
-`poetry run python src/cli.py calibrate-reject ...` and commit the updated
-`models/staff_reject/thresholds.json`.
+**7. The staff-reject CTC gate (`min_mean_logprob`) is hand-tuned — do NOT blindly re-run `calibrate-reject`.**
+The CTC-confidence gate in `staff_reject.py` rejects a staff when its mean CTC
+log-prob falls below `min_mean_logprob` (and `confident_override_logprob` rescues
+borderline geometry rejections). This value IS checkpoint-dependent in principle.
+**However:** `cli.py calibrate-reject` only sweeps the four *geometric* thresholds
+(line-span, spacing, ink, text-area — all checkpoint-independent); it does **not**
+calibrate `min_mean_logprob`, it copies `DEFAULT_THRESHOLDS.min_mean_logprob`
+(-1.2). The deployed `models/staff_reject/thresholds.json` carries **hand-tuned,
+music-preserving** values (`min_mean_logprob=-0.15`, `confident_override_logprob=-0.05`,
+set in commit `bc1fab7`). Running `calibrate-reject` would overwrite those with the
+default and re-sweep geometry from scratch, regressing the calibration.
+
+So after a CRNN re-train: the geometric gates need no change, and the CTC gate's
+threshold is a manual value — re-tune `min_mean_logprob` **by hand** only if real
+pages start getting wrongly rejected (verify on a few real pages first), then commit
+the change. Do not treat `calibrate-reject` as the recalibration step for the CTC gate.
 
 ---
 

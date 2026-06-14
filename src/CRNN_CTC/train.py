@@ -76,14 +76,29 @@ def _resolve_run_dir(cfg: Config, resume_from: Path | str | None) -> Path:
     return create_run_dir(cfg.model_dir)
 
 
-def train(cfg: Config, resume_from: Path | str | None = None) -> Path:
+def train(
+    cfg: Config,
+    resume_from: Path | str | None = None,
+    init_weights: Path | str | None = None,
+) -> Path:
     """Full training run. Returns path to the best checkpoint.
 
     Parameters
     ----------
     cfg : Config
         Centralised configuration (paths, hyperparameters, etc.).
+    resume_from : path, optional
+        Continue an interrupted run: restore model + optimiser + scheduler +
+        epoch counter and keep training the SAME run in place.
+    init_weights : path, optional
+        Warm-start fine-tuning: load ONLY the model weights from this checkpoint,
+        then start a FRESH run (new run dir, fresh optimiser, fresh OneCycle at
+        ``cfg.lr`` for ``cfg.epochs``). Use with ``finetune_data_dirs`` to adapt
+        a trained model to real data at a low LR. Mutually exclusive with
+        ``resume_from``.
     """
+    if resume_from is not None and init_weights is not None:
+        raise ValueError("Pass either resume_from or init_weights, not both.")
     seed_everything(cfg.seed)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

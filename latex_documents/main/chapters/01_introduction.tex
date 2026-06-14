@@ -13,7 +13,7 @@ Optical Character Recognition (OCR) did for printed text~\cite{shatriOPTICALMUSI
 This thesis describes the design, implementation, and quantitative evaluation of an
 end-to-end OMR system targeted at a specific and practically significant input: the
 monophonic melody lines and chord symbols of jazz lead sheets, with a primary focus on
-\textit{The Real Book}, one of the most widely circulated fake-books in jazz practice and
+\textit{The Real Book}, one of the best-known fake-books in jazz practice and
 pedagogy~\cite{kernfeldStoryFakeBooks2006}.
 
 \smallskip
@@ -138,8 +138,8 @@ This thesis addresses the four difficulties jointly: by constructing a synthetic
 training corpus in the jazz engraving style, applying a calibrated scan-simulation
 augmentation pipeline, training a \term{Convolutional Recurrent Neural Network}
 with the \term{Connectionist Temporal Classification} (CTC) loss (CRNN--CTC) for melody
-recognition, and building a separate OCR pathway for chord symbols that is fused into a
-unified output by the inference pipeline.
+recognition, and building a second CRNN--CTC network to read the chord symbols, whose
+output the inference pipeline fuses with the melody.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Objectives}
@@ -197,7 +197,7 @@ token sequences without requiring per-symbol segmentation; the full justificatio
 is in \Cref{ch:design,sec:mgmt-justification}.
 
 The system is organised around a five-stage inference pipeline (preprocessing, staff
-detection, melody recognition, grammar correction, and chord OCR) whose outputs are
+detection, melody recognition, grammar correction, and chord recognition) whose outputs are
 merged into a structured JSON document. The decomposition, the contracts between
 stages, and its design rationale are presented in detail in \Cref{ch:design}.
 
@@ -225,7 +225,7 @@ The project is bounded by the following scope definition.
     \item Staff region detection as a preprocessing module.
     \item Design, training, and evaluation of a CRNN-CTC model for single-staff
           melody recognition.
-    \item Chord symbol extraction via an OCR-based module.
+    \item Chord symbol extraction via a dedicated chord-recognition network.
     \item Quantitative evaluation using SER and qualitative error analysis.
     \item Domain-gap analysis and fine-tuning on a small set of annotated Real Book
           pages.

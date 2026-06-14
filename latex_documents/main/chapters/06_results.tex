@@ -20,7 +20,7 @@ worst-case predictions are collected in \Cref{app:qual}.
 state of the art.
 \Cref{sec:res-domaingap} addresses the synthetic-to-real domain gap
 and is, in the current draft, the chapter's main open experimental
-front.\
+front.
 
 
 % ─────────────────────────────────────────────────────────────────────────────
@@ -867,7 +867,7 @@ gate (\Cref{sec:design-staff-reject}).
     \label{fig:realpage-staff}
 \end{figure}
 
-\subsection{Chord OCR}
+\subsection{Chord Recognition}
 \label{sec:res-chord}
 
 The chord stream is evaluated on its own track, because its training
@@ -884,7 +884,7 @@ numbers are reproduced by \code{scripts/evaluate\_chord.py}.
 
 \begin{table}[ht]
     \centering
-    \caption{Chord-OCR evaluation across the three conditions, all with
+    \caption{Chord-recognition evaluation across the three conditions, all with
     greedy decoding.  The synthetic-pretrain checkpoint is evaluated on
     the clean synthetic validation strips and, zero-shot, on the real
     strips it never saw; the fine-tuned checkpoint is evaluated on a
@@ -966,11 +966,11 @@ barline boundaries from the time signature, these results place the
 synthetic baseline within the operating range required for downstream
 musical applications.
 
-The chord OCR stream, evaluated separately in \Cref{sec:res-chord},
+The chord-recognition stream, evaluated separately in \Cref{sec:res-chord},
 confirms the same pretrain-then-fine-tune pattern at the character
-level: a zero-shot CER of \SI{74.0}{\percent} on real strips drops to
-\SI{5.9}{\percent} after fine-tuning on \num{262} hand-labelled strips,
-with a \SI{58.6}{\percent} exact-match rate on the held-out set.
+level: a zero-shot CER of \SI{69.9}{\percent} on the held-out real split drops
+to \SI{5.9}{\percent} after fine-tuning on the other \num{262} hand-labelled
+strips, with a \SI{58.6}{\percent} exact-match rate.
 
 Two experimental fronts remain open.
 First, the synthetic-to-real domain gap for the music stream

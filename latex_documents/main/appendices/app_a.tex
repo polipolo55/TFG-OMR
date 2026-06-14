@@ -97,7 +97,7 @@ Total parameter count (ResNet18, vocab\_size=80) & \num{14365200} (\textasciitil
 \texttt{ImageCompression}            & JPEG quality $[72, 92]$                  & 0.35 \\
 \midrule
 \multicolumn{3}{@{}l}{\textit{Post-processing steps (applied in order)}} \\
-\texttt{dilate\_ink}        & 0, 1, or 2 morphological erosion iterations (weights 0.42\,/\,0.48\,/\,0.10) & 1.0 \\
+\texttt{dilate\_ink}        & 0, 1, or 2 morphological iterations that thicken the ink (weights 0.42\,/\,0.48\,/\,0.10) & 1.0 \\
 \texttt{vary\_staff\_line\_thickness} & $\pm 1$ px morphological tweak on detected staff lines  & 0.40 \\
 \texttt{remap\_tones}       & linear remap to paper range $[28, 245]$  & 1.0 \\
 \texttt{add\_vignette}      & radial darkening, strength $\approx 0.15$ jittered $\pm 40\%$ & 0.50\textsuperscript{*} \\
@@ -134,7 +134,7 @@ The three filter flags in \Cref{tab:filters} realise the lead-sheet domain contr
 
 The allowed time-signature set must remain in sync between \texttt{src/CRNN\_CTC/dataset.py} (\texttt{\_COMMON\_TIME\_SIGS}) and \texttt{src/omr\_pipeline/grammar\_fix.py} (\texttt{\_COMMON\_TIME\_SIGS}); the grammar fixer rejects, at inference, any prediction outside this set.
 
-\section{Chord OCR CRNN}
+\section{Chord-Recognition CRNN}
 
 The chord-symbol recognition stage uses a separate, smaller CRNN trained on synthetic LilyJAZZ strips and fine-tuned on hand-labelled Real Book strips. Its defaults are summarised in \Cref{tab:hyperparams-chord} and live in the \texttt{ChordConfig} dataclass at \texttt{src/CRNN\_CTC/chord\_train.py}; the fine-tuning stage at \texttt{src/CRNN\_CTC/chord\_finetune.py} overrides a subset of these.
 
@@ -164,10 +164,10 @@ BiLSTM hidden size                & 192 per direction   & 192 per direction \\
 LSTM inter-layer dropout          & 0.2                 & 0.2 \\
 CNN dropout                       & 0.15                & 0.15 \\
 Vocabulary size                   & 29 (26 char + 3 special) & 29 \\
-Real-to-synthetic sampling weight & N/A                 & real 1.0 / synth 0.4 \\
+Real-to-synthetic sampling weight & N/A                 & real 1.0 / synth 0.5 \\
 \bottomrule
 \end{tabularx}
-\caption{Hyperparameters of the chord-OCR CRNN at training and fine-tuning.}
+\caption{Hyperparameters of the chord-recognition CRNN at training and fine-tuning.}
 \label{tab:hyperparams-chord}
 \end{table}
 
@@ -199,15 +199,15 @@ Horizontal staff-line kernel                     & $hh \times 1$ rectangle, wher
 \texttt{max\_spacing\_cov}                       & 0.10 \\
 \texttt{min\_interline\_ink\_frac}               & 0.10 \\
 \texttt{max\_text\_area\_frac}                   & 0.10 \\
-\texttt{min\_mean\_logprob} (CTC gate)           & $-0.05$ (checkpoint-dependent) \\
-\texttt{confident\_override\_logprob}            & $-0.05$ (checkpoint-dependent) \\
+\texttt{min\_mean\_logprob} (CTC gate)           & $-0.15$ (hand-tuned) \\
+\texttt{confident\_override\_logprob}            & $-0.05$ (hand-tuned) \\
 \bottomrule
 \end{tabularx}
 \caption{Default inference-time settings of the OMR pipeline.}
 \label{tab:inference}
 \end{table}
 
-The two log-probability thresholds in \Cref{tab:inference} are calibrated against the log-probability distribution of the active CRNN checkpoint and must be recomputed after every retraining via \texttt{poetry run python src/cli.py calibrate-reject \ldots}; the values shown reflect the current \texttt{models/latest/best\_model.pt}.
+The four geometric thresholds in \Cref{tab:inference} are fitted by \texttt{poetry run python src/cli.py calibrate-reject \ldots} against a labelled fixture set; they depend only on staff geometry, not on the trained weights, so they are reused unchanged across checkpoints. The two log-probability thresholds are instead hand-tuned, music-preserving values: \texttt{calibrate-reject} does not optimise them (it leaves \texttt{min\_mean\_logprob} at a conservative default), so they are adjusted by hand only if a retrained recogniser starts rejecting genuine staves. The values shown are those deployed with the current \texttt{models/latest/best\_model.pt}.
 
 \section{Technology Stack}
 
@@ -269,7 +269,7 @@ Every subcommand prints self-contained help text when invoked with
 \code{pipeline-train}          & Run the full data pipeline then immediately start training. \\ \tfgrowsep
 \code{generate-header-templates} & Prerender clef/key/time header templates for continuation-staff injection. \\ \tfgrowsep
 \code{harvest-reject-fixtures} & Cut staff-strip fixtures from real PDFs for reject-gate calibration. \\ \tfgrowsep
-\code{calibrate-reject}        & Sweep reject-gate thresholds on labelled fixtures and emit \code{thresholds.json}. \\
+\code{calibrate-reject}        & Sweep the geometric reject-gate thresholds on labelled fixtures and emit \code{thresholds.json}. \\
 \bottomrule
 \end{tabularx}
 \caption{CLI subcommands exposed by \code{src/cli.py} (\Cref{sec:impl-cli}).}

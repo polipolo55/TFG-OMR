@@ -97,7 +97,7 @@ alignment~\cite{gravesConnectionistTemporal2006}, removing the need for
 per-symbol segmentation~\cite{shiEndToEndTrainable2017}.
 
 Alongside the architecture, Calvo-Zaragoza and Rizo released the
-\term{PrIMuS} corpus~\cite{PrIMuSDataset,calvoZaragozaEndToEndNeural2018}: 87\,678 real-music monophonic
+\term{PrIMuS} corpus~\cite{PrIMuSDataset,calvoZaragozaEndToEndNeural2018}: 87\,678 monophonic
 incipits sourced from the R\'epertoire International des Sources
 Musicales (RISM) and distributed in five
 representations, including two purpose-built token formats.
@@ -139,9 +139,7 @@ trend further with a pretrained vision encoder, an ABC-notation decoder, and ove
 214\,000 typeset pages of pretraining, reporting on its most realistic
 evaluation set absolute error reductions of up to \SI{68}{\percent} on the
 tree-edit metric TEDn and \SI{47.6}{\percent} on OMR-NED over the previous
-state of the art.
-
-\Cref{fig:soa-transformer-pipeline} shows the generic encoder--decoder
+state of the art; both metrics are defined in \Cref{sec:soa-metrics}. \Cref{fig:soa-transformer-pipeline} shows the generic encoder--decoder
 structure shared by these systems.
 
 \input{figures/fig_transformer_pipeline}
@@ -149,9 +147,10 @@ structure shared by these systems.
 These architectures, however, demand resources that exceed the budget of
 a Bachelor's thesis.
 For a strictly monophonic target domain, where the CRNN--CTC baseline
-already attains sub-percent SER and the headroom for further gain lies in
-domain robustness rather than model capacity, CRNN--CTC remains the more
-economical choice.
+already attains sub-percent SER on the semantic
+encoding~\cite{calvoZaragozaEndToEndNeural2018} and the headroom for further
+gain lies in domain robustness rather than model capacity, CRNN--CTC remains
+the more economical choice.
 The quantitative justification is in \Cref{ch:design}; the
 project-management argument is in \Cref{sec:mgmt-justification}.
 
@@ -196,8 +195,8 @@ symbols as first-class objects. The only directly comparable corpus emerged
 contemporaneously with this work~\cite{martinezSevillaJazzLeadSheets2025}
 and, at 293 annotated sheets, is far smaller than the tens of
 thousands of samples those CRNN--CTC models require, and so cannot train
-one from scratch. Every recent end-to-end
-system (SMT, SMT++, OLiMPiC, and LEGATO) addresses an
+one from scratch. Recent end-to-end
+systems such as SMT, SMT++, OLiMPiC, and LEGATO address an
 equivalent scarcity by synthetic pretraining followed by fine-tuning on a
 small annotated target set.
 
@@ -216,10 +215,11 @@ and vocabulary size when fed to a sequence model.
 \textbf{MEI} (Music Encoding Initiative)~\cite{rolandMEI2002} is even more
 expressive but inherits the same penalty.
 \textbf{Humdrum} \code{**kern}~\cite{huronHumdrum2002} and
-\textbf{ABC notation}~\cite{walshawABC2011} are far more compact and are
-used as targets of recent
-transformer-based work~\cite{riosVilaSheetMusicTransformer2024,yangLEGATO2025},
-at the cost of reduced expressiveness for complex multi-voice layout.
+\textbf{ABC notation}~\cite{walshawABC2011} are far more compact and serve as
+the targets of recent transformer-based work---\code{**kern} for
+SMT~\cite{riosVilaSheetMusicTransformer2024} and ABC for
+LEGATO~\cite{yangLEGATO2025}---at the cost of reduced expressiveness for
+complex multi-voice layout.
 The PrIMuS \textbf{agnostic} and \textbf{semantic} formats are compact and
 CTC-friendly but interoperate only with the PrIMuS ecosystem.
 
@@ -241,7 +241,7 @@ its grammar, encoding choices, and vocabulary are described in full in
 \midrule
 MusicXML~\cite{goodMusicXML2001}            & Low (verbose XML)        & Full: polyphony, layout, lyrics, chords & Native    & Notation-editor interchange \\ \tfgrowsep
 MEI~\cite{rolandMEI2002}                    & Low                      & Full, plus scholarly markup             & Lossy     & Digital musicology \\ \tfgrowsep
-Humdrum \code{**kern}~\cite{huronHumdrum2002} & High                   & Medium: pitch/rhythm focus              & Lossy     & Analysis; SMT/LEGATO target \\ \tfgrowsep
+Humdrum \code{**kern}~\cite{huronHumdrum2002} & High                   & Medium: pitch/rhythm focus              & Lossy     & Analysis; SMT target \\ \tfgrowsep
 ABC~\cite{walshawABC2011}                   & High                     & Medium: melody/lead-sheet focus         & Lossy     & LEGATO decoder target \\ \tfgrowsep
 PrIMuS agnostic/semantic~\cite{calvoZaragozaEndToEndNeural2018} & High & Low: monophonic single-staff         & No        & Monophonic CRNN--CTC \\ \tfgrowsep
 LMX~\cite{mayerPracticalEndToEnd2024}       & High                     & Inherits MusicXML                       & Lossless  & End-to-end OMR (this work) \\
@@ -263,7 +263,7 @@ choosing it over the alternatives above are developed in
 \section{Evaluation Metrics}
 \label{sec:soa-metrics}
 
-\textbf{Symbol Error Rate} (SER) is the de facto evaluation metric for
+\textbf{Symbol Error Rate} is the de facto evaluation metric for
 sequence-based OMR.
 It is defined as the Levenshtein edit distance between the predicted and
 the reference token sequences, normalised by the reference

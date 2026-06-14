@@ -304,8 +304,8 @@ calibrated confidence threshold. A confidence override re-admits
 geometry-rejected strips on which the recogniser is confident, but it
 deliberately does not override the OCR-text rejection, since high CRNN
 confidence on running text is a known false-positive mode.
-The per-signal algorithm, the threshold, and its checkpoint-dependent
-recalibration live in \Cref{ch:impl}.
+The per-signal algorithm and the threshold values, including which are
+fitted automatically and which are hand-tuned, live in \Cref{ch:impl}.
 
 \subsection{Alternatives considered}
 \label{sec:design-staffdetect-alts}
@@ -784,7 +784,7 @@ adjuncts to staff notation.
 
 \paragraph{Single multi-task network with shared backbone.}
 One CNN backbone feeding two task-specific recurrent heads, trained
-with a summed CTC loss. Rejected because chord-OCR features (letter
+with a summed CTC loss. Rejected because chord-character features (letter
 and numeric glyphs) and melody features (notehead position relative to
 staff lines) barely overlap: a shared backbone wastes capacity on a
 generic representation, and the summed loss adds a loss-weighting

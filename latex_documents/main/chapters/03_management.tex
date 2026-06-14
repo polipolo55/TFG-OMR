@@ -53,7 +53,7 @@ The chosen architecture should support natural extensions to polyphony, full-pag
     \caption{Qualitative comparison of architectural alternatives
     against the six project criteria.
     Symbols denote relative suitability: \textbf{++} excellent,
-    \textbf{+} good, \textbf{--} poor, \textbf{-{}-} very poor.}
+    \textbf{+} good, $\mathbf{-}$ poor, $\mathbf{--}$ very poor.}
     \label{tab:alt-comparison}
     \small
     \setlength{\tabcolsep}{5pt}
@@ -62,12 +62,12 @@ The chosen architecture should support natural extensions to polyphony, full-pag
         \toprule
         \textbf{Criterion} & \textbf{Traditional pipeline} & \textbf{CRNN--CTC} & \textbf{Transformer} \\
         \midrule
-        Monophonic line accuracy          & --  & +  & ++ \\ \tfgrowsep
-        Computational feasibility         & ++  & +  & -{}- \\ \tfgrowsep
-        Data requirements                 & ++  & +  & -{}- \\ \tfgrowsep
-        Implementation complexity         & +   & +  & -{}- \\ \tfgrowsep
-        Reproducibility in TFG timeline   & +   & ++ & -- \\ \tfgrowsep
-        Extension potential (future work) & --  & +  & ++ \\
+        Monophonic line accuracy          & $-$  & +  & ++ \\ \tfgrowsep
+        Computational feasibility         & ++  & +  & $--$ \\ \tfgrowsep
+        Data requirements                 & ++  & +  & $--$ \\ \tfgrowsep
+        Implementation complexity         & +   & +  & $--$ \\ \tfgrowsep
+        Reproducibility in TFG timeline   & +   & ++ & $-$ \\ \tfgrowsep
+        Extension potential (future work) & $-$  & +  & ++ \\
         \bottomrule
     \end{tabularx}
 \end{table}
@@ -177,7 +177,8 @@ Over the 21 weeks this amounts to roughly ten meetings, the activity
 budgeted as T0.5 (25\,h) in \Cref{tab:task-summary} and
 referred to elsewhere simply as the biweekly milestone meetings.
 This four-week grouping is a deliberate revision of the two-week
-sprint cadence in the initial GEP plan: aligning each sprint with a
+sprint cadence in the initial plan produced for FIB's project-management
+course (GEP, \textit{Gestió de Projectes}): aligning each sprint with a
 single work package gave the train--evaluate--improve loop a coherent
 deliverable per sprint and accommodated the late addition of the
 chord-recognition track (detailed in the WP4 and WP5 descriptions
@@ -483,7 +484,8 @@ totals derived here as its inputs.
 
 \subsection{Human resources}
 
-Hourly rates are derived from the Spanish ICT salary survey
+Hourly rates are derived from the Spanish information and communications
+technology (ICT) salary survey
 INE-EAES~\cite{ineEncuestaEstructuraSalarial2023} and loaded with
 a \num{1.35} multiplier that captures the employer's
 social-security contributions in the General Regime of the
@@ -605,12 +607,9 @@ data-cleaning cycles incur direct monetary cost.
 
 \begin{table}[H]
     \centering
-    \caption{Incidentals derived from the risk register.
-    Each entry is the cost of the priced contingency action
-    weighted by the probability that this specific action
-    (rather than a no-cost effort reallocation) is required;
-    these activation probabilities are lower than the bare
-    likelihood ratings of \Cref{tab:risk-register}.}
+    \caption{Incidentals derived from the risk register: the
+    expected-value cost of the priced contingency actions (R1, R4, R6),
+    computed as explained in the text above.}
     \label{tab:incidentals}
     \small
     \setlength{\tabcolsep}{5pt}

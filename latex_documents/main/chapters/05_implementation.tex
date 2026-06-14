@@ -373,7 +373,7 @@ itself uses the model-assisted music-strip UI served at
 the chord labeller below.
 
 % ─────────────────────────────────────────────────────────────────────────────
-\section{Chord OCR Implementation}
+\section{Chord Recognition Implementation}
 \label{sec:impl-chord}
 
 The chord-recognition network reuses the CRNN--CTC machinery of the
@@ -451,7 +451,7 @@ hand-labelling UI is served at \code{/labeler} on the FastAPI server
 (\Cref{sec:impl-api}).
 
 Fine-tuning mixes real and synthetic strips with a weighted sampler:
-real strips carry weight $1.0$, synthetic strips weight $0.4$ (the
+real strips carry weight $1.0$, synthetic strips weight $0.5$ (the
 default \code{--synth-weight}).  The synthetic admixture prevents
 catastrophic forgetting of rare chord qualities under-represented in
 the small real set.
@@ -527,12 +527,15 @@ gate runs once per detected strip and the CPU latency is bounded.
 Strips that survive the pre-CRNN gate (and borderline strips
 re-admitted via the CTC-confidence override) are then evaluated by
 the post-CRNN gate, which thresholds the mean log-probability of the
-CRNN's argmax frames against the calibrated
-\code{min\_mean\_logprob}.
-Thresholds live in \code{models/staff\_reject/thresholds.json} and
-are produced by the \code{calibrate-reject} CLI subcommand
-(\Cref{sec:impl-cli}); the file is checkpoint-specific and must be
-regenerated whenever the music CRNN is retrained.
+CRNN's argmax frames against \code{min\_mean\_logprob}.
+Thresholds live in \code{models/staff\_reject/thresholds.json}.
+The four geometric thresholds are fitted by the \code{calibrate-reject}
+CLI subcommand (\Cref{sec:impl-cli}) on a labelled fixture set and depend
+only on staff geometry, not on the trained weights; the
+\code{min\_mean\_logprob} gate, by contrast, is a hand-tuned,
+music-preserving value that \code{calibrate-reject} leaves at a
+conservative default, so it is re-tuned by hand only if a retrained
+recogniser begins rejecting genuine staves.
 
 \subsection{Music recognition}
 

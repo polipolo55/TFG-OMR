@@ -54,7 +54,7 @@ a pointer to the evidence.
           and musically substantive (pitch, octave, duration,
           accidental) classes, isolating the contribution of each
           category to the aggregate metric.
-    \item \textbf{O6 — Inference pipeline with chord OCR and JSON
+    \item \textbf{O6 — Inference pipeline with chord recognition and JSON
           output.}
           Met.
           The five-stage pipeline of \Cref{sec:design-pipeline} is
@@ -119,11 +119,11 @@ numbers unchanged within run-to-run noise.
           negligible SER change (well under \num{0.01} pp) at roughly
           $8\times$ the decode cost; greedy decoding is therefore the
           deployed default (\Cref{sec:impl-inference}).
-    \item \textbf{Chord OCR:} after fine-tuning on \num{262} real
+    \item \textbf{Chord recognition:} after fine-tuning on \num{262} real
           chord strips, the chord model reaches \SI{5.9}{\percent} CER
           and a \SI{58.6}{\percent} exact-match rate on the held-out
-          real set, down from a zero-shot CER of \SI{74.0}{\percent}
-          (\Cref{tab:chord-eval}).
+          real set, down from a zero-shot CER of \SI{69.9}{\percent} on the
+          same split (\Cref{tab:chord-eval}).
 \end{itemize}
 
 The four acceptance criteria from \Cref{sec:design-domain} are met
@@ -202,11 +202,12 @@ No combined melody-plus-chord quality figure is reported; the harmonic
 half of the output is less thoroughly benchmarked than the melodic half,
 and no unified end-to-end metric has been defined.
 
-\paragraph{CTC-confidence reject gate is checkpoint-bound.}
+\paragraph{CTC-confidence reject gate is hand-tuned.}
 The staff rejection gate of \Cref{sec:design-staff-reject} uses a
-CTC mean log-probability threshold calibrated against the
-distribution of the current checkpoint.
-The threshold must be re-derived whenever the recogniser is
+CTC mean log-probability threshold whose value is hand-tuned against
+the confidence distribution of the current checkpoint rather than
+fitted automatically.
+It must therefore be re-tuned by hand whenever the recogniser is
 retrained, which is documented as a hard constraint in the
 project's contributor guide.
 The gate is robust within a checkpoint family but it is not
@@ -374,10 +375,13 @@ which learns the frame-to-token alignment without per-frame
 supervision; it is the basis of the melody-recognition stage.
 
 The data dimension is large by Bachelor's-thesis standards. PrIMuS
-contributes 87\,678 monophonic incipits, each re-rendered in LilyJAZZ
-and paired with a synthetic scanned copy, yielding on the order of
-\num{170000} training images after filtering
-(\Cref{sec:design-data}). The design choices that exploit this volume
+contributes 87\,678 raw monophonic incipits, of which \num{46089}
+survive the three domain filters (\Cref{sec:design-data}) and are
+partitioned 36\,873 / 4\,608 / 4\,608 into train, validation, and test.
+Every retained sample is re-rendered in LilyJAZZ both clean and
+scan-simulated, and each training sample additionally draws from two
+extra scan variants, so the model trains on the order of \num{150000}
+distinct rendered images. The design choices that exploit this volume
 are developed elsewhere: synthetic supervision in place of manual
 annotation, virtual header injection for the
 continuation-line case (\Cref{sec:impl-inference}), and a deterministic
@@ -386,7 +390,7 @@ split protocol that keeps validation and test disjoint
 
 The structured-output side is satisfied by the choice of LMX as the
 model's symbolic target, argued in
-\Cref{sec:lmx-format,sec:design-lmx-alts}. The chord-OCR network
+\Cref{sec:lmx-format,sec:design-lmx-alts}. The chord-recognition network
 (\Cref{sec:impl-chord}) applies the same pattern to a different visual
 language through synthetic pretraining followed by domain-targeted
 fine-tuning on hand-labelled real strips. The full inference pipeline
@@ -413,6 +417,6 @@ them (\Cref{tab:stage-contracts}) made each stage debuggable in
 isolation and kept iteration cheap; the deterministic grammar fixer,
 a few hundred lines of stateful code, removed a class of structural
 errors that would otherwise have cost model capacity. With hindsight
-the chord-OCR stream was scoped too late, after the melody network had
+the chord-recognition stream was scoped too late, after the melody network had
 converged, and developing the two streams in parallel would have given
 the chord fine-tuning loop more iteration time.

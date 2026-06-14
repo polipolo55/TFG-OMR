@@ -1,8 +1,9 @@
-\chapter{Qualitative Predictions}
+\chapter{Qualitative Predictions and Training Diagnostics}
 \label{app:qual}
 
-This appendix collects the five worst-case predictions on the synthetic
-scanned test split, selected by per-sample edit distance.
+This appendix collects the second through fifth worst-case predictions on the
+synthetic scanned test split, selected by per-sample edit distance; the rank-1
+case is shown in \Cref{sec:res-qualitative}.
 Each figure pairs the scan-augmented input strip with a LilyPond
 re-render of the grammar-fixed model prediction, so the discrepancy can
 be read off the staves without consulting the raw token lists.
@@ -81,8 +82,8 @@ the worst predictions.
         \label{fig:qual-worst-4-pred}
     \end{subfigure}
     \caption{Rank-4 worst prediction (sample \texttt{220011439-1\_1\_1}):
-    edit distance \num{9}, SER \num{0.167} --- the highest per-sample
-    SER in the test set.
+    edit distance \num{9}, SER \num{0.167} --- the highest SER among the
+    five worst-by-edit-distance samples shown here.
     Whole- and half-note measures cause misaligned barline insertion,
     producing extra short measures that inflate the edit count relative
     to the number of wrong pitches (zero).}

@@ -51,7 +51,7 @@ letters A--G (the white keys of a piano).
 The remaining five pitches are written with \term{accidentals} placed just to the left of
 the notehead: a \term{sharp} (\(\sharp\)) raises the note one semitone, a \term{flat}
 (\(\flat\)) lowers it one semitone, and a \term{natural} (\(\natural\)) cancels either.
-An accidental holds for the rest of the measure in which it appears, then lapses.
+An accidental holds for that pitch, at that octave, for the rest of the measure in which it appears, then lapses.
 \Cref{fig:accidentals} shows the three accidentals applied to a single pitch.
 
 \begin{figure}[htbp]
@@ -234,8 +234,8 @@ recognition used for the melody. This split motivates the two-stream architectur
 \section{The Lead-Sheet Format}
 
 A jazz lead sheet assembles the elements above into a minimal score: one or more
-\term{systems} of single-voice treble-clef staff carrying the melody (each opening with
-a clef, key signature, and time signature), chord symbols above the staff, and
+\term{systems}, each a single-voice treble-clef staff carrying the melody (and opening
+with a clef, key signature, and time signature), chord symbols above the staff, and
 sometimes structural marks such as repeat signs, section labels (\textit{A},
 \textit{B}, \textit{Bridge}), or style indications.
 Many of these marks are absent from informal editions, including large parts of

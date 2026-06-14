@@ -14,7 +14,7 @@ anticipated useful life, records the ethical and open-science
 position adopted, and revisits the assessment once the work is
 complete.
 The discussion is anchored to four UN Sustainable Development Goals
-(SDGs)~\cite{gepSustainabilityReport2018} that the project plausibly
+(SDGs) that the project plausibly
 touches: SDG~4 (Quality Education), SDG~9 (Industry, Innovation and
 Infrastructure), SDG~10 (Reduced Inequalities), and SDG~12
 (Responsible Consumption and Production).
@@ -53,7 +53,7 @@ useful-life perspective (the impact once the system is in service).
               The main cost driver is specialised engineering time.
             & Open-source release and fast local inference can reduce recurrent transcription cost compared with manual copying and commercial OMR tools. \\ \tfgrowsep
         Environmental
-            & Estimated energy use of $\approx 57.5$\,kWh for the full project, mitigated by mixed-precision training, early stopping, and the reuse of existing
+            & Estimated energy use of $\approx 62.5$\,kWh for the full project, mitigated by mixed-precision training, early stopping, and the reuse of existing
               hardware~\cite{reeInformeSistemaElectrico2024,mitecoFactorEmision2025}.
             & One-time training cost is amortised over repeated inference; local execution reduces cloud dependency for common use cases. \\ \tfgrowsep
         Social
@@ -109,7 +109,7 @@ This dimension is the one most directly aligned with SDG~12
 
 \textbf{PPP (design and development).}
 The project's estimated energy consumption is approximately
-\SI{57.5}{\kilo\watt\hour}, derived from a coarse but reproducible
+\SI{62.5}{\kilo\watt\hour}, derived from a coarse but reproducible
 multiplication of the rated power draw of the development
 workstation by the cumulative GPU-engaged time over the twenty-one
 week schedule.
@@ -119,7 +119,7 @@ is approximately \SI{250}{\watt}.
 Cumulative GPU-engaged time totals approximately
 \SI{250}{\hour}: a single 90-epoch CRNN training takes about
 \SI{13}{\hour}, and the figure aggregates the many re-trainings,
-ablation runs, and chord-OCR fine-tuning carried out over the project,
+ablation runs, and chord-recognition fine-tuning carried out over the project,
 with smaller contributions from synthetic-data rendering and
 evaluation passes.
 The energy estimate follows directly:
@@ -156,8 +156,8 @@ well past convergence ``to be safe'' (on the final run the best SER
 was reached near the end, at epoch 83 of 90, so the run reached the
 cap without the patience triggering).
 Finally, the project reuses existing hardware rather than provisioning
-new equipment, whose embodied manufacturing energy would dwarf the
-project's operational energy by an order of magnitude.
+new equipment, whose embodied manufacturing energy would substantially
+exceed the project's modest operational energy.
 
 Data generation and training are also organised in batches to
 avoid redundant runs: the dataset is fixed before model training
@@ -292,9 +292,10 @@ guess at how the present numbers were computed.
 \textit{Licence-respecting use of third-party data.}
 All third-party data used in the project is consumed in
 accordance with its licence.
-PrIMuS, the synthetic-supervision source, is distributed by the
-Universidad de Alicante PRAIG group for non-commercial research
-use~\cite{PrIMuSDataset} and is used here unmodified.
+PrIMuS, the synthetic-supervision source, is distributed by the Pattern
+Recognition and Artificial Intelligence Group (PRAIG) at the University of
+Alicante for non-commercial research use~\cite{PrIMuSDataset} and is used
+here unmodified.
 The training corpus visible to the CRNN is entirely synthetic:
 LilyJAZZ renders generated from PrIMuS \texttt{.semantic} files, so
 no copyrighted Real Book page is part of the music CRNN's

@@ -879,8 +879,8 @@ comparable. Exact split fractions are stated in \Cref{ch:impl}.
 
 Real Book pages place several staves under one system, and every staff
 after the first omits the clef, key, and time signature.
-Rather than teach the recogniser to read such header-less staves, the
-design keeps the training distribution uniformly full-header and
+Instead of training the recogniser to interpret header-less staves, the
+design maintains a uniformly full-header training distribution and
 repairs the mismatch at inference: each continuation staff has a
 reconstructed clef--key--time header prepended before the CRNN, so the
 model only ever sees the full-header staves it was trained on.

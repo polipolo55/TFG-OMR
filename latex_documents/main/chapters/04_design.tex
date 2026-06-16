@@ -151,6 +151,10 @@ range \SIrange{1}{3}{\percent}~\cite{calvoZaragozaCameraPrimus2018,mayerPractica
     \item \textbf{Perfect-transcription rate} above \SI{60}{\percent}
           on the scanned test split: more than half of input staves
           come out token-perfect.
+    \item \textbf{Chord recognition} (O6): a dedicated chord-recognition
+          network fine-tuned on real strips achieves a Character Error
+          Rate (CER) below the zero-shot baseline on a held-out real
+          chord strip set.
 \end{itemize}
 
 
@@ -437,11 +441,11 @@ The synthetic-to-real gap is a feature-distribution shift, not a
 capacity bottleneck: adding parameters does not move the training
 distribution closer to the test distribution.
 
-\paragraph{Learned domain transfer (CycleGAN, style transfer).}
+\paragraph{Learned domain transfer.}
 Train an unpaired image-to-image translator to map clean renders to
-the scan distribution. CycleGAN training is unstable and GPU-costly,
-and a cycle-loss-minimising mapping need not preserve the structural
-detail (notehead position, accidental placement) the recogniser must
+the scan distribution. Such training is unstable and GPU-costly,
+and a structure-agnostic mapping need not preserve the fine detail
+(notehead position, accidental placement) the recogniser must
 learn; a hand-crafted pipeline instead gives explicit, debuggable
 control over each distortion's intensity.
 
@@ -945,7 +949,7 @@ error analysis (\Cref{ch:results}).
 \label{sec:design-eval}
 
 The acceptance criteria stated in \Cref{sec:design-domain} commit the
-project to four numeric targets.  This section defines the metrics
+project to five acceptance criteria. This section defines the metrics
 that produce those numbers and the protocol under which they are
 collected, so that \Cref{ch:results} can adjudicate against them
 without ambiguity.
@@ -978,7 +982,7 @@ For the melody branch this protocol requires a held-out real set large
 enough for SER, so the current thesis reports the phase qualitatively;
 for the chord branch, the same idea is measured on a held-out real
 strip split (protocol as in \Cref{sec:design-training}).
-To keep the four numeric targets falsifiable, the protocol commits in
+To keep the acceptance criteria falsifiable, the protocol commits in
 advance to: (a)~the split definitions and seed, fixed once and not
 retuned per experiment; (b)~greedy CTC decoding as the primary number,
 with beam search reported as an ablation (\Cref{sec:design-decoder});

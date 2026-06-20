@@ -1,618 +1,592 @@
+% !TEX program = lualatex
 % ======================================================================
-%  TFG Defense — Optical Music Recognition for Jazz Lead Sheets
-%  Pol Casanovas Puig · FIB/UPC · June 2026
-%  Compile:  latexmk -pdf defense.tex
+%  TFG — Defensa
+%  Reconeixement òptic de música per a partitures de jazz
+%  Pol Casanovas Puig · FIB / UPC · Juny 2026
+%  REQUEREIX LuaLaTeX (fontspec + Adwaita Sans).
+%  El fitxer .latexmkrc d'aquesta carpeta redirigeix latexmk a lualatex,
+%  així el botó de compilar de l'editor funciona sense canviar-ne la config.
+%  Manualment:  latexmk defense.tex   (o:  lualatex defense.tex)
 % ======================================================================
-\documentclass[aspectratio=169,11pt]{beamer}
+\documentclass[aspectratio=169,10pt]{beamer}
 
-% ── Theme ──────────────────────────────────────────────────────────────
-\usetheme{Boadilla}
-\useinnertheme{rounded}
+% ── Tipografia (LuaLaTeX + fontspec) ───────────────────────────────────
+%  Cos: Adwaita Sans (humanista modern). Mono: FiraCode.
+\usepackage{fontspec}
+\setsansfont{Adwaita Sans}
+\setmonofont{FiraCode Nerd Font Mono}[Scale=0.82]
+\newfontfamily\AdwaitaLight{Adwaita Sans}[RawFeature={axis={weight=300}}]
+\newfontfamily\AdwaitaHeavy{Adwaita Sans}[RawFeature={axis={weight=800}}]
+\newcommand{\displayfont}{\AdwaitaLight}
 
-% ── Colours: UPC identity ──────────────────────────────────────────────
-\definecolor{upcblue}{RGB}{0,60,140}
-\definecolor{upcbluelight}{RGB}{0,130,200}
-\definecolor{upcgray}{RGB}{90,90,95}
-\definecolor{metgreen}{RGB}{30,120,60}
-\definecolor{metred}{RGB}{160,30,30}
-\definecolor{metorange}{RGB}{180,90,0}
-
-\setbeamercolor{structure}{fg=upcblue}
-\setbeamercolor{frametitle}{bg=upcblue, fg=white}
-\setbeamercolor{palette primary}{bg=upcblue, fg=white}
-\setbeamercolor{palette secondary}{bg=upcblue!80, fg=white}
-\setbeamercolor{palette tertiary}{bg=upcblue!60, fg=white}
-\setbeamercolor{palette quaternary}{bg=upcblue!40, fg=white}
-\setbeamercolor{block title}{bg=upcblue, fg=white}
-\setbeamercolor{block body}{bg=upcblue!8, fg=black}
-\setbeamercolor{alerted text}{fg=metred}
-\setbeamercolor{example text}{fg=metgreen}
-
-\setbeamerfont{frametitle}{size=\large, series=\bfseries}
-\setbeamerfont{title}{size=\Large, series=\bfseries}
-\setbeamerfont{block title}{series=\bfseries}
-
-% ── Packages ───────────────────────────────────────────────────────────
-\usepackage[T1]{fontenc}
-\usepackage[utf8]{inputenc}
-\usepackage{amsmath}
-\usepackage{siunitx}
+\usepackage{amsmath,amssymb}
+\usepackage{pifont}     % \ding (check / cross)
+\usepackage{wasysym}    % \LEFTcircle (parcial)
 \usepackage{booktabs}
 \usepackage{array}
-\usepackage{tabularx}
 \usepackage{graphicx}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta,positioning,shapes.geometric,calc,fit,backgrounds}
+\usetikzlibrary{arrows.meta,positioning,calc,fit,backgrounds}
+\usepackage{polyglossia}
+\setdefaultlanguage{catalan}
+\emergencystretch=2em
 
-% Figures live two levels up in main/figures/
 \graphicspath{
   {../main/figures/}
   {../main/figures/real_page/}
   {../main/figures/worst/}
 }
 
-% ── Navigation / footline ──────────────────────────────────────────────
-\beamertemplatenavigationsymbolsempty
+% ── Paleta (moderna, daltònic-segura: blau + ambre) ────────────────────
+\definecolor{ink}{HTML}{14213D}        % blau marí profund — text/títols
+\definecolor{accent}{HTML}{1F6FEB}     % blau modern — estructura
+\definecolor{highlight}{HTML}{E0701F}  % ambre càlid — èmfasi
+\definecolor{muted}{HTML}{6B7280}      % gris
+\definecolor{paper}{HTML}{FCFCFE}      % fons quasi blanc
+
+% ── Colors del tema ────────────────────────────────────────────────────
+\setbeamercolor{normal text}{fg=ink, bg=paper}
+\setbeamercolor{structure}{fg=accent}
+\setbeamercolor{title}{fg=ink}
+\setbeamercolor{frametitle}{fg=ink}
+\setbeamercolor{itemize item}{fg=accent}
+\setbeamercolor{itemize subitem}{fg=muted}
+\setbeamercolor{alerted text}{fg=highlight}
+\setbeamertemplate{blocks}[rounded][shadow=false]
+\setbeamercolor{block title}{bg=accent!15, fg=ink}
+\setbeamercolor{block body}{bg=accent!7, fg=ink}
+\setbeamercolor{block title alerted}{bg=highlight!20, fg=ink}
+\setbeamercolor{block body alerted}{bg=highlight!8, fg=ink}
+
+% ── Marcadors de llista (quadrat modern petit) ─────────────────────────
+\setbeamertemplate{itemize item}{\color{accent}\rule[0.25ex]{0.62ex}{0.62ex}}
+\setbeamertemplate{itemize subitem}{\color{muted}\small\textendash}
+\setbeamertemplate{navigation symbols}{}
+
+% ── Títol de diapositiva: pes mitjà + filet d'accent ───────────────────
+\setbeamerfont{frametitle}{size=\Large}
+\setbeamertemplate{frametitle}{%
+  \vspace{0.55em}%
+  {\bfseries\color{ink}\insertframetitle\par}%
+  \vspace{0.18em}%
+  {\color{accent}\rule{2.1em}{2.2pt}}\par
+  \vspace{-0.1em}%
+}
+
+% ── Peu de pàgina minimalista ──────────────────────────────────────────
 \setbeamertemplate{footline}{%
-  \leavevmode
   \hbox{%
-    \begin{beamercolorbox}[wd=0.34\paperwidth,ht=2.25ex,dp=1ex,center]{author in head/foot}%
-      \usebeamerfont{author in head/foot}\insertshortauthor
-    \end{beamercolorbox}%
-    \begin{beamercolorbox}[wd=0.50\paperwidth,ht=2.25ex,dp=1ex,center]{title in head/foot}%
-      \usebeamerfont{title in head/foot}\insertshorttitle
-    \end{beamercolorbox}%
-    \begin{beamercolorbox}[wd=0.16\paperwidth,ht=2.25ex,dp=1ex,right]{date in head/foot}%
-      \usebeamerfont{date in head/foot}
-      \insertframenumber{}/\inserttotalframenumber\hspace*{2ex}
+    \begin{beamercolorbox}[wd=\paperwidth,ht=2.6ex,dp=1.3ex,leftskip=1.6em,rightskip=1.6em]{}%
+      {\color{muted}\scriptsize Pol Casanovas Puig%
+        \hfill \insertframenumber\,/\,\inserttotalframenumber}%
     \end{beamercolorbox}%
   }%
 }
 
-% ── Shorthand macros ───────────────────────────────────────────────────
-\newcommand{\metyes}{\textcolor{metgreen}{$\checkmark$}}
-\newcommand{\metno}{\textcolor{metred}{$\times$}}
-\newcommand{\metpart}{\textcolor{metorange}{$\circ$}}
-\newcommand{\code}[1]{\texttt{\small #1}}
-
-% ── Metadata ───────────────────────────────────────────────────────────
-\title[OMR for Jazz Lead Sheets]{%
-  End-to-End Optical Music Recognition\\
-  for Jazz Lead Sheets}
-\subtitle{Grau en Enginyeria Inform\`{a}tica (Computaci\'{o}) $\cdot$ TFG}
-\author[Pol Casanovas Puig]{%
-  Pol Casanovas Puig\\[3pt]
-  {\small Supervisor: Manel Frigola Bourlon%
-    \ (\emph{Dept.\ Automatic Control})}}
-\institute[FIB / UPC]{%
-  Facultat d'Inform\`{a}tica de Barcelona $\cdot$
-  Universitat Polit\`{e}cnica de Catalunya}
-\date{June 2026}
+% ── Dreceres ───────────────────────────────────────────────────────────
+\newcommand{\code}[1]{{\ttfamily\small #1}}
+\newcommand{\ok}{\textcolor{accent}{\ding{52}}}        % ✓
+\newcommand{\halfok}{\textcolor{highlight}{\LEFTcircle}}% ◑ parcial
+\newcommand{\no}{\textcolor{highlight}{\ding{56}}}     % ✗
+\newcommand{\stat}[1]{{\AdwaitaHeavy\color{ink}#1}}
+\newcommand{\flatt}{$\flat$}
 
 % ======================================================================
 \begin{document}
-% ======================================================================
 
-% ── Title ─────────────────────────────────────────────────────────────
+% ── Portada ────────────────────────────────────────────────────────────
 \begin{frame}[plain]
-  \titlepage
+  \vspace{0.35cm}
+  {\color{accent}\rule{3em}{2.6pt}}\par
+  \vspace{0.5cm}
+  {\displayfont\fontsize{27}{32}\selectfont\color{ink}%
+    Reconeixement òptic de música\\
+    per a partitures de jazz\par}
+  \vspace{0.3cm}
+  {\large\color{muted} Sistema OMR d'extrem a extrem amb xarxes CRNN--CTC\par}
+  \vspace{1.05cm}
+  {\large\color{ink}\textbf{Pol Casanovas Puig}\par}
+  \vspace{0.12cm}
+  {\color{muted} Director: Manel Frigola Bourlon · Dept.\ de Control Automàtic\par}
+  \vspace{0.6cm}
+  {\footnotesize\color{muted}%
+    Grau en Enginyeria Informàtica --- Computació\\
+    Facultat d'Informàtica de Barcelona · Universitat Politècnica de Catalunya\\
+    Juny de 2026\par}
 \end{frame}
 
-% ======================================================================
-\section{Motivation}
-% ======================================================================
-
-\begin{frame}{A problem every jazz musician knows}
-  \begin{columns}[T]
-    \column{0.56\textwidth}
-    \textbf{Years of jazz and big band experience\ldots}
-    \medskip
-    \begin{itemize}
-      \item Rehearsals start, you get a stack of paper
-      \item Brass section mixes concert-pitch and transposing instruments
-        \begin{itemize}
-          \item \textbf{B\(\flat\)} — trumpet, clarinet, soprano sax
-          \item \textbf{E\(\flat\)} — alto sax, baritone sax
-          \item \textbf{F} — French horn
-        \end{itemize}
-      \item You receive the lead sheet in one transposition, need it in another
-      \item Manual on-paper transposition: slow, error-prone, and
-            must be repeated every time
-    \end{itemize}
-    \medskip
-    \alert{%
-      \emph{The sheet music on this table is a real example.}\\[2pt]
-      If it existed as structured data, transposition would be
-      a single click.}
-    \column{0.40\textwidth}
-    \centering
-    \begin{tikzpicture}
-      \node[draw=upcblue,rounded corners,fill=upcblue!10,
-            text width=3.5cm,align=center,minimum height=1.1cm] (c)
-            {\textbf{Concert C part}\\{\small piano, flute, guitar}};
-      \node[below=0.8cm of c,draw=upcblue,rounded corners,fill=upcblue!10,
-            text width=3.5cm,align=center,minimum height=1.1cm] (bb)
-            {\textbf{B\(\flat\) part}\\{\small trumpet, clarinet}};
-      \node[below=0.8cm of bb,draw=upcblue,rounded corners,fill=upcblue!10,
-            text width=3.5cm,align=center,minimum height=1.1cm] (eb)
-            {\textbf{E\(\flat\) part}\\{\small alto sax, bari sax}};
-      \draw[-{Stealth[length=5pt]},upcblue,thick] (c) -- (bb)
-            node[midway,right=2pt,font=\small] {$-2$ semitones};
-      \draw[-{Stealth[length=5pt]},upcblue,thick] (c) -- (eb)
-            node[midway,right=2pt] {};
-      \draw[-{Stealth[length=5pt]},upcblue,thick] (bb) -- (eb)
-            node[midway,right=2pt,font=\small] {$-3$ semitones};
-    \end{tikzpicture}
-    \vspace{0.3cm}\\
-    {\small Today: done by hand on paper.\\
-    Goal: done automatically.}
-  \end{columns}
-\end{frame}
-
-\begin{frame}{\textit{The Real Book} and the digitisation gap}
-  \begin{columns}[T]
-    \column{0.58\textwidth}
-    \begin{itemize}
-      \item Most widely circulated jazz fake book in the world
-      \item Assembled by Berklee students in the 1970s; now officially published
-      \item Hundreds of jazz standards --- on every musician's stand worldwide
-      \item Official PDF is \textbf{image-only}: not searchable, not editable,
-            not machine-readable
-    \end{itemize}
-    \medskip
-    \textbf{What full digitisation would unlock:}
-    \begin{itemize}
-      \item \textbf{Automatic transposition} for all instrument families
-      \item MIDI playback for practice
-      \item Corpus-level harmonic analysis (jazz theory research)
-      \item Search and catalogue for digital music libraries
-    \end{itemize}
-    \column{0.38\textwidth}
-    \includegraphics[width=\textwidth]{fig_leadsheet_excerpt}
-    \vspace{0.1cm}\\
-    {\small\centering
-      Today: scan $\to$ image PDF\newline
-      (no symbolic content)\par
-      \vspace{0.3cm}
-      \textbf{Goal:} scan $\to$ structured JSON\newline
-      (pitch, rhythm, chords)}
-  \end{columns}
-\end{frame}
-
-% ======================================================================
-\section{Problem}
-% ======================================================================
-
-\begin{frame}{Four compounding challenges}
-  \begin{columns}[T]
-    \column{0.49\textwidth}
-    \begin{block}{1. Notation complexity}
-      Pitch = vertical position \emph{relative to the clef}.
-      Duration = head shape + stem + flags + dots.
-      Beams create joint dependencies across groups of notes.
-      No standalone symbols.
-    \end{block}
-    \smallskip
-    \begin{block}{3. Data scarcity}
-      No publicly labelled corpus of Real Book pages.\\
-      Must construct synthetic training data from scratch\\
-      in the target engraving style.
-    \end{block}
-    \column{0.49\textwidth}
-    \begin{block}{2. Domain gap}
-      Models trained on clean computer-rendered images
-      fail on real scans: noise, blur, perspective distortion,
-      ink bleed, paper yellowing, JPEG artefacts.
-    \end{block}
-    \smallskip
-    \begin{block}{4. Dual-stream recognition}
-      A lead sheet carries two simultaneous streams:
-      \textbf{melody} on the staff (pattern recognition)
-      and \textbf{chord symbols} above it (character recognition).
-      Existing OMR systems address only the first.
-    \end{block}
-  \end{columns}
-\end{frame}
-
-% ======================================================================
-\section{System Design}
-% ======================================================================
-
-\begin{frame}{Five-stage inference pipeline}
+% ── 2. Motivació / hook ────────────────────────────────────────────────
+\begin{frame}
   \centering
-  \begin{tikzpicture}[
-    box/.style={draw=upcblue, rounded corners=4pt,
-                fill=upcblue!12, text width=1.72cm, align=center,
-                minimum height=1.05cm, font=\small\bfseries},
-    dim/.style={draw=upcgray, rounded corners=3pt,
-                fill=upcgray!10, text width=1.72cm, align=center,
-                minimum height=0.85cm, font=\scriptsize},
-    arr/.style={-{Stealth[length=5pt]}, upcblue, thick},
-    note/.style={font=\scriptsize, text=upcgray, align=center}
-  ]
-    \node[box] (pre)   {Pre-\\process};
-    \node[box, right=0.45cm of pre]  (det)  {Staff\\detect};
-    \node[box, right=0.45cm of det]  (hdr)  {Header\\inject};
-    \node[box, right=0.45cm of hdr]  (mel)  {Melody\\CRNN};
-    \node[box, right=0.45cm of mel]  (crd)  {Chord\\CRNN};
-    \node[box, right=0.45cm of crd]  (gfx)  {Grammar\\fix};
-    \node[box, right=0.45cm of gfx]  (out)  {\textbf{JSON}};
+  \vfill
+  {\color{accent}\rule{3em}{2.6pt}}\par
+  \vspace{0.7cm}
+  {\displayfont\fontsize{24}{30}\selectfont\color{ink}%
+    Com pot un ordinador\\
+    llegir una partitura?\par}
+  \vfill
+  \includegraphics[width=0.72\textwidth]{fig_leadsheet_excerpt}
+  \vfill
+  {\color{muted}\large
+    Reconeixement òptic de música --- com l'OCR, però per a partitures.\par}
+  \vfill
+\end{frame}
 
-    \draw[arr] ([xshift=-0.5cm]pre.west) -- (pre.west)
-               node[pos=0, left, font=\small]{PDF};
-    \foreach \a/\b in {pre/det, det/hdr, hdr/mel, mel/crd, crd/gfx, gfx/out}
-      \draw[arr] (\a) -- (\b);
-
-    % Annotations below
-    \node[note, below=0.5cm of hdr, text width=2.8cm]
-      {Prepend clef+key+time template\\for continuation staves};
-    \node[note, below=0.5cm of mel, text width=1.9cm]
-      {ResNet18\\+BiLSTM\\+CTC};
-    \node[note, below=0.5cm of gfx, text width=2.4cm]
-      {Deterministic barline recovery from time sig};
-
-    \draw[densely dotted, upcgray]
-      ([yshift=-0.15cm]hdr.south) -- ([yshift=0.05cm]hdr.south |- {$(hdr.south)+(0,-0.5cm)$});
-    \draw[densely dotted, upcgray]
-      ([yshift=-0.15cm]mel.south) -- ([yshift=0.05cm]mel.south |- {$(mel.south)+(0,-0.5cm)$});
-    \draw[densely dotted, upcgray]
-      ([yshift=-0.15cm]gfx.south) -- ([yshift=0.05cm]gfx.south |- {$(gfx.south)+(0,-0.5cm)$});
-  \end{tikzpicture}
-
-  \vspace{0.4cm}
+% ── 3. The Real Book ───────────────────────────────────────────────────
+\begin{frame}{El problema: Partitures només en \textbf{paper} o \textbf{imatge}}
   \begin{columns}[T]
-    \column{0.32\textwidth}
-    \small\textbf{Header injection (key design):}\\
-    Continuation staves have no clef, key, or time signature.
-    Injection keeps every staff in-distribution for the CRNN ---
-    zero training cost, no leakage risk.
-    \column{0.32\textwidth}
-    \small\textbf{Two parallel CRNNs:}\\
-    Separate model for each visual language.
-    Melody: LMX token sequence.
-    Chords: character-level recognition.
-    \column{0.32\textwidth}
-    \small\textbf{End-to-end latency:}\\
-    \SI{114}{\milli\second} per page\\
-    (8-staff page, RTX~3060, greedy decoding)
+    \column{0.48\textwidth}
+    \begin{itemize}
+      \setlength\itemsep{0.55em}
+      \item El \textit{fake book} de jazz \textbf{més estès del món}
+      \item Centenars d'estàndards; a tots els faristols
+      \item El PDF oficial és \textbf{només imatge}\\
+            \small\color{muted} no es pot cercar, editar ni reproduir
+    \end{itemize}
+    \vspace{0.35em}
+    Digitalitzar-lo desbloquejaria:
+    \begin{itemize}
+      \setlength\itemsep{0.35em}
+      \item \textbf{Transposició automàtica} (B\flatt, E\flatt, F)
+      \item Reproducció MIDI per a l'estudi
+      \item Anàlisi harmònica a escala de corpus
+      \item Cerca i catalogació en biblioteques digitals
+    \end{itemize}
+
+    \column{0.52\textwidth}
+    \centering
+    \vspace{2.4em}
+    \includegraphics[width=\textwidth]{fig_leadsheet_excerpt}
   \end{columns}
 \end{frame}
 
-\begin{frame}{Design decisions}
+% ── 4. Quatre reptes ───────────────────────────────────────────────────
+\begin{frame}{Quatre reptes}
+  \vspace{0.3em}
+  \begin{columns}[T]
+    \column{0.48\textwidth}
+    \textbf{\color{accent}1 · Notació bidimensional}\\
+    L'altura d'una nota depèn de la \emph{posició relativa a la clau}; la durada, de cap + plica + corxets.
+    \vspace{1.0em}
+
+    \textbf{\color{accent}3 · Escassetat de dades}\\
+    No hi ha cap corpus etiquetat de \textit{lead sheets}. Cal construir dades sintètiques des de zero.
+
+    \column{0.48\textwidth}
+    \textbf{\color{accent}2 · Bretxa de domini}\\
+    Models entrenats amb imatges netes fallen en escanejos reals: soroll, desenfocament, perspectiva, tinta.
+    \vspace{1.0em}
+
+    \textbf{\color{accent}4 · Doble flux}\\
+    Melodia al pentagrama (patrons) + acords a sobre (text). Els sistemes existents només resolen el primer.
+  \end{columns}
+\end{frame}
+
+% ── 5. Pipeline ────────────────────────────────────────────────────────
+\begin{frame}{Pipeline d'inferència}
+  \vspace{0.4em}
+  \centering
+  \resizebox{\textwidth}{!}{%
+  \begin{tikzpicture}[
+    stage/.style={draw=accent, line width=0.8pt, rounded corners=3pt, fill=accent!8,
+                  text=ink, font=\scriptsize\bfseries, minimum height=0.9cm,
+                  text width=1.6cm, align=center, inner sep=2pt},
+    result/.style={draw=highlight, line width=1pt, rounded corners=3pt, fill=highlight!15,
+                text=ink, font=\scriptsize\bfseries, minimum height=0.9cm,
+                text width=1.0cm, align=center},
+    io/.style={font=\scriptsize\bfseries, text=muted},
+    cond/.style={font=\scriptsize\itshape, text=muted, align=center},
+    arr/.style={-{Stealth[length=4pt]}, accent, line width=0.9pt}
+  ]
+    \node[io] (in) {PDF};
+    \node[stage, right=0.4cm of in] (a) {Preprocés};
+    \node[stage, right=0.35cm of a]  (b) {Detecció\\pentagrames};
+    % melody branch (top)
+    \node[stage, right=0.75cm of b, yshift=0.85cm]  (c) {Injecció\\capçalera};
+    \node[stage, right=0.35cm of c]  (d) {CRNN\\melodia};
+    \node[stage, right=0.35cm of d]  (e) {Correcció\\gramatical};
+    % chord branch (bottom)
+    \node[stage, right=0.75cm of b, yshift=-0.85cm] (f) {CRNN\\acords};
+    \node[result, right=0.55cm of e, yshift=-0.85cm] (g) {JSON};
+    % condition label above the header-injection node
+    \node[cond, above=2pt of c] {només si no és\\el 1r pentagrama};
+
+    \draw[arr] (in) -- (a);
+    \draw[arr] (a) -- (b);
+    \draw[arr] (b.east) -- ++(0.3,0) |- (c.west);
+    \draw[arr] (b.east) -- ++(0.3,0) |- (f.west);
+    \draw[arr] (c) -- (d);
+    \draw[arr] (d) -- (e);
+    \draw[arr] (e.east) -- ++(0.28,0) |- (g.west);
+    \draw[arr] (f.east) -| (g.south);
+  \end{tikzpicture}}
+
+  \vspace{0.7em}
+  \begin{columns}[T]
+    \column{0.36\textwidth}
+    \textbf{\color{accent}Injecció de capçalera}\\
+    {\small Els pentagrames de continuació (no el primer) no tenen capçalera. S'hi afegeix una plantilla abans del CRNN de melodia → sempre veu un pentagrama complet.}
+    \column{0.30\textwidth}
+    \textbf{\color{accent}Dos CRNN en paral·lel}\\
+    {\small Un model per a cada llenguatge visual: melodia (tokens LMX) i acords (caràcters).}
+    \column{0.30\textwidth}
+    \textbf{\color{accent}Latència}\\
+    {\small \stat{114 ms} per pàgina\\ (8 pentagrames, RTX 3060, descodificació voraç).}
+  \end{columns}
+\end{frame}
+
+% ── 6. Decisions de disseny ────────────────────────────────────────────
+\begin{frame}{Decisions de disseny}
+  \begin{columns}[T]
+    \column{0.52\textwidth}
+    \textbf{Per què CRNN--CTC?}
+    \vspace{0.6em}
+
+    {\renewcommand{\arraystretch}{1.35}
+    \begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.0cm} >{\raggedright\arraybackslash}p{3.6cm}@{}}
+      \toprule
+      \textbf{\small Alternativa} & \textbf{\small Motiu de rebuig} \\
+      \midrule
+      {\small Pipeline modular} & {\small Cal segmentació per símbol} \\
+      {\small Transformer (SMT, LEGATO)} & {\small Millor SER, però $>$10× còmput} \\
+      {\small Seq2seq + atenció} & {\small Sobrecàrrega sense benefici} \\
+      \bottomrule
+    \end{tabular}}
+
+    \vspace{0.8em}
+    {\small \textbf{Backbone:} ResNet18 — meitat de temps que VGG.}
+
+    \column{0.44\textwidth}
+    \textbf{Per què LMX?}
+    \vspace{0.5em}
+
+    \begin{block}{\no\ MusicXML}
+      Arbre XML: cal context jeràrquic complet per a cada node. Incompatible amb el flux atòmic del CTC.
+    \end{block}
+    \vspace{0.2em}
+    \begin{block}{\ok\ LMX}
+      Tokens plans i atòmics: \code{pitch:C}, \code{quarter}, \code{flat}, \code{measure}.\\
+      Vocabulari $\approx$100 tokens · gramàtica regular → corrector determinista.
+    \end{block}
+  \end{columns}
+\end{frame}
+
+% ── 7. Dades sintètiques ───────────────────────────────────────────────
+\begin{frame}{Dades sintètiques i simulació d'escaneig}
   \begin{columns}[T]
     \column{0.50\textwidth}
-    \textbf{Why CRNN+CTC?}
-    \smallskip
-
-    \begin{tabular}{@{} l p{4.2cm} @{}}
-      \toprule
-      \textbf{Alternative} & \textbf{Reason rejected} \\
-      \midrule
-      Modular pipeline & Needs per-symbol segmentation labels (none available) \\[3pt]
-      Seq2seq + attention & Adds encoder--decoder overhead with no benefit for left-to-right monophonic reading \\[3pt]
-      Transformer (SMT, LEGATO) & State-of-the-art SER, but $>10\times$ compute; exceeds single-RTX-3060 budget \\
-      \bottomrule
-    \end{tabular}
-
-    \smallskip
-    \textbf{Backbone:} ResNet18 trains in half the time of VGG at comparable SER.
-
-    \column{0.46\textwidth}
-    \textbf{Why LMX?}
-    \smallskip
-    \begin{block}{\metno\ MusicXML}
-      XML tree. Requires full hierarchical context to emit each node.
-      Incompatible with CTC's atomic, left-to-right token stream.
+    \begin{itemize}
+      \setlength\itemsep{0.5em}
+      \item PrIMuS (87.678 incipits) re-renderitzat en estil \textbf{LilyJAZZ}
+      \item 3 filtres de domini → \textbf{46.089} mostres · $\approx$166.000 imatges
+      \item Partició 36.873 / 4.608 / 4.608 (train / val / test)
+      \item Simulació d'escaneig: soroll, desenfocament, perspectiva, tinta, esgrogueïment
+    \end{itemize}
+    \vspace{0.4em}
+    \begin{block}{Criteri d'acceptació}
+      Bretxa net$\leftrightarrow$escanejat $< 1$ pp \quad→\quad assolit: \stat{0,06 pp}
     \end{block}
-    \smallskip
-    \begin{block}{\metyes\ LMX (chosen)}
-      Flat, whitespace-delimited tokens.\\
-      Each token is atomic: \code{pitch:C}, \code{quarter}, \code{flat}, \code{measure}.\\
-      $\approx$100-token vocabulary.\\
-      Regular grammar $\Rightarrow$ deterministic post-pass fixer.
-    \end{block}
+
+    \column{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth,height=5.5cm,keepaspectratio]{fig_augmentation_gallery}\\[0.3em]
+    {\scriptsize\color{muted} Una mostra neta i les seves variants amb escaneig simulat.}
   \end{columns}
 \end{frame}
 
-% ======================================================================
-\section{Data \& Training}
-% ======================================================================
-
-\begin{frame}{Synthetic data pipeline and quality control}
-  \begin{columns}[T]
-    \column{0.48\textwidth}
-    \textbf{Building the training corpus:}
-    \begin{itemize}
-      \item PrIMuS: 87,678 monophonic incipits
-      \item Re-rendered in \textbf{LilyJAZZ} style (matching Real Book typography)
-      \item 3 domain filters $\Rightarrow$ 46,089 survive
-      \item Split: 36,873 / 4,608 / 4,608 (train/val/test)
-      \item Each sample: 1 clean + 2 scan-simulated PNGs
-      \item $\approx$166,000 rendered assets on disk
-    \end{itemize}
-    \column{0.48\textwidth}
-    \textbf{Scan simulation pipeline:}
-    \begin{itemize}
-      \item Gaussian + salt-and-pepper noise
-      \item Motion blur and defocus
-      \item Perspective distortion
-      \item Ink bleed
-      \item Paper yellowing (tone remap)
-      \item JPEG compression
-    \end{itemize}
-    \medskip
-    \textbf{Acceptance criterion:} clean-to-scanned SER gap $< 1$ pp.\\
-    \textbf{Achieved:} $\Delta = \mathbf{0.06}$ pp.
-  \end{columns}
-
-  \vspace{0.25cm}
-  \includegraphics[width=\textwidth]{fig_augmentation_gallery}
-\end{frame}
-
-\begin{frame}{The twin leakage bug --- quality by finding the problem}
+% ── 8. Fuga de dades ───────────────────────────────────────────────────
+\begin{frame}{Un error detectat i resolt: fuga de dades}
   \begin{columns}[T]
     \column{0.55\textwidth}
-    \textbf{What happened:}
+    \textbf{Què passava:}
     \begin{enumerate}
-      \item \code{extra\_data\_dirs} added derived image copies of training samples
-      \item They joined the \emph{shared} split pool \textbf{before} the random permutation
-      \item Near-duplicate training samples appeared in the val/test splits
-      \item All metrics before 3 June 2026 were inflated
+      \setlength\itemsep{0.3em}
+      \item \code{extra\_data\_dirs} afegia còpies derivades de mostres d'entrenament
+      \item S'unien al pool de splits \textbf{abans} de la partició aleatòria
+      \item Duplicats quasi-idèntics queien a val/test
+      \item Mètriques inflades (abans del 3 de juny de 2026)
     \end{enumerate}
-    \medskip
-    \textbf{Fix applied:}
-    \begin{itemize}
-      \item Introduced \code{scanned\_variant\_dirs} --- train-only by construction, keyed by sample ID
-      \item Clean split protocol re-run; all results in this presentation are post-fix
-    \end{itemize}
-    \column{0.41\textwidth}
-    \begin{alertblock}{Why this is a positive outcome}
-      Identifying data contamination mid-project, designing a leakage-safe mechanism,
-      and re-reporting clean numbers is precisely the engineering rigour
-      the project required.
-      \medskip\\
-      The metrics now reflect the true generalisation of the system.
+    \vspace{0.4em}
+    \textbf{Solució:} \code{scanned\_variant\_dirs} — només train, indexat per ID de mostra.
+
+    \column{0.42\textwidth}
+    \begin{alertblock}{Per què és un resultat positiu}
+      Detectar la contaminació, redissenyar el protocol de splits i tornar a mesurar valida les xifres: totes les mètriques d'aquesta presentació són posteriors a la correcció.
     \end{alertblock}
   \end{columns}
 \end{frame}
 
-\begin{frame}{Training trajectory}
-  \begin{columns}[T]
-    \column{0.58\textwidth}
-    \includegraphics[width=\textwidth]{fig_training_curves}
-    \column{0.38\textwidth}
-    \textbf{Observations:}
-    \begin{itemize}
-      \item SER falls from $\approx\SI{12}{\percent}$ to $\approx\SI{2}{\percent}$
-            by epoch~7 --- the alignment is learnt early
-      \item Convergence to $\approx\SI{1.2}{\percent}$ by epoch~83
-      \item Validation plateau: $\pm 0.02$ pp over last 10 epochs
-      \item 90 epochs total, $\approx$13 h on RTX~3060
-    \end{itemize}
-    \medskip
-    The training distribution is \textbf{scan-augmented only} --- clean images
-    are held out for evaluation, so the gap is measured fairly.
-  \end{columns}
-\end{frame}
-
-% ======================================================================
-\section{Results}
-% ======================================================================
-
-\begin{frame}{Headline results}
-  \centering
-  \renewcommand{\arraystretch}{1.4}
-  \begin{tabular}{@{} l
-      S[table-format=2.2,
-        table-number-alignment=right]
-      S[table-format=2.2,
-        table-number-alignment=right] @{}}
+% ── 9. Resultats ───────────────────────────────────────────────────────
+\begin{frame}{Resultats principals}
+  \vspace{0.2em}
+  \begin{center}
+  {\renewcommand{\arraystretch}{1.4}
+  \begin{tabular}{@{}l r r@{}}
     \toprule
-    \textbf{Metric}
-      & {\textbf{Scanned (\%)}}
-      & {\textbf{Clean (\%)}} \\
+    \textbf{Mètrica} & \textbf{Escanejat} & \textbf{Net} \\
     \midrule
-    Aggregate SER          & 1.23 & 1.17 \\
-    Melodic SER            & 0.14 & 0.10 \\
-    Perfect transcriptions & 72.7 & 73.7 \\
-    SER $\le 5\%$          & 90.3 & 90.7 \\
+    SER agregat (\%)              & \stat{1,23} & 1,17 \\
+    SER melòdic (\%)             & 0,14 & 0,10 \\
+    Transcripcions perfectes (\%) & 72,7 & 73,7 \\
     \bottomrule
-  \end{tabular}
+  \end{tabular}}
+  \end{center}
 
-  \vspace{0.5cm}
+  \vspace{0.7em}
   \begin{columns}[c]
-    \column{0.30\textwidth}
+    \column{0.32\textwidth}
     \centering
-    \begin{block}{\metyes\ Target met}
-      Scanned SER $1.23\% < 3\%$\\
-      (target set at project start)
-    \end{block}
+    \stat{\large 1,23\,\% < 3\,\%}\\[0.2em]
+    {\small\color{muted} objectiu assolit\\(escaneig simulat)}
     \column{0.34\textwidth}
     \centering
-    \begin{block}{\metyes\ Melody is accurate}
-      $\mathbf{99.86\%}$ of pitch, duration,\\
-      and accidental tokens are correct
-    \end{block}
-    \column{0.30\textwidth}
+    \stat{\large 99,86\,\%}\\[0.2em]
+    {\small\color{muted} de tokens de pitch, durada\\i alteració correctes}
+    \column{0.32\textwidth}
     \centering
-    \begin{block}{\metyes\ Gap is negligible}
-      Clean vs scanned: $0.06$ pp\\
-      (criterion: $< 1$ pp)
-    \end{block}
+    \stat{\large 0,06 pp}\\[0.2em]
+    {\small\color{muted} bretxa net$\leftrightarrow$escaneig\\(criteri: $<1$ pp)}
   \end{columns}
 \end{frame}
 
-\begin{frame}{Error analysis --- where the residual error lives}
+% ── 10. Anàlisi d'errors ───────────────────────────────────────────────
+\begin{frame}{On són els errors?}
   \begin{columns}[T]
-    \column{0.48\textwidth}
+    \column{0.46\textwidth}
+    \centering
     \includegraphics[width=\textwidth]{fig_error_pie}
-    \column{0.48\textwidth}
-    \textbf{3,506 total edits on the scanned split:}
-    \begin{itemize}
-      \item $\approx\mathbf{90\%}$ are \code{measure} (barline) and tie tokens
-      \item Pitch and octave tokens barely appear in deletions or insertions
-      \item Substitutions: only $3.4\%$ of all edits
-    \end{itemize}
-    \medskip
-    \textbf{Most common substitution:}\\
-    \code{pitch:B $\to$ pitch:G} (8 times over 4,608 staves)
-    \medskip
 
-    \begin{alertblock}{Key takeaway}
-      The model reads the \textbf{music} correctly.
-      It occasionally misplaces a \textbf{barline}.
-      The melodic SER ($0.14\%$) measures this directly:
-      once structural tokens are excluded, errors are negligible.
+    \column{0.50\textwidth}
+    \begin{itemize}
+      \setlength\itemsep{0.5em}
+      \item $\approx$\textbf{90\,\%} dels errors: barres de compàs i lligadures
+      \item Pitch i octava \textbf{quasi absents} de les insercions/supressions
+      \item Substitucions: només el \textbf{3,4\,\%} de les edicions
+    \end{itemize}
+    \vspace{0.5em}
+    \begin{alertblock}{Conclusió}
+      El model \textbf{llegeix la música} correctament; de tant en tant col·loca malament una barra de compàs. El SER melòdic (\textbf{0,14\,\%}) ho confirma.
     \end{alertblock}
   \end{columns}
 \end{frame}
 
-\begin{frame}{\textit{Satin Doll} --- qualitative comparison}
+% ── 11. Satin Doll ─────────────────────────────────────────────────────
+\begin{frame}{Comparació qualitativa: \textit{Satin Doll}}
   \begin{columns}[T]
     \column{0.48\textwidth}
     \centering
-    \textbf{Audiveris 5.10 (state-of-the-art open-source)}
-    \smallskip
-    \includegraphics[width=\textwidth,height=4.2cm,keepaspectratio]{satin_audiveris}
-    \smallskip
-    \begin{itemize}
-      \item[\metno] Correct clef on \textbf{2 of 9 staves}; rest default to bass clef
-      \item[\metno] \textbf{No chord symbols} recovered
-      \item[\metno] Octaves displaced; output musically unusable
-    \end{itemize}
+    \textbf{Audiveris 5.10} {\small\color{muted}(referència lliure)}\\[0.3em]
+    \includegraphics[height=4.6cm,keepaspectratio]{satin_audiveris}\\[0.3em]
+    {\small\raggedright
+      \no\ Clau correcta a \textbf{2 de 9} pentagrames\\
+      \no\ \textbf{Cap} acord reconegut\\
+      \no\ Octaves desplaçades → inservible\par}
+
     \column{0.48\textwidth}
     \centering
-    \textbf{This system}
-    \smallskip
-    \includegraphics[width=\textwidth,height=4.2cm,keepaspectratio]{satin_ours_stacked}
-    \smallskip
-    \begin{itemize}
-      \item[\metyes] \textbf{7 of 9 staves} recognised, all on correct treble clef
-      \item[\metyes] \textbf{36 chord symbols} recovered:\\
-            \code{D-7 G7 / E-7 A7 / G-7 C7 Fmaj7\,\ldots}
-      \item[\metyes] Title band + credit line correctly rejected by gate
-    \end{itemize}
+    \textbf{El nostre sistema}\\[0.3em]
+    \includegraphics[height=4.6cm,keepaspectratio]{satin_ours_stacked}\\[0.3em]
+    {\small\raggedright
+      \ok\ \textbf{7 de 9} pentagrames, tots en clau de sol\\
+      \ok\ \textbf{36 acords} (\code{D-7 G7 · E-7 A7}…)\\
+      \ok\ Títol i crèdits rebutjats correctament\par}
   \end{columns}
 \end{frame}
 
-% ======================================================================
-\section{Conclusions}
-% ======================================================================
+% ── 12. Objectius ──────────────────────────────────────────────────────
+\begin{frame}{Objectius assolits}
+  \vspace{0.3em}
+  {\renewcommand{\arraystretch}{1.45}
+  \begin{tabular}{@{}c l@{}}
+    \ok & \textbf{General} — SER 1,23\,\% $<$ 3\,\% (objectiu) en escaneig simulat \\
+    \ok & \textbf{O1} — Estat de l'art; CRNN--CTC justificat enfront de 3 alternatives \\
+    \ok & \textbf{O2} — Dataset sintètic LilyJAZZ des de PrIMuS (46.089 mostres) \\
+    \ok & \textbf{O3} — Simulació d'escaneig; bretxa net$\leftrightarrow$escaneig 0,06 pp \\
+    \ok & \textbf{O4} — CRNN--CTC: 1,17\,\% net / 1,23\,\% escanejat \\
+    \ok & \textbf{O5} — Anàlisi d'errors per categoria \\
+    \ok & \textbf{O6} — Pipeline complet + FastAPI + sortida JSON \\
+    \halfok & \textbf{O7} — Fine-tuning amb 36 staves reals: millora qualitativa; \\
+            & \phantom{\textbf{O7} —} sense SER real (totes calen per a entrenar) \\
+  \end{tabular}}
+\end{frame}
 
-\begin{frame}{Work plan, sustainability, and adjustments}
+% ── 13. Conclusions ────────────────────────────────────────────────────
+\begin{frame}{Conclusions i treball futur}
   \begin{columns}[T]
     \column{0.50\textwidth}
-    \textbf{Methodology:} incremental --- one pipeline stage at a time.\\
-    \textbf{Budget:} 540 h (18 ECTS $\times$ 30 h/ECTS). On target.
-
-    \medskip
-    \textbf{Main deviation from plan:}
+    \textbf{\color{accent}Què s'ha construït}
     \begin{itemize}
-      \item Twin leakage discovery mid-project
-      \item Response: redesign split protocol, introduce leakage-safe mechanism, re-train
-      \item Added $\approx$2 weeks; resulted in clean, verifiable metrics
+      \setlength\itemsep{0.35em}
+      \item Sistema OMR d'extrem a extrem per a jazz
+      \item SER agregat \textbf{1,23\,\%} (escaneig simulat)
+      \item SER melòdic \textbf{0,14\,\%} — pitch quasi perfecte
+      \item \textbf{72,7\,\%} de transcripcions perfectes
+      \item Acords: \textbf{5,9\,\%} CER després del fine-tuning
     \end{itemize}
 
     \column{0.46\textwidth}
-    \textbf{Sustainability (Art.\ 12):}
-    \begin{itemize}
-      \item \textbf{Environmental:} $\approx$13 h GPU training, RTX~3060.
-            Inference: 114 ms/page.
-            No cloud compute, no distributed training.
-      \item \textbf{Economic:} fully open-source stack (LilyPond, PyTorch, FastAPI).
-            Zero licensing cost.
-      \item \textbf{Social:} enables access to music archives.
-            Dataset IP: PrIMuS (freely available);
-            inference on The Real Book does not redistribute copyrighted content.
-    \end{itemize}
-  \end{columns}
-\end{frame}
-
-\begin{frame}{Objectives achieved}
-  \renewcommand{\arraystretch}{1.3}
-  \begin{tabular}{@{} c l @{}}
-    \metyes & \textbf{General} --- SER $1.23\% < 3\%$ target on scan-simulated split \\
-    \metyes & \textbf{O1} --- SoA survey; CRNN+CTC justified against three alternatives \\
-    \metyes & \textbf{O2} --- Synthetic LilyJAZZ dataset from PrIMuS\\
-            & \quad (46,089 samples; $\approx$166k rendered images) \\
-    \metyes & \textbf{O3} --- Scan simulation; clean-to-scanned gap $= 0.06$ pp \\
-    \metyes & \textbf{O4} --- CRNN+CTC: $1.17\%$ clean / $1.23\%$ scanned \\
-    \metyes & \textbf{O5} --- Error analysis: $90\%$ structural tokens; pitch near-zero \\
-    \metyes & \textbf{O6} --- Full inference pipeline + FastAPI + JSON output \\
-    \metpart & \textbf{O7} --- Domain fine-tuning: 36 real staves, qualitative improvement; \\
-             & \quad no held-out real SER (all 36 staves needed for training) \\
-  \end{tabular}
-\end{frame}
-
-\begin{frame}{Conclusions and future work}
-  \begin{columns}[T]
-    \column{0.50\textwidth}
-    \textbf{What was built and demonstrated:}
-    \begin{itemize}
-      \item End-to-end OMR system for jazz lead sheets
-      \item $1.23\%$ aggregate SER on scan-simulated split
-      \item $0.14\%$ melodic SER --- pitch is essentially error-free
-      \item $72.7\%$ perfect transcriptions
-      \item Chord recognition: $5.9\%$ CER after fine-tuning
-            (from $69.9\%$ zero-shot)
-      \item $114$ ms per page on RTX~3060
-    \end{itemize}
-    \column{0.46\textwidth}
-    \textbf{Three concrete next steps:}
+    \textbf{\color{accent}Tres passos següents}
     \begin{enumerate}
-      \item \textbf{Annotate $\geq$200 real staves} $\to$ held-out real-domain SER (binding constraint for O7)
-      \item \textbf{Tuplet vocabulary} $\to$ largest single gap in LMX grammar coverage
-      \item \textbf{Learned staff detector} (YOLO/DETR) $\to$ robustness on slanted and partial systems
+      \setlength\itemsep{0.35em}
+      \item Etiquetar \textbf{$\geq$200 staves reals} → SER de domini real (O7)
+      \item \textbf{Vocabulari de tresets} — el buit més gran de l'LMX
+      \item \textbf{Detector de pentagrames après} (YOLO/DETR) per a escanejos difícils
     \end{enumerate}
   \end{columns}
-  \medskip\hrule\medskip
-  \textbf{Back to the original problem:}
-  digitise \textit{The Real Book} $\to$ automatic transposition for
-  B\(\flat\), E\(\flat\), and F instruments.
-  This system makes that pipeline technically feasible.
+  \vspace{0.6em}
+  {\color{accent}\rule{\textwidth}{0.6pt}}
+  \vspace{0.3em}\\
+  Aplicació directa: digitalització de \textit{The Real Book} i transposició automàtica per a instruments en B\flatt, E\flatt\ i F.
 \end{frame}
 
-\begin{frame}{Technical competences (GEI / Computaci\'{o})}
+% ── 14. Competències ───────────────────────────────────────────────────
+\begin{frame}{Competències tècniques (Computació)}
   \begin{columns}[T]
     \column{0.48\textwidth}
-    \begin{block}{CCO1.1 --- Algorithmic strategies \& performance}
-      CRNN+CTC vs seq2seq vs transformer: justified on compute and data-efficiency grounds (\emph{Ch.\ 4}).\\
-      Greedy vs beam search: $<0.01$ pp SER at $8\times$ cost --- greedy deployed (\emph{Ch.\ 6}).\\
-      ResNet18 vs VGG: $2\times$ training time, comparable SER.\\
-      Deterministic grammar fixer vs learned corrector.
+    \begin{block}{CCO1.1 — Estratègies algorísmiques i rendiment}
+      {\small
+      CRNN--CTC vs.\ seq2seq vs.\ transformer: justificat per còmput i eficiència de dades.\\[0.3em]
+      Voraç vs.\ \textit{beam search}: $<$0,01 pp de SER a 8× cost → voraç desplegat.\\[0.3em]
+      ResNet18 vs.\ VGG; corrector determinista vs.\ après.}
     \end{block}
+
     \column{0.48\textwidth}
-    \begin{block}{CCO2.4 --- Machine learning \& large data}
-      CRNN+CTC supervised by CTC loss (\emph{Ch.\ 4--5}).\\
-      $\approx$166,000 rendered training assets.\\
-      Synthetic pre-training then domain fine-tuning applied to both CRNN streams.\\
-      Data leakage discovered and remedied (\emph{Ch.\ 5}).
+    \begin{block}{CCO2.4 — Aprenentatge automàtic i grans volums}
+      {\small
+      CRNN--CTC supervisat amb pèrdua CTC.\\[0.3em]
+      $\approx$166.000 imatges d'entrenament.\\[0.3em]
+      Pre-entrenament sintètic + fine-tuning de domini als dos fluxos.\\[0.3em]
+      Fuga de dades detectada i corregida.}
     \end{block}
   \end{columns}
-  \vspace{0.3cm}
-  Both competences declared \textbf{in depth} at TFG inscription.
+  \vspace{0.5em}
+  \centering {\small\color{muted} Totes dues competències declarades \textbf{en profunditat} a la inscripció del TFG.}
 \end{frame}
 
-% ── Thank you / questions ─────────────────────────────────────────────
+% ── 15. Referències ────────────────────────────────────────────────────
+\begin{frame}{Referències}
+  \vspace{0.3em}
+  \footnotesize
+  \begin{thebibliography}{9}
+    \setbeamertemplate{bibliography item}[text]
+    \bibitem{calvo2018} J.\ Calvo-Zaragoza, D.\ Rizo.
+      \emph{End-to-end neural OMR of monophonic scores} (PrIMuS, CRNN--CTC). 2018.
+    \bibitem{lmx} OMR Research.
+      \emph{Linearized MusicXML (LMX)}. 2025.
+    \bibitem{primus} J.\ Calvo-Zaragoza, D.\ Rizo.
+      \emph{Camera-PrIMuS dataset}. 2018.
+    \bibitem{smt} A.\ Ríos-Vila et al.
+      \emph{Sheet Music Transformer (SMT / SMT++)}. 2024.
+    \bibitem{ctc} A.\ Graves et al.
+      \emph{Connectionist Temporal Classification}. 2006.
+    \bibitem{audiveris} H.\ Bitteur.
+      \emph{Audiveris} (motor OMR de programari lliure), v5.10.
+  \end{thebibliography}
+\end{frame}
+
+% ── 16. Gràcies ────────────────────────────────────────────────────────
 \begin{frame}[plain]
   \centering
-  \vfill
-  {\Huge\bfseries\color{upcblue} Thank you}\\[14pt]
-  {\Large Questions?}\\[28pt]
-  \hrule
-  \vspace{14pt}
-  \small
-  \renewcommand{\arraystretch}{1.3}
-  \begin{tabular}{@{} l l @{}}
-    \textbf{SER}       & $1.23\%$ scanned / $1.17\%$ clean
-                         (4,608 test samples, greedy CTC) \\
-    \textbf{Melodic SER} & $0.14\%$ --- pitch content is essentially error-free \\
-    \textbf{Perfect transcriptions} & $72.7\%$ \\
-    \textbf{Chord CER} & $5.9\%$ after fine-tuning (from $69.9\%$ zero-shot) \\
-    \textbf{Latency}   & $114$ ms/page on RTX~3060 \\[6pt]
-    \textbf{Supervisor} & Manel Frigola Bourlon --- Dept.\ of Automatic Control \\
-  \end{tabular}
-  \vfill
+  \vspace{1.1cm}
+  {\color{accent}\rule{3em}{2.6pt}}\par
+  \vspace{0.5cm}
+  {\displayfont\fontsize{34}{38}\selectfont\color{ink} Gràcies\par}
+  \vspace{0.3cm}
+  {\large\color{muted} Preguntes?\par}
+  \vspace{1.0cm}
+  {\renewcommand{\arraystretch}{1.35}\small
+  \begin{tabular}{@{}r l@{}}
+    \textbf{SER}        & 1,23\,\% escanejat / 1,17\,\% net \;(4.608 mostres) \\
+    \textbf{SER melòdic} & 0,14\,\% — el pitch és quasi perfecte \\
+    \textbf{Perfectes}  & 72,7\,\% de pentagrames \\
+    \textbf{Acords}     & 5,9\,\% CER (de 69,9\,\% zero-shot) \\
+    \textbf{Latència}   & 114 ms/pàgina (RTX 3060) \\
+  \end{tabular}}
+  \vspace{0.7cm}\\
+  {\footnotesize\color{muted} Pol Casanovas Puig · Director: Manel Frigola Bourlon · FIB/UPC}
+\end{frame}
+
+% ======================================================================
+\appendix
+% ======================================================================
+\begin{frame}[plain]
+  \centering
+  \vspace{2.2cm}
+  {\color{accent}\rule{2.4em}{2.4pt}}\par
+  \vspace{0.5cm}
+  {\displayfont\fontsize{24}{28}\selectfont\color{ink} Diapositives de suport\par}
+\end{frame}
+
+% ── Backup: corba d'entrenament ────────────────────────────────────────
+\begin{frame}{Suport · Corba d'entrenament}
+  \begin{columns}[T]
+    \column{0.60\textwidth}
+    \includegraphics[width=\textwidth]{fig_training_curves}
+    \column{0.38\textwidth}
+    \begin{itemize}
+      \setlength\itemsep{0.45em}
+      \item SER cau de $\approx$12\,\% a $\approx$2\,\% cap a l'època 7
+      \item Convergència a $\approx$1,2\,\% (època 83)
+      \item 90 èpoques, $\approx$13 h en RTX 3060
+      \item Plateau de validació: $\pm$0,02 pp
+    \end{itemize}
+    \vspace{0.4em}
+    {\small\color{muted} Entrenament només amb escaneig simulat; les imatges netes es reserven per a l'avaluació.}
+  \end{columns}
+\end{frame}
+
+% ── Backup: reconeixement d'acords ─────────────────────────────────────
+\begin{frame}{Suport · Reconeixement d'acords}
+  \vspace{0.3em}
+  \begin{center}
+  {\renewcommand{\arraystretch}{1.35}
+  \begin{tabular}{@{}l l r r r@{}}
+    \toprule
+    \textbf{Condició} & \textbf{Checkpoint} & \textbf{CER (\%)} & \textbf{Exacte (\%)} & \textbf{Strips} \\
+    \midrule
+    Val.\ sintètica        & pre-entrenat & 0,0  & 100,0 & 2000 \\
+    Real, zero-shot        & pre-entrenat & 69,9 & 0,0   & 29 \\
+    Real held-out          & fine-tune    & \stat{5,9} & \stat{58,6} & 29 \\
+    \bottomrule
+  \end{tabular}}
+  \end{center}
+  \vspace{0.6em}
+  {\small El flux d'acords col·lapsa en zero-shot sobre escanejos reals (glifs estilitzats + soroll de pàgina). El fine-tuning amb 262 strips reals tanca gairebé tota la bretxa.}
+\end{frame}
+
+% ── Backup: latència ───────────────────────────────────────────────────
+\begin{frame}{Suport · Latència d'inferència}
+  \vspace{0.3em}
+  \begin{center}
+  {\renewcommand{\arraystretch}{1.35}
+  \begin{tabular}{@{}l r@{}}
+    \toprule
+    \textbf{Etapa} & \textbf{Temps (ms)} \\
+    \midrule
+    Preprocés (càrrega + desbiaix + binarització) & 21,0 \\
+    Detecció de pentagrames                       & 48,1 \\
+    CRNN melodia (8 pentagrames, voraç)           & 7,6 \\
+    CRNN acords (8 strips)                         & 4,6 \\
+    Corrector gramatical                          & 0,1 \\
+    \midrule
+    \textbf{Extrem a extrem (mediana, 10 reps.)}  & \stat{114,0} \\
+    \bottomrule
+  \end{tabular}}
+  \end{center}
+  \vspace{0.5em}
+  {\small\color{muted} Pàgina representativa de 8 pentagrames, RTX 3060, descodificació voraç.}
+\end{frame}
+
+% ── Backup: pitjor cas melòdic ─────────────────────────────────────────
+\begin{frame}{Suport · El pitjor cas melòdic}
+  \centering
+  \includegraphics[width=0.84\textwidth,height=1.5cm,keepaspectratio]{melodic_worst_input}\\[0.15em]
+  {\scriptsize\color{muted} \textbf{Entrada} — pentagrama escanejat (mostra \code{220014195-1\_1\_1})}\\[0.5em]
+  \includegraphics[width=0.84\textwidth,height=1.5cm,keepaspectratio]{melodic_worst_gt}\\[0.15em]
+  {\scriptsize\color{accent} \textbf{Ground truth} — transcripció correcta}\\[0.5em]
+  \includegraphics[width=0.84\textwidth,height=1.5cm,keepaspectratio]{melodic_worst_pred}\\[0.15em]
+  {\scriptsize\color{highlight} \textbf{Predicció} — l'última mesura és incorrecta}\\[0.6em]
+  {\small SER melòdic \textbf{0,092}: les tres primeres mesures coincideixen; a l'última el model erra els tons (\code{C\,C\,D\,D} → \code{B\,A\,E\,B}). Els errors melòdics visibles són poc freqüents.}
 \end{frame}
 
 \end{document}

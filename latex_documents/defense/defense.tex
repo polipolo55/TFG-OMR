@@ -32,6 +32,7 @@
 \emergencystretch=2em
 
 \graphicspath{
+  {figures/}
   {../main/figures/}
   {../main/figures/real_page/}
   {../main/figures/worst/}
@@ -78,7 +79,7 @@
   \hbox{%
     \begin{beamercolorbox}[wd=\paperwidth,ht=2.6ex,dp=1.3ex,leftskip=1.6em,rightskip=1.6em]{}%
       {\color{muted}\scriptsize Pol Casanovas Puig%
-        \hfill \insertframenumber\,/\,\inserttotalframenumber}%
+        \hfill \insertframenumber}%
     \end{beamercolorbox}%
   }%
 }
@@ -125,39 +126,40 @@
     Com pot un ordinador\\
     llegir una partitura?\par}
   \vfill
-  \includegraphics[width=0.72\textwidth]{fig_leadsheet_excerpt}
+  \includegraphics[width=0.66\textwidth]{def_hook}
   \vfill
   {\color{muted}\large
     Reconeixement òptic de música --- com l'OCR, però per a partitures.\par}
   \vfill
 \end{frame}
 
-% ── 3. The Real Book ───────────────────────────────────────────────────
-\begin{frame}{El problema: Partitures només en \textbf{paper} o \textbf{imatge}}
+% ── 3. El problema ─────────────────────────────────────────────────────
+\begin{frame}{El problema: partitures només en paper o imatge}
   \begin{columns}[T]
-    \column{0.48\textwidth}
+    \column{0.5\textwidth}
     \begin{itemize}
-      \setlength\itemsep{0.55em}
-      \item El \textit{fake book} de jazz \textbf{més estès del món}
-      \item Centenars d'estàndards; a tots els faristols
-      \item El PDF oficial és \textbf{només imatge}\\
-            \small\color{muted} no es pot cercar, editar ni reproduir
-    \end{itemize}
-    \vspace{0.35em}
-    Digitalitzar-lo desbloquejaria:
-    \begin{itemize}
-      \setlength\itemsep{0.35em}
-      \item \textbf{Transposició automàtica} (B\flatt, E\flatt, F)
-      \item Reproducció MIDI per a l'estudi
-      \item Anàlisi harmònica a escala de corpus
-      \item Cerca i catalogació en biblioteques digitals
+      \setlength\itemsep{0.5em}
+      \item Molta música notada només existeix \textbf{en paper} o escanejada
+      \item Centenars d'estàndards de jazz, a tots els faristols
+      \item Els PDF són \textbf{només imatge}\\
+            \small\color{muted} no es poden cercar, editar ni reproduir
     \end{itemize}
 
-    \column{0.52\textwidth}
-    \centering
-    \vspace{2.4em}
-    \includegraphics[width=\textwidth]{fig_leadsheet_excerpt}
+    \column{0.5\textwidth}
+    Digitalitzar-la desbloquejaria:
+    \begin{itemize}
+      \setlength\itemsep{0.5em}
+      \item \textbf{Transposició automàtica} (B\flatt, E\flatt, F)
+      \item Reproducció MIDI
+      \item Anàlisi harmònica de corpus
+      \item Cerca i catalogació
+    \end{itemize}
   \end{columns}
+
+  \vspace{1.0em}
+  \centering
+  {\setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.5pt}%
+   \fcolorbox{muted}{white}{\includegraphics[width=0.6\textwidth]{def_paper}}}
 \end{frame}
 
 % ── 4. Quatre reptes ───────────────────────────────────────────────────
@@ -166,19 +168,19 @@
   \begin{columns}[T]
     \column{0.48\textwidth}
     \textbf{\color{accent}1 · Notació bidimensional}\\
-    L'altura d'una nota depèn de la \emph{posició relativa a la clau}; la durada, de cap + plica + corxets.
-    \vspace{1.0em}
+    Altura = posició relativa a la clau; durada = cap + plica + corxets.
+    \vspace{1.1em}
 
     \textbf{\color{accent}3 · Escassetat de dades}\\
-    No hi ha cap corpus etiquetat de \textit{lead sheets}. Cal construir dades sintètiques des de zero.
+    Cap corpus etiquetat de \textit{lead sheets} → cal generar dades sintètiques.
 
     \column{0.48\textwidth}
     \textbf{\color{accent}2 · Bretxa de domini}\\
-    Models entrenats amb imatges netes fallen en escanejos reals: soroll, desenfocament, perspectiva, tinta.
-    \vspace{1.0em}
+    Entrenat en net, falla en escanejos reals: soroll, perspectiva, tinta.
+    \vspace{1.1em}
 
     \textbf{\color{accent}4 · Doble flux}\\
-    Melodia al pentagrama (patrons) + acords a sobre (text). Els sistemes existents només resolen el primer.
+    Melodia (pentagrama) + acords (text). L'estat de l'art només fa el primer.
   \end{columns}
 \end{frame}
 
@@ -261,7 +263,7 @@
     \vspace{0.5em}
 
     \begin{block}{\no\ MusicXML}
-      Arbre XML: cal context jeràrquic complet per a cada node. Incompatible amb el flux atòmic del CTC.
+      Arbre XML jeràrquic → incompatible amb el flux atòmic del CTC.
     \end{block}
     \vspace{0.2em}
     \begin{block}{\ok\ LMX}
@@ -280,7 +282,7 @@
       \item PrIMuS (87.678 incipits) re-renderitzat en estil \textbf{LilyJAZZ}
       \item 3 filtres de domini → \textbf{46.089} mostres · $\approx$166.000 imatges
       \item Partició 36.873 / 4.608 / 4.608 (train / val / test)
-      \item Simulació d'escaneig: soroll, desenfocament, perspectiva, tinta, esgrogueïment
+      \item Escaneig simulat: soroll, perspectiva, tinta, esgrogueïment
     \end{itemize}
     \vspace{0.4em}
     \begin{block}{Criteri d'acceptació}
@@ -289,30 +291,7 @@
 
     \column{0.48\textwidth}
     \centering
-    \includegraphics[width=\textwidth,height=5.5cm,keepaspectratio]{fig_augmentation_gallery}\\[0.3em]
-    {\scriptsize\color{muted} Una mostra neta i les seves variants amb escaneig simulat.}
-  \end{columns}
-\end{frame}
-
-% ── 8. Fuga de dades ───────────────────────────────────────────────────
-\begin{frame}{Un error detectat i resolt: fuga de dades}
-  \begin{columns}[T]
-    \column{0.55\textwidth}
-    \textbf{Què passava:}
-    \begin{enumerate}
-      \setlength\itemsep{0.3em}
-      \item \code{extra\_data\_dirs} afegia còpies derivades de mostres d'entrenament
-      \item S'unien al pool de splits \textbf{abans} de la partició aleatòria
-      \item Duplicats quasi-idèntics queien a val/test
-      \item Mètriques inflades (abans del 3 de juny de 2026)
-    \end{enumerate}
-    \vspace{0.4em}
-    \textbf{Solució:} \code{scanned\_variant\_dirs} — només train, indexat per ID de mostra.
-
-    \column{0.42\textwidth}
-    \begin{alertblock}{Per què és un resultat positiu}
-      Detectar la contaminació, redissenyar el protocol de splits i tornar a mesurar valida les xifres: totes les mètriques d'aquesta presentació són posteriors a la correcció.
-    \end{alertblock}
+    \includegraphics[width=\textwidth,height=5.6cm,keepaspectratio]{def_augstrip}
   \end{columns}
 \end{frame}
 
@@ -351,21 +330,19 @@
 
 % ── 10. Anàlisi d'errors ───────────────────────────────────────────────
 \begin{frame}{On són els errors?}
+  \centering
+  \includegraphics[width=0.96\textwidth]{def_errorbar}
+  \vspace{0.9em}
   \begin{columns}[T]
-    \column{0.46\textwidth}
-    \centering
-    \includegraphics[width=\textwidth]{fig_error_pie}
-
     \column{0.50\textwidth}
     \begin{itemize}
       \setlength\itemsep{0.5em}
-      \item $\approx$\textbf{90\,\%} dels errors: barres de compàs i lligadures
-      \item Pitch i octava \textbf{quasi absents} de les insercions/supressions
-      \item Substitucions: només el \textbf{3,4\,\%} de les edicions
+      \item Pitch i octava \textbf{quasi absents} dels errors
+      \item Les substitucions (errors de \emph{contingut}) són només el \textbf{3,4\,\%}
     \end{itemize}
-    \vspace{0.5em}
+    \column{0.46\textwidth}
     \begin{alertblock}{Conclusió}
-      El model \textbf{llegeix la música} correctament; de tant en tant col·loca malament una barra de compàs. El SER melòdic (\textbf{0,14\,\%}) ho confirma.
+      El model \textbf{llegeix la música} correctament; de tant en tant col·loca malament una barra. El SER melòdic (\textbf{0,14\,\%}) ho confirma.
     \end{alertblock}
   \end{columns}
 \end{frame}
@@ -405,7 +382,7 @@
     \ok & \textbf{O4} — CRNN--CTC: 1,17\,\% net / 1,23\,\% escanejat \\
     \ok & \textbf{O5} — Anàlisi d'errors per categoria \\
     \ok & \textbf{O6} — Pipeline complet + FastAPI + sortida JSON \\
-    \halfok & \textbf{O7} — Fine-tuning amb 36 staves reals: millora qualitativa; \\
+    \halfok & \textbf{O7} — Fine-tuning amb 36 pentagrames reals: millora qualitativa; \\
             & \phantom{\textbf{O7} —} sense SER real (totes calen per a entrenar) \\
   \end{tabular}}
 \end{frame}
@@ -428,7 +405,7 @@
     \textbf{\color{accent}Tres passos següents}
     \begin{enumerate}
       \setlength\itemsep{0.35em}
-      \item Etiquetar \textbf{$\geq$200 staves reals} → SER de domini real (O7)
+      \item Etiquetar \textbf{$\geq$200 pentagrames reals} → SER de domini real (O7)
       \item \textbf{Vocabulari de tresets} — el buit més gran de l'LMX
       \item \textbf{Detector de pentagrames après} (YOLO/DETR) per a escanejos difícils
     \end{enumerate}
@@ -445,17 +422,16 @@
     \column{0.48\textwidth}
     \begin{block}{CCO1.1 — Estratègies algorísmiques i rendiment}
       {\small
-      CRNN--CTC vs.\ seq2seq vs.\ transformer: justificat per còmput i eficiència de dades.\\[0.3em]
-      Voraç vs.\ \textit{beam search}: $<$0,01 pp de SER a 8× cost → voraç desplegat.\\[0.3em]
-      ResNet18 vs.\ VGG; corrector determinista vs.\ après.}
+      CRNN--CTC vs.\ transformer: triat per còmput i eficiència de dades.\\[0.3em]
+      Voraç vs.\ \textit{beam}: $<$0,01 pp a 8× cost.\\[0.3em]
+      ResNet18 vs.\ VGG; corrector determinista.}
     \end{block}
 
     \column{0.48\textwidth}
     \begin{block}{CCO2.4 — Aprenentatge automàtic i grans volums}
       {\small
-      CRNN--CTC supervisat amb pèrdua CTC.\\[0.3em]
-      $\approx$166.000 imatges d'entrenament.\\[0.3em]
-      Pre-entrenament sintètic + fine-tuning de domini als dos fluxos.\\[0.3em]
+      CRNN--CTC amb pèrdua CTC; $\approx$166.000 imatges.\\[0.3em]
+      Pre-entrenament sintètic + fine-tuning als dos fluxos.\\[0.3em]
       Fuga de dades detectada i corregida.}
     \end{block}
   \end{columns}
@@ -521,7 +497,7 @@
 \begin{frame}{Suport · Corba d'entrenament}
   \begin{columns}[T]
     \column{0.60\textwidth}
-    \includegraphics[width=\textwidth]{fig_training_curves}
+    \includegraphics[width=\textwidth]{def_training}
     \column{0.38\textwidth}
     \begin{itemize}
       \setlength\itemsep{0.45em}
@@ -577,16 +553,16 @@
   {\small\color{muted} Pàgina representativa de 8 pentagrames, RTX 3060, descodificació voraç.}
 \end{frame}
 
-% ── Backup: pitjor cas melòdic ─────────────────────────────────────────
-\begin{frame}{Suport · El pitjor cas melòdic}
+% ── Backup: cas melòdic difícil (rang 3) ──────────────────────────────
+\begin{frame}{Suport · Un cas melòdic difícil}
   \centering
   \includegraphics[width=0.84\textwidth,height=1.5cm,keepaspectratio]{melodic_worst_input}\\[0.15em]
   {\scriptsize\color{muted} \textbf{Entrada} — pentagrama escanejat (mostra \code{220014195-1\_1\_1})}\\[0.5em]
   \includegraphics[width=0.84\textwidth,height=1.5cm,keepaspectratio]{melodic_worst_gt}\\[0.15em]
   {\scriptsize\color{accent} \textbf{Ground truth} — transcripció correcta}\\[0.5em]
   \includegraphics[width=0.84\textwidth,height=1.5cm,keepaspectratio]{melodic_worst_pred}\\[0.15em]
-  {\scriptsize\color{highlight} \textbf{Predicció} — l'última mesura és incorrecta}\\[0.6em]
-  {\small SER melòdic \textbf{0,092}: les tres primeres mesures coincideixen; a l'última el model erra els tons (\code{C\,C\,D\,D} → \code{B\,A\,E\,B}). Els errors melòdics visibles són poc freqüents.}
+  {\scriptsize\color{highlight} \textbf{Predicció} — confusió d'octava en notes greus}\\[0.6em]
+  {\small SER melòdic \textbf{0,089} (rang 3 dels pitjors casos): el model confon l'octava d'algunes notes greus en patrons de semicorxera. Els errors melòdics visibles són poc freqüents.}
 \end{frame}
 
 \end{document}

@@ -25,6 +25,7 @@
 \usepackage{booktabs}
 \usepackage{array}
 \usepackage{graphicx}
+\usepackage{qrcode}     % codi QR per a l'enllaç de la demo
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,calc,fit,backgrounds}
 \usepackage{polyglossia}
@@ -370,6 +371,28 @@
   \end{columns}
 \end{frame}
 
+% ── 11·5. Demostració en viu ───────────────────────────────────────────
+\begin{frame}{Demostració del sistema}
+  \vspace{0.4em}
+  \begin{columns}[c]
+    \column{0.56\textwidth}
+    {\large D'una pàgina escanejada del \textit{Real Book} a la transcripció simbòlica, \textbf{d'extrem a extrem}.}
+    \vspace{1.1em}
+
+    {\small\color{muted} Preprocés → detecció de pentagrames → CRNN de melodia i acords en paral·lel → corrector gramatical → JSON.}
+    \vspace{1.4em}
+
+    {\setlength{\fboxsep}{9pt}%
+     \href{https://youtu.be/JAkTSFvwVQ4}{%
+       \colorbox{accent}{\color{white}\textbf{$\blacktriangleright$\ \ Veure la demostració}}}}
+
+    \column{0.40\textwidth}
+    \centering
+    \qrcode[height=3.3cm]{https://youtu.be/JAkTSFvwVQ4}\\[0.5em]
+    {\footnotesize\color{muted} youtu.be/JAkTSFvwVQ4}
+  \end{columns}
+\end{frame}
+
 % ── 12. Objectius ──────────────────────────────────────────────────────
 \begin{frame}{Objectius assolits}
   \vspace{0.3em}
@@ -563,6 +586,224 @@
   \includegraphics[width=0.84\textwidth,height=1.5cm,keepaspectratio]{melodic_worst_pred}\\[0.15em]
   {\scriptsize\color{highlight} \textbf{Predicció} — confusió d'octava en notes greus}\\[0.6em]
   {\small SER melòdic \textbf{0,089} (rang 3 dels pitjors casos): el model confon l'octava d'algunes notes greus en patrons de semicorxera. Els errors melòdics visibles són poc freqüents.}
+\end{frame}
+
+% ══════════════════════════════════════════════════════════════════════
+%  SUPORT ADDICIONAL — profunditat tècnica · rigor · transversals
+% ══════════════════════════════════════════════════════════════════════
+
+% ── Backup: arquitectura del model ─────────────────────────────────────
+\begin{frame}{Suport · Arquitectura del model (CRNN--CTC)}
+  \vspace{0.2em}
+  \begin{columns}[T]
+    \column{0.56\textwidth}
+    {\small
+    \begin{itemize}\setlength\itemsep{0.35em}
+      \item \textbf{Entrada}: pentagrama d'1 canal, alçada fixa \textbf{128 px}, amplada variable (límit 2048 px)
+      \item \textbf{Backbone ResNet18} (sense ImageNet): conv1 7×7 monocanal; passes asimètriques → alçada ÷32, amplada \textbf{÷4}
+      \item \code{AdaptiveAvgPool} → $(W/4,\,B,\,512)$
+      \item \textbf{BiLSTM} 2 capes, 256/direcció (512), dropout 0,3
+      \item \code{Linear} → \textbf{80 classes} → \code{log\_softmax}
+      \item \code{CTCLoss(blank=0, zero\_infinity)}
+    \end{itemize}}
+
+    \column{0.42\textwidth}
+    \begin{block}{Xifres}
+      {\small $\approx$\,\textbf{14,4 M} paràmetres\\[0.25em]
+      Descodificació \textbf{voraç}\\(\textit{beam} $<$ 0,01 pp a 8× cost)\\[0.25em]
+      AdamW 1e-3 · OneCycle · \textit{batch} 16 · $\approx$8,5 GB VRAM}
+    \end{block}
+    {\footnotesize\color{muted} Vocabulari = 80 (77 tokens LMX + blank/pad/unk). Entrenat des de zero.}
+  \end{columns}
+\end{frame}
+
+% ── Backup: LMX gramàtica i exemple ────────────────────────────────────
+\begin{frame}{Suport · LMX: gramàtica i exemple}
+  \vspace{0.2em}
+  \textbf{\color{accent}Ordre dels tokens d'una nota}\\[0.25em]
+  {\small \code{pitch:<A--G>} · \code{octave:<0--8>} · \textbf{durada} · \code{dot}* · [alteració] · [\code{tied:stop}] · [\code{fermata}]}
+  \vspace{0.5em}
+  \begin{itemize}\setlength\itemsep{0.3em}
+    \item L'\textbf{alteració} és una paraula simple (\code{flat}/\code{sharp}/\code{natural}) \textbf{després} de la durada; és \textbf{només visual} (el to ja és a \code{pitch})
+    \item El \textbf{compàs} són 3 tokens: \code{time} · \code{beats:N} · \code{beat-type:N} → comparteix representació entre mètriques
+  \end{itemize}
+  \vspace{0.3em}
+  \begin{block}{Exemple — 3/4 en Mi\flatt\ major}
+    {\footnotesize\ttfamily measure clef:G2 key:fifths:-3 time beats:3 beat-type:4\\ pitch:B octave:5 quarter flat \ \ pitch:E octave:5 eighth flat \ldots}
+  \end{block}
+\end{frame}
+
+% ── Backup: fuga de dades i correcció ──────────────────────────────────
+\begin{frame}{Suport · Higiene de dades: fuga i correcció}
+  \begin{columns}[T]
+    \column{0.5\textwidth}
+    \textbf{\color{accent}Què va fallar}
+    {\small
+    \begin{itemize}\setlength\itemsep{0.3em}
+      \item Variants derivades d'una mateixa peça (bessones sense capçalera, re-renders, augmentacions) entraven al conjunt \textbf{abans} de la partició aleatòria
+      \item Un quasi-duplicat de \textit{train} podia caure a \textit{val/test} → mètriques inflades
+    \end{itemize}}
+    \begin{alertblock}{Mètriques pre-correcció — invàlides}
+      {\small 0,23\,\% SER · 94,1\,\% perfectes (no comparables).}
+    \end{alertblock}
+
+    \column{0.5\textwidth}
+    \textbf{\color{accent}La correcció}
+    {\small
+    \begin{itemize}\setlength\itemsep{0.3em}
+      \item Partició \textbf{per id de mostra}: totes les variants (neta + escanejades) al \textbf{mateix costat}
+      \item Diversitat \textbf{només a \textit{train}} per construcció — no pot creuar el \textit{split}
+      \item Totes les xifres reportades són \textbf{posteriors} a la correcció (run \code{20260612}, època 83)
+    \end{itemize}}
+    \vspace{0.2em}
+    {\footnotesize\color{muted} Detectat i corregit a mig projecte → evidència d'autocorrecció i d'higiene de dades.}
+  \end{columns}
+\end{frame}
+
+% ── Backup: SER brut vs contingut ──────────────────────────────────────
+\begin{frame}{Suport · SER brut vs.\ contingut}
+  \vspace{0.3em}
+  \begin{itemize}\setlength\itemsep{0.6em}
+    \item \textbf{SER agregat 1,23\,\%} = sortida \textbf{crua} del CRNN, \textbf{abans} del corrector i sobre pentagrames aïllats → els errors estructurals \textbf{compten en contra}, no s'amaguen.
+    \item \textbf{SER melòdic 0,14\,\%} = distància d'edició \textbf{ignorant} barres de compàs i lligadures (només contingut).
+    \item El \textbf{corrector gramatical} re-barreja a partir del compàs → una barra mal col·locada poques vegades canvia el contingut renderitzat.
+  \end{itemize}
+  \vspace{0.4em}
+  \begin{block}{Per què dues xifres}
+    {\small Es mantenen totes dues a la taula perquè el tribunal pugui jutjar l'error \textbf{total} i el de \textbf{contingut} per separat, sense dependre del nostre enquadrament.}
+  \end{block}
+\end{frame}
+
+% ── Backup: gestió i metodologia ───────────────────────────────────────
+\begin{frame}{Suport · Gestió i metodologia}
+  \begin{columns}[T]
+    \column{0.46\textwidth}
+    \textbf{\color{accent}Metodologia}\\[0.2em]
+    {\small Iterativa i incremental; sprints de 4 setmanes alineats amb els \textit{work packages}; reunions quinzenals amb el director.}
+    \vspace{0.5em}
+
+    {\small Bucle tancat \textbf{dades → entrenament → anàlisi d'errors}: cada error sistemàtic dispara un canvi de \textit{pipeline} i un reentrenament.}
+    \vspace{0.5em}
+
+    \textbf{\color{accent}Replanificacions}
+    {\small
+    \begin{itemize}\setlength\itemsep{0.2em}
+      \item Sprints GEP de 2 set.\ → \textbf{4 set.}/WP
+      \item Flux d'acords afegit tard, absorbit \textbf{sense ampliar} pressupost
+    \end{itemize}}
+
+    \column{0.52\textwidth}
+    \centering
+    {\renewcommand{\arraystretch}{1.15}\small
+    \begin{tabular}{@{}l r@{}}
+      \toprule
+      \textbf{Work package} & \textbf{h} \\
+      \midrule
+      WP0 Gestió (transversal) & 130 \\
+      WP1 Estat de l'art        & 78 \\
+      WP2 Dades                 & 73 \\
+      WP3 CRNN--CTC             & 75 \\
+      WP4 Refinament            & 68 \\
+      WP5 Avaluació + defensa   & 85 \\
+      \midrule
+      \textbf{Total}            & \stat{509} \\
+      \bottomrule
+    \end{tabular}}
+
+    \vspace{0.5em}
+    {\footnotesize\color{muted} 21 setmanes · 31 tasques · 509 h $<$ 540 h (Art.\,17) → 31 h de reserva. Risc: 6 riscos (probabilitat×impacte) amb disparadors; control per valor guanyat.}
+  \end{columns}
+\end{frame}
+
+% ── Backup: pressupost ─────────────────────────────────────────────────
+\begin{frame}{Suport · Pressupost}
+  \vspace{0.2em}
+  \begin{columns}[T]
+    \column{0.52\textwidth}
+    \centering
+    {\renewcommand{\arraystretch}{1.35}\small
+    \begin{tabular}{@{}l r@{}}
+      \toprule
+      \textbf{Concepte} & \textbf{€} \\
+      \midrule
+      Recursos humans ($\approx$85\,\%) & 13.615,57 \\
+      Costos generals                   & 250,69 \\
+      Contingència (15\,\%)             & 2.079,94 \\
+      Imprevistos (risc)                & 150,96 \\
+      \midrule
+      \textbf{Total}                    & \stat{16.097,16} \\
+      \bottomrule
+    \end{tabular}}
+
+    \column{0.44\textwidth}
+    \begin{itemize}\setlength\itemsep{0.5em}
+      \item \textbf{509 h} de feina · tarifa mitjana \textbf{26,75 €/h}
+      \item Maquinari (RTX 3060) amortitzat: \textbf{125,69 €}
+      \item Programari: \stat{0 €} — tota la cadena és \textbf{codi obert}
+      \item El cost dominant és el \textbf{temps d'enginyeria}
+    \end{itemize}
+  \end{columns}
+\end{frame}
+
+% ── Backup: sostenibilitat ─────────────────────────────────────────────
+\begin{frame}{Suport · Sostenibilitat}
+  \vspace{0.2em}
+  \begin{columns}[T]
+    \column{0.32\textwidth}
+    \textbf{\color{accent}Ambiental}
+    {\small
+    \begin{itemize}\setlength\itemsep{0.25em}
+      \item $\approx$\stat{62,5 kWh} tot el projecte
+      \item $\approx$\stat{14,4 kg} CO\textsubscript{2}e (0,23 kg/kWh, xarxa ES)
+      \item Mitigació: ResNet18, precisió mixta, \textit{early stopping}, reús de maquinari
+    \end{itemize}}
+
+    \column{0.32\textwidth}
+    \textbf{\color{accent}Econòmica}
+    {\small
+    \begin{itemize}\setlength\itemsep{0.25em}
+      \item \textbf{100\,\% codi obert} (0 € de llicències)
+      \item Corre en \textbf{maquinari de consum} (1 GPU)
+      \item Menor cost per pàgina que l'OMR comercial
+    \end{itemize}}
+
+    \column{0.32\textwidth}
+    \textbf{\color{accent}Social}
+    {\small
+    \begin{itemize}\setlength\itemsep{0.25em}
+      \item Beneficia músics, docents, arxivers, recerca
+      \item JSON → accessible (lectors de pantalla, braille)
+      \item Exclou: polifonia, claus no-sol, estils fora del Real Book
+    \end{itemize}}
+  \end{columns}
+  \vspace{0.4em}
+  {\color{accent}\rule{\textwidth}{0.5pt}}\\[0.25em]
+  \centering {\small\textbf{ODS:} 4 Educació · 9 Indústria i innovació · 10 Reducció de desigualtats · 12 Consum responsable}
+\end{frame}
+
+% ── Backup: aspectes legals ────────────────────────────────────────────
+\begin{frame}{Suport · Aspectes legals i propietat intel·lectual}
+  \begin{columns}[T]
+    \column{0.52\textwidth}
+    \textbf{\color{accent}The Real Book — © Hal Leonard}
+    {\small
+    \begin{itemize}\setlength\itemsep{0.3em}
+      \item El CRNN de melodia s'entrena \textbf{només amb dades sintètiques} (LilyJAZZ); cap pàgina amb drets és entrada d'entrenament
+      \item Els escanejos reals: \textbf{només avaluació} i un petit \textit{fine-tuning} d'acords; \textbf{mai redistribuïts}
+      \item Els pesos alliberats codifiquen \textbf{tokens, no píxels}
+    \end{itemize}}
+
+    \column{0.46\textwidth}
+    \begin{block}{Base legal}
+      {\small RD Leg.\ \textbf{1/1996} art.\,32 (docència i recerca) + Directiva UE \textbf{2019/790} art.\,3 (mineria de text i dades).}
+    \end{block}
+    {\small
+    \begin{itemize}\setlength\itemsep{0.3em}
+      \item \textbf{PrIMuS}: PRAIG / Univ.\ d'Alacant, recerca no comercial; sense modificar
+      \item \textbf{RGPD} (2016/679) \textbf{no aplica}: cap dada personal
+      \item El llançament exclou tot material derivat del Real Book
+    \end{itemize}}
+  \end{columns}
 \end{frame}
 
 \end{document}

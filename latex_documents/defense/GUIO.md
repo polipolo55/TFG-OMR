@@ -1,6 +1,6 @@
 # Guió de la defensa — OMR per a partitures de jazz
 
-**Durada objectiu:** ~18–19 min (les 4 diapos de *Suport* són només per a preguntes).
+**Durada objectiu:** ~18–19 min (+ ~1–2 min si reprodueixes la demostració). Les diapos de *Suport* són només per a preguntes.
 **To:** proper però tècnic. Primera persona del singular per a la motivació personal (diapo 2); plural / impersonal («el sistema», «hem») per a la part tècnica.
 **Consell:** no llegeixis les diapos — el tribunal ja les veu. Explica-les.
 
@@ -104,6 +104,18 @@
 
 ---
 
+## 10·5 · Demostració del sistema · (~1–2 min) — *opcional, segons temps*
+
+> «I perquè no quedi tot en xifres, una demostració ràpida del sistema funcionant d'extrem a extrem: d'una pàgina escanejada del *Real Book* fins a la transcripció simbòlica i el JSON.»
+
+*(Clica el botó **▶ Veure la demostració** — obre el vídeo al navegador. Mantén el clip curt, ~1 min.)*
+
+**Punt clau:** el vídeo fa tangible tot el *pipeline*. Si vas just de temps, mostra la diapo i ofereix reproduir-lo a les preguntes — el QR permet que el tribunal el vegi pel seu compte.
+
+> **Vídeo (no llistat):** https://youtu.be/JAkTSFvwVQ4
+
+---
+
 ## 11 · Objectius assolits · (~1 min)
 
 > «Repassant els objectius: l'objectiu general i sis dels set específics estan **assolits** — l'estat de l'art, el dataset, la simulació d'escaneig, el model i la seva avaluació, l'anàlisi d'errors i el *pipeline* complet amb API. El **setè és parcial**: he fet el *fine-tuning* amb 36 pentagrames reals i millora la transcripció qualitativament, però amb només 36 no en podia reservar prou per a un test real estable, així que la xifra quantitativa queda pendent.»
@@ -147,21 +159,51 @@
 
 ## Diapos de suport (per a preguntes) — on saltar
 
+> **Avaluació (Art. 21):** el tribunal de la fita final puntua les **competències tècniques (60 %)**. Les **transversals (40 %)** les avaluen el GEP i el director al llarg de les tres fites — no es re-puntuen a la defensa. Així doncs, les diapos de suport transversals (gestió, pressupost, sostenibilitat, legal) són per **respondre amb solidesa si pregunten** (i pel director), no per al recorregut puntuat.
+
 | Si pregunten sobre… | Vés a |
 |---|---|
 | Corba / convergència de l'entrenament | **Suport · Corba d'entrenament** |
 | Reconeixement d'acords en detall (CER, zero-shot vs *fine-tune*) | **Suport · Reconeixement d'acords** |
-| Velocitat / cost / desglossament per etapa | **Suport · Latència** |
+| Velocitat / cost / desglossament per etapa | **Suport · Latència d'inferència** |
 | «Quin és el pitjor cas?» / errors melòdics | **Suport · Un cas melòdic difícil** |
+| Arquitectura / capes / CRNN–CTC en detall | **Suport · Arquitectura del model** |
+| LMX / tokens / codificació de sortida | **Suport · LMX: gramàtica i exemple** |
+| Fuga de dades / *leakage* / com es fa el *split* | **Suport · Higiene de dades** |
+| SER brut vs net / paper del corrector gramatical | **Suport · SER brut vs. contingut** |
+| Planificació / metodologia / desviacions / risc | **Suport · Gestió i metodologia** |
+| Cost / pressupost / hores | **Suport · Pressupost** |
+| Sostenibilitat / energia / CO₂ / ètica | **Suport · Sostenibilitat** |
+| Drets d'autor / Real Book / llicències / RGPD | **Suport · Aspectes legals** |
 
 ### Preguntes probables i resposta curta
+
+**Disseny i tècnica**
 - **Per què CRNN i no transformer?** → Pressupost de còmput (1 RTX 3060) i eficiència de dades; el transformer dóna millor SER però a >10× cost. (diapo 6)
-- **Per què el test real és tan petit?** → Només 36 pentagrames reals etiquetats; tots calen per entrenar, no en queden prou per a un test estable. És la limitació principal i el primer treball futur. (O7)
+- **Has entrenat realment un transformer amb les teves dades?** → No: hauria consumit tot el pressupost d'una sola GPU al voltant del qual s'escala el projecte — i això és precisament l'argument. La justificació és per adjudicació d'enginyeria (autoregressiu = *exposure bias* + descodificació seqüencial + més dades; polifonia fora d'abast), no per *benchmark*. Que el *beam* només guanyi <0,01 pp mostra que la maquinària autoregressiva és innecessària aquí. Una comparació amb transformer entrenat és el contrast net però inassequible. (diapo 6)
+- **On és la contribució algorísmica profunda (CCO1.1)?** → En les decisions adjudicades: ResNet18 de passes **asimètriques** que preserva l'eix temporal del CTC a ÷4 exacte; *beam* vs voraç quantificat (8× cost, <0,01 pp); corrector gramatical determinista vs descodificador restringit/FST. La contribució és el *pipeline* específic de domini (LilyJAZZ + simulació calibrada + corrector + doble flux), no un CRNN nou. (Suport · Arquitectura)
+- **Per què LMX i no MusicXML?** → MusicXML és un arbre jeràrquic, incompatible amb el flux atòmic del CTC; LMX són tokens plans. (diapo 6, Suport · LMX)
 - **Què és el SER?** → *Symbol Error Rate*: distància d'edició entre la seqüència predita i la real, dividida per la longitud. L'equivalent del WER de la parla.
-- **Com garanteixes que no hi ha fuga entre train i test?** → La partició es fa per **id de mostra** i totes les variants (neta + escanejades) d'una mateixa peça queden al **mateix costat** del split; les variants derivades són **només a train**. *(De fet, a mig projecte vaig detectar una fuga per aquest motiu, la vaig corregir redissenyant el protocol de partició, i totes les xifres reportades són posteriors a la correcció.)*
-- **El pitjor cas?** → El pitjor cas absolut (SER **0,112**, mostra `210017589-1_51_1`) és un **desplaçament de barra**, no un error melòdic. La diapo de suport mostra el cas melòdic més il·lustratiu (rang 3, SER **0,089**): **confusió d'octava** en notes greus dins patrons de semicorxera en Mi♭ major. Els errors melòdics visibles són poc freqüents.
-- **Per què LMX i no MusicXML?** → MusicXML és un arbre jeràrquic, incompatible amb el flux atòmic del CTC; LMX són tokens plans. (diapo 6)
+
+**Resultats i validesa**
+- **Per què el test real és tan petit?** → Només 36 pentagrames reals etiquetats; tots calen per entrenar, no en queden prou per a un test estable. És la limitació principal i el primer treball futur. (O7)
+- **Reportes SER pre- o post-corrector? No amagues errors?** → El SER agregat és la sortida **crua** del CRNN, **abans** del corrector i sobre pentagrames aïllats — els errors estructurals **compten en contra**. El SER melòdic (0,14 %) és una mètrica separada (només contingut). Es mantenen les dues per jutjar-les per separat. (Suport · SER brut vs. contingut)
+- **Una sola llavor, cap variància?** → Cada run són ~13 h, multi-llavor fora de pressupost (i ho dic). *Proxies*: el *plateau* de validació és estret (±0,02 pp) i l'avaluador independent coincideix amb l'estimació en bucle. No sobreinterpreto els 0,06 pp: és una cota d'una banda, no un efecte precís. Multi-llavor = treball futur.
+- **Satin Doll no té *ground truth* — no és *cherry-picking*?** → És qualitatiu i mai reporto una taxa d'error head-to-head. No és triat: és una pàgina real del domini exacte i el contrast és **estructural** (injecció de capçalera + flux d'acords), no numèric. Comparació quantitativa multi-pàgina i multi-motor = treball futur.
+- **El SER melòdic 0,14 % i les confusions de to?** → Les substitucions (únic tipus que canvia el contingut) són el 3,4 % de 3.506 edicions ≈ ~119 tokens en tot el test; el parell líder (B→G) surt 8 cops i la resta cau ràpid. Un músic notaria un salt d'octava en un passatge greu (és el pitjor cas de suport), però són rars i localitzats.
+- **La porta de rebuig per CTC és fràgil (re-ajust manual)?** → Limitació documentada: 4 llindars geomètrics independents del *checkpoint* + 1 llindar CTC dependent del *checkpoint*, ajustat a mà i **preservant música** (verificat en pàgines reals). A Satin Doll rebutja el títol i els crèdits i manté els 7 pentagrames. El detector OOD après és treball futur.
+
+**Transversals (gestió · legal · sostenibilitat)**
+- **Com garanteixes que no hi ha fuga entre train i test?** → Partició per **id de mostra**; totes les variants (neta + escanejades) d'una peça al **mateix costat**; diversitat derivada **només a train**. *(A mig projecte vaig detectar una fuga d'aquest tipus, la vaig corregir redissenyant el protocol, i totes les xifres són posteriors.)* (Suport · Higiene de dades)
+- **The Real Book té drets d'autor (Hal Leonard) — és legal?** → Sí. El CRNN de melodia s'entrena **només amb dades sintètiques**; els escanejos reals només per avaluació i un petit *fine-tuning* d'acords, **mai redistribuïts**; els pesos guarden **tokens, no píxels**. Base: RD Leg. 1/1996 art. 32 (docència/recerca) + Directiva UE 2019/790 art. 3 (mineria de text i dades). El llançament exclou tot material derivat del Real Book. (Suport · Aspectes legals)
+- **PrIMuS és per a recerca no comercial — i un ús comercial?** → S'usa sense modificar i només per a entrenament de recerca dins el TFG; els artefactes alliberats són *checkpoints* de recerca amb llicència oberta, no un producte. «Digitalitzar el Real Book» és la motivació i una direcció de recerca, no un servei comercial; un desplegament comercial requeriria re-llicenciar les dades i queda fora d'abast. LilyJAZZ ve amb LilyPond (només per renderitzar). (Suport · Aspectes legals)
+- **D'on surten els 62,5 kWh / 14,4 kg CO₂e?** → Estimació de projecte (potència nominal × temps, factor REE/MITECO ~0,23 kg/kWh), descrita com a «grossera però reproduïble». El run final de 90 èpoques ≈ 13 h; mitigacions: ResNet18, precisió mixta, *early stopping*, reús de maquinari. Manufactura i fi de vida queden **fora** (qualitatius). (Suport · Sostenibilitat)
+- **Quant ha costat?** → 16.097,16 € pressupostats: ~85 % temps d'enginyeria (13.615,57 €), 250,69 € generals, 15 % contingència, imprevistos de risc; 509 h vs 540 h de l'Art. 17; programari **0 €** (codi obert); RTX 3060 amortitzada 125,69 €. (Suport · Pressupost)
+- **Quina metodologia i quines desviacions?** → Iterativa-incremental, sprints de 4 setmanes per WP, bucle dades→entrenament→anàlisi. Dues replanificacions: sprints GEP 2→4 set., i el flux d'acords absorbit sense ampliar pressupost. Registre de 6 riscos + control per valor guanyat. (Suport · Gestió i metodologia)
+- **Si tornessis a començar, què faries diferent?** → Construir el flux d'acords **en paral·lel** amb la melodia des del principi (no tard), per donar més iteracions al *fine-tuning* real; i avançar l'etiquetatge real perquè existís un test real (tancar O7). Vaig aprendre que la bretxa sintètic→real és **desigual** (la notació transfereix molt millor que el text d'acords) i que la higiene del *split* pot inflar-ho tot fins que l'audites per construcció.
+
+> **Consell de presentació (diapo 14, Competències):** en parlar-ne, anomena explícitament la **integració de coneixements** del grau — aprenentatge profund, algorísmia, arquitectura de programari i disseny d'API — perquè el tribunal marqui aquest criteri de la rúbrica (Art. 10.4), no només els dos codis CCO.
 
 ---
 
-> **Nota** — La diapositiva dedicada a la fuga de dades s'ha tret del recorregut principal. Segueix sent a la memòria i la pots explicar de viva veu si et pregunten per la higiene del split (resposta preparada a dalt). La diapo 13 (Competències) encara la menciona en una línia com a evidència de la CCO2.4; si la vols treure també, digues-m'ho.
+> **Nota — diapo 14 (Competències):** mantén la línia «fuga de dades detectada i corregida». És la millor evidència d'iniciativa i autocorrecció (criteri transversal) i ara està reforçada per la diapo de suport **Higiene de dades**. L'auditoria contra la normativa recomana **no treure-la**.
